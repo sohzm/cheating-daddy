@@ -66,7 +66,7 @@ function createWindow() {
 
     mainWindow.setContentProtection(true);
     mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-    
+
     if (process.platform === 'win32') {
         mainWindow.setAlwaysOnTop(true, 'screen-saver', 1);
     }
@@ -439,8 +439,9 @@ ipcMain.handle('close-session', async event => {
     try {
         stopMacOSAudioCapture();
 
+        // Cleanup any pending resources and stop audio/video capture
         if (geminiSession) {
-            await geminiSession.disconnect();
+            await geminiSession.close();
             geminiSession = null;
         }
 
