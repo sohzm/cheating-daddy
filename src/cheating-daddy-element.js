@@ -1,14 +1,11 @@
 import { html, css, LitElement } from './lit-core-2.7.4.min.js';
+import './markdown-display.js';
 
 class CheatingDaddyApp extends LitElement {
     static styles = css`
         * {
             box-sizing: border-box;
-            font-family:
-                'Inter',
-                -apple-system,
-                BlinkMacSystemFont,
-                sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             margin: 0px;
             padding: 0px;
             cursor: default;
@@ -608,9 +605,8 @@ class CheatingDaddyApp extends LitElement {
                     ${this.currentView === 'assistant'
                         ? html`
                               <button @click=${this.handleClose} class="button window-close">
-                                  Back&nbsp;&nbsp;<span class="key" style="pointer-events: none;">${cheddar.isMacOS ? 'Cmd' : 'Ctrl'}</span>&nbsp;&nbsp;<span class="key"
-                                      >&bsol;</span
-                                  >
+                                  Back&nbsp;&nbsp;<span class="key" style="pointer-events: none;">${cheddar.isMacOS ? 'Cmd' : 'Ctrl'}</span
+                                  >&nbsp;&nbsp;<span class="key">&bsol;</span>
                               </button>
                           `
                         : html`
@@ -831,11 +827,11 @@ class CheatingDaddyApp extends LitElement {
                 <div class="option-group">
                     <span class="option-label">Audio Input</span>
                     <div class="description">
-                        ${cheddar.isMacOS 
+                        ${cheddar.isMacOS
                             ? html`<strong>macOS:</strong> Uses SystemAudioDump for system audio capture`
                             : cheddar.isLinux
-                              ? html`<strong>Linux:</strong> Uses microphone input`
-                              : html`<strong>Windows:</strong> Uses loopback audio capture`}<br />
+                            ? html`<strong>Linux:</strong> Uses microphone input`
+                            : html`<strong>Windows:</strong> Uses loopback audio capture`}<br />
                         The AI listens to conversations and provides contextual assistance based on what it hears.
                     </div>
                 </div>
@@ -874,7 +870,9 @@ class CheatingDaddyApp extends LitElement {
 
         return html`
             <div style="height: 100%; display: flex; flex-direction: column;">
-                <div class="response-container">${currentResponse}</div>
+                <div class="response-container">
+                    <markdown-display .markdown=${currentResponse}></markdown-display>
+                </div>
 
                 <div class="text-input-container">
                     <button
