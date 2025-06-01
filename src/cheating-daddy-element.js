@@ -4,11 +4,7 @@ class CheatingDaddyApp extends LitElement {
     static styles = css`
         * {
             box-sizing: border-box;
-            font-family:
-                'Inter',
-                -apple-system,
-                BlinkMacSystemFont,
-                sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             margin: 0px;
             padding: 0px;
             cursor: default;
@@ -368,6 +364,8 @@ class CheatingDaddyApp extends LitElement {
         selectedLanguage: { type: String },
         responses: { type: Array },
         currentResponseIndex: { type: Number },
+        selectedScreenshotInterval: { type: String },
+        selectedImageQuality: { type: String },
     };
 
     constructor() {
@@ -379,6 +377,8 @@ class CheatingDaddyApp extends LitElement {
         this.sessionActive = false;
         this.selectedProfile = localStorage.getItem('selectedProfile') || 'interview';
         this.selectedLanguage = localStorage.getItem('selectedLanguage') || 'en-US';
+        this.selectedScreenshotInterval = localStorage.getItem('selectedScreenshotInterval') || '1'; // Default 1 second
+        this.selectedImageQuality = localStorage.getItem('selectedImageQuality') || 'medium'; // Default medium
         this.responses = [];
         this.currentResponseIndex = -1;
     }
@@ -429,9 +429,19 @@ class CheatingDaddyApp extends LitElement {
         localStorage.setItem('selectedLanguage', this.selectedLanguage);
     }
 
+    handleScreenshotIntervalSelect(e) {
+        this.selectedScreenshotInterval = e.target.value;
+        localStorage.setItem('selectedScreenshotInterval', this.selectedScreenshotInterval);
+    }
+
+    handleImageQualitySelect(e) {
+        this.selectedImageQuality = e.target.value;
+        localStorage.setItem('selectedImageQuality', this.selectedImageQuality);
+    }
+
     async handleStart() {
         await cheddar.initializeGemini(this.selectedProfile, this.selectedLanguage);
-        cheddar.startCapture();
+        cheddar.startCapture(parseInt(this.selectedScreenshotInterval, 10), this.selectedImageQuality);
         this.responses = [];
         this.currentResponseIndex = -1;
         this.currentView = 'assistant';
@@ -608,9 +618,8 @@ class CheatingDaddyApp extends LitElement {
                     ${this.currentView === 'assistant'
                         ? html`
                               <button @click=${this.handleClose} class="button window-close">
-                                  Back&nbsp;&nbsp;<span class="key" style="pointer-events: none;">${cheddar.isMacOS ? 'Cmd' : 'Ctrl'}</span>&nbsp;&nbsp;<span class="key"
-                                      >&bsol;</span
-                                  >
+                                  Back&nbsp;&nbsp;<span class="key" style="pointer-events: none;">${cheddar.isMacOS ? 'Cmd' : 'Ctrl'}</span
+                                  >&nbsp;&nbsp;<span class="key">&bsol;</span>
                               </button>
                           `
                         : html`
@@ -758,6 +767,26 @@ class CheatingDaddyApp extends LitElement {
                 </div>
 
                 <div class="option-group">
+                    <label class="option-label">Screenshot Interval</label>
+                    <select .value=${this.selectedScreenshotInterval} @change=${this.handleScreenshotIntervalSelect}>
+                        <option value="1" ?selected=${this.selectedScreenshotInterval === '1'}>Fast (1 second)</option>
+                        <option value="3" ?selected=${this.selectedScreenshotInterval === '3'}>Medium (3 seconds)</option>
+                        <option value="5" ?selected=${this.selectedScreenshotInterval === '5'}>Slow (5 seconds)</option>
+                    </select>
+                    <div class="description">Frequency of screen captures sent to the AI. Slower intervals use fewer tokens.</div>
+                </div>
+
+                <div class="option-group">
+                    <label class="option-label">Image Quality</label>
+                    <select .value=${this.selectedImageQuality} @change=${this.handleImageQualitySelect}>
+                        <option value="high" ?selected=${this.selectedImageQuality === 'high'}>High (More tokens)</option>
+                        <option value="medium" ?selected=${this.selectedImageQuality === 'medium'}>Medium (Balanced)</option>
+                        <option value="low" ?selected=${this.selectedImageQuality === 'low'}>Low (Fewer tokens)</option>
+                    </select>
+                    <div class="description">Quality of screenshots sent to the AI. Lower quality uses fewer tokens.</div>
+                </div>
+
+                <div class="option-group">
                     <span class="option-label">AI Behavior for ${profileNames[this.selectedProfile] || 'Selected Profile'}</span>
                     <textarea
                         placeholder="Describe how you want the AI to behave..."
@@ -831,11 +860,11 @@ class CheatingDaddyApp extends LitElement {
                 <div class="option-group">
                     <span class="option-label">Audio Input</span>
                     <div class="description">
-                        ${cheddar.isMacOS 
+                        ${cheddar.isMacOS
                             ? html`<strong>macOS:</strong> Uses SystemAudioDump for system audio capture`
                             : cheddar.isLinux
-                              ? html`<strong>Linux:</strong> Uses microphone input`
-                              : html`<strong>Windows:</strong> Uses loopback audio capture`}<br />
+                            ? html`<strong>Linux:</strong> Uses microphone input`
+                            : html`<strong>Windows:</strong> Uses loopback audio capture`}<br />
                         The AI listens to conversations and provides contextual assistance based on what it hears.
                     </div>
                 </div>
