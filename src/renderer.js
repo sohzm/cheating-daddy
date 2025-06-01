@@ -67,7 +67,7 @@ ipcRenderer.on('update-response', (event, response) => {
     // You can add UI elements to display the response if needed
 });
 
-async function startCapture() {
+async function startCapture(screenshotIntervalSeconds = 1, imageQuality = 'medium') {
     try {
         if (isMacOS) {
             // On macOS, use SystemAudioDump for audio and getDisplayMedia for screen
@@ -154,11 +154,12 @@ async function startCapture() {
             videoTrack: mediaStream.getVideoTracks()[0]?.getSettings(),
         });
 
-        // Start capturing screenshots every second
-        screenshotInterval = setInterval(captureScreenshot, 1000);
+        // Start capturing screenshots
+        const intervalMilliseconds = screenshotIntervalSeconds * 1000;
+        screenshotInterval = setInterval(() => captureScreenshot(imageQuality), intervalMilliseconds);
 
         // Capture first screenshot immediately
-        setTimeout(captureScreenshot, 100);
+        setTimeout(() => captureScreenshot(imageQuality), 100);
     } catch (err) {
         console.error('Error starting capture:', err);
         cheddar.e().setStatus('error');
@@ -228,7 +229,7 @@ function setupWindowsLoopbackProcessing() {
     audioProcessor.connect(audioContext.destination);
 }
 
-async function captureScreenshot() {
+async function captureScreenshot(imageQuality = 'medium') {
     console.log('Capturing screenshot...');
     if (!mediaStream) return;
 
@@ -271,6 +272,21 @@ async function captureScreenshot() {
         console.warn('Screenshot appears to be blank/black');
     }
 
+    let qualityValue;
+    switch (imageQuality) {
+        case 'high':
+            qualityValue = 0.9;
+            break;
+        case 'medium':
+            qualityValue = 0.7;
+            break;
+        case 'low':
+            qualityValue = 0.5;
+            break;
+        default:
+            qualityValue = 0.7; // Default to medium
+    }
+
     offscreenCanvas.toBlob(
         async blob => {
             if (!blob) {
@@ -299,7 +315,7 @@ async function captureScreenshot() {
             reader.readAsDataURL(blob);
         },
         'image/jpeg',
-        0.8
+        qualityValue
     );
 }
 
