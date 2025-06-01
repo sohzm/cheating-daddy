@@ -109,9 +109,39 @@ function createWindow() {
     const toggleVisibilityShortcut = isMac ? 'Cmd+\\' : 'Ctrl+\\';
     globalShortcut.register(toggleVisibilityShortcut, () => {
         if (mainWindow.isVisible()) {
-            mainWindow.hide();
+            // Fade out animation before hiding
+            mainWindow.webContents.executeJavaScript(`
+                document.body.style.transition = 'opacity 0.2s ease-in-out';
+                document.body.style.opacity = '0';
+            `).catch(() => {
+                // Fallback if webContents not ready
+                mainWindow.hide();
+            });
+            // Hide window after fade animation completes
+            setTimeout(() => {
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                    mainWindow.hide();
+                }
+            }, 220); // Slightly longer to ensure animation completes
         } else {
+            // Show window immediately but with opacity 0
+            mainWindow.webContents.executeJavaScript(`
+                document.body.style.transition = 'opacity 0.2s ease-in-out';
+                document.body.style.opacity = '0';
+            `).catch(() => {
+                // Continue with show even if script fails
+            });
             mainWindow.show();
+            // Fade in animation after showing
+            setTimeout(() => {
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                    mainWindow.webContents.executeJavaScript(`
+                        document.body.style.opacity = '1';
+                    `).catch(() => {
+                        // Ignore errors - window might be closing
+                    });
+                }
+            }, 50);
         }
     });
 
