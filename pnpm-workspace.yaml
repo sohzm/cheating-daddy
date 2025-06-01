@@ -1,0 +1,3 @@
+onlyBuiltDependencies:
+  - electron
+  - electron-winstaller
