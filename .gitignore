@@ -91,3 +91,5 @@ typings/
 
 # Electron-Forge
 out/
+.specstory
+.specstory/
