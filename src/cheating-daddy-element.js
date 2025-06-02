@@ -881,7 +881,6 @@ class CheatingDaddyApp extends LitElement {
                         class="nav-button"
                         @click=${this.navigateToPreviousResponse}
                         ?disabled=${this.currentResponseIndex <= 0}
-                        title="Previous response"
                     >
                         ←
                     </button>
@@ -894,7 +893,6 @@ class CheatingDaddyApp extends LitElement {
                         class="nav-button"
                         @click=${this.navigateToNextResponse}
                         ?disabled=${this.currentResponseIndex >= this.responses.length - 1}
-                        title="Next response"
                     >
                         →
                     </button>
