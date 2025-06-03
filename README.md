@@ -10,7 +10,8 @@ A real-time AI assistant that provides contextual help during video calls, inter
 
 ## Features
 
-- **Live AI Assistance**: Real-time help powered by Google Gemini 2.0 Flash Live
+- **Multiple AI Models**: Choose between Google Gemini 2.0 Flash Live and OpenAI GPT-4 Real-time API
+- **Live AI Assistance**: Real-time help powered by your preferred AI model
 - **Screen & Audio Capture**: Analyzes what you see and hear for contextual responses
 - **Multiple Profiles**: Interview, Sales Call, Business Meeting, Presentation, Negotiation
 - **Transparent Overlay**: Always-on-top window that can be positioned anywhere
@@ -19,17 +20,21 @@ A real-time AI assistant that provides contextual help during video calls, inter
 
 ## Setup
 
-1. **Get a Gemini API Key**: Visit [Google AI Studio](https://aistudio.google.com/apikey)
-2. **Install Dependencies**: `npm install`
-3. **Run the App**: `npm start`
+1. **Choose Your AI Model**: Select between Gemini or OpenAI in the model dropdown
+2. **Get an API Key**:
+   - **Gemini**: Visit [Google AI Studio](https://aistudio.google.com/apikey)
+   - **OpenAI**: Visit [OpenAI Platform](https://platform.openai.com/api-keys)
+3. **Install Dependencies**: `npm install`
+4. **Run the App**: `npm start`
 
 ## Usage
 
-1. Enter your Gemini API key in the main window
-2. Choose your profile and language in settings
-3. Click "Start Session" to begin
-4. Position the window using keyboard shortcuts
-5. The AI will provide real-time assistance based on your screen and what interview asks
+1. Select your preferred AI model (Gemini or OpenAI) in the model dropdown
+2. Enter your API key for the selected model
+3. Choose your profile and language in settings
+4. Click "Start Session" to begin
+5. Position the window using keyboard shortcuts
+6. The AI will provide real-time assistance based on your screen and what interview asks
 
 ## Keyboard Shortcuts
 
@@ -47,6 +52,6 @@ A real-time AI assistant that provides contextual help during video calls, inter
 ## Requirements
 
 - Electron-compatible OS (macOS, Windows, Linux)
-- Gemini API key
+- API key for your chosen model (Gemini or OpenAI)
 - Screen recording permissions
 - Microphone/audio permissions 

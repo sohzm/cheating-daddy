@@ -10,6 +10,7 @@ const os = require('os');
 const { spawn } = require('child_process');
 const { pcmToWav, analyzeAudioBuffer, saveDebugAudio } = require('./audioUtils');
 const { getSystemPrompt } = require('./prompts');
+const { createModelProvider } = require('./modelProviders');
 
 let geminiSession = null;
 let loopbackProc = null;
@@ -17,6 +18,7 @@ let systemAudioProc = null;
 let audioIntervalTimer = null;
 let mouseEventsIgnored = false;
 let messageBuffer = '';
+let modelProvider = null;
 
 function ensureDataDirectories() {
     const homeDir = os.homedir();
@@ -66,7 +68,7 @@ function createWindow() {
 
     mainWindow.setContentProtection(true);
     mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-
+    
     if (process.platform === 'win32') {
         mainWindow.setAlwaysOnTop(true, 'screen-saver', 1);
     }
@@ -106,13 +108,9 @@ function createWindow() {
         });
     });
 
-    const toggleVisibilityShortcut = isMac ? 'Cmd+\\' : 'Ctrl+\\';
-    globalShortcut.register(toggleVisibilityShortcut, () => {
-        if (mainWindow.isVisible()) {
-            mainWindow.hide();
-        } else {
-            mainWindow.show();
-        }
+    const closeShortcut = isMac ? 'Cmd+\\' : 'Ctrl+\\';
+    globalShortcut.register(closeShortcut, () => {
+        mainWindow.close();
     });
 
     const toggleShortcut = isMac ? 'Cmd+M' : 'Ctrl+M';
@@ -153,63 +151,21 @@ function createWindow() {
     });
 }
 
-async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'interview', language = 'en-US') {
-    const client = new GoogleGenAI({
-        vertexai: false,
-        apiKey: apiKey,
-    });
-
+async function initializeModelSession(providerType, apiKey, customPrompt = '', profile = 'interview', language = 'en-US') {
     const systemPrompt = getSystemPrompt(profile, customPrompt);
 
     try {
-        const session = await client.live.connect({
-            model: 'gemini-2.0-flash-live-001',
-            callbacks: {
-                onopen: function () {
-                    sendToRenderer('update-status', 'Connected to Gemini - Starting recording...');
-                },
-                onmessage: function (message) {
-                    console.log(message);
-                    if (message.serverContent?.modelTurn?.parts) {
-                        for (const part of message.serverContent.modelTurn.parts) {
-                            console.log(part);
-                            if (part.text) {
-                                messageBuffer += part.text;
-                            }
-                        }
-                    }
-
-                    if (message.serverContent?.generationComplete) {
-                        sendToRenderer('update-response', messageBuffer);
-                        messageBuffer = '';
-                    }
-
-                    if (message.serverContent?.turnComplete) {
-                        sendToRenderer('update-status', 'Listening...');
-                    }
-                },
-                onerror: function (e) {
-                    console.debug('Error:', e.message);
-                    sendToRenderer('update-status', 'Error: ' + e.message);
-                },
-                onclose: function (e) {
-                    console.debug('Session closed:', e.reason);
-                    sendToRenderer('update-status', 'Session closed');
-                },
-            },
-            config: {
-                responseModalities: ['TEXT'],
-                speechConfig: { languageCode: language },
-                systemInstruction: {
-                    parts: [{ text: systemPrompt }],
-                },
-            },
+        modelProvider = createModelProvider(providerType, apiKey, {
+            systemPrompt,
+            language,
+            onStatusUpdate: (status) => sendToRenderer('update-status', status),
+            onResponse: (response) => sendToRenderer('update-response', response)
         });
 
-        geminiSession = session;
-        return true;
+        const success = await modelProvider.initialize();
+        return success;
     } catch (error) {
-        console.error('Failed to initialize Gemini session:', error);
+        console.error('Failed to initialize model session:', error);
         return false;
     }
 }
@@ -263,7 +219,7 @@ function startMacOSAudioCapture() {
 
             const monoChunk = CHANNELS === 2 ? convertStereoToMono(chunk) : chunk;
             const base64Data = monoChunk.toString('base64');
-            sendAudioToGemini(base64Data);
+            sendAudioToModel(base64Data);
 
             if (process.env.DEBUG_AUDIO) {
                 console.log(`Processed audio chunk: ${chunk.length} bytes`);
@@ -314,19 +270,14 @@ function stopMacOSAudioCapture() {
     }
 }
 
-async function sendAudioToGemini(base64Data) {
-    if (!geminiSession) return;
+async function sendAudioToModel(base64Data) {
+    if (!modelProvider) return;
 
     try {
         process.stdout.write('.');
-        await geminiSession.sendRealtimeInput({
-            audio: {
-                data: base64Data,
-                mimeType: 'audio/pcm;rate=24000',
-            },
-        });
+        await modelProvider.sendAudio(base64Data, 'audio/pcm;rate=24000');
     } catch (error) {
-        console.error('Error sending audio to Gemini:', error);
+        console.error('Error sending audio to model:', error);
     }
 }
 
@@ -350,17 +301,19 @@ app.on('activate', () => {
 });
 
 ipcMain.handle('initialize-gemini', async (event, apiKey, customPrompt, profile = 'interview', language = 'en-US') => {
-    return await initializeGeminiSession(apiKey, customPrompt, profile, language);
+    return await initializeModelSession('gemini', apiKey, customPrompt, profile, language);
+});
+
+ipcMain.handle('initialize-model', async (event, providerType, apiKey, customPrompt, profile = 'interview', language = 'en-US') => {
+    return await initializeModelSession(providerType, apiKey, customPrompt, profile, language);
 });
 
 ipcMain.handle('send-audio-content', async (event, { data, mimeType }) => {
-    if (!geminiSession) return { success: false, error: 'No active Gemini session' };
+    if (!modelProvider) return { success: false, error: 'No active model session' };
     try {
         process.stdout.write('.');
-        await geminiSession.sendRealtimeInput({
-            audio: { data: data, mimeType: mimeType },
-        });
-        return { success: true };
+        const result = await modelProvider.sendAudio(data, mimeType);
+        return result;
     } catch (error) {
         console.error('Error sending audio:', error);
         return { success: false, error: error.message };
@@ -368,7 +321,7 @@ ipcMain.handle('send-audio-content', async (event, { data, mimeType }) => {
 });
 
 ipcMain.handle('send-image-content', async (event, { data, debug }) => {
-    if (!geminiSession) return { success: false, error: 'No active Gemini session' };
+    if (!modelProvider) return { success: false, error: 'No active model session' };
 
     try {
         if (!data || typeof data !== 'string') {
@@ -384,9 +337,7 @@ ipcMain.handle('send-image-content', async (event, { data, debug }) => {
         }
 
         process.stdout.write('!');
-        await geminiSession.sendRealtimeInput({
-            media: { data: data, mimeType: 'image/jpeg' },
-        });
+        await modelProvider.sendImage(data, 'image/jpeg');
 
         return { success: true };
     } catch (error) {
@@ -396,7 +347,7 @@ ipcMain.handle('send-image-content', async (event, { data, debug }) => {
 });
 
 ipcMain.handle('send-text-message', async (event, text) => {
-    if (!geminiSession) return { success: false, error: 'No active Gemini session' };
+    if (!modelProvider) return { success: false, error: 'No active model session' };
 
     try {
         if (!text || typeof text !== 'string' || text.trim().length === 0) {
@@ -404,7 +355,7 @@ ipcMain.handle('send-text-message', async (event, text) => {
         }
 
         console.log('Sending text message:', text);
-        await geminiSession.sendRealtimeInput({ text: text.trim() });
+        await modelProvider.sendText(text.trim());
         return { success: true };
     } catch (error) {
         console.error('Error sending text:', error);
@@ -443,10 +394,9 @@ ipcMain.handle('close-session', async event => {
     try {
         stopMacOSAudioCapture();
 
-        // Cleanup any pending resources and stop audio/video capture
-        if (geminiSession) {
-            await geminiSession.close();
-            geminiSession = null;
+        if (modelProvider) {
+            await modelProvider.close();
+            modelProvider = null;
         }
 
         return { success: true };

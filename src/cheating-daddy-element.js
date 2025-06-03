@@ -366,6 +366,7 @@ class CheatingDaddyApp extends LitElement {
         sessionActive: { type: Boolean },
         selectedProfile: { type: String },
         selectedLanguage: { type: String },
+        selectedModel: { type: String },
         responses: { type: Array },
         currentResponseIndex: { type: Number },
     };
@@ -379,6 +380,7 @@ class CheatingDaddyApp extends LitElement {
         this.sessionActive = false;
         this.selectedProfile = localStorage.getItem('selectedProfile') || 'interview';
         this.selectedLanguage = localStorage.getItem('selectedLanguage') || 'en-US';
+        this.selectedModel = localStorage.getItem('selectedModel') || 'gemini';
         this.responses = [];
         this.currentResponseIndex = -1;
     }
@@ -429,8 +431,13 @@ class CheatingDaddyApp extends LitElement {
         localStorage.setItem('selectedLanguage', this.selectedLanguage);
     }
 
+    handleModelSelect(e) {
+        this.selectedModel = e.target.value;
+        localStorage.setItem('selectedModel', this.selectedModel);
+    }
+
     async handleStart() {
-        await cheddar.initializeGemini(this.selectedProfile, this.selectedLanguage);
+        await cheddar.initializeModel(this.selectedModel, this.selectedProfile, this.selectedLanguage);
         cheddar.startCapture();
         this.responses = [];
         this.currentResponseIndex = -1;
@@ -462,7 +469,10 @@ class CheatingDaddyApp extends LitElement {
 
     async openAPIKeyHelp() {
         const { ipcRenderer } = window.require('electron');
-        await ipcRenderer.invoke('open-external', 'https://cheatingdaddy.com/help/api-key'); // TODO
+        const url = this.selectedModel === 'openai' 
+            ? 'https://platform.openai.com/api-keys'
+            : 'https://aistudio.google.com/app/apikey';
+        await ipcRenderer.invoke('open-external', url);
     }
 
     async openExternalLink(url) {
@@ -640,6 +650,18 @@ class CheatingDaddyApp extends LitElement {
     }
 
     renderMainView() {
+        const getApiKeyPlaceholder = () => {
+            return this.selectedModel === 'openai' 
+                ? 'Enter your OpenAI API Key'
+                : 'Enter your Gemini API Key';
+        };
+
+        const getApiKeyHelpText = () => {
+            return this.selectedModel === 'openai'
+                ? 'get one from OpenAI'
+                : 'get one here';
+        };
+
         return html`
             <div style="height: 100%; display: flex; flex-direction: column; width: 100%; max-width: 500px;">
                 <div class="welcome">Welcome</div>
@@ -647,7 +669,7 @@ class CheatingDaddyApp extends LitElement {
                 <div class="input-group">
                     <input
                         type="password"
-                        placeholder="Enter your Gemini API Key"
+                        placeholder=${getApiKeyPlaceholder()}
                         .value=${localStorage.getItem('apiKey') || ''}
                         @input=${e => this.handleInput(e, 'apiKey')}
                     />
@@ -655,7 +677,7 @@ class CheatingDaddyApp extends LitElement {
                 </div>
                 <p class="description">
                     dont have an api key?
-                    <span @click=${this.openAPIKeyHelp} class="link">get one here</span>
+                    <span @click=${this.openAPIKeyHelp} class="link">${getApiKeyHelpText()}</span>
                 </p>
             </div>
         `;
@@ -733,6 +755,19 @@ class CheatingDaddyApp extends LitElement {
 
         return html`
             <div>
+                <div class="option-group">
+                    <label class="option-label">Select AI Model</label>
+                    <select .value=${this.selectedModel} @change=${this.handleModelSelect}>
+                        <option value="gemini" ?selected=${this.selectedModel === 'gemini'}>Google Gemini</option>
+                        <option value="openai" ?selected=${this.selectedModel === 'openai'}>OpenAI GPT-4</option>
+                    </select>
+                    <div class="description">
+                        ${this.selectedModel === 'gemini' 
+                            ? 'Gemini supports real-time audio, video, and text input with live streaming responses.'
+                            : 'OpenAI GPT-4 supports text and image input with streaming responses. Audio input not yet supported.'}
+                    </div>
+                </div>
+
                 <div class="option-group">
                     <label class="option-label">Select Profile</label>
                     <select .value=${this.selectedProfile} @change=${this.handleProfileSelect}>

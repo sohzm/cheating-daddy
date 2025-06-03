@@ -43,15 +43,21 @@ function arrayBufferToBase64(buffer) {
 }
 
 async function initializeGemini(profile = 'interview', language = 'en-US') {
+    return await initializeModel('gemini', profile, language);
+}
+
+async function initializeModel(providerType = 'gemini', profile = 'interview', language = 'en-US') {
     const apiKey = localStorage.getItem('apiKey')?.trim();
     if (apiKey) {
-        const success = await ipcRenderer.invoke('initialize-gemini', apiKey, localStorage.getItem('customPrompt') || '', profile, language);
+        const success = await ipcRenderer.invoke('initialize-model', providerType, apiKey, localStorage.getItem('customPrompt') || '', profile, language);
         if (success) {
             cheddar.e().setStatus('Live');
         } else {
             cheddar.e().setStatus('error');
         }
+        return success;
     }
+    return false;
 }
 
 // Listen for status updates
@@ -364,6 +370,7 @@ async function sendTextMessage(text) {
 
 window.cheddar = {
     initializeGemini,
+    initializeModel,
     startCapture,
     stopCapture,
     sendTextMessage,
