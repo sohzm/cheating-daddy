@@ -1,4 +1,5 @@
 import { html, css, LitElement } from './lit-core-2.7.4.min.js';
+import './markdown-display.js';
 
 class CheatingDaddyApp extends LitElement {
     static styles = css`
@@ -903,7 +904,9 @@ class CheatingDaddyApp extends LitElement {
 
         return html`
             <div style="height: 100%; display: flex; flex-direction: column;">
-                <div class="response-container">${currentResponse}</div>
+                <div class="response-container">
+                    <markdown-display .markdown=${currentResponse}></markdown-display>
+                </div>
 
                 <div class="text-input-container">
                     <button
