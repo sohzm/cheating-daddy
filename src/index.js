@@ -9,7 +9,7 @@ const { GoogleGenAI } = require('@google/genai');
 const os = require('os');
 const { spawn } = require('child_process');
 const { pcmToWav, analyzeAudioBuffer, saveDebugAudio } = require('./audioUtils');
-const { getSystemPrompt } = require('./prompts');
+const { getSystemPrompt } = require('./utils/prompts');
 
 let geminiSession = null;
 let loopbackProc = null;
@@ -63,7 +63,8 @@ function createWindow() {
         },
         { useSystemPicker: true }
     );
-
+    
+    mainWindow.setResizable(false);
     mainWindow.setContentProtection(true);
     mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 
@@ -83,6 +84,10 @@ function createWindow() {
 
     shortcuts.forEach(accelerator => {
         globalShortcut.register(accelerator, () => {
+            if (!mainWindow.isVisible()) {
+                return;
+            }
+            
             const [currentX, currentY] = mainWindow.getPosition();
             let newX = currentX;
             let newY = currentY;
@@ -503,6 +508,24 @@ ipcMain.handle('open-external', async (event, url) => {
         return { success: true };
     } catch (error) {
         console.error('Error opening external URL:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+ipcMain.handle('toggle-window-visibility', async (event) => {
+    try {
+        const windows = BrowserWindow.getAllWindows();
+        if (windows.length > 0) {
+            const mainWindow = windows[0];
+            if (mainWindow.isVisible()) {
+                mainWindow.hide();
+            } else {
+                mainWindow.show();
+            }
+        }
+        return { success: true };
+    } catch (error) {
+        console.error('Error toggling window visibility:', error);
         return { success: false, error: error.message };
     }
 });
