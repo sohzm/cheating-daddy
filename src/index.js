@@ -84,6 +84,10 @@ function createWindow() {
 
     shortcuts.forEach(accelerator => {
         globalShortcut.register(accelerator, () => {
+            if (!mainWindow.isVisible()) {
+                return;
+            }
+            
             const [currentX, currentY] = mainWindow.getPosition();
             let newX = currentX;
             let newY = currentY;
