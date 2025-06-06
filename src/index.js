@@ -160,6 +160,7 @@ function createWindow() {
             mainWindow.setIgnoreMouseEvents(false);
             console.log('Mouse events enabled');
         }
+        sendToRenderer('click-through-changed', mouseEventsIgnored);
     });
 
     const nextStepShortcut = isMac ? 'Cmd+Enter' : 'Ctrl+Enter';
@@ -528,4 +529,8 @@ ipcMain.handle('toggle-window-visibility', async (event) => {
         console.error('Error toggling window visibility:', error);
         return { success: false, error: error.message };
     }
+});
+
+ipcMain.handle('get-click-through-state', async (event) => {
+    return mouseEventsIgnored;
 });
