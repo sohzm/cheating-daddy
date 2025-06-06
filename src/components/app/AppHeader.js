@@ -10,6 +10,13 @@ export class AppHeader extends LitElement {
             border: 1px solid var(--border-color);
             background: var(--header-background);
             border-radius: 7px;
+            box-sizing: border-box;
+            transition: all 0.3s ease;
+        }
+
+        .header.click-through {
+            border: 1px solid var(--border-color);
+            box-shadow: inset 0 0 0 2px rgba(255, 107, 53, 0.6), inset 0 2px 4px rgba(255, 107, 53, 0.2);
         }
 
         .header-title {
@@ -73,6 +80,7 @@ export class AppHeader extends LitElement {
         currentView: { type: String },
         statusText: { type: String },
         startTime: { type: Number },
+        isClickThrough: { type: Boolean },
         onCustomizeClick: { type: Function },
         onHelpClick: { type: Function },
         onCloseClick: { type: Function },
@@ -84,6 +92,7 @@ export class AppHeader extends LitElement {
         this.currentView = 'main';
         this.statusText = '';
         this.startTime = null;
+        this.isClickThrough = false;
         this.onCustomizeClick = () => {};
         this.onHelpClick = () => {};
         this.onCloseClick = () => {};
@@ -112,7 +121,7 @@ export class AppHeader extends LitElement {
         const elapsedTime = this.getElapsedTime();
 
         return html`
-            <div class="header">
+            <div class="header ${this.isClickThrough ? 'click-through' : ''}">
                 <div class="header-title">${this.getViewTitle()}</div>
                 <div class="header-actions">
                     ${this.currentView === 'assistant'

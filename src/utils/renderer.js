@@ -378,6 +378,12 @@ async function sendTextMessage(text) {
     }
 }
 
+// Initialize fade animation state
+document.addEventListener('DOMContentLoaded', () => {
+    document.body.style.transition = 'opacity 0.2s ease-in-out';
+    document.body.style.opacity = '1';
+});
+
 window.cheddar = {
     initializeGemini,
     startCapture,

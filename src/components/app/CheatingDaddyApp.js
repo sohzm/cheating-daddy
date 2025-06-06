@@ -27,6 +27,7 @@ export class CheatingDaddyApp extends LitElement {
             height: 100vh;
             border-radius: 7px;
             overflow: hidden;
+            position: relative;
         }
 
         .container {
@@ -99,6 +100,7 @@ export class CheatingDaddyApp extends LitElement {
         selectedScreenshotInterval: { type: String },
         selectedImageQuality: { type: String },
         _viewInstances: { type: Object, state: true },
+        isClickThrough: { type: Boolean },
     };
 
     constructor() {
@@ -115,11 +117,11 @@ export class CheatingDaddyApp extends LitElement {
         this.responses = [];
         this.currentResponseIndex = -1;
         this._viewInstances = new Map();
+        this.isClickThrough = false;
     }
 
     connectedCallback() {
         super.connectedCallback();
-        // Set up IPC listeners if needed
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
             ipcRenderer.on('update-response', (_, response) => {
@@ -127,6 +129,12 @@ export class CheatingDaddyApp extends LitElement {
             });
             ipcRenderer.on('update-status', (_, status) => {
                 this.setStatus(status);
+            });
+            ipcRenderer.on('click-through-changed', (_, isClickThrough) => {
+                this.isClickThrough = isClickThrough;
+            });
+            ipcRenderer.invoke('get-click-through-state').then(isClickThrough => {
+                this.isClickThrough = isClickThrough;
             });
         }
     }
@@ -137,6 +145,7 @@ export class CheatingDaddyApp extends LitElement {
             const { ipcRenderer } = window.require('electron');
             ipcRenderer.removeAllListeners('update-response');
             ipcRenderer.removeAllListeners('update-status');
+            ipcRenderer.removeAllListeners('click-through-changed');
         }
     }
 
@@ -355,6 +364,7 @@ export class CheatingDaddyApp extends LitElement {
                         .currentView=${this.currentView}
                         .statusText=${this.statusText}
                         .startTime=${this.startTime}
+                        .isClickThrough=${this.isClickThrough}
                         .onCustomizeClick=${() => this.handleCustomizeClick()}
                         .onHelpClick=${() => this.handleHelpClick()}
                         .onCloseClick=${() => this.handleClose()}
