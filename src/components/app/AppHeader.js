@@ -60,6 +60,11 @@ export class AppHeader extends LitElement {
             background: var(--hover-background);
         }
 
+        :host([isclickthrough]) .button:hover,
+        :host([isclickthrough]) .icon-button:hover {
+            background: transparent;
+        }
+
         .key {
             background: var(--key-background);
             padding: 2px 6px;
@@ -76,7 +81,8 @@ export class AppHeader extends LitElement {
         onCustomizeClick: { type: Function },
         onHelpClick: { type: Function },
         onCloseClick: { type: Function },
-        onHideToggleClick: { type: Function }
+        onHideToggleClick: { type: Function },
+        isClickThrough: { type: Boolean, reflect: true },
     };
 
     constructor() {
@@ -88,6 +94,7 @@ export class AppHeader extends LitElement {
         this.onHelpClick = () => {};
         this.onCloseClick = () => {};
         this.onHideToggleClick = () => {};
+        this.isClickThrough = false;
     }
 
     getViewTitle() {
@@ -237,4 +244,4 @@ export class AppHeader extends LitElement {
     }
 }
 
-customElements.define('app-header', AppHeader); 
+customElements.define('app-header', AppHeader);

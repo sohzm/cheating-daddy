@@ -99,6 +99,7 @@ export class CheatingDaddyApp extends LitElement {
         selectedScreenshotInterval: { type: String },
         selectedImageQuality: { type: String },
         _viewInstances: { type: Object, state: true },
+        _isClickThrough: { state: true },
     };
 
     constructor() {
@@ -115,6 +116,7 @@ export class CheatingDaddyApp extends LitElement {
         this.responses = [];
         this.currentResponseIndex = -1;
         this._viewInstances = new Map();
+        this._isClickThrough = false;
     }
 
     connectedCallback() {
@@ -128,6 +130,9 @@ export class CheatingDaddyApp extends LitElement {
             ipcRenderer.on('update-status', (_, status) => {
                 this.setStatus(status);
             });
+            ipcRenderer.on('click-through-toggled', (_, isEnabled) => {
+                this._isClickThrough = isEnabled;
+            });
         }
     }
 
@@ -137,6 +142,7 @@ export class CheatingDaddyApp extends LitElement {
             const { ipcRenderer } = window.require('electron');
             ipcRenderer.removeAllListeners('update-response');
             ipcRenderer.removeAllListeners('update-status');
+            ipcRenderer.removeAllListeners('click-through-toggled');
         }
     }
 
@@ -359,6 +365,7 @@ export class CheatingDaddyApp extends LitElement {
                         .onHelpClick=${() => this.handleHelpClick()}
                         .onCloseClick=${() => this.handleClose()}
                         .onHideToggleClick=${() => this.handleHideToggle()}
+                        ?isClickThrough=${this._isClickThrough}
                     ></app-header>
                     <div class="${mainContentClass}">
                         <div class="view-container">

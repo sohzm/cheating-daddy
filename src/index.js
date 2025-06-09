@@ -130,6 +130,7 @@ function createWindow() {
             mainWindow.setIgnoreMouseEvents(false);
             console.log('Mouse events enabled');
         }
+        mainWindow.webContents.send('click-through-toggled', mouseEventsIgnored);
     });
 
     const nextStepShortcut = isMac ? 'Cmd+Enter' : 'Ctrl+Enter';
