@@ -36,6 +36,9 @@ function ensureDataDirectories() {
 
 function createWindow() {
     const mainWindow = new BrowserWindow({
+        resizable: true,
+        minWidth: 450,
+        minHeight: 200,
         width: 900,
         height: 400,
         frame: false,
@@ -64,7 +67,6 @@ function createWindow() {
         { useSystemPicker: true }
     );
     
-    mainWindow.setResizable(false);
     mainWindow.setContentProtection(true);
     mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 
