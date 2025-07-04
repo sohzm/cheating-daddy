@@ -2,9 +2,12 @@ if (require('electron-squirrel-startup')) {
     process.exit(0);
 }
 
-const { app, BrowserWindow, shell, ipcMain } = require('electron');
-const { createWindow, updateGlobalShortcuts } = require('./utils/window');
+const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const path = require('path');
+const url = require('url');
 const { setupGeminiIpcHandlers, stopMacOSAudioCapture, sendToRenderer } = require('./utils/gemini');
+const { setupNotionIpcHandlers } = require('./utils/notion');
+const { createWindow, updateGlobalShortcuts } = require('./utils/window');
 
 const geminiSessionRef = { current: null };
 let mainWindow = null;
@@ -17,6 +20,7 @@ function createMainWindow() {
 app.whenReady().then(() => {
     createMainWindow();
     setupGeminiIpcHandlers(geminiSessionRef);
+    setupNotionIpcHandlers(); // Initialize Notion IPC handlers
     setupGeneralIpcHandlers();
 });
 

@@ -161,22 +161,35 @@ Provide only the exact words to say in **markdown format**. Focus on finding win
     },
 };
 
-function buildSystemPrompt(promptParts, customPrompt = '', googleSearchEnabled = true) {
-    const sections = [promptParts.intro, '\n\n', promptParts.formatRequirements];
+// Build system prompt with all parts
+const buildSystemPrompt = (promptParts, customPrompt, enableGoogleSearch, notionContext) => {
+    const sections = [
+        promptParts.intro,
+        promptParts.formatRequirements,
+        promptParts.content
+    ];
 
-    // Only add search usage section if Google Search is enabled
-    if (googleSearchEnabled) {
+    // Add search instructions if enabled
+    if (enableGoogleSearch) {
         sections.push('\n\n', promptParts.searchUsage);
     }
 
-    sections.push('\n\n', promptParts.content, '\n\nUser-provided context\n-----\n', customPrompt, '\n-----\n\n', promptParts.outputInstructions);
+    // Add user-provided context
+    sections.push('\n\nUser-provided context\n-----\n', customPrompt, '\n-----\n');
+    
+    // Add Notion context if available
+    if (notionContext && notionContext.trim()) {
+        sections.push('\n\nNotion context\n-----\n', notionContext, '\n-----\n');
+    }
+    
+    sections.push('\n', promptParts.outputInstructions);
 
     return sections.join('');
 }
 
-function getSystemPrompt(profile, customPrompt = '', googleSearchEnabled = true) {
-    const promptParts = profilePrompts[profile] || profilePrompts.interview;
-    return buildSystemPrompt(promptParts, customPrompt, googleSearchEnabled);
+function getSystemPrompt(profileType, customPrompt = '', enableGoogleSearch = false, notionContext = '') {
+    const promptParts = profilePrompts[profileType] || profilePrompts.interview;
+    return buildSystemPrompt(promptParts, customPrompt, enableGoogleSearch, notionContext);
 }
 
 module.exports = {

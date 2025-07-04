@@ -326,6 +326,15 @@ export class AdvancedView extends LitElement {
         throttleTokens: { type: Boolean },
         maxTokensPerMin: { type: Number },
         throttleAtPercent: { type: Number },
+        // Notion integration properties
+        notionApiKey: { type: String },
+        notionPages: { type: Array },
+        notionApiStatus: { type: String },
+        isTestingApi: { type: Boolean },
+        isAddingPage: { type: Boolean },
+        newPageUrl: { type: String },
+        newPageName: { type: String },
+        addPageError: { type: String },
     };
 
     constructor() {
@@ -339,7 +348,18 @@ export class AdvancedView extends LitElement {
         this.maxTokensPerMin = 1000000;
         this.throttleAtPercent = 75;
 
+        // Notion integration defaults
+        this.notionApiKey = '';
+        this.notionPages = [];
+        this.notionApiStatus = '';
+        this.isTestingApi = false;
+        this.isAddingPage = false;
+        this.newPageUrl = '';
+        this.newPageName = '';
+        this.addPageError = '';
+
         this.loadRateLimitSettings();
+        this.loadNotionSettings();
     }
 
     connectedCallback() {
@@ -461,11 +481,332 @@ export class AdvancedView extends LitElement {
         this.requestUpdate();
     }
 
+    // Notion integration methods
+    loadNotionSettings() {
+        // Load Notion API key
+        const notionApiKey = localStorage.getItem('notionApiKey');
+        if (notionApiKey) {
+            this.notionApiKey = notionApiKey;
+        }
+
+        // Load Notion pages
+        const notionPagesJson = localStorage.getItem('notionPages');
+        if (notionPagesJson) {
+            try {
+                this.notionPages = JSON.parse(notionPagesJson);
+            } catch (error) {
+                console.error('Error parsing Notion pages from localStorage:', error);
+                this.notionPages = [];
+            }
+        }
+    }
+
+    handleNotionApiKeyChange(e) {
+        this.notionApiKey = e.target.value;
+        localStorage.setItem('notionApiKey', this.notionApiKey);
+        // Reset status when API key changes
+        this.notionApiStatus = '';
+    }
+
+    async testNotionApiKey() {
+        if (!this.notionApiKey) {
+            this.notionApiStatus = '❌ API key is required';
+            return;
+        }
+
+        this.isTestingApi = true;
+        this.notionApiStatus = '';
+        this.requestUpdate();
+
+        try {
+            // Use direct IPC to main process
+            const { ipcRenderer } = window.require('electron');
+            const result = await ipcRenderer.invoke('notion-test-connection', this.notionApiKey);
+            
+            if (result.success) {
+                this.notionApiStatus = `✅ Connected successfully (${result.user.name})`;
+                console.log('Notion API test successful:', result.user);
+            } else {
+                throw new Error(result.error);
+            }
+        } catch (error) {
+            console.error('Error testing Notion API:', error);
+            this.notionApiStatus = `❌ Error: ${error.message || 'Failed to connect'}`;
+        } finally {
+            this.isTestingApi = false;
+            this.requestUpdate();
+        }
+    }
+
+    openNotionIntegrationPage() {
+        if (window.require) {
+            const { ipcRenderer } = window.require('electron');
+            ipcRenderer.invoke('open-external', 'https://www.notion.so/my-integrations');
+        } else {
+            window.open('https://www.notion.so/my-integrations', '_blank');
+        }
+    }
+
+    toggleAddPageForm() {
+        this.isAddingPage = !this.isAddingPage;
+        if (!this.isAddingPage) {
+            // Reset form fields
+            this.newPageUrl = '';
+            this.newPageName = '';
+            this.addPageError = '';
+        }
+        this.requestUpdate();
+    }
+
+    handleNewPageUrlChange(e) {
+        this.newPageUrl = e.target.value;
+        this.addPageError = '';
+    }
+
+    handleNewPageNameChange(e) {
+        this.newPageName = e.target.value;
+    }
+
+    async addNotionPage() {
+        if (!this.newPageUrl) {
+            this.addPageError = 'Page URL is required';
+            return;
+        }
+
+        // Extract page ID from URL
+        let pageId = this.newPageUrl;
+        try {
+            // Handle full URLs like https://www.notion.so/workspace/Some-Page-Name-1234567890abcdef1234567890abcdef
+            if (pageId.includes('notion.so/')) {
+                pageId = pageId.split('notion.so/').pop();
+                // Get the last part of the URL which should contain the ID
+                const parts = pageId.split('/');
+                pageId = parts[parts.length - 1];
+                
+                // Extract the UUID part from the page identifier
+                const uuidMatch = pageId.match(/([a-f0-9]{32}|[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})/);
+                if (uuidMatch) {
+                    pageId = uuidMatch[0];
+                }
+            }
+
+            // Remove any hyphens and format correctly for Notion API
+            pageId = pageId.replace(/-/g, '');
+        } catch (error) {
+            console.error('Error extracting page ID:', error);
+            this.addPageError = 'Invalid Notion page URL';
+            return;
+        }
+
+        // Try both page and database type
+        const testPageTypes = async () => {
+            const { ipcRenderer } = window.require('electron');
+            
+            // Try as a page first
+            let pageResult = await ipcRenderer.invoke('notion-get-content', { 
+                apiKey: this.notionApiKey, 
+                id: pageId, 
+                type: 'page' 
+            });
+            
+            if (pageResult.success) {
+                return { type: 'page', title: 'Untitled Page' }; // Basic page info
+            }
+            
+            // If it fails, try as a database
+            let dbResult = await ipcRenderer.invoke('notion-get-content', { 
+                apiKey: this.notionApiKey, 
+                id: pageId, 
+                type: 'database' 
+            });
+            
+            if (dbResult.success) {
+                return { type: 'database', title: 'Untitled Database' }; // Basic db info
+            }
+            
+            // Both failed
+            throw new Error('Could not find page or database with this ID');
+        };
+
+        try {            
+            // Verify the page exists and we have access to it
+            const pageInfo = await testPageTypes();
+
+            // Create new page object
+            const newPage = {
+                id: pageId,
+                name: this.newPageName || pageInfo.title,
+                type: pageInfo.type,
+                enabled: true,
+                addedAt: Date.now()
+            };
+
+            // Add page to list
+            this.notionPages = [...this.notionPages, newPage];
+            localStorage.setItem('notionPages', JSON.stringify(this.notionPages));
+
+            // Reset form
+            this.newPageUrl = '';
+            this.newPageName = '';
+            this.addPageError = '';
+            this.isAddingPage = false;
+        } catch (error) {
+            console.error('Error adding Notion page:', error);
+            this.addPageError = `Error: ${error.message}`;
+        }
+
+        this.requestUpdate();
+    }
+
+    toggleNotionPage(index, enabled) {
+        if (index >= 0 && index < this.notionPages.length) {
+            const updatedPages = [...this.notionPages];
+            updatedPages[index].enabled = enabled;
+            this.notionPages = updatedPages;
+            localStorage.setItem('notionPages', JSON.stringify(this.notionPages));
+        }
+    }
+
+    removeNotionPage(index) {
+        if (index >= 0 && index < this.notionPages.length) {
+            const updatedPages = this.notionPages.filter((_, i) => i !== index);
+            this.notionPages = updatedPages;
+            localStorage.setItem('notionPages', JSON.stringify(this.notionPages));
+        }
+    }
 
 
     render() {
         return html`
             <div class="advanced-container">
+                <!-- Notion Integration Section -->
+                <div class="advanced-section">
+                    <div class="section-title">
+                        <span>📝 Notion Integration</span>
+                    </div>
+                    <div class="advanced-description">
+                        Connect to your Notion workspace to use pages and databases as context for the AI engine.
+                    </div>
+
+                    <!-- Notion API Key Input -->
+                    <div class="form-group">
+                        <label class="form-label">Notion API Key</label>
+                        <div class="form-row">
+                            <input
+                                type="password"
+                                class="form-control"
+                                placeholder="Enter your Notion API key"
+                                .value=${this.notionApiKey || ''}
+                                @input=${this.handleNotionApiKeyChange}
+                            />
+                            <button 
+                                class="action-button"
+                                @click=${this.testNotionApiKey}
+                                ?disabled=${this.isTestingApi || !this.notionApiKey}
+                            >
+                                ${this.isTestingApi ? '🔄 Testing...' : '🔍 Test Connection'}
+                            </button>
+                        </div>
+                        <div class="form-description">
+                            Generate an API key from your <a href="#" @click=${this.openNotionIntegrationPage}>Notion integrations page</a>.
+                            Your API key will be stored locally and never sent anywhere except to Notion's API.                            
+                        </div>
+                        ${this.notionApiStatus ? html`
+                            <div class="status-message ${this.notionApiStatus.startsWith('✅') ? 'status-success' : 'status-error'}">
+                                ${this.notionApiStatus}
+                            </div>
+                        ` : ''}
+                    </div>
+
+                    <!-- Notion Pages Management -->
+                    <div class="form-group" style="margin-top: 20px;">
+                        <label class="form-label">Notion Pages & Databases</label>
+                        <div class="form-description">
+                            Add Notion pages or databases to be used as context for the AI engine. 
+                            Toggle pages on/off to include or exclude them from the context.
+                        </div>
+                        
+                        <!-- Add Page Input -->
+                        ${!this.isAddingPage ? html`
+                            <button class="action-button" @click=${this.toggleAddPageForm} ?disabled=${!this.notionApiKey}>
+                                ➕ Add Page or Database
+                            </button>
+                        ` : html`
+                            <div class="form-grid" style="margin-top: 10px;">
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label class="form-label">Page URL</label>
+                                        <input 
+                                            type="text" 
+                                            class="form-control"
+                                            placeholder="https://notion.so/page-id"
+                                            .value=${this.newPageUrl}
+                                            @input=${this.handleNewPageUrlChange}
+                                        />
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Name (Optional)</label>
+                                        <input 
+                                            type="text" 
+                                            class="form-control"
+                                            placeholder="My Notion Page"
+                                            .value=${this.newPageName}
+                                            @input=${this.handleNewPageNameChange}
+                                        />
+                                    </div>
+                                </div>
+                                <div style="display: flex; gap: 8px; margin-top: 10px;">
+                                    <button class="action-button" @click=${this.addNotionPage} ?disabled=${!this.newPageUrl}>
+                                        ➕ Add Page
+                                    </button>
+                                    <button class="action-button" @click=${this.toggleAddPageForm}>
+                                        Cancel
+                                    </button>
+                                </div>
+                                ${this.addPageError ? html`
+                                    <div class="status-message status-error">
+                                        ${this.addPageError}
+                                    </div>
+                                ` : ''}
+                            </div>
+                        `}
+
+                        <!-- Notion Pages List -->
+                        ${this.notionPages.length > 0 ? html`
+                            <div class="notion-pages-list" style="margin-top: 15px;">
+                                ${this.notionPages.map((page, index) => html`
+                                    <div class="checkbox-group">
+                                        <input 
+                                            type="checkbox" 
+                                            class="checkbox-input" 
+                                            id="notion-page-${index}"
+                                            .checked=${page.enabled}
+                                            @change=${e => this.toggleNotionPage(index, e.target.checked)}
+                                        />
+                                        <label for="notion-page-${index}" class="checkbox-label">
+                                            ${page.name || page.id}
+                                            <span style="font-size: 10px; color: var(--description-color); margin-left: 6px;">
+                                                (${page.type})
+                                            </span>
+                                        </label>
+                                        <button 
+                                            class="action-button danger-button" 
+                                            style="margin-left: auto; padding: 4px 8px;"
+                                            @click=${() => this.removeNotionPage(index)}
+                                        >
+                                            ❌
+                                        </button>
+                                    </div>
+                                `)}
+                            </div>
+                        ` : this.notionApiKey ? html`
+                            <div style="margin-top: 15px; font-size: 12px; color: var(--description-color);">
+                                No Notion pages or databases added yet.
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+
                 <!-- Rate Limiting Section -->
                 <div class="advanced-section">
                     <div class="section-title">
@@ -538,8 +879,6 @@ export class AdvancedView extends LitElement {
                     </div>
                 </div>
 
-
-
                 <!-- Data Management Section -->
                 <div class="advanced-section danger-section">
                     <div class="section-title danger">
@@ -557,7 +896,7 @@ export class AdvancedView extends LitElement {
 
                         ${this.statusMessage
                             ? html`
-                                  <div class="status-message ${this.statusType === 'success' ? 'status-success' : 'status-error'}">
+                                  <div class="status-message ${this.statusType === 'success' ? 'status-success' : 'status-error'}">>
                                       ${this.statusMessage}
                                   </div>
                               `

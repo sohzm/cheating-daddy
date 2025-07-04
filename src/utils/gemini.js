@@ -2,7 +2,8 @@ const { GoogleGenAI } = require('@google/genai');
 const { BrowserWindow, ipcMain } = require('electron');
 const { spawn } = require('child_process');
 const { saveDebugAudio } = require('../audioUtils');
-const { getSystemPrompt } = require('./prompts');
+const { getSystemPrompt, getProfileOptions } = require('./prompts');
+const { getMultipleNotionContents } = require('./notion');
 
 // Conversation tracking variables
 let currentSessionId = null;
@@ -218,7 +219,45 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
     const enabledTools = await getEnabledTools();
     const googleSearchEnabled = enabledTools.some(tool => tool.googleSearch);
 
-    const systemPrompt = getSystemPrompt(profile, customPrompt, googleSearchEnabled);
+    // Get Notion context if available
+    const getNotionContext = async () => {
+        try {
+            // Use localStorage to get Notion settings from renderer
+            const notionApiKey = localStorage.getItem('notionApiKey');
+            const notionPagesJson = localStorage.getItem('notionPages');
+            
+            if (!notionApiKey || !notionPagesJson) {
+                return '';
+            }
+            
+            const notionPages = JSON.parse(notionPagesJson);
+            if (!notionPages || notionPages.length === 0) {
+                return '';
+            }
+            
+            // Instead of direct API call, use the IPC to get context from main process
+            // Make sure we get the ipcRenderer from Electron
+            const { ipcRenderer } = window.require('electron');
+            const ipcResult = await ipcRenderer.invoke('notion-get-multiple-contents', { 
+                apiKey: notionApiKey, 
+                notionResources: notionPages 
+            });
+            
+            if (ipcResult && ipcResult.success) {
+                return ipcResult.content || '';
+            } else {
+                console.error('Error from IPC:', ipcResult?.error);
+                return '';
+            }
+        } catch (error) {
+            console.error('Error getting Notion context:', error);
+            return '';
+        }
+    };
+
+    const notionContext = await getNotionContext();
+
+    const systemPrompt = getSystemPrompt(profile, customPrompt, googleSearchEnabled, notionContext);
 
     // Initialize new conversation session (only if not reconnecting)
     if (!isReconnection) {

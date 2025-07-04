@@ -25,6 +25,7 @@
     "license": "GPL-3.0",
     "dependencies": {
         "@google/genai": "^1.2.0",
+        "@notionhq/client": "^4.0.0",
         "electron-squirrel-startup": "^1.0.1"
     },
     "devDependencies": {
