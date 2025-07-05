@@ -118,6 +118,8 @@ export class CheatingDaddyApp extends LitElement {
         advancedMode: { type: Boolean },
         _viewInstances: { type: Object, state: true },
         _isClickThrough: { state: true },
+        _awaitingNewResponse: { state: true },
+        shouldAnimateResponse: { type: Boolean },
     };
 
     constructor() {
@@ -139,6 +141,8 @@ export class CheatingDaddyApp extends LitElement {
         this.currentResponseIndex = -1;
         this._viewInstances = new Map();
         this._isClickThrough = false;
+        this._awaitingNewResponse = false;
+        this.shouldAnimateResponse = false;
 
         // Apply layout mode to document root
         this.updateLayoutMode();
@@ -196,13 +200,20 @@ export class CheatingDaddyApp extends LitElement {
     }
 
     setResponse(response) {
-        this.responses.push(response);
-
-        // If user is viewing the latest response (or no responses yet), auto-navigate to new response
-        if (this.currentResponseIndex === this.responses.length - 2 || this.currentResponseIndex === -1) {
+        if (this._awaitingNewResponse || this.responses.length === 0) {
+            this.responses = [...this.responses, response];
             this.currentResponseIndex = this.responses.length - 1;
+            this._awaitingNewResponse = false;
+            this.shouldAnimateResponse = true;
+            console.log('[setResponse] Pushed new response:', response);
+        } else {
+            this.responses = [
+                ...this.responses.slice(0, this.responses.length - 1),
+                response
+            ];
+            this.shouldAnimateResponse = true;
+            console.log('[setResponse] Updated last response:', response);
         }
-
         this.requestUpdate();
     }
 
@@ -336,12 +347,15 @@ export class CheatingDaddyApp extends LitElement {
                 this.setStatus('Error sending message: ' + result.error);
             } else {
                 this.setStatus('Message sent...');
+                this._awaitingNewResponse = true;
             }
         }
     }
 
     handleResponseIndexChanged(e) {
         this.currentResponseIndex = e.detail.index;
+        this.shouldAnimateResponse = false;
+        this.requestUpdate();
     }
 
     // Onboarding event handlers
@@ -441,7 +455,9 @@ export class CheatingDaddyApp extends LitElement {
                         .currentResponseIndex=${this.currentResponseIndex}
                         .selectedProfile=${this.selectedProfile}
                         .onSendText=${message => this.handleSendText(message)}
+                        .shouldAnimateResponse=${this.shouldAnimateResponse}
                         @response-index-changed=${this.handleResponseIndexChanged}
+                        @response-animation-complete=${() => { this.shouldAnimateResponse = false; this.requestUpdate(); }}
                     ></assistant-view>
                 `;
 
