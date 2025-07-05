@@ -24,6 +24,18 @@ export class AssistantView extends LitElement {
             scroll-behavior: smooth;
         }
 
+        /* Animated word-by-word reveal */
+        .response-container [data-word] {
+            opacity: 0;
+            filter: blur(10px);
+            display: inline-block;
+            transition: opacity 0.5s, filter 0.5s;
+        }
+        .response-container [data-word].visible {
+            opacity: 1;
+            filter: blur(0px);
+        }
+
         /* Markdown styling */
         .response-container h1,
         .response-container h2,
@@ -252,6 +264,7 @@ export class AssistantView extends LitElement {
         this.currentResponseIndex = -1;
         this.selectedProfile = 'interview';
         this.onSendText = () => {};
+        this._lastAnimatedWordCount = 0; // Track last animated word count
     }
 
     getProfileNames() {
@@ -281,7 +294,8 @@ export class AssistantView extends LitElement {
                     gfm: true,
                     sanitize: false, // We trust the AI responses
                 });
-                const rendered = window.marked.parse(content);
+                let rendered = window.marked.parse(content);
+                rendered = this.wrapWordsInSpans(rendered);
                 console.log('Markdown rendered successfully');
                 return rendered;
             } catch (error) {
@@ -291,6 +305,34 @@ export class AssistantView extends LitElement {
         }
         console.log('Marked not available, using plain text');
         return content; // Fallback if marked is not available
+    }
+
+    wrapWordsInSpans(html) {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const tagsToSkip = ['PRE'];
+
+        function wrap(node) {
+            if (node.nodeType === Node.TEXT_NODE && node.textContent.trim() && !tagsToSkip.includes(node.parentNode.tagName)) {
+                const words = node.textContent.split(/(\s+)/);
+                const frag = document.createDocumentFragment();
+                words.forEach(word => {
+                    if (word.trim()) {
+                        const span = document.createElement('span');
+                        span.setAttribute('data-word', '');
+                        span.textContent = word;
+                        frag.appendChild(span);
+                    } else {
+                        frag.appendChild(document.createTextNode(word));
+                    }
+                });
+                node.parentNode.replaceChild(frag, node);
+            } else if (node.nodeType === Node.ELEMENT_NODE && !tagsToSkip.includes(node.tagName)) {
+                Array.from(node.childNodes).forEach(wrap);
+            }
+        }
+        Array.from(doc.body.childNodes).forEach(wrap);
+        return doc.body.innerHTML;
     }
 
     getResponseCounter() {
@@ -437,6 +479,9 @@ export class AssistantView extends LitElement {
     updated(changedProperties) {
         super.updated(changedProperties);
         if (changedProperties.has('responses') || changedProperties.has('currentResponseIndex')) {
+            if (changedProperties.has('currentResponseIndex')) {
+                this._lastAnimatedWordCount = 0;
+            }
             this.updateResponseContent();
         }
     }
@@ -450,6 +495,17 @@ export class AssistantView extends LitElement {
             const renderedResponse = this.renderMarkdown(currentResponse);
             console.log('Rendered response:', renderedResponse);
             container.innerHTML = renderedResponse;
+            const words = container.querySelectorAll('[data-word]');
+            for (let i = 0; i < this._lastAnimatedWordCount && i < words.length; i++) {
+                words[i].classList.add('visible');
+            }
+            for (let i = this._lastAnimatedWordCount; i < words.length; i++) {
+                words[i].classList.remove('visible');
+                setTimeout(() => {
+                    words[i].classList.add('visible');
+                }, (i - this._lastAnimatedWordCount) * 100);
+            }
+            this._lastAnimatedWordCount = words.length;
         } else {
             console.log('Response container not found');
         }
