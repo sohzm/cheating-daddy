@@ -114,9 +114,7 @@ setInterval(() => {
     tokenTracker.trackAudioTokens();
 }, 2000);
 
-function cheddarElement() {
-    return document.getElementById('cheddar');
-}
+
 
 function convertFloat32ToInt16(float32Array) {
     const int16Array = new Int16Array(float32Array.length);
@@ -142,18 +140,18 @@ async function initializeGemini(profile = 'interview', language = 'en-US') {
     const apiKey = localStorage.getItem('apiKey')?.trim();
     if (apiKey) {
         const success = await ipcRenderer.invoke('initialize-gemini', apiKey, localStorage.getItem('customPrompt') || '', profile, language);
-        if (success) {
-            cheddar.e().setStatus('Live');
-        } else {
-            cheddar.e().setStatus('error');
-        }
+                  if (success) {
+              cheddar.setStatus('Live');
+          } else {
+              cheddar.setStatus('error');
+          }
     }
 }
 
 // Listen for status updates
 ipcRenderer.on('update-status', (event, status) => {
     console.log('Status update:', status);
-    cheddar.e().setStatus(status);
+                    cheddar.setStatus(status);
 });
 
 // Listen for responses - REMOVED: This is handled in CheatingDaddyApp.js to avoid duplicates
@@ -270,7 +268,7 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
         }
     } catch (err) {
         console.error('Error starting capture:', err);
-        cheddar.e().setStatus('error');
+                            cheddar.setStatus('error');
     }
 }
 
@@ -609,59 +607,56 @@ initConversationStorage().catch(console.error);
 
 // Handle shortcuts based on current view
 function handleShortcut(shortcutKey) {
-    console.log('Handling shortcut:', shortcutKey);
-
-    // Get current view from the app
-    const currentView = window.cheddar.getCurrentView ? window.cheddar.getCurrentView() : null;
-    console.log('Current view:', currentView);
+    const currentView = cheddar.getCurrentView();
 
     if (shortcutKey === 'ctrl+enter' || shortcutKey === 'cmd+enter') {
         if (currentView === 'main') {
-            // Trigger the start session from main view
-            console.log('Triggering start session from main view');
-
-            // First try to get the app component and call handleStart directly
-            const appElement = document.querySelector('cheating-daddy-app');
-            if (appElement && typeof appElement.handleStart === 'function') {
-                appElement.handleStart();
-            } else {
-                // Fallback: simulate click on the start button
-                const mainView = document.querySelector('main-view');
-                if (mainView) {
-                    const startButton = mainView.shadowRoot?.querySelector('.start-button');
-                    if (startButton && !startButton.classList.contains('initializing')) {
-                        startButton.click();
-                    } else {
-                        console.warn('Start button not available or initializing');
-                    }
-                } else {
-                    console.warn('Could not find main-view element');
-                }
-            }
+            cheddar.element().handleStart();
         } else {
-            // In other views, take manual screenshot
-            console.log('Taking manual screenshot from current view');
             captureManualScreenshot();
         }
     }
 }
 
-window.cheddar = {
+// Create reference to the main app element
+const cheatingDaddyApp = document.querySelector('cheating-daddy-app');
+
+// Consolidated cheddar object - all functions in one place
+const cheddar = {
+    // Element access
+    element: () => cheatingDaddyApp,
+    e: () => cheatingDaddyApp,
+    
+    // App state functions - access properties directly from the app element
+    getCurrentView: () => cheatingDaddyApp.currentView,
+    getLayoutMode: () => cheatingDaddyApp.layoutMode,
+    
+    // Status and response functions
+    setStatus: (text) => cheatingDaddyApp.setStatus(text),
+    setResponse: (response) => cheatingDaddyApp.setResponse(response),
+    
+    // Core functionality
     initializeGemini,
     startCapture,
     stopCapture,
     sendTextMessage,
     handleShortcut,
+    
     // Conversation history functions
     getAllConversationSessions,
     getConversationSession,
     initConversationStorage,
+    
     // Content protection function
     getContentProtection: () => {
         const contentProtection = localStorage.getItem('contentProtection');
         return contentProtection !== null ? contentProtection === 'true' : true;
     },
+    
+    // Platform detection
     isLinux: isLinux,
     isMacOS: isMacOS,
-    e: cheddarElement,
 };
+
+// Make it globally available
+window.cheddar = cheddar;

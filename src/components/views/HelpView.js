@@ -239,7 +239,7 @@ export class HelpView extends LitElement {
     }
 
     getDefaultKeybinds() {
-        const isMac = window.cheddar?.isMacOS || navigator.platform.includes('Mac');
+        const isMac = cheddar.isMacOS || navigator.platform.includes('Mac');
         return {
             moveUp: isMac ? 'Alt+Up' : 'Ctrl+Up',
             moveDown: isMac ? 'Alt+Down' : 'Ctrl+Down',
@@ -276,8 +276,8 @@ export class HelpView extends LitElement {
     }
 
     render() {
-        const isMacOS = window.cheddar?.isMacOS || false;
-        const isLinux = window.cheddar?.isLinux || false;
+                    const isMacOS = cheddar.isMacOS || false;
+            const isLinux = cheddar.isLinux || false;
 
         return html`
             <div class="help-container">

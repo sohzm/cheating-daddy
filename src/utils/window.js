@@ -104,7 +104,7 @@ function createWindow(sendToRenderer, geminiSessionRef) {
                     // Apply content protection setting via IPC handler
                     try {
                         const contentProtection = await mainWindow.webContents.executeJavaScript(
-                            'window.cheddar ? window.cheddar.getContentProtection() : true'
+                            'cheddar.getContentProtection()'
                         );
                         mainWindow.setContentProtection(contentProtection);
                         console.log('Content protection loaded from settings:', contentProtection);
@@ -240,11 +240,7 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
 
                     // Use the new handleShortcut function
                     mainWindow.webContents.executeJavaScript(`
-                        if (window.cheddar && window.cheddar.handleShortcut) {
-                            window.cheddar.handleShortcut('${shortcutKey}');
-                        } else {
-                            console.log('handleShortcut function not available');
-                        }
+                        cheddar.handleShortcut('${shortcutKey}');
                     `);
                 } catch (error) {
                     console.error('Error handling next step shortcut:', error);
@@ -439,12 +435,11 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
             let viewName, layoutMode;
             try {
                 viewName = await event.sender.executeJavaScript(
-                    'window.cheddar && window.cheddar.getCurrentView ? window.cheddar.getCurrentView() : "main"'
+                    'cheddar.getCurrentView()'
                 );
-                layoutMode =
-                    (await event.sender.executeJavaScript(
-                        'window.cheddar && window.cheddar.getLayoutMode ? window.cheddar.getLayoutMode() : "normal"'
-                    )) || 'normal';
+                layoutMode = await event.sender.executeJavaScript(
+                    'cheddar.getLayoutMode()'
+                );
             } catch (error) {
                 console.warn('Failed to get view/layout from renderer, using defaults:', error);
                 viewName = 'main';
