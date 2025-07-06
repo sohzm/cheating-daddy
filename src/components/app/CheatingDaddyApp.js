@@ -185,16 +185,15 @@ export class CheatingDaddyApp extends LitElement {
             this.responses = [...this.responses, response];
             this.currentResponseIndex = this.responses.length - 1;
             this._awaitingNewResponse = false;
-            this.shouldAnimateResponse = true;
             console.log('[setResponse] Pushed new response:', response);
         } else {
             this.responses = [
                 ...this.responses.slice(0, this.responses.length - 1),
                 response
             ];
-            this.shouldAnimateResponse = true;
             console.log('[setResponse] Updated last response:', response);
         }
+        this.shouldAnimateResponse = true;
         this.requestUpdate();
     }
 
