@@ -10,16 +10,26 @@ export class MainView extends LitElement {
         }
 
         .welcome {
-            font-size: 24px;
-            margin-bottom: 8px;
-            font-weight: 600;
+            font-size: 36px;
             margin-top: auto;
+            margin-bottom: 12px;
+            margin-left: 12px;
+            font-weight: 600;
         }
 
         .input-group {
             display: flex;
             gap: 12px;
-            margin-bottom: 20px;
+            margin-bottom: 0;
+            margin-left: 12px;
+        }
+
+        .description {
+            color: var(--description-color);
+            font-size: 14px;
+            margin-bottom: auto;
+            margin-left: 18px;
+            line-height: 1.5;
         }
 
         .input-group input {
@@ -113,13 +123,6 @@ export class MainView extends LitElement {
 
         .shortcut-icons svg path {
             stroke: currentColor;
-        }
-
-        .description {
-            color: var(--description-color);
-            font-size: 14px;
-            margin-bottom: 24px;
-            line-height: 1.5;
         }
 
         .link {
