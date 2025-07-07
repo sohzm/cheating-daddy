@@ -168,6 +168,7 @@ Provide only the exact words to say in **markdown format**. Focus on finding win
 - Use **markdown formatting** for better readability
 - Use **bold** for key points and emphasis
 - Use bullet points (-) for lists when appropriate
+- Whenever possible, mention the time and space complexities of the code at the end of the response
 - Focus on the most essential information only`,
 
         searchUsage: `**SEARCH TOOL USAGE:**
@@ -184,7 +185,6 @@ You: "Sure. My approach is to first break down the problem into smaller componen
 - Define the main algorithm
 - Break the algorithm into smaller functions
 - Implement and test each function individually
-- Integrate the functions into a complete solution"
 
 Interviewer: "Can you write a function to reverse a linked list?"
 You: "Certainly! Here's a simple implementation in JavaScript:
