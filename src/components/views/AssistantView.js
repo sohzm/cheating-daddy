@@ -16,7 +16,7 @@ export class AssistantView extends LitElement {
         .response-container {
             height: calc(100% - 60px);
             overflow-y: auto;
-            border-radius: 10px;
+            border-radius: var(--border-radius-big);
             font-size: var(--response-font-size, 18px);
             line-height: 1.6;
             background: var(--main-content-background);
@@ -178,7 +178,7 @@ export class AssistantView extends LitElement {
             border: 1px solid var(--button-border);
             padding: 10px 14px;
             border-radius: 8px;
-            font-size: 14px;
+            font-size: var(--subtext-size);
         }
 
         .text-input-container input:focus {
@@ -269,7 +269,7 @@ export class AssistantView extends LitElement {
         const profileNames = this.getProfileNames();
         return this.responses.length > 0 && this.currentResponseIndex >= 0
             ? this.responses[this.currentResponseIndex]
-            : `Hey, Im listening to your ${profileNames[this.selectedProfile] || 'session'}?`;
+            : `Currently assisting you with your ${profileNames[this.selectedProfile] || 'session'}...`;
     }
 
     renderMarkdown(content) {

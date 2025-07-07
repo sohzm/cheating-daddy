@@ -23,7 +23,7 @@ export class HelpView extends LitElement {
         .option-group {
             background: var(--card-background, rgba(255, 255, 255, 0.04));
             border: 1px solid var(--card-border, rgba(255, 255, 255, 0.1));
-            border-radius: 6px;
+            border-radius: var(--border-radius);
             padding: 16px;
             backdrop-filter: blur(10px);
         }
@@ -35,7 +35,7 @@ export class HelpView extends LitElement {
             margin-bottom: 12px;
             color: var(--text-color);
             font-weight: 600;
-            font-size: 14px;
+            font-size: var(--title-size);
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
@@ -50,7 +50,7 @@ export class HelpView extends LitElement {
 
         .description {
             color: var(--description-color, rgba(255, 255, 255, 0.75));
-            font-size: 12px;
+            font-size: var(--subtext-size);
             line-height: 1.4;
         }
 
@@ -81,7 +81,7 @@ export class HelpView extends LitElement {
             border: 1px solid var(--key-border, rgba(255, 255, 255, 0.15));
             padding: 2px 6px;
             border-radius: 3px;
-            font-size: 10px;
+            font-size: var(--subtext-size);
             font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace;
             font-weight: 500;
             margin: 0 1px;
@@ -115,7 +115,7 @@ export class HelpView extends LitElement {
             justify-content: space-between;
             align-items: center;
             padding: 3px 0;
-            font-size: 11px;
+            font-size: var(--subtext-size);
         }
 
         .shortcut-description {
@@ -143,13 +143,13 @@ export class HelpView extends LitElement {
 
         .profile-name {
             font-weight: 600;
-            font-size: 12px;
+            font-size: var(--subtitle-size, 16px);
             color: var(--text-color);
             margin-bottom: 3px;
         }
 
         .profile-description {
-            font-size: 10px;
+            font-size: var(--subtext-size);
             color: var(--description-color, rgba(255, 255, 255, 0.6));
             line-height: 1.3;
         }
@@ -170,7 +170,7 @@ export class HelpView extends LitElement {
             border-radius: 4px;
             text-decoration: none;
             color: var(--link-color, #007aff);
-            font-size: 11px;
+            font-size: var(--subtext-size);
             font-weight: 500;
             transition: all 0.15s ease;
             cursor: pointer;
@@ -190,7 +190,7 @@ export class HelpView extends LitElement {
             position: relative;
             padding-left: 24px;
             margin-bottom: 6px;
-            font-size: 11px;
+            font-size: var(--subtitle-size);
             line-height: 1.3;
         }
 
