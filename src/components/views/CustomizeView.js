@@ -301,7 +301,7 @@ export class CustomizeView extends LitElement {
 
         .checkbox-label {
             font-weight: 500;
-            font-size: 12px;
+            font-size: var(--subtext-size);
             color: var(--label-color, rgba(255, 255, 255, 0.9));
             cursor: pointer;
             user-select: none;
