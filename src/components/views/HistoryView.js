@@ -4,11 +4,7 @@ import { resizeLayout } from '../../utils/windowResize.js';
 export class HistoryView extends LitElement {
     static styles = css`
         * {
-            font-family:
-                'Inter',
-                -apple-system,
-                BlinkMacSystemFont,
-                sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             cursor: default;
             user-select: none;
         }
@@ -89,6 +85,8 @@ export class HistoryView extends LitElement {
             border-radius: 6px;
             padding: 12px;
             padding-bottom: 20px;
+            user-select: text;
+            cursor: text;
         }
 
         .message {
@@ -99,6 +97,8 @@ export class HistoryView extends LitElement {
             line-height: 1.4;
             background: var(--input-background);
             border-radius: 0 4px 4px 0;
+            user-select: text;
+            cursor: text;
         }
 
         .message.user {
@@ -245,7 +245,7 @@ export class HistoryView extends LitElement {
     async loadSessions() {
         try {
             this.loading = true;
-                    this.sessions = await cheddar.getAllConversationSessions();
+            this.sessions = await cheddar.getAllConversationSessions();
         } catch (error) {
             console.error('Error loading conversation sessions:', error);
             this.sessions = [];
