@@ -261,6 +261,7 @@ export class AssistantView extends LitElement {
             meeting: 'Business Meeting',
             presentation: 'Presentation',
             negotiation: 'Negotiation',
+            exam: 'Exam Assistant',
         };
     }
 
