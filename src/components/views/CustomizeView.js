@@ -13,11 +13,13 @@ export class CustomizeView extends LitElement {
             display: block;
             padding: 12px;
             margin: 0 auto;
-            max-width: 700px;
+            // max-width: 700px;
         }
 
         .settings-container {
-            display: grid;
+            display: flex;
+            flex-direction: column;
+            width: 100%;
             gap: 12px;
             padding-bottom: 20px;
         }
