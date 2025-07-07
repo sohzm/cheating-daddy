@@ -4,7 +4,7 @@ import { resizeLayout } from '../../utils/windowResize.js';
 export class MainView extends LitElement {
     static styles = css`
         * {
-            font-family: 'Inter', sans-serif;
+            font-family: 'DM Sans', sans-serif;
             cursor: default;
             user-select: none;
         }
@@ -283,7 +283,7 @@ export class MainView extends LitElement {
 
     render() {
         return html`
-            <div class="welcome">Welcome</div>
+            <div class="welcome">Log In</div>
 
             <div class="input-group">
                 <input
@@ -298,8 +298,8 @@ export class MainView extends LitElement {
                 </button>
             </div>
             <p class="description">
-                dont have an api key?
-                <span @click=${this.handleAPIKeyHelpClick} class="link">get one here</span>
+                Don't have an API key?
+                <span @click=${this.handleAPIKeyHelpClick} class="link">Get one for free here.</span>
             </p>
         `;
     }

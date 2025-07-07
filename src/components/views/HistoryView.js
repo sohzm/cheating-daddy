@@ -4,11 +4,7 @@ import { resizeLayout } from '../../utils/windowResize.js';
 export class HistoryView extends LitElement {
     static styles = css`
         * {
-            font-family:
-                'Inter',
-                -apple-system,
-                BlinkMacSystemFont,
-                sans-serif;
+            font-family: 'DM Sans', sans-serif;
             cursor: default;
             user-select: none;
         }

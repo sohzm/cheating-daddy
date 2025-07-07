@@ -9,7 +9,7 @@ export class AssistantView extends LitElement {
         }
 
         * {
-            font-family: 'Inter', sans-serif;
+            font-family: 'DM Sans', sans-serif;
             cursor: default;
         }
 
