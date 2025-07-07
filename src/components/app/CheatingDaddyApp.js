@@ -12,11 +12,7 @@ export class CheatingDaddyApp extends LitElement {
     static styles = css`
         * {
             box-sizing: border-box;
-            font-family:
-                'Inter',
-                -apple-system,
-                BlinkMacSystemFont,
-                sans-serif;
+            font-family: 'DM Sans', sans-serif;
             margin: 0px;
             padding: 0px;
             cursor: default;

@@ -9,7 +9,7 @@ export class AssistantView extends LitElement {
         }
 
         * {
-            font-family: 'Inter', sans-serif;
+            font-family: 'DM Sans', sans-serif;
             cursor: default;
         }
 
@@ -244,6 +244,8 @@ export class AssistantView extends LitElement {
         currentResponseIndex: { type: Number },
         selectedProfile: { type: String },
         onSendText: { type: Function },
+        isStreaming: { type: Boolean },
+        streamingResponse: { type: String },
     };
 
     constructor() {
@@ -252,6 +254,8 @@ export class AssistantView extends LitElement {
         this.currentResponseIndex = -1;
         this.selectedProfile = 'interview';
         this.onSendText = () => {};
+        this.isStreaming = false;
+        this.streamingResponse = '';
     }
 
     getProfileNames() {
@@ -261,14 +265,18 @@ export class AssistantView extends LitElement {
             meeting: 'Business Meeting',
             presentation: 'Presentation',
             negotiation: 'Negotiation',
+            'coding-assessment': 'Coding Assessment',
         };
     }
 
     getCurrentResponse() {
+        if (this.isStreaming) {
+            return this.streamingResponse;
+        }
         const profileNames = this.getProfileNames();
         return this.responses.length > 0 && this.currentResponseIndex >= 0
             ? this.responses[this.currentResponseIndex]
-            : `Hey, Im listening to your ${profileNames[this.selectedProfile] || 'session'}?`;
+            : `Currently assisting you with your ${profileNames[this.selectedProfile] || 'session'}...`;
     }
 
     renderMarkdown(content) {
@@ -376,10 +384,34 @@ export class AssistantView extends LitElement {
                 this.scrollResponseDown();
             };
 
+            this.handleStreamStart = () => {
+                console.log('Received ai-response-stream-start');
+                this.isStreaming = true;
+                this.streamingResponse = '';
+                this.requestUpdate();
+            };
+
+            this.handleStreamChunk = (event, { chunk }) => {
+                if (chunk) {
+                    this.streamingResponse += chunk;
+                    this.requestUpdate();
+                }
+            };
+
+            this.handleStreamEnd = () => {
+                console.log('Received ai-response-stream-end');
+                this.isStreaming = false;
+                this.streamingResponse = '';
+                this.requestUpdate();
+            };
+
             ipcRenderer.on('navigate-previous-response', this.handlePreviousResponse);
             ipcRenderer.on('navigate-next-response', this.handleNextResponse);
             ipcRenderer.on('scroll-response-up', this.handleScrollUp);
             ipcRenderer.on('scroll-response-down', this.handleScrollDown);
+            ipcRenderer.on('ai-response-stream-start', this.handleStreamStart);
+            ipcRenderer.on('ai-response-stream-chunk', this.handleStreamChunk);
+            ipcRenderer.on('ai-response-stream-end', this.handleStreamEnd);
         }
     }
 
@@ -400,6 +432,15 @@ export class AssistantView extends LitElement {
             }
             if (this.handleScrollDown) {
                 ipcRenderer.removeListener('scroll-response-down', this.handleScrollDown);
+            }
+            if (this.handleStreamStart) {
+                ipcRenderer.removeListener('ai-response-stream-start', this.handleStreamStart);
+            }
+            if (this.handleStreamChunk) {
+                ipcRenderer.removeListener('ai-response-stream-chunk', this.handleStreamChunk);
+            }
+            if (this.handleStreamEnd) {
+                ipcRenderer.removeListener('ai-response-stream-end', this.handleStreamEnd);
             }
         }
     }
@@ -436,7 +477,11 @@ export class AssistantView extends LitElement {
 
     updated(changedProperties) {
         super.updated(changedProperties);
-        if (changedProperties.has('responses') || changedProperties.has('currentResponseIndex')) {
+        if (
+            changedProperties.has('responses') ||
+            changedProperties.has('currentResponseIndex') ||
+            changedProperties.has('streamingResponse')
+        ) {
             this.updateResponseContent();
         }
     }
@@ -450,6 +495,11 @@ export class AssistantView extends LitElement {
             const renderedResponse = this.renderMarkdown(currentResponse);
             console.log('Rendered response:', renderedResponse);
             container.innerHTML = renderedResponse;
+
+            // Auto-scroll to the bottom if streaming
+            if (this.isStreaming) {
+                this.scrollToBottom();
+            }
         } else {
             console.log('Response container not found');
         }

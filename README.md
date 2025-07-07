@@ -1,6 +1,6 @@
 <img src="/src/assets/logo.png" alt="uwu" width="200"/>
 
-# Cheating Daddy
+# Hinty
 
 > [!NOTE]  
 > Use latest MacOS and Windows version, older versions have limited support

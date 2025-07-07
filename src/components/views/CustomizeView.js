@@ -4,11 +4,7 @@ import { resizeLayout } from '../../utils/windowResize.js';
 export class CustomizeView extends LitElement {
     static styles = css`
         * {
-            font-family:
-                'Inter',
-                -apple-system,
-                BlinkMacSystemFont,
-                sans-serif;
+            font-family: 'DM Sans', sans-serif;
             cursor: default;
             user-select: none;
         }
@@ -39,7 +35,7 @@ export class CustomizeView extends LitElement {
             align-items: center;
             gap: 8px;
             margin-bottom: 12px;
-            font-size: 14px;
+            font-size: 18px;
             font-weight: 600;
             color: var(--text-color);
             text-transform: uppercase;
@@ -84,7 +80,7 @@ export class CustomizeView extends LitElement {
 
         .form-label {
             font-weight: 500;
-            font-size: 12px;
+            font-size: 14px;
             color: var(--label-color, rgba(255, 255, 255, 0.9));
             display: flex;
             align-items: center;
@@ -486,6 +482,11 @@ export class CustomizeView extends LitElement {
                 name: 'Negotiation',
                 description: 'Guidance for business negotiations and deals',
             },
+            {
+                value: 'coding-assessment',
+                name: 'Coding Assessment',
+                description: 'Help with solving coding problems and technical assessments',
+            },
         ];
     }
 
@@ -531,6 +532,7 @@ export class CustomizeView extends LitElement {
             meeting: 'Business Meeting',
             presentation: 'Presentation',
             negotiation: 'Negotiation',
+            'coding-assessment': 'Coding Assessment',
         };
     }
 
@@ -577,7 +579,7 @@ export class CustomizeView extends LitElement {
             toggleVisibility: isMac ? 'Cmd+\\' : 'Ctrl+\\',
             toggleClickThrough: isMac ? 'Cmd+M' : 'Ctrl+M',
             nextStep: isMac ? 'Cmd+Enter' : 'Ctrl+Enter',
-            previousResponse: isMac ? 'Cmd+[' : 'Ctrl+[',
+            previousResponse: isMac ? 'Cmd+[' : 'Ctrl:[',
             nextResponse: isMac ? 'Cmd+]' : 'Ctrl+]',
             scrollUp: isMac ? 'Cmd+Shift+Up' : 'Ctrl+Shift+Up',
             scrollDown: isMac ? 'Cmd+Shift+Down' : 'Ctrl+Shift+Down',
