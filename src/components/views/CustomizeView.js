@@ -484,6 +484,11 @@ export class CustomizeView extends LitElement {
                 name: 'Negotiation',
                 description: 'Guidance for business negotiations and deals',
             },
+            {
+                value: 'coding-assessment',
+                name: 'Coding Assessment',
+                description: 'Guidance for coding assessments and technical interviews',
+            },
         ];
     }
 
