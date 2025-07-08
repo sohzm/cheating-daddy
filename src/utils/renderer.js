@@ -192,17 +192,44 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
 
             console.log('macOS screen capture started - audio handled by SystemAudioDump');
         } else if (isLinux) {
-            // Linux - use display media for screen capture and getUserMedia for microphone
-            mediaStream = await navigator.mediaDevices.getDisplayMedia({
-                video: {
-                    frameRate: 1,
-                    width: { ideal: 1920 },
-                    height: { ideal: 1080 },
-                },
-                audio: false, // Don't use system audio loopback on Linux
-            });
+            // Linux - use display media for screen capture and try to get system audio
+            try {
+                // First try to get system audio via getDisplayMedia (works on newer browsers)
+                mediaStream = await navigator.mediaDevices.getDisplayMedia({
+                    video: {
+                        frameRate: 1,
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 },
+                    },
+                    audio: {
+                        sampleRate: SAMPLE_RATE,
+                        channelCount: 1,
+                        echoCancellation: false, // Don't cancel system audio
+                        noiseSuppression: false,
+                        autoGainControl: false,
+                    },
+                });
 
-            // Get microphone input for Linux
+                console.log('Linux system audio capture via getDisplayMedia succeeded');
+                
+                // Setup audio processing for Linux system audio
+                setupLinuxSystemAudioProcessing();
+                
+            } catch (systemAudioError) {
+                console.warn('System audio via getDisplayMedia failed, trying screen-only capture:', systemAudioError);
+                
+                // Fallback to screen-only capture
+                mediaStream = await navigator.mediaDevices.getDisplayMedia({
+                    video: {
+                        frameRate: 1,
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 },
+                    },
+                    audio: false,
+                });
+            }
+
+            // Additionally get microphone input for Linux
             let micStream = null;
             try {
                 micStream = await navigator.mediaDevices.getUserMedia({
@@ -225,7 +252,7 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
                 // Continue without microphone if permission denied
             }
 
-            console.log('Linux screen capture started');
+            console.log('Linux capture started - system audio:', mediaStream.getAudioTracks().length > 0, 'microphone:', micStream !== null);
         } else {
             // Windows - use display media with loopback for system audio
             mediaStream = await navigator.mediaDevices.getDisplayMedia({
@@ -302,7 +329,37 @@ function setupLinuxMicProcessing(micStream) {
     micProcessor.connect(micAudioContext.destination);
 
     // Store processor reference for cleanup
-    audioProcessor = micProcessor;
+    micAudioProcessor = micProcessor;
+}
+
+function setupLinuxSystemAudioProcessing() {
+    // Setup system audio processing for Linux (from getDisplayMedia)
+    audioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
+    const source = audioContext.createMediaStreamSource(mediaStream);
+    audioProcessor = audioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
+
+    let audioBuffer = [];
+    const samplesPerChunk = SAMPLE_RATE * AUDIO_CHUNK_DURATION;
+
+    audioProcessor.onaudioprocess = async e => {
+        const inputData = e.inputBuffer.getChannelData(0);
+        audioBuffer.push(...inputData);
+
+        // Process audio in chunks
+        while (audioBuffer.length >= samplesPerChunk) {
+            const chunk = audioBuffer.splice(0, samplesPerChunk);
+            const pcmData16 = convertFloat32ToInt16(chunk);
+            const base64Data = arrayBufferToBase64(pcmData16.buffer);
+
+            await ipcRenderer.invoke('send-audio-content', {
+                data: base64Data,
+                mimeType: 'audio/pcm;rate=24000',
+            });
+        }
+    };
+
+    source.connect(audioProcessor);
+    audioProcessor.connect(audioContext.destination);
 }
 
 function setupWindowsLoopbackProcessing() {
@@ -460,6 +517,12 @@ function stopCapture() {
     if (audioProcessor) {
         audioProcessor.disconnect();
         audioProcessor = null;
+    }
+
+    // Clean up microphone audio processor (Linux only)
+    if (micAudioProcessor) {
+        micAudioProcessor.disconnect();
+        micAudioProcessor = null;
     }
 
     if (audioContext) {

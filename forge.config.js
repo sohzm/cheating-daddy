@@ -42,12 +42,18 @@ module.exports = {
             platforms: ['darwin'],
         },
         {
-            name: '@electron-forge/maker-deb',
-            config: {},
-        },
-        {
-            name: '@electron-forge/maker-rpm',
-            config: {},
+            name: '@reforged/maker-appimage',
+            platforms: ['linux'],
+            config: {
+                options: {
+                    name: 'Cheating Daddy',
+                    productName: 'Cheating Daddy',
+                    genericName: 'AI Assistant',
+                    description: 'AI assistant for interviews and learning',
+                    categories: ['Development', 'Education'],
+                    icon: 'src/assets/logo.png'
+                }
+            },
         },
     ],
     plugins: [
