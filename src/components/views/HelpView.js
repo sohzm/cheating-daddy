@@ -52,11 +52,14 @@ export class HelpView extends LitElement {
             color: var(--description-color, rgba(255, 255, 255, 0.75));
             font-size: var(--subtext-size);
             line-height: 1.4;
+            user-select: text;
+            cursor: text;
         }
 
         .description strong {
             color: var(--text-color);
             font-weight: 500;
+            user-select: text;
         }
 
         .description br {
@@ -68,6 +71,7 @@ export class HelpView extends LitElement {
             text-decoration: none;
             cursor: pointer;
             transition: color 0.15s ease;
+            user-select: text;
         }
 
         .link:hover {
@@ -86,6 +90,8 @@ export class HelpView extends LitElement {
             font-weight: 500;
             margin: 0 1px;
             white-space: nowrap;
+            user-select: text;
+            cursor: text;
         }
 
         .keyboard-section {
@@ -120,6 +126,8 @@ export class HelpView extends LitElement {
 
         .shortcut-description {
             color: var(--description-color, rgba(255, 255, 255, 0.7));
+            user-select: text;
+            cursor: text;
         }
 
         .shortcut-keys {
@@ -146,12 +154,16 @@ export class HelpView extends LitElement {
             font-size: var(--subtitle-size, 16px);
             color: var(--text-color);
             margin-bottom: 3px;
+            user-select: text;
+            cursor: text;
         }
 
         .profile-description {
             font-size: var(--subtext-size);
             color: var(--description-color, rgba(255, 255, 255, 0.6));
             line-height: 1.3;
+            user-select: text;
+            cursor: text;
         }
 
         .community-links {
@@ -192,6 +204,8 @@ export class HelpView extends LitElement {
             margin-bottom: 6px;
             font-size: var(--subtitle-size);
             line-height: 1.3;
+            user-select: text;
+            cursor: text;
         }
 
         .usage-step::before {
@@ -213,6 +227,7 @@ export class HelpView extends LitElement {
 
         .usage-step strong {
             color: var(--text-color);
+            user-select: text;
         }
     `;
 
@@ -272,8 +287,8 @@ export class HelpView extends LitElement {
     }
 
     render() {
-                    const isMacOS = cheddar.isMacOS || false;
-            const isLinux = cheddar.isLinux || false;
+        const isMacOS = cheddar.isMacOS || false;
+        const isLinux = cheddar.isLinux || false;
 
         return html`
             <div class="help-container">
