@@ -2,6 +2,7 @@ const { BrowserWindow, globalShortcut, ipcMain, screen } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const os = require('os');
+const { applyStealthMeasures, startTitleRandomization } = require('./stealthFeatures');
 
 let mouseEventsIgnored = false;
 let windowResizing = false;
@@ -24,7 +25,7 @@ function ensureDataDirectories() {
     return { imageDir, audioDir };
 }
 
-function createWindow(sendToRenderer, geminiSessionRef) {
+function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
     // Get layout preference (default to 'normal')
     let windowWidth = 1100;
     let windowHeight = 600;
@@ -76,6 +77,18 @@ function createWindow(sendToRenderer, geminiSessionRef) {
 
     mainWindow.loadFile(path.join(__dirname, '../index.html'));
 
+    // Set window title to random name if provided
+    if (randomNames && randomNames.windowTitle) {
+        mainWindow.setTitle(randomNames.windowTitle);
+        console.log(`Set window title to: ${randomNames.windowTitle}`);
+    }
+
+    // Apply stealth measures
+    applyStealthMeasures(mainWindow);
+
+    // Start periodic title randomization for additional stealth
+    startTitleRandomization(mainWindow);
+
     // After window is created, check for layout preference and resize if needed
     mainWindow.webContents.once('dom-ready', () => {
         setTimeout(() => {
@@ -103,9 +116,7 @@ function createWindow(sendToRenderer, geminiSessionRef) {
 
                     // Apply content protection setting via IPC handler
                     try {
-                        const contentProtection = await mainWindow.webContents.executeJavaScript(
-                            'cheddar.getContentProtection()'
-                        );
+                        const contentProtection = await mainWindow.webContents.executeJavaScript('cheddar.getContentProtection()');
                         mainWindow.setContentProtection(contentProtection);
                         console.log('Content protection loaded from settings:', contentProtection);
                     } catch (error) {
@@ -434,12 +445,8 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
             // Get current view and layout mode from renderer
             let viewName, layoutMode;
             try {
-                viewName = await event.sender.executeJavaScript(
-                    'cheddar.getCurrentView()'
-                );
-                layoutMode = await event.sender.executeJavaScript(
-                    'cheddar.getLayoutMode()'
-                );
+                viewName = await event.sender.executeJavaScript('cheddar.getCurrentView()');
+                layoutMode = await event.sender.executeJavaScript('cheddar.getLayoutMode()');
             } catch (error) {
                 console.warn('Failed to get view/layout from renderer, using defaults:', error);
                 viewName = 'main';

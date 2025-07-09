@@ -80,7 +80,9 @@ async function sendReconnectionContext() {
         }
 
         // Create the context message
-        const contextMessage = `Till now all these questions were asked in the interview, answer the last one please:\n\n${transcriptions.join('\n')}`;
+        const contextMessage = `Till now all these questions were asked in the interview, answer the last one please:\n\n${transcriptions.join(
+            '\n'
+        )}`;
 
         console.log('Sending reconnection context with', transcriptions.length, 'previous questions');
 
@@ -389,9 +391,24 @@ async function startMacOSAudioCapture(geminiSessionRef) {
 
     console.log('SystemAudioDump path:', systemAudioPath);
 
-    systemAudioProc = spawn(systemAudioPath, [], {
+    // Spawn SystemAudioDump with stealth options
+    const spawnOptions = {
         stdio: ['ignore', 'pipe', 'pipe'],
-    });
+        env: {
+            ...process.env,
+            // Set environment variables that might help with stealth
+            PROCESS_NAME: 'AudioService',
+            APP_NAME: 'System Audio Service',
+        },
+    };
+
+    // On macOS, apply additional stealth measures
+    if (process.platform === 'darwin') {
+        spawnOptions.detached = false;
+        spawnOptions.windowsHide = false;
+    }
+
+    systemAudioProc = spawn(systemAudioPath, [], spawnOptions);
 
     if (!systemAudioProc.pid) {
         console.error('Failed to start SystemAudioDump');
