@@ -15,7 +15,7 @@ export class AppHeader extends LitElement {
             padding: var(--header-padding);
             border: 1px solid var(--border-color);
             background: var(--header-background);
-            border-radius: var(--border-radius);
+            border-radius: 20px 20px 0 0;
         }
 
         .header-title {

@@ -274,10 +274,10 @@ export class CustomizeView extends LitElement {
             color: var(--note-color, rgba(255, 255, 255, 0.4));
             font-style: italic;
             text-align: center;
-            margin-top: 10px;
+            margin-top: 0;
             padding: 8px;
             background: var(--note-background, rgba(255, 255, 255, 0.02));
-            border-radius: 4px;
+            border-radius: 20px;
             border: 1px solid var(--note-border, rgba(255, 255, 255, 0.08));
         }
 
