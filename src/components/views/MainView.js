@@ -4,22 +4,32 @@ import { resizeLayout } from '../../utils/windowResize.js';
 export class MainView extends LitElement {
     static styles = css`
         * {
-            font-family: 'Inter', sans-serif;
+            font-family: 'DM Sans', sans-serif;
             cursor: default;
             user-select: none;
         }
 
         .welcome {
-            font-size: 24px;
-            margin-bottom: 8px;
-            font-weight: 600;
+            font-size: 36px;
             margin-top: auto;
+            margin-bottom: 12px;
+            margin-left: 12px;
+            font-weight: 600;
         }
 
         .input-group {
             display: flex;
             gap: 12px;
-            margin-bottom: 20px;
+            margin-bottom: 0;
+            margin-left: 12px;
+        }
+
+        .description {
+            color: var(--description-color);
+            font-size: 14px;
+            margin-bottom: auto;
+            margin-left: 18px;
+            line-height: 1.5;
         }
 
         .input-group input {
@@ -113,13 +123,6 @@ export class MainView extends LitElement {
 
         .shortcut-icons svg path {
             stroke: currentColor;
-        }
-
-        .description {
-            color: var(--description-color);
-            font-size: 14px;
-            margin-bottom: 24px;
-            line-height: 1.5;
         }
 
         .link {
@@ -283,7 +286,7 @@ export class MainView extends LitElement {
 
     render() {
         return html`
-            <div class="welcome">Welcome</div>
+            <div class="welcome">Log In</div>
 
             <div class="input-group">
                 <input
@@ -298,8 +301,8 @@ export class MainView extends LitElement {
                 </button>
             </div>
             <p class="description">
-                dont have an api key?
-                <span @click=${this.handleAPIKeyHelpClick} class="link">get one here</span>
+                Don't have an API key?
+                <span @click=${this.handleAPIKeyHelpClick} class="link">Get one for free here.</span>
             </p>
         `;
     }

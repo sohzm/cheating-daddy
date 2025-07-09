@@ -4,11 +4,7 @@ import { resizeLayout } from '../../utils/windowResize.js';
 export class CustomizeView extends LitElement {
     static styles = css`
         * {
-            font-family:
-                'Inter',
-                -apple-system,
-                BlinkMacSystemFont,
-                sans-serif;
+            font-family: 'DM Sans', sans-serif;
             cursor: default;
             user-select: none;
         }
@@ -17,11 +13,13 @@ export class CustomizeView extends LitElement {
             display: block;
             padding: 12px;
             margin: 0 auto;
-            max-width: 700px;
+            // max-width: 700px;
         }
 
         .settings-container {
-            display: grid;
+            display: flex;
+            flex-direction: column;
+            width: 100%;
             gap: 12px;
             padding-bottom: 20px;
         }
@@ -29,7 +27,7 @@ export class CustomizeView extends LitElement {
         .settings-section {
             background: var(--card-background, rgba(255, 255, 255, 0.04));
             border: 1px solid var(--card-border, rgba(255, 255, 255, 0.1));
-            border-radius: 6px;
+            border-radius: var(--border-radius);
             padding: 16px;
             backdrop-filter: blur(10px);
         }
@@ -39,7 +37,7 @@ export class CustomizeView extends LitElement {
             align-items: center;
             gap: 8px;
             margin-bottom: 12px;
-            font-size: 14px;
+            font-size: var(--title-size, 16px);
             font-weight: 600;
             color: var(--text-color);
             text-transform: uppercase;
@@ -84,7 +82,7 @@ export class CustomizeView extends LitElement {
 
         .form-label {
             font-weight: 500;
-            font-size: 12px;
+            font-size: var(--subtitle-size, 14px);
             color: var(--label-color, rgba(255, 255, 255, 0.9));
             display: flex;
             align-items: center;
@@ -92,7 +90,7 @@ export class CustomizeView extends LitElement {
         }
 
         .form-description {
-            font-size: 11px;
+            font-size: var(--subtext-size, 12px);
             color: var(--description-color, rgba(255, 255, 255, 0.5));
             line-height: 1.3;
             margin-top: 2px;
@@ -104,7 +102,7 @@ export class CustomizeView extends LitElement {
             border: 1px solid var(--input-border, rgba(255, 255, 255, 0.15));
             padding: 8px 10px;
             border-radius: 4px;
-            font-size: 12px;
+            font-size: 14px;
             transition: all 0.15s ease;
             min-height: 16px;
             font-weight: 400;
@@ -191,7 +189,7 @@ export class CustomizeView extends LitElement {
             border: 1px solid var(--button-border, rgba(255, 255, 255, 0.15));
             padding: 6px 10px;
             border-radius: 4px;
-            font-size: 11px;
+            font-size: 14px;
             font-weight: 500;
             cursor: pointer;
             transition: all 0.15s ease;
@@ -224,7 +222,7 @@ export class CustomizeView extends LitElement {
         .keybinds-table th {
             background: var(--table-header-background, rgba(255, 255, 255, 0.04));
             font-weight: 600;
-            font-size: 11px;
+            font-size: 14px;
             color: var(--label-color, rgba(255, 255, 255, 0.8));
             text-transform: uppercase;
             letter-spacing: 0.5px;
@@ -237,11 +235,11 @@ export class CustomizeView extends LitElement {
         .keybinds-table .action-name {
             font-weight: 500;
             color: var(--text-color);
-            font-size: 12px;
+            font-size: 16px;
         }
 
         .keybinds-table .action-description {
-            font-size: 10px;
+            font-size: 14px;
             color: var(--description-color, rgba(255, 255, 255, 0.5));
             margin-top: 1px;
         }
@@ -250,7 +248,7 @@ export class CustomizeView extends LitElement {
             min-width: 100px;
             padding: 4px 8px;
             margin: 0;
-            font-size: 11px;
+            font-size: 14px;
         }
 
         .keybinds-table tr:hover {
@@ -276,10 +274,10 @@ export class CustomizeView extends LitElement {
             color: var(--note-color, rgba(255, 255, 255, 0.4));
             font-style: italic;
             text-align: center;
-            margin-top: 10px;
+            margin-top: 0;
             padding: 8px;
             background: var(--note-background, rgba(255, 255, 255, 0.02));
-            border-radius: 4px;
+            border-radius: 20px;
             border: 1px solid var(--note-border, rgba(255, 255, 255, 0.08));
         }
 
@@ -303,7 +301,7 @@ export class CustomizeView extends LitElement {
 
         .checkbox-label {
             font-weight: 500;
-            font-size: 12px;
+            font-size: var(--subtext-size);
             color: var(--label-color, rgba(255, 255, 255, 0.9));
             cursor: pointer;
             user-select: none;
@@ -337,7 +335,7 @@ export class CustomizeView extends LitElement {
         }
 
         .slider-value {
-            font-size: 11px;
+            font-size: 14px;
             color: var(--success-color, #34d399);
             background: var(--success-background, rgba(52, 211, 153, 0.1));
             padding: 2px 6px;
@@ -485,6 +483,11 @@ export class CustomizeView extends LitElement {
                 value: 'negotiation',
                 name: 'Negotiation',
                 description: 'Guidance for business negotiations and deals',
+            },
+            {
+                value: 'coding-assessment',
+                name: 'Coding Assessment',
+                description: 'Guidance for coding assessments and technical interviews',
             },
         ];
     }
@@ -1144,13 +1147,13 @@ export class CustomizeView extends LitElement {
                 </div>
 
                 <div class="settings-note">
-                    💡 Settings are automatically saved as you change them. Changes will take effect immediately or on the next session start.
+                    Settings are automatically saved as you change them. Changes will take effect immediately or on the next session start.
                 </div>
 
                 <!-- Advanced Mode Section (Danger Zone) -->
                 <div class="settings-section" style="border-color: var(--danger-border, rgba(239, 68, 68, 0.3)); background: var(--danger-background, rgba(239, 68, 68, 0.05));">
                     <div class="section-title" style="color: var(--danger-color, #ef4444);">
-                        <span>⚠️ Advanced Mode</span>
+                        <span>Advanced Mode</span>
                     </div>
 
                     <div class="form-grid">

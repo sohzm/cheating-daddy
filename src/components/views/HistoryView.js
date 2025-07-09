@@ -4,16 +4,18 @@ import { resizeLayout } from '../../utils/windowResize.js';
 export class HistoryView extends LitElement {
     static styles = css`
         * {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family: 'DM Sans', sans-serif;
             cursor: default;
             user-select: none;
         }
 
         :host {
+            margin: 0;
+            padding: 0;
+            width: 100%;
             height: 100%;
             display: flex;
             flex-direction: column;
-            width: 100%;
         }
 
         .history-container {
@@ -26,15 +28,15 @@ export class HistoryView extends LitElement {
             flex: 1;
             overflow-y: auto;
             margin-bottom: 16px;
-            padding-bottom: 20px;
+            padding-bottom: 0;
         }
 
         .session-item {
             background: var(--input-background);
             border: 1px solid var(--button-border);
-            border-radius: 6px;
-            padding: 12px;
-            margin-bottom: 8px;
+            border-radius: var(--border-radius);
+            padding: 16px;
+            margin-bottom: 12px;
             cursor: pointer;
             transition: all 0.15s ease;
         }
@@ -57,18 +59,18 @@ export class HistoryView extends LitElement {
         }
 
         .session-date {
-            font-size: 12px;
+            font-size: var(--subtitle-size, 16px);
             font-weight: 600;
             color: var(--text-color);
         }
 
         .session-time {
-            font-size: 11px;
+            font-size: var(--subtitle-size, 14px);
             color: var(--description-color);
         }
 
         .session-preview {
-            font-size: 11px;
+            font-size: var(--subtext-size, 14px);
             color: var(--description-color);
             line-height: 1.3;
             display: -webkit-box;
@@ -84,9 +86,7 @@ export class HistoryView extends LitElement {
             border: 1px solid var(--button-border);
             border-radius: 6px;
             padding: 12px;
-            padding-bottom: 20px;
-            user-select: text;
-            cursor: text;
+            padding-bottom: 0;
         }
 
         .message {

@@ -3,7 +3,7 @@ import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
 export class AppHeader extends LitElement {
     static styles = css`
         * {
-            font-family: 'Inter', sans-serif;
+            font-family: 'DM Sans', sans-serif;
             cursor: default;
             user-select: none;
         }
@@ -15,7 +15,7 @@ export class AppHeader extends LitElement {
             padding: var(--header-padding);
             border: 1px solid var(--border-color);
             background: var(--header-background);
-            border-radius: var(--border-radius);
+            border-radius: 20px 20px 0 0;
         }
 
         .header-title {
@@ -174,15 +174,15 @@ export class AppHeader extends LitElement {
 
     getViewTitle() {
         const titles = {
-            onboarding: 'Welcome to Cheating Daddy',
-            main: 'Cheating Daddy',
+            onboarding: 'Welcome',
+            main: '',
             customize: 'Customize',
             help: 'Help & Shortcuts',
             history: 'Conversation History',
             advanced: 'Advanced Tools',
-            assistant: 'Cheating Daddy',
+            assistant: '',
         };
-        return titles[this.currentView] || 'Cheating Daddy';
+        return titles[this.currentView] || '';
     }
 
     getElapsedTime() {
