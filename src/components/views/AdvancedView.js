@@ -326,6 +326,7 @@ export class AdvancedView extends LitElement {
         throttleTokens: { type: Boolean },
         maxTokensPerMin: { type: Number },
         throttleAtPercent: { type: Number },
+        contentProtection: { type: Boolean },
     };
 
     constructor() {
@@ -339,7 +340,11 @@ export class AdvancedView extends LitElement {
         this.maxTokensPerMin = 1000000;
         this.throttleAtPercent = 75;
 
+        // Content protection default
+        this.contentProtection = true;
+
         this.loadRateLimitSettings();
+        this.loadContentProtectionSetting();
     }
 
     connectedCallback() {
@@ -461,11 +466,65 @@ export class AdvancedView extends LitElement {
         this.requestUpdate();
     }
 
+    // Content protection methods
+    loadContentProtectionSetting() {
+        const contentProtection = localStorage.getItem('contentProtection');
+        this.contentProtection = contentProtection !== null ? contentProtection === 'true' : true;
+    }
+
+    async handleContentProtectionChange(e) {
+        this.contentProtection = e.target.checked;
+        localStorage.setItem('contentProtection', this.contentProtection.toString());
+        
+        // Update the window's content protection in real-time
+        if (window.require) {
+            const { ipcRenderer } = window.require('electron');
+            try {
+                await ipcRenderer.invoke('update-content-protection', this.contentProtection);
+            } catch (error) {
+                console.error('Failed to update content protection:', error);
+            }
+        }
+        
+        this.requestUpdate();
+    }
+
 
 
     render() {
         return html`
             <div class="advanced-container">
+                <!-- Content Protection Section -->
+                <div class="advanced-section">
+                    <div class="section-title">
+                        <span>🔒 Content Protection</span>
+                    </div>
+                    <div class="advanced-description">
+                        Content protection makes the application window invisible to screen sharing and recording software. 
+                        This is useful for privacy when sharing your screen, but may interfere with certain display setups like DisplayLink.
+                    </div>
+
+                    <div class="form-grid">
+                        <div class="checkbox-group">
+                            <input
+                                type="checkbox"
+                                class="checkbox-input"
+                                id="content-protection"
+                                .checked=${this.contentProtection}
+                                @change=${this.handleContentProtectionChange}
+                            />
+                            <label for="content-protection" class="checkbox-label">
+                                Enable content protection (stealth mode)
+                            </label>
+                        </div>
+                        <div class="form-description" style="margin-left: 22px;">
+                            ${this.contentProtection 
+                                ? 'The application is currently invisible to screen sharing and recording software.' 
+                                : 'The application is currently visible to screen sharing and recording software.'}
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Rate Limiting Section -->
                 <div class="advanced-section">
                     <div class="section-title">
