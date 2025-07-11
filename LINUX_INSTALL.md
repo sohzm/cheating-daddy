@@ -57,7 +57,7 @@ sudo pacman -S base-devel nss gtk3 libxss alsa-lib
 
 ```bash
 # Clone the repository
-git clone https://github.com/sebamar88/cheating-daddy.git
+git clone https://github.com/sohzm/cheating-daddy.git
 cd cheating-daddy
 
 # Install dependencies
@@ -137,4 +137,4 @@ If you encounter issues during installation, please:
 
 1. Check the logs: `journalctl -u cheating-daddy`
 2. Verify system dependencies
-3. Open an issue at: https://github.com/sebamar88/cheating-daddy/issues
+3. Open an issue at: https://github.com/sohzm/cheating-daddy/issues
