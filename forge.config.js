@@ -14,7 +14,7 @@ module.exports = {
         },
         // use `security find-identity -v -p codesigning` to find your identity
         // for macos signing
-        // Note: Apple-related processes can be frustrating at times
+        // Note: macOS signing may require additional configuration and time
         // osxSign: {
         //    identity: '<paste your identity here>',
         //   optionsForFile: (filePath) => {
