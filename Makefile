@@ -44,8 +44,8 @@ build-appimage: install-deps
 	@echo "Building AppImage..."
 	$(NPM) run make:appimage
 	@echo "✓ AppImage built successfully!"
-	@echo "Location: $(OUTPUT_DIR)/AppImage/"
 	mkdir -p $(OUTPUT_DIR)/AppImage
+	@echo "Location: $(OUTPUT_DIR)/AppImage/"
 	if ls $(OUTPUT_DIR)/*.AppImage 1> /dev/null 2>&1; then \  
         mv $(OUTPUT_DIR)/*.AppImage $(OUTPUT_DIR)/AppImage/; \  
     else \  
