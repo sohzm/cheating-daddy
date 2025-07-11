@@ -7,6 +7,11 @@ module.exports = {
         extraResource: ['./src/assets/SystemAudioDump'],
         name: 'Cheating Daddy',
         icon: 'src/assets/logo',
+        executableName: 'cheating-daddy',
+        // Linux specific configuration
+        linux: {
+            category: 'Development',
+        },
         // use `security find-identity -v -p codesigning` to find your identity
         // for macos signing
         // also fuck apple
@@ -42,6 +47,55 @@ module.exports = {
             platforms: ['darwin'],
         },
         {
+            name: '@electron-forge/maker-deb',
+            platforms: ['linux'],
+            config: {
+                options: {
+                    name: 'cheating-daddy',
+                    productName: 'Cheating Daddy',
+                    genericName: 'AI Assistant',
+                    description: 'AI assistant for interviews and learning',
+                    productDescription: 'Cheating Daddy is an AI-powered assistant designed to help with interviews and learning processes.',
+                    categories: ['Development', 'Education'],
+                    icon: 'src/assets/logo.png',
+                    homepage: 'https://github.com/sohzm/cheating-daddy',
+                    maintainer: 'sohzm <sohambharambe9@gmail.com>',
+                    section: 'devel',
+                    priority: 'optional',
+                    depends: [],
+                    recommends: [],
+                    suggests: [],
+                    enhances: [],
+                    preDepends: [],
+                    scripts: {
+                        postinst: 'scripts/postinst',
+                        prerm: 'scripts/prerm',
+                        postrm: 'scripts/postrm',
+                    },
+                    desktopTemplate: 'src/assets/cheating-daddy.desktop',
+                },
+            },
+        },
+        {
+            name: '@electron-forge/maker-rpm',
+            platforms: ['linux'],
+            config: {
+                options: {
+                    name: 'cheating-daddy',
+                    productName: 'Cheating Daddy',
+                    genericName: 'AI Assistant',
+                    description: 'AI assistant for interviews and learning',
+                    productDescription: 'Cheating Daddy is an AI-powered assistant designed to help with interviews and learning processes.',
+                    categories: ['Development', 'Education'],
+                    icon: 'src/assets/logo.png',
+                    homepage: 'https://github.com/sebamar88/cheating-daddy',
+                    license: 'GPL-3.0',
+                    requires: [],
+                    group: 'Development/Tools',
+                },
+            },
+        },
+        {
             name: '@reforged/maker-appimage',
             platforms: ['linux'],
             config: {
@@ -51,8 +105,9 @@ module.exports = {
                     genericName: 'AI Assistant',
                     description: 'AI assistant for interviews and learning',
                     categories: ['Development', 'Education'],
-                    icon: 'src/assets/logo.png'
-                }
+                    icon: 'src/assets/logo.png',
+                    bin: 'cheating-daddy',
+                },
             },
         },
     ],

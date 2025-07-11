@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Cheating Daddy
+Comment=AI assistant for interviews and learning
+Exec=cheating-daddy %U
+Icon=cheating-daddy
+Terminal=false
+Categories=Development;Education;
+StartupNotify=true
+StartupWMClass=Cheating Daddy
+MimeType=x-scheme-handler/cheating-daddy;

@@ -1,0 +1,7 @@
+#!/bin/bash
+
+# Pre-removal script for Cheating Daddy .deb package
+
+set -e
+
+echo "Removing Cheating Daddy..."
