@@ -88,7 +88,7 @@ module.exports = {
                     productDescription: 'Cheating Daddy is an AI-powered assistant designed to help with interviews and learning processes.',
                     categories: ['Development', 'Education'],
                     icon: 'src/assets/logo.png',
-                    homepage: 'https://github.com/sebamar88/cheating-daddy',
+                    homepage: 'https://github.com/sohzm/cheating-daddy',
                     license: 'GPL-3.0',
                     requires: [],
                     group: 'Development/Tools',
