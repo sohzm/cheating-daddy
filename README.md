@@ -25,13 +25,6 @@ A real-time AI assistant that provides contextual help during video calls, inter
 
 Cheating Daddy is available in multiple formats for Linux:
 
-#### Quick Installation
-
-```bash
-# Download and run the installer script
-./install-linux.sh
-```
-
 #### Manual Installation
 
 **DEB Package (Ubuntu, Debian, Linux Mint)**

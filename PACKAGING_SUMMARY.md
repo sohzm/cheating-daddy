@@ -10,9 +10,6 @@
 
 ### 2. Installation Scripts
 
--   **`install-linux.sh`** - Interactive installer that detects your Linux distro and installs the appropriate package
--   **`build-linux.sh`** - Automated script to build all Linux installers
--   **`create-release.sh`** - Creates complete distribution packages
 -   **`Makefile`** - Make targets for easy building
 
 ### 3. Configuration Files
@@ -26,35 +23,6 @@
 
 -   **`LINUX_INSTALL.md`** - Comprehensive Linux installation guide
 -   **Updated `README.md`** - Added Linux installation section
-
-## 🚀 How to Use
-
-### For End Users
-
-1. **Download** the installers from releases
-2. **Run installer**:
-    ```bash
-    chmod +x install-linux.sh
-    ./install-linux.sh
-    ```
-3. **Choose your package type** (DEB, AppImage)
-4. **Launch** from applications menu
-
-### For Developers
-
-1. **Build all packages**:
-    ```bash
-    ./build-linux.sh
-    ```
-2. **Build specific package**:
-    ```bash
-    npm run make:deb      # DEB only
-    npm run make:appimage # AppImage only
-    ```
-3. **Create release**:
-    ```bash
-    ./create-release.sh
-    ```
 
 ## 📁 Generated Files
 
@@ -72,9 +40,6 @@ out/make/
 
 ```
 cheating-daddy/
-├── install-linux.sh          # Interactive installer
-├── build-linux.sh           # Build automation
-├── create-release.sh         # Release packaging
 ├── Makefile                  # Make targets
 ├── LINUX_INSTALL.md         # Installation docs
 ├── forge.config.js          # Electron Forge config
@@ -171,27 +136,11 @@ sudo apt-get install rpm
 # Test DEB package
 sudo dpkg -i cheating-daddy_*.deb
 
-# Test AppImage
-chmod +x Cheating-Daddy-*.AppImage
-./Cheating-Daddy-*.AppImage
-
-# Test installer script
-./install-linux.sh
-```
-
 ### Verify Installation
 
 -   Check applications menu for "Cheating Daddy"
 -   Run `cheating-daddy` from terminal
 -   Verify desktop file: `cat ~/.local/share/applications/cheating-daddy.desktop`
-
-## 🚀 Distribution
-
-### Manual Distribution
-
-1. Build packages: `./build-linux.sh`
-2. Create release: `./create-release.sh`
-3. Upload `cheating-daddy-v0.4.0-linux-release.tar.gz`
 
 ### GitHub Releases
 
@@ -222,3 +171,4 @@ The Linux packaging is now **production-ready** with:
 6. **Complete documentation** for users and developers
 
 Your Linux packaging is now complete and ready for distribution! 🎊
+```
