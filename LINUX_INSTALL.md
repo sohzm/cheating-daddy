@@ -1,46 +1,46 @@
-# Cheating Daddy - Instalación en Linux
+# Cheating Daddy - Linux Installation
 
-## Formatos de instalación disponibles
+## Available Installation Formats
 
-Cheating Daddy está disponible en varios formatos para diferentes distribuciones de Linux:
+Cheating Daddy is available in several formats for different Linux distributions:
 
-### 1. Paquete .deb (Ubuntu, Debian, Linux Mint, etc.)
+### 1. .deb Package (Ubuntu, Debian, Linux Mint, etc.)
 
 ```bash
-# Descargar el archivo .deb
+# Download the .deb file
 sudo dpkg -i cheating-daddy_*.deb
 
-# Si hay problemas de dependencias, ejecutar:
+# If you encounter dependency issues, run:
 sudo apt-get install -f
 ```
 
-### 2. Paquete .rpm (Fedora, RHEL, CentOS, openSUSE, etc.)
+### 2. .rpm Package (Fedora, RHEL, CentOS, openSUSE, etc.)
 
 ```bash
 # Fedora/RHEL/CentOS
 sudo rpm -i cheating-daddy_*.rpm
-# o
+# or
 sudo dnf install cheating-daddy_*.rpm
 
 # openSUSE
 sudo zypper install cheating-daddy_*.rpm
 ```
 
-### 3. AppImage (Universal - cualquier distribución)
+### 3. AppImage (Universal - any distribution)
 
 ```bash
-# Hacer el archivo ejecutable
+# Make the file executable
 chmod +x Cheating-Daddy-*.AppImage
 
-# Ejecutar directamente
+# Run directly
 ./Cheating-Daddy-*.AppImage
 ```
 
-## Construcción desde el código fuente
+## Building from Source
 
-Si prefieres construir los instaladores desde el código fuente:
+If you prefer to build the installers from source code:
 
-### Prerrequisitos
+### Prerequisites
 
 ```bash
 # Ubuntu/Debian
@@ -53,28 +53,28 @@ sudo dnf install gcc-c++ make nss-devel gtk3-devel libXScrnSaver-devel alsa-lib-
 sudo pacman -S base-devel nss gtk3 libxss alsa-lib
 ```
 
-### Construcción
+### Build
 
 ```bash
-# Clonar el repositorio
+# Clone the repository
 git clone https://github.com/sebamar88/cheating-daddy.git
 cd cheating-daddy
 
-# Instalar dependencias
+# Install dependencies
 npm install
 
-# Construir todos los formatos para Linux
+# Build all formats for Linux
 npm run make:linux
 
-# O construir formatos específicos:
-npm run make:deb      # Solo .deb
-npm run make:rpm      # Solo .rpm
-npm run make:appimage # Solo AppImage
+# Or build specific formats:
+npm run make:deb      # Only .deb
+npm run make:rpm      # Only .rpm
+npm run make:appimage # Only AppImage
 ```
 
-Los instaladores generados se encontrarán en la carpeta `out/make/`.
+The generated installers will be found in the `out/make/` folder.
 
-## Desinstalación
+## Uninstallation
 
 ### .deb
 
@@ -87,7 +87,7 @@ sudo apt-get remove cheating-daddy
 ```bash
 # Fedora/RHEL/CentOS
 sudo rpm -e cheating-daddy
-# o
+# or
 sudo dnf remove cheating-daddy
 
 # openSUSE
@@ -96,32 +96,32 @@ sudo zypper remove cheating-daddy
 
 ### AppImage
 
-Simplemente elimina el archivo AppImage.
+Simply delete the AppImage file.
 
-## Problemas comunes
+## Common Issues
 
-### Problema: La aplicación no aparece en el menú
+### Issue: The application does not appear in the menu
 
-**Solución:**
+**Solution:**
 
 ```bash
 sudo update-desktop-database
 sudo gtk-update-icon-cache -f -t /usr/share/icons/hicolor
 ```
 
-### Problema: Error de permisos con audio
+### Issue: Audio permission error
 
-**Solución:**
+**Solution:**
 
 ```bash
-# Agregar usuario al grupo audio
+# Add user to the audio group
 sudo usermod -a -G audio $USER
-# Luego reiniciar sesión
+# Then restart your session
 ```
 
-### Problema: Dependencias faltantes
+### Issue: Missing dependencies
 
-**Solución:**
+**Solution:**
 
 ```bash
 # Ubuntu/Debian
@@ -131,10 +131,10 @@ sudo apt-get install --fix-broken
 sudo dnf install -y --best --allowerasing
 ```
 
-## Soporte
+## Support
 
-Si encuentras problemas durante la instalación, por favor:
+If you encounter issues during installation, please:
 
-1. Revisa los logs: `journalctl -u cheating-daddy`
-2. Verifica las dependencias del sistema
-3. Abre un issue en: https://github.com/sebamar88/cheating-daddy/issues
+1. Check the logs: `journalctl -u cheating-daddy`
+2. Verify system dependencies
+3. Open an issue at: https://github.com/sebamar88/cheating-daddy/issues
