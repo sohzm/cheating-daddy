@@ -44,7 +44,9 @@ build-appimage: install-deps
 	@echo "Building AppImage..."
 	$(NPM) run make:appimage
 	@echo "✓ AppImage built successfully!"
-	@echo "Location: $(OUTPUT_DIR)/"
+	@echo "Location: $(OUTPUT_DIR)/AppImage/"
+	mkdir -p $(OUTPUT_DIR)/AppImage
+	mv $(OUTPUT_DIR)/*.AppImage $(OUTPUT_DIR)/AppImage/
 
 # Build all Linux packages
 build-all: install-deps
