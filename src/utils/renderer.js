@@ -715,25 +715,46 @@ function handleShortcut(shortcutKey) {
     }
 }
 
+// Cached app element reference for performance
+let _cachedAppElement = null;
+let _elementCacheTime = 0;
+const ELEMENT_CACHE_DURATION = 1000; // Cache for 1 second
+
+// Helper to get app element with caching
+const getAppElement = () => {
+    const now = Date.now();
+    if (_cachedAppElement && (now - _elementCacheTime) < ELEMENT_CACHE_DURATION) {
+        // Return cached element if it's still valid and connected
+        if (_cachedAppElement.isConnected) {
+            return _cachedAppElement;
+        }
+    }
+    
+    // Cache miss or stale cache - query fresh
+    _cachedAppElement = document.querySelector('cheating-daddy-app');
+    _elementCacheTime = now;
+    return _cachedAppElement;
+};
+
 // Consolidated cheddar object - all functions in one place
 const cheddar = {
-    // Element access - lazy load the element
-    element: () => document.querySelector('cheating-daddy-app'),
-    e: () => document.querySelector('cheating-daddy-app'),
+    // Element access - cached for performance
+    element: () => getAppElement(),
+    e: () => getAppElement(),
 
     // App state functions - access properties directly from the app element
     getCurrentView: () => {
-        const app = document.querySelector('cheating-daddy-app');
+        const app = getAppElement();
         return app?.currentView || 'main';
     },
     getLayoutMode: () => {
-        const app = document.querySelector('cheating-daddy-app');
+        const app = getAppElement();
         return app?.layoutMode || 'normal';
     },
 
     // Status and response functions
     setStatus: text => {
-        const app = document.querySelector('cheating-daddy-app');
+        const app = getAppElement();
         if (app && app.setStatus) {
             app.setStatus(text);
         } else {
@@ -741,7 +762,7 @@ const cheddar = {
         }
     },
     setResponse: response => {
-        const app = document.querySelector('cheating-daddy-app');
+        const app = getAppElement();
         if (app && app.setResponse) {
             app.setResponse(response);
         } else {

@@ -29,13 +29,20 @@ app.whenReady().then(async () => {
     setupGeneralIpcHandlers();
     setupConfigIpcHandlers();
     
-    // Migrate from localStorage on first run after window is ready
+    // Migrate from localStorage only on first run after window is ready
     if (mainWindow && mainWindow.webContents) {
         mainWindow.webContents.once('dom-ready', async () => {
-            // Add minimal delay to ensure renderer is initialized
+            // Check if migration is needed before running
             setTimeout(async () => {
                 try {
-                    await config.migrateFromLocalStorage(mainWindow.webContents);
+                    const isFirstRun = config.isFirstRun();
+                    if (isFirstRun) {
+                        console.log('First run detected, starting localStorage migration...');
+                        await config.migrateFromLocalStorage(mainWindow.webContents);
+                        console.log('Migration completed successfully');
+                    } else {
+                        console.log('Not first run, skipping migration');
+                    }
                 } catch (error) {
                     console.error('Migration failed:', error);
                 }
