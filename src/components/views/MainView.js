@@ -194,7 +194,11 @@ export class MainView extends LitElement {
     }
 
     handleInput(e) {
-        localStorage.setItem('apiKey', e.target.value);
+        try {
+            window.cheddar?.config?.set('app.apiKey', e.target.value);
+        } catch (error) {
+            console.warn('Failed to save API key:', error);
+        }
         // Clear error state when user starts typing
         if (this.showApiKeyError) {
             this.showApiKeyError = false;
@@ -213,16 +217,24 @@ export class MainView extends LitElement {
     }
 
     handleResetOnboarding() {
-        localStorage.removeItem('onboardingCompleted');
+        try {
+            window.cheddar?.config?.set('app.onboardingCompleted', false);
+        } catch (error) {
+            console.warn('Failed to reset onboarding:', error);
+        }
         // Refresh the page to trigger onboarding
         window.location.reload();
     }
 
     loadLayoutMode() {
-        const savedLayoutMode = localStorage.getItem('layoutMode');
-        if (savedLayoutMode && savedLayoutMode !== 'normal') {
-            // Notify parent component to apply the saved layout mode
-            this.onLayoutModeChange(savedLayoutMode);
+        try {
+            const savedLayoutMode = window.cheddar?.config?.getCached('window.layoutMode');
+            if (savedLayoutMode && savedLayoutMode !== 'normal') {
+                // Notify parent component to apply the saved layout mode
+                this.onLayoutModeChange(savedLayoutMode);
+            }
+        } catch (error) {
+            console.warn('Failed to load layout mode:', error);
         }
     }
 
@@ -289,7 +301,7 @@ export class MainView extends LitElement {
                 <input
                     type="password"
                     placeholder="Enter your Gemini API Key"
-                    .value=${localStorage.getItem('apiKey') || ''}
+                    .value=${window.cheddar?.config?.getCached('app.apiKey') || ''}
                     @input=${this.handleInput}
                     class="${this.showApiKeyError ? 'api-key-error' : ''}"
                 />

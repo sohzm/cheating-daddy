@@ -113,34 +113,29 @@ async function getEnabledTools() {
 }
 
 async function getStoredSetting(key, defaultValue) {
+    const config = require('../config/store');
+    
     try {
-        const windows = BrowserWindow.getAllWindows();
-        if (windows.length > 0) {
-            // Wait a bit for the renderer to be ready
-            await new Promise(resolve => setTimeout(resolve, 100));
-
-            // Try to get setting from renderer process localStorage
-            const value = await windows[0].webContents.executeJavaScript(`
-                (function() {
-                    try {
-                        if (typeof localStorage === 'undefined') {
-                            console.log('localStorage not available yet for ${key}');
-                            return '${defaultValue}';
-                        }
-                        const stored = localStorage.getItem('${key}');
-                        console.log('Retrieved setting ${key}:', stored);
-                        return stored || '${defaultValue}';
-                    } catch (e) {
-                        console.error('Error accessing localStorage for ${key}:', e);
-                        return '${defaultValue}';
-                    }
-                })()
-            `);
-            return value;
+        // Map old localStorage keys to new config paths
+        const keyMapping = {
+            'googleSearchEnabled': 'advanced.googleSearchEnabled',
+            'throttleTokens': 'advanced.throttleTokens',
+            'maxTokensPerMin': 'advanced.maxTokensPerMin',
+            'throttleAtPercent': 'advanced.throttleAtPercent',
+            'contentProtection': 'advanced.contentProtection'
+        };
+        
+        const configKey = keyMapping[key] || key;
+        const value = config.get(configKey);
+        
+        if (value !== undefined) {
+            console.log('Retrieved setting', key, ':', value);
+            return value.toString();
         }
     } catch (error) {
         console.error('Error getting stored setting for', key, ':', error.message);
     }
+    
     console.log('Using default value for', key, ':', defaultValue);
     return defaultValue;
 }

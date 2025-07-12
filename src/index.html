@@ -101,10 +101,25 @@
     </head>
     <body>
         <script src="assets/marked-4.3.0.min.js"></script>
-        <script type="module" src="components/app/CheatingDaddyApp.js"></script>
+        <script src="utils/renderer.js"></script>
+        <script type="module">
+            // Import all components from single bundle
+            import './components/all.js';
+            
+            // Debug: Check if app element exists and is connected
+            window.addEventListener('DOMContentLoaded', () => {
+                console.log('DOM loaded');
+                const appElement = document.querySelector('cheating-daddy-app');
+                console.log('App element found:', appElement);
+                console.log('App element connected:', appElement?.isConnected);
+                
+                // Force a render check
+                setTimeout(() => {
+                    console.log('App element after timeout:', appElement?.shadowRoot);
+                }, 1000);
+            });
+        </script>
 
         <cheating-daddy-app id="cheddar"></cheating-daddy-app>
-        <script src="script.js"></script>
-        <script src="utils/renderer.js"></script>
     </body>
 </html>
