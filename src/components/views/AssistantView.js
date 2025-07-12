@@ -265,7 +265,7 @@ export class AssistantView extends LitElement {
     `;
 
     static properties = {
-        responses: { type: Array },
+        responses: { type: Array, attribute: false },
         currentResponseIndex: { type: Number },
         selectedProfile: { type: String },
         onSendText: { type: Function },
@@ -394,9 +394,9 @@ export class AssistantView extends LitElement {
     }
 
     loadFontSize() {
-        const fontSize = localStorage.getItem('fontSize');
+        const fontSize = cheddar.config.getCached('advanced.fontSize');
         if (fontSize !== null) {
-            const fontSizeValue = parseInt(fontSize, 10) || 20;
+            const fontSizeValue = fontSize || 20;
             const root = document.documentElement;
             root.style.setProperty('--response-font-size', `${fontSizeValue}px`);
         }

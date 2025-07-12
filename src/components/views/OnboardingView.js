@@ -427,10 +427,14 @@ export class OnboardingView extends LitElement {
     }
 
     completeOnboarding() {
-        if (this.contextText.trim()) {
-            localStorage.setItem('customPrompt', this.contextText.trim());
+        try {
+            if (this.contextText.trim()) {
+                window.cheddar?.config?.set('app.customPrompt', this.contextText.trim());
+            }
+            window.cheddar?.config?.set('app.onboardingCompleted', true);
+        } catch (error) {
+            console.warn('Failed to save onboarding settings:', error);
         }
-        localStorage.setItem('onboardingCompleted', 'true');
         this.onComplete();
     }
 

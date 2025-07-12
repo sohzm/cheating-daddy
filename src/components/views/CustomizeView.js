@@ -4,11 +4,7 @@ import { resizeLayout } from '../../utils/windowResize.js';
 export class CustomizeView extends LitElement {
     static styles = css`
         * {
-            font-family:
-                'Inter',
-                -apple-system,
-                BlinkMacSystemFont,
-                sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             cursor: default;
             user-select: none;
         }
@@ -432,16 +428,10 @@ export class CustomizeView extends LitElement {
         this.onLayoutModeChange = () => {};
         this.onAdvancedModeChange = () => {};
 
-        // Google Search default
-        this.googleSearchEnabled = true;
-
-        // Advanced mode default
+        // Initialize with default values - will be overridden by loadX() methods
+        this.googleSearchEnabled = false;
         this.advancedMode = false;
-
-        // Background transparency default
         this.backgroundTransparency = 0.8;
-
-        // Font size default (in pixels)
         this.fontSize = 20;
 
         this.loadKeybinds();
@@ -542,19 +532,19 @@ export class CustomizeView extends LitElement {
 
     handleProfileSelect(e) {
         this.selectedProfile = e.target.value;
-        localStorage.setItem('selectedProfile', this.selectedProfile);
+        cheddar.config.set('app.selectedProfile', this.selectedProfile);
         this.onProfileChange(this.selectedProfile);
     }
 
     handleLanguageSelect(e) {
         this.selectedLanguage = e.target.value;
-        localStorage.setItem('selectedLanguage', this.selectedLanguage);
+        cheddar.config.set('app.selectedLanguage', this.selectedLanguage);
         this.onLanguageChange(this.selectedLanguage);
     }
 
     handleScreenshotIntervalSelect(e) {
         this.selectedScreenshotInterval = e.target.value;
-        localStorage.setItem('selectedScreenshotInterval', this.selectedScreenshotInterval);
+        cheddar.config.set('app.selectedScreenshotInterval', this.selectedScreenshotInterval);
         this.onScreenshotIntervalChange(this.selectedScreenshotInterval);
     }
 
@@ -565,12 +555,12 @@ export class CustomizeView extends LitElement {
 
     handleLayoutModeSelect(e) {
         this.layoutMode = e.target.value;
-        localStorage.setItem('layoutMode', this.layoutMode);
+        cheddar.config.set('window.layoutMode', this.layoutMode);
         this.onLayoutModeChange(e.target.value);
     }
 
     handleCustomPromptInput(e) {
-        localStorage.setItem('customPrompt', e.target.value);
+        cheddar.config.set('app.customPrompt', e.target.value);
     }
 
     getDefaultKeybinds() {
@@ -591,19 +581,14 @@ export class CustomizeView extends LitElement {
     }
 
     loadKeybinds() {
-        const savedKeybinds = localStorage.getItem('customKeybinds');
+        const savedKeybinds = cheddar.config.getCached('keybinds');
         if (savedKeybinds) {
-            try {
-                this.keybinds = { ...this.getDefaultKeybinds(), ...JSON.parse(savedKeybinds) };
-            } catch (e) {
-                console.error('Failed to parse saved keybinds:', e);
-                this.keybinds = this.getDefaultKeybinds();
-            }
+            this.keybinds = { ...this.getDefaultKeybinds(), ...savedKeybinds };
         }
     }
 
     saveKeybinds() {
-        localStorage.setItem('customKeybinds', JSON.stringify(this.keybinds));
+        cheddar.config.set('keybinds', this.keybinds);
         // Send to main process to update global shortcuts
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
@@ -619,7 +604,7 @@ export class CustomizeView extends LitElement {
 
     resetKeybinds() {
         this.keybinds = this.getDefaultKeybinds();
-        localStorage.removeItem('customKeybinds');
+        cheddar.config.resetKeybinds();
         this.requestUpdate();
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
@@ -763,15 +748,15 @@ export class CustomizeView extends LitElement {
     }
 
     loadGoogleSearchSettings() {
-        const googleSearchEnabled = localStorage.getItem('googleSearchEnabled');
+        const googleSearchEnabled = cheddar.config.getCached('advanced.googleSearchEnabled');
         if (googleSearchEnabled !== null) {
-            this.googleSearchEnabled = googleSearchEnabled === 'true';
+            this.googleSearchEnabled = googleSearchEnabled;
         }
     }
 
     async handleGoogleSearchChange(e) {
         this.googleSearchEnabled = e.target.checked;
-        localStorage.setItem('googleSearchEnabled', this.googleSearchEnabled.toString());
+        cheddar.config.set('advanced.googleSearchEnabled', this.googleSearchEnabled);
 
         // Notify main process if available
         if (window.require) {
@@ -787,37 +772,37 @@ export class CustomizeView extends LitElement {
     }
 
     loadLayoutMode() {
-        const savedLayoutMode = localStorage.getItem('layoutMode');
+        const savedLayoutMode = cheddar.config.getCached('window.layoutMode');
         if (savedLayoutMode) {
             this.layoutMode = savedLayoutMode;
         }
     }
 
     loadAdvancedModeSettings() {
-        const advancedMode = localStorage.getItem('advancedMode');
+        const advancedMode = cheddar.config.getCached('app.advancedMode');
         if (advancedMode !== null) {
-            this.advancedMode = advancedMode === 'true';
+            this.advancedMode = advancedMode;
         }
     }
 
     async handleAdvancedModeChange(e) {
         this.advancedMode = e.target.checked;
-        localStorage.setItem('advancedMode', this.advancedMode.toString());
+        cheddar.config.set('app.advancedMode', this.advancedMode);
         this.onAdvancedModeChange(this.advancedMode);
         this.requestUpdate();
     }
 
     loadBackgroundTransparency() {
-        const backgroundTransparency = localStorage.getItem('backgroundTransparency');
+        const backgroundTransparency = cheddar.config.getCached('advanced.backgroundTransparency');
         if (backgroundTransparency !== null) {
-            this.backgroundTransparency = parseFloat(backgroundTransparency) || 0.8;
+            this.backgroundTransparency = backgroundTransparency || 0.8;
         }
         this.updateBackgroundTransparency();
     }
 
     handleBackgroundTransparencyChange(e) {
         this.backgroundTransparency = parseFloat(e.target.value);
-        localStorage.setItem('backgroundTransparency', this.backgroundTransparency.toString());
+        cheddar.config.set('advanced.backgroundTransparency', this.backgroundTransparency);
         this.updateBackgroundTransparency();
         this.requestUpdate();
     }
@@ -837,16 +822,16 @@ export class CustomizeView extends LitElement {
     }
 
     loadFontSize() {
-        const fontSize = localStorage.getItem('fontSize');
+        const fontSize = cheddar.config.getCached('advanced.fontSize');
         if (fontSize !== null) {
-            this.fontSize = parseInt(fontSize, 10) || 20;
+            this.fontSize = fontSize || 20;
         }
         this.updateFontSize();
     }
 
     handleFontSizeChange(e) {
         this.fontSize = parseInt(e.target.value, 10);
-        localStorage.setItem('fontSize', this.fontSize.toString());
+        cheddar.config.set('advanced.fontSize', this.fontSize);
         this.updateFontSize();
         this.requestUpdate();
     }
@@ -897,7 +882,7 @@ export class CustomizeView extends LitElement {
                                 placeholder="Add specific instructions for how you want the AI to behave during ${
                                     profileNames[this.selectedProfile] || 'this interaction'
                                 }..."
-                                .value=${localStorage.getItem('customPrompt') || ''}
+                                .value=${cheddar.config.getCached('app.customPrompt') || ''}
                                 rows="4"
                                 @input=${this.handleCustomPromptInput}
                             ></textarea>
@@ -976,7 +961,7 @@ export class CustomizeView extends LitElement {
                                     min="0"
                                     max="1"
                                     step="0.01"
-                                    .value=${this.backgroundTransparency}
+                                    .value=${this.backgroundTransparency.toString()}
                                     @input=${this.handleBackgroundTransparencyChange}
                                 />
                                 <div class="slider-labels">
@@ -1001,7 +986,7 @@ export class CustomizeView extends LitElement {
                                     min="12"
                                     max="32"
                                     step="1"
-                                    .value=${this.fontSize}
+                                    .value=${this.fontSize.toString()}
                                     @input=${this.handleFontSizeChange}
                                 />
                                 <div class="slider-labels">
@@ -1066,8 +1051,8 @@ export class CustomizeView extends LitElement {
                                         this.selectedImageQuality === 'high'
                                             ? 'Best quality, uses more tokens'
                                             : this.selectedImageQuality === 'medium'
-                                              ? 'Balanced quality and token usage'
-                                              : 'Lower quality, uses fewer tokens'
+                                            ? 'Balanced quality and token usage'
+                                            : 'Lower quality, uses fewer tokens'
                                     }
                                 </div>
                             </div>
