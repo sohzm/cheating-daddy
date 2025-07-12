@@ -1,6 +1,26 @@
 // renderer.js
 const { ipcRenderer } = require('electron');
 
+console.log('Renderer __dirname:', __dirname);
+console.log('Renderer process.cwd():', process.cwd());
+console.log('Window location:', window.location.href);
+
+// Since renderer context runs from src/, config is in ./config/
+const rendererConfig = require('./config/rendererConfig');
+
+// Initialize config cache asynchronously without blocking
+console.log('Starting config cache initialization...');
+rendererConfig.initCache().then(() => {
+    console.log('Config cache initialized successfully');
+    // Refresh UI components that might be waiting for config
+    if (window.cheddar?.element()?.refreshConfigValues) {
+        window.cheddar.element().refreshConfigValues();
+    }
+}).catch(err => {
+    console.error('Failed to initialize config cache:', err);
+    // Continue anyway with empty cache
+});
+
 // Initialize random display name for UI components
 window.randomDisplayName = null;
 
@@ -100,14 +120,14 @@ let tokenTracker = {
 
     // Check if we should throttle based on settings
     shouldThrottle() {
-        // Get rate limiting settings from localStorage
-        const throttleEnabled = localStorage.getItem('throttleTokens') === 'true';
+        // Get rate limiting settings from config
+        const throttleEnabled = rendererConfig.getCached('advanced.throttleTokens') || false;
         if (!throttleEnabled) {
             return false;
         }
 
-        const maxTokensPerMin = parseInt(localStorage.getItem('maxTokensPerMin') || '1000000', 10);
-        const throttleAtPercent = parseInt(localStorage.getItem('throttleAtPercent') || '75', 10);
+        const maxTokensPerMin = rendererConfig.getCached('advanced.maxTokensPerMin') || 1000000;
+        const throttleAtPercent = rendererConfig.getCached('advanced.throttleAtPercent') || 75;
 
         const currentTokens = this.getTokensInLastMinute();
         const throttleThreshold = Math.floor((maxTokensPerMin * throttleAtPercent) / 100);
@@ -150,9 +170,10 @@ function arrayBufferToBase64(buffer) {
 }
 
 async function initializeGemini(profile = 'interview', language = 'en-US') {
-    const apiKey = localStorage.getItem('apiKey')?.trim();
+    const apiKey = rendererConfig.getCached('app.apiKey')?.trim();
     if (apiKey) {
-        const success = await ipcRenderer.invoke('initialize-gemini', apiKey, localStorage.getItem('customPrompt') || '', profile, language);
+        const customPrompt = rendererConfig.getCached('app.customPrompt') || '';
+        const success = await ipcRenderer.invoke('initialize-gemini', apiKey, customPrompt, profile, language);
         if (success) {
             cheddar.setStatus('Live');
         } else {
@@ -694,22 +715,39 @@ function handleShortcut(shortcutKey) {
     }
 }
 
-// Create reference to the main app element
-const cheatingDaddyApp = document.querySelector('cheating-daddy-app');
-
 // Consolidated cheddar object - all functions in one place
 const cheddar = {
-    // Element access
-    element: () => cheatingDaddyApp,
-    e: () => cheatingDaddyApp,
+    // Element access - lazy load the element
+    element: () => document.querySelector('cheating-daddy-app'),
+    e: () => document.querySelector('cheating-daddy-app'),
 
     // App state functions - access properties directly from the app element
-    getCurrentView: () => cheatingDaddyApp.currentView,
-    getLayoutMode: () => cheatingDaddyApp.layoutMode,
+    getCurrentView: () => {
+        const app = document.querySelector('cheating-daddy-app');
+        return app?.currentView || 'main';
+    },
+    getLayoutMode: () => {
+        const app = document.querySelector('cheating-daddy-app');
+        return app?.layoutMode || 'normal';
+    },
 
     // Status and response functions
-    setStatus: text => cheatingDaddyApp.setStatus(text),
-    setResponse: response => cheatingDaddyApp.setResponse(response),
+    setStatus: text => {
+        const app = document.querySelector('cheating-daddy-app');
+        if (app && app.setStatus) {
+            app.setStatus(text);
+        } else {
+            console.warn('App element not ready for setStatus:', text);
+        }
+    },
+    setResponse: response => {
+        const app = document.querySelector('cheating-daddy-app');
+        if (app && app.setResponse) {
+            app.setResponse(response);
+        } else {
+            console.warn('App element not ready for setResponse:', response);
+        }
+    },
 
     // Core functionality
     initializeGemini,
@@ -723,16 +761,28 @@ const cheddar = {
     getConversationSession,
     initConversationStorage,
 
-    // Content protection function
+    // Content protection function (now using config)
     getContentProtection: () => {
-        const contentProtection = localStorage.getItem('contentProtection');
-        return contentProtection !== null ? contentProtection === 'true' : true;
+        return rendererConfig.getCached('advanced.contentProtection') ?? true;
     },
 
     // Platform detection
     isLinux: isLinux,
     isMacOS: isMacOS,
+    
+    // Config API
+    config: rendererConfig,
 };
 
 // Make it globally available
 window.cheddar = cheddar;
+console.log('Cheddar object created and assigned to window');
+
+// Wait for DOM to be ready before using cheddar
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        console.log('DOM ready, cheddar is now safe to use');
+    });
+} else {
+    console.log('DOM already ready when cheddar was created');
+}
