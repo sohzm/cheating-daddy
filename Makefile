@@ -46,10 +46,10 @@ build-appimage: install-deps
 	@echo "✓ AppImage built successfully!"
 	mkdir -p $(OUTPUT_DIR)/AppImage
 	@echo "Location: $(OUTPUT_DIR)/AppImage/"
-	if ls $(OUTPUT_DIR)/*.AppImage 1> /dev/null 2>&1; then \  
-        mv $(OUTPUT_DIR)/*.AppImage $(OUTPUT_DIR)/AppImage/; \  
-    else \  
-        echo "No .AppImage files found in $(OUTPUT_DIR). Skipping move."; \  
+	if ls $(OUTPUT_DIR)/*.AppImage 1> /dev/null 2>&1; then \
+        mv $(OUTPUT_DIR)/*.AppImage $(OUTPUT_DIR)/AppImage/; \
+    else \
+        echo "No .AppImage files found in $(OUTPUT_DIR). Skipping move."; \
     fi
 
 # Build all Linux packages
