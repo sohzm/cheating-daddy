@@ -12,11 +12,7 @@ export class CheatingDaddyApp extends LitElement {
     static styles = css`
         * {
             box-sizing: border-box;
-            font-family:
-                'Inter',
-                -apple-system,
-                BlinkMacSystemFont,
-                sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             margin: 0px;
             padding: 0px;
             cursor: default;
@@ -71,9 +67,7 @@ export class CheatingDaddyApp extends LitElement {
         .view-container {
             opacity: 1;
             transform: translateY(0);
-            transition:
-                opacity 0.15s ease-out,
-                transform 0.15s ease-out;
+            transition: opacity 0.15s ease-out, transform 0.15s ease-out;
             height: 100%;
         }
 
@@ -174,24 +168,35 @@ export class CheatingDaddyApp extends LitElement {
         }
     }
 
-
-
     setStatus(text) {
         this.statusText = text;
     }
 
     setResponse(response) {
+        // Check if this looks like a filler response (very short responses to hmm, ok, etc)
+        const isFillerResponse =
+            response.length < 30 &&
+            (response.toLowerCase().includes('hmm') ||
+                response.toLowerCase().includes('okay') ||
+                response.toLowerCase().includes('next') ||
+                response.toLowerCase().includes('go on') ||
+                response.toLowerCase().includes('continue'));
+
         if (this._awaitingNewResponse || this.responses.length === 0) {
+            // Always add as new response when explicitly waiting for one
             this.responses = [...this.responses, response];
             this.currentResponseIndex = this.responses.length - 1;
             this._awaitingNewResponse = false;
             console.log('[setResponse] Pushed new response:', response);
-        } else {
-            this.responses = [
-                ...this.responses.slice(0, this.responses.length - 1),
-                response
-            ];
+        } else if (!isFillerResponse && this.responses.length > 0) {
+            // For substantial responses, update the last one (streaming behavior)
+            this.responses = [...this.responses.slice(0, this.responses.length - 1), response];
             console.log('[setResponse] Updated last response:', response);
+        } else {
+            // For filler responses, add as new to preserve the previous important answer
+            this.responses = [...this.responses, response];
+            this.currentResponseIndex = this.responses.length - 1;
+            console.log('[setResponse] Added filler response as new:', response);
         }
         this.shouldAnimateResponse = true;
         this.requestUpdate();
@@ -431,7 +436,10 @@ export class CheatingDaddyApp extends LitElement {
                         .onSendText=${message => this.handleSendText(message)}
                         .shouldAnimateResponse=${this.shouldAnimateResponse}
                         @response-index-changed=${this.handleResponseIndexChanged}
-                        @response-animation-complete=${() => { this.shouldAnimateResponse = false; this.requestUpdate(); }}
+                        @response-animation-complete=${() => {
+                            this.shouldAnimateResponse = false;
+                            this.requestUpdate();
+                        }}
                     ></assistant-view>
                 `;
 
