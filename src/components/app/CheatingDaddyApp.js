@@ -134,6 +134,7 @@ export class CheatingDaddyApp extends LitElement {
         this._viewInstances = new Map();
         this._isClickThrough = false;
         this._awaitingNewResponse = false;
+        this._currentResponseIsComplete = true;
         this.shouldAnimateResponse = false;
 
         // Apply layout mode to document root
@@ -170,6 +171,12 @@ export class CheatingDaddyApp extends LitElement {
 
     setStatus(text) {
         this.statusText = text;
+        
+        // Mark response as complete when we get certain status messages
+        if (text.includes('Ready') || text.includes('Listening') || text.includes('Error')) {
+            this._currentResponseIsComplete = true;
+            console.log('[setStatus] Marked current response as complete');
+        }
     }
 
     setResponse(response) {
@@ -187,16 +194,19 @@ export class CheatingDaddyApp extends LitElement {
             this.responses = [...this.responses, response];
             this.currentResponseIndex = this.responses.length - 1;
             this._awaitingNewResponse = false;
+            this._currentResponseIsComplete = false;
             console.log('[setResponse] Pushed new response:', response);
-        } else if (!isFillerResponse && this.responses.length > 0) {
+        } else if (!this._currentResponseIsComplete && !isFillerResponse && this.responses.length > 0) {
             // For substantial responses, update the last one (streaming behavior)
+            // Only update if the current response is not marked as complete
             this.responses = [...this.responses.slice(0, this.responses.length - 1), response];
             console.log('[setResponse] Updated last response:', response);
         } else {
-            // For filler responses, add as new to preserve the previous important answer
+            // For filler responses or when current response is complete, add as new
             this.responses = [...this.responses, response];
             this.currentResponseIndex = this.responses.length - 1;
-            console.log('[setResponse] Added filler response as new:', response);
+            this._currentResponseIsComplete = false;
+            console.log('[setResponse] Added response as new:', response);
         }
         this.shouldAnimateResponse = true;
         this.requestUpdate();
@@ -438,6 +448,8 @@ export class CheatingDaddyApp extends LitElement {
                         @response-index-changed=${this.handleResponseIndexChanged}
                         @response-animation-complete=${() => {
                             this.shouldAnimateResponse = false;
+                            this._currentResponseIsComplete = true;
+                            console.log('[response-animation-complete] Marked current response as complete');
                             this.requestUpdate();
                         }}
                     ></assistant-view>
