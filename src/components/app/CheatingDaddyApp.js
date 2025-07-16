@@ -250,10 +250,16 @@ export class CheatingDaddyApp extends LitElement {
 
     // Main view event handlers
     async handleStart() {
-        // check if api key is empty do nothing
-        const apiKey = localStorage.getItem('apiKey')?.trim();
+        const llmService = localStorage.getItem('llmService') || 'gemini';
+        let apiKey;
+
+        if (llmService === 'gemini') {
+            apiKey = localStorage.getItem('apiKey')?.trim();
+        } else {
+            apiKey = localStorage.getItem('openaiApiKey')?.trim();
+        }
+
         if (!apiKey || apiKey === '') {
-            // Trigger the red blink animation on the API key input
             const mainView = this.shadowRoot.querySelector('main-view');
             if (mainView && mainView.triggerApiKeyError) {
                 mainView.triggerApiKeyError();
@@ -261,8 +267,14 @@ export class CheatingDaddyApp extends LitElement {
             return;
         }
 
-        await cheddar.initializeGemini(this.selectedProfile, this.selectedLanguage);
-        // Pass the screenshot interval as string (including 'manual' option)
+        if (llmService === 'gemini') {
+            await cheddar.initializeGemini(this.selectedProfile, this.selectedLanguage);
+        } else {
+            const baseURL = localStorage.getItem('openaiBaseURL');
+            const model = localStorage.getItem('openaiModel');
+            await cheddar.initializeOpenAI(this.selectedProfile, this.selectedLanguage, apiKey, baseURL, model);
+        }
+
         cheddar.startCapture(this.selectedScreenshotInterval, this.selectedImageQuality);
         this.responses = [];
         this.currentResponseIndex = -1;
