@@ -262,6 +262,33 @@ export class AssistantView extends LitElement {
             min-width: 60px;
             text-align: center;
         }
+
+        .save-button {
+            background: transparent;
+            color: var(--start-button-background);
+            border: none;
+            padding: 4px;
+            border-radius: 50%;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            width: 36px;
+            height: 36px;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .save-button:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .save-button.saved {
+            color: #4caf50;
+        }
+
+        .save-button svg {
+            stroke: currentColor !important;
+        }
     `;
 
     static properties = {
@@ -270,6 +297,7 @@ export class AssistantView extends LitElement {
         selectedProfile: { type: String },
         onSendText: { type: Function },
         shouldAnimateResponse: { type: Boolean },
+        savedResponses: { type: Array },
     };
 
     constructor() {
@@ -279,6 +307,12 @@ export class AssistantView extends LitElement {
         this.selectedProfile = 'interview';
         this.onSendText = () => {};
         this._lastAnimatedWordCount = 0;
+        // Load saved responses from localStorage
+        try {
+            this.savedResponses = JSON.parse(localStorage.getItem('savedResponses') || '[]');
+        } catch (e) {
+            this.savedResponses = [];
+        }
     }
 
     getProfileNames() {
@@ -485,6 +519,28 @@ export class AssistantView extends LitElement {
         }, 0);
     }
 
+    saveCurrentResponse() {
+        const currentResponse = this.getCurrentResponse();
+        if (currentResponse && !this.isResponseSaved()) {
+            this.savedResponses = [
+                ...this.savedResponses,
+                {
+                    response: currentResponse,
+                    timestamp: new Date().toISOString(),
+                    profile: this.selectedProfile,
+                },
+            ];
+            // Save to localStorage for persistence
+            localStorage.setItem('savedResponses', JSON.stringify(this.savedResponses));
+            this.requestUpdate();
+        }
+    }
+
+    isResponseSaved() {
+        const currentResponse = this.getCurrentResponse();
+        return this.savedResponses.some(saved => saved.response === currentResponse);
+    }
+
     firstUpdated() {
         super.firstUpdated();
         this.updateResponseContent();
@@ -536,6 +592,7 @@ export class AssistantView extends LitElement {
     render() {
         const currentResponse = this.getCurrentResponse();
         const responseCounter = this.getResponseCounter();
+        const isSaved = this.isResponseSaved();
 
         return html`
             <div class="response-container" id="responseContainer"></div>
@@ -556,6 +613,31 @@ export class AssistantView extends LitElement {
                 </button>
 
                 ${this.responses.length > 0 ? html` <span class="response-counter">${responseCounter}</span> ` : ''}
+
+                <button
+                    class="save-button ${isSaved ? 'saved' : ''}"
+                    @click=${this.saveCurrentResponse}
+                    title="${isSaved ? 'Response saved' : 'Save this response'}"
+                >
+                    <?xml version="1.0" encoding="UTF-8"?><svg
+                        width="24px"
+                        height="24px"
+                        stroke-width="1.7"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                    >
+                        <path
+                            d="M5 20V5C5 3.89543 5.89543 3 7 3H16.1716C16.702 3 17.2107 3.21071 17.5858 3.58579L19.4142 5.41421C19.7893 5.78929 20 6.29799 20 6.82843V20C20 21.1046 19.1046 22 18 22H7C5.89543 22 5 21 5 20Z"
+                            stroke="currentColor"
+                            stroke-width="1.7"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        ></path>
+                        <path d="M15 22V13H9V22" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
+                        <path d="M9 3V8H15" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
+                    </svg>
+                </button>
 
                 <input type="text" id="textInput" placeholder="Type a message to the AI..." @keydown=${this.handleTextKeydown} />
 
