@@ -327,6 +327,10 @@ export class AdvancedView extends LitElement {
         maxTokensPerMin: { type: Number },
         throttleAtPercent: { type: Number },
         contentProtection: { type: Boolean },
+        llmService: { type: String },
+        openaiApiKey: { type: String },
+        openaiBaseURL: { type: String },
+        openaiModel: { type: String },
     };
 
     constructor() {
@@ -342,6 +346,11 @@ export class AdvancedView extends LitElement {
 
         // Content protection default
         this.contentProtection = true;
+
+        this.llmService = localStorage.getItem('llmService') || 'gemini';
+        this.openaiApiKey = localStorage.getItem('openaiApiKey') || '';
+        this.openaiBaseURL = localStorage.getItem('openaiBaseURL') || 'https://api.openai.com/v1';
+        this.openaiModel = localStorage.getItem('openaiModel') || 'gpt-4-turbo';
 
         this.loadRateLimitSettings();
         this.loadContentProtectionSetting();
@@ -489,11 +498,49 @@ export class AdvancedView extends LitElement {
         this.requestUpdate();
     }
 
+    handleInputChange(e) {
+        const { name, value } = e.target;
+        this[name] = value;
+        localStorage.setItem(name, value);
+        this.requestUpdate();
+    }
+
 
 
     render() {
         return html`
             <div class="advanced-container">
+                <!-- LLM Service Section -->
+                <div class="advanced-section">
+                    <div class="section-title">
+                        <span>⚙️ LLM Service</span>
+                    </div>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="llmService" class="form-label">LLM Service</label>
+                            <select name="llmService" id="llmService" class="form-control" .value=${this.llmService} @change=${this.handleInputChange}>
+                                <option value="gemini">Gemini</option>
+                                <option value="openai">OpenAI</option>
+                            </select>
+                        </div>
+
+                        ${this.llmService === 'openai' ? html`
+                            <div class="form-group">
+                                <label for="openaiApiKey" class="form-label">OpenAI API Key</label>
+                                <input type="password" name="openaiApiKey" id="openaiApiKey" class="form-control" .value=${this.openaiApiKey} @input=${this.handleInputChange}>
+                            </div>
+                            <div class="form-group">
+                                <label for="openaiBaseURL" class="form-label">OpenAI Base URL</label>
+                                <input type="text" name="openaiBaseURL" id="openaiBaseURL" class="form-control" .value=${this.openaiBaseURL} @input=${this.handleInputChange}>
+                            </div>
+                            <div class="form-group">
+                                <label for="openaiModel" class="form-label">OpenAI Model</label>
+                                <input type="text" name="openaiModel" id="openaiModel" class="form-control" .value=${this.openaiModel} @input=${this.handleInputChange}>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+
                 <!-- Content Protection Section -->
                 <div class="advanced-section">
                     <div class="section-title">

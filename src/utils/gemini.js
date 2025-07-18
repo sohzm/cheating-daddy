@@ -3,6 +3,7 @@ const { BrowserWindow, ipcMain } = require('electron');
 const { spawn } = require('child_process');
 const { saveDebugAudio } = require('../audioUtils');
 const { getSystemPrompt } = require('./prompts');
+const { LLMService } = require('./llm.js');
 
 // Conversation tracking variables
 let currentSessionId = null;
@@ -509,6 +510,17 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
     ipcMain.handle('initialize-gemini', async (event, apiKey, customPrompt, profile = 'interview', language = 'en-US') => {
         const session = await initializeGeminiSession(apiKey, customPrompt, profile, language);
         if (session) {
+            geminiSessionRef.current = session;
+            return true;
+        }
+        return false;
+    });
+
+    ipcMain.handle('initialize-openai', async (event, apiKey, customPrompt, profile, language, baseURL, model) => {
+        const { OpenAIService } = require('./openai.js');
+        const session = new OpenAIService(apiKey, baseURL, model, customPrompt, profile, language);
+        const success = await session.init();
+        if (success) {
             geminiSessionRef.current = session;
             return true;
         }
