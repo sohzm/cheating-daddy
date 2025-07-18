@@ -220,12 +220,96 @@ export class HistoryView extends LitElement {
         .conversation-view::-webkit-scrollbar-thumb:hover {
             background: var(--scrollbar-thumb-hover, rgba(255, 255, 255, 0.3));
         }
+
+        .tabs-container {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            border-bottom: 1px solid var(--button-border);
+            padding-bottom: 8px;
+        }
+
+        .tab {
+            background: transparent;
+            color: var(--description-color);
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px 4px 0 0;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .tab:hover {
+            background: var(--hover-background);
+            color: var(--text-color);
+        }
+
+        .tab.active {
+            background: var(--focus-box-shadow);
+            color: var(--text-color);
+            border-bottom: 2px solid var(--focus-border-color);
+        }
+
+        .saved-response-item {
+            background: var(--input-background);
+            border: 1px solid var(--button-border);
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 8px;
+            transition: all 0.15s ease;
+        }
+
+        .saved-response-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 8px;
+        }
+
+        .saved-response-profile {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--focus-border-color);
+            text-transform: capitalize;
+        }
+
+        .saved-response-date {
+            font-size: 10px;
+            color: var(--description-color);
+        }
+
+        .saved-response-content {
+            font-size: 12px;
+            color: var(--text-color);
+            line-height: 1.4;
+            user-select: text;
+            cursor: text;
+        }
+
+        .delete-button {
+            background: transparent;
+            color: var(--description-color);
+            border: none;
+            padding: 4px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .delete-button:hover {
+            background: rgba(255, 0, 0, 0.1);
+            color: #ff4444;
+        }
     `;
 
     static properties = {
         sessions: { type: Array },
         selectedSession: { type: Object },
         loading: { type: Boolean },
+        activeTab: { type: String },
+        savedResponses: { type: Array },
     };
 
     constructor() {
@@ -233,6 +317,13 @@ export class HistoryView extends LitElement {
         this.sessions = [];
         this.selectedSession = null;
         this.loading = true;
+        this.activeTab = 'sessions';
+        // Load saved responses from localStorage
+        try {
+            this.savedResponses = JSON.parse(localStorage.getItem('savedResponses') || '[]');
+        } catch (e) {
+            this.savedResponses = [];
+        }
         this.loadSessions();
     }
 
@@ -299,6 +390,27 @@ export class HistoryView extends LitElement {
         this.selectedSession = null;
     }
 
+    handleTabClick(tab) {
+        this.activeTab = tab;
+    }
+
+    deleteSavedResponse(index) {
+        this.savedResponses = this.savedResponses.filter((_, i) => i !== index);
+        localStorage.setItem('savedResponses', JSON.stringify(this.savedResponses));
+        this.requestUpdate();
+    }
+
+    getProfileNames() {
+        return {
+            interview: 'Job Interview',
+            sales: 'Sales Call',
+            meeting: 'Business Meeting',
+            presentation: 'Presentation',
+            negotiation: 'Negotiation',
+            exam: 'Exam Assistant',
+        };
+    }
+
     renderSessionsList() {
         if (this.loading) {
             return html`<div class="loading">Loading conversation history...</div>`;
@@ -323,6 +435,55 @@ export class HistoryView extends LitElement {
                                 <div class="session-time">${this.formatTime(session.timestamp)}</div>
                             </div>
                             <div class="session-preview">${this.getSessionPreview(session)}</div>
+                        </div>
+                    `
+                )}
+            </div>
+        `;
+    }
+
+    renderSavedResponses() {
+        if (this.savedResponses.length === 0) {
+            return html`
+                <div class="empty-state">
+                    <div class="empty-state-title">No saved responses</div>
+                    <div>Use the save button during conversations to save important responses</div>
+                </div>
+            `;
+        }
+
+        const profileNames = this.getProfileNames();
+
+        return html`
+            <div class="sessions-list">
+                ${this.savedResponses.map(
+                    (saved, index) => html`
+                        <div class="saved-response-item">
+                            <div class="saved-response-header">
+                                <div>
+                                    <div class="saved-response-profile">${profileNames[saved.profile] || saved.profile}</div>
+                                    <div class="saved-response-date">${this.formatTimestamp(saved.timestamp)}</div>
+                                </div>
+                                <button class="delete-button" @click=${() => this.deleteSavedResponse(index)} title="Delete saved response">
+                                    <svg
+                                        width="16px"
+                                        height="16px"
+                                        stroke-width="1.7"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        xmlns="http://www.w3.org/2000/svg"
+                                    >
+                                        <path
+                                            d="M6 6L18 18M6 18L18 6"
+                                            stroke="currentColor"
+                                            stroke-width="1.7"
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"
+                                        ></path>
+                                    </svg>
+                                </button>
+                            </div>
+                            <div class="saved-response-content">${saved.response}</div>
                         </div>
                     `
                 )}
@@ -392,7 +553,23 @@ export class HistoryView extends LitElement {
     }
 
     render() {
-        return html` <div class="history-container">${this.selectedSession ? this.renderConversationView() : this.renderSessionsList()}</div> `;
+        if (this.selectedSession) {
+            return html`<div class="history-container">${this.renderConversationView()}</div>`;
+        }
+
+        return html`
+            <div class="history-container">
+                <div class="tabs-container">
+                    <button class="tab ${this.activeTab === 'sessions' ? 'active' : ''}" @click=${() => this.handleTabClick('sessions')}>
+                        Conversation History
+                    </button>
+                    <button class="tab ${this.activeTab === 'saved' ? 'active' : ''}" @click=${() => this.handleTabClick('saved')}>
+                        Saved Responses (${this.savedResponses.length})
+                    </button>
+                </div>
+                ${this.activeTab === 'sessions' ? this.renderSessionsList() : this.renderSavedResponses()}
+            </div>
+        `;
     }
 }
 
