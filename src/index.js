@@ -7,6 +7,7 @@ const { createWindow, updateGlobalShortcuts } = require('./utils/window');
 const { setupGeminiIpcHandlers, stopMacOSAudioCapture, sendToRenderer } = require('./utils/gemini');
 const { initializeRandomProcessNames } = require('./utils/processRandomizer');
 const { applyAntiAnalysisMeasures } = require('./utils/stealthFeatures');
+const config = require('./config/store');
 
 const geminiSessionRef = { current: null };
 let mainWindow = null;
@@ -26,6 +27,28 @@ app.whenReady().then(async () => {
     createMainWindow();
     setupGeminiIpcHandlers(geminiSessionRef);
     setupGeneralIpcHandlers();
+    setupConfigIpcHandlers();
+    
+    // Migrate from localStorage only on first run after window is ready
+    if (mainWindow && mainWindow.webContents) {
+        mainWindow.webContents.once('dom-ready', async () => {
+            // Check if migration is needed before running
+            setTimeout(async () => {
+                try {
+                    const isFirstRun = config.isFirstRun();
+                    if (isFirstRun) {
+                        console.log('First run detected, starting localStorage migration...');
+                        await config.migrateFromLocalStorage(mainWindow.webContents);
+                        console.log('Migration completed successfully');
+                    } else {
+                        console.log('Not first run, skipping migration');
+                    }
+                } catch (error) {
+                    console.error('Migration failed:', error);
+                }
+            }, 200);
+        });
+    }
 });
 
 app.on('window-all-closed', () => {
@@ -96,5 +119,113 @@ function setupGeneralIpcHandlers() {
             console.error('Error getting random display name:', error);
             return 'System Monitor';
         }
+    });
+}
+
+function setupConfigIpcHandlers() {
+    // Get all config
+    ipcMain.handle('config:getAll', () => {
+        return config.getAll();
+    });
+    
+    // Get specific config value
+    ipcMain.handle('config:get', (event, key) => {
+        return config.get(key);
+    });
+    
+    // Set specific config value
+    ipcMain.handle('config:set', (event, key, value) => {
+        config.set(key, value);
+        // Notify renderer of change
+        if (mainWindow && mainWindow.webContents) {
+            mainWindow.webContents.send('config:changed', { key, value });
+        }
+        return true;
+    });
+    
+    // Window config
+    ipcMain.handle('config:getWindowConfig', () => {
+        return config.getWindowConfig();
+    });
+    
+    ipcMain.handle('config:setWindowConfig', (event, windowConfig) => {
+        config.setWindowConfig(windowConfig);
+        if (mainWindow && mainWindow.webContents) {
+            mainWindow.webContents.send('config:changed', { key: 'window', value: config.getWindowConfig() });
+        }
+        return true;
+    });
+    
+    // App config
+    ipcMain.handle('config:getAppConfig', () => {
+        return config.getAppConfig();
+    });
+    
+    ipcMain.handle('config:setAppConfig', (event, appConfig) => {
+        config.setAppConfig(appConfig);
+        if (mainWindow && mainWindow.webContents) {
+            mainWindow.webContents.send('config:changed', { key: 'app', value: config.getAppConfig() });
+        }
+        return true;
+    });
+    
+    // Keybinds
+    ipcMain.handle('config:getKeybinds', () => {
+        return config.getKeybinds();
+    });
+    
+    ipcMain.handle('config:setKeybinds', (event, keybinds) => {
+        config.setKeybinds(keybinds);
+        // Also update global shortcuts
+        if (mainWindow) {
+            updateGlobalShortcuts(config.getKeybinds(), mainWindow, sendToRenderer, geminiSessionRef);
+        }
+        if (mainWindow && mainWindow.webContents) {
+            mainWindow.webContents.send('config:changed', { key: 'keybinds', value: config.getKeybinds() });
+        }
+        return true;
+    });
+    
+    ipcMain.handle('config:resetKeybinds', () => {
+        config.resetKeybinds();
+        // Also update global shortcuts
+        if (mainWindow) {
+            updateGlobalShortcuts(config.getKeybinds(), mainWindow, sendToRenderer, geminiSessionRef);
+        }
+        if (mainWindow && mainWindow.webContents) {
+            mainWindow.webContents.send('config:changed', { key: 'keybinds', value: config.getKeybinds() });
+        }
+        return true;
+    });
+    
+    // Advanced settings
+    ipcMain.handle('config:getAdvancedConfig', () => {
+        return config.getAdvancedConfig();
+    });
+    
+    ipcMain.handle('config:setAdvancedConfig', (event, advancedConfig) => {
+        config.setAdvancedConfig(advancedConfig);
+        if (mainWindow && mainWindow.webContents) {
+            mainWindow.webContents.send('config:changed', { key: 'advanced', value: config.getAdvancedConfig() });
+        }
+        return true;
+    });
+    
+    // Reset all
+    ipcMain.handle('config:reset', () => {
+        config.reset();
+        // Also update global shortcuts
+        if (mainWindow) {
+            updateGlobalShortcuts(config.getKeybinds(), mainWindow, sendToRenderer, geminiSessionRef);
+        }
+        if (mainWindow && mainWindow.webContents) {
+            mainWindow.webContents.send('config:changed', { key: 'all', value: config.getAll() });
+        }
+        return true;
+    });
+    
+    // Check if first run
+    ipcMain.handle('config:isFirstRun', () => {
+        return config.isFirstRun();
     });
 }

@@ -3,6 +3,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const os = require('os');
 const { applyStealthMeasures, startTitleRandomization } = require('./stealthFeatures');
+const config = require('../config/store');
 
 let mouseEventsIgnored = false;
 let windowResizing = false;
@@ -26,9 +27,11 @@ function ensureDataDirectories() {
 }
 
 function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
-    // Get layout preference (default to 'normal')
-    let windowWidth = 1100;
-    let windowHeight = 600;
+    // Get window config from store
+    const windowConfig = config.getWindowConfig();
+    let windowWidth = windowConfig.width || 1100;
+    let windowHeight = windowConfig.height || 600;
+    console.log('Window config loaded:', windowConfig);
 
     const mainWindow = new BrowserWindow({
         width: windowWidth,
@@ -41,7 +44,7 @@ function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
         hiddenInMissionControl: true,
         webPreferences: {
             nodeIntegration: true,
-            contextIsolation: false, // TODO: change to true
+            contextIsolation: false, // Required for current renderer code
             backgroundThrottling: false,
             enableBlinkFeatures: 'GetDisplayMedia',
             webSecurity: true,
@@ -64,18 +67,37 @@ function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
     mainWindow.setContentProtection(true);
     mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 
-    // Center window at the top of the screen
+    // Position window based on saved position or center at top
     const primaryDisplay = screen.getPrimaryDisplay();
     const { width: screenWidth } = primaryDisplay.workAreaSize;
-    const x = Math.floor((screenWidth - windowWidth) / 2);
-    const y = 0;
+    const x = windowConfig.x !== null ? windowConfig.x : Math.floor((screenWidth - windowWidth) / 2);
+    const y = windowConfig.y !== null ? windowConfig.y : 0;
     mainWindow.setPosition(x, y);
+
+    // Save window position changes
+    mainWindow.on('moved', () => {
+        if (!mainWindow.isDestroyed()) {
+            const [newX, newY] = mainWindow.getPosition();
+            config.setWindowConfig({ x: newX, y: newY });
+        }
+    });
 
     if (process.platform === 'win32') {
         mainWindow.setAlwaysOnTop(true, 'screen-saver', 1);
     }
 
-    mainWindow.loadFile(path.join(__dirname, '../index.html'));
+    const htmlPath = path.join(__dirname, '../index.html');
+    console.log('Loading HTML file from:', htmlPath);
+    mainWindow.loadFile(htmlPath);
+
+    // Add error handling for load failures
+    mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+        console.error('Failed to load window:', errorCode, errorDescription);
+    });
+
+    mainWindow.webContents.on('did-finish-load', () => {
+        console.log('Window finished loading');
+    });
 
     // Set window title to random name if provided
     if (randomNames && randomNames.windowTitle) {
@@ -83,54 +105,28 @@ function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
         console.log(`Set window title to: ${randomNames.windowTitle}`);
     }
 
+    // Ensure window is visible
+    mainWindow.show();
+    console.log(`Window created and shown at position: ${x}, ${y} with size: ${windowWidth}x${windowHeight}`);
+
     // Apply stealth measures
     applyStealthMeasures(mainWindow);
 
     // Start periodic title randomization for additional stealth
     startTitleRandomization(mainWindow);
 
-    // After window is created, check for layout preference and resize if needed
+    // After window is created, apply settings from config
     mainWindow.webContents.once('dom-ready', () => {
         setTimeout(() => {
-            const defaultKeybinds = getDefaultKeybinds();
-            let keybinds = defaultKeybinds;
+            // Get keybinds from config
+            const keybinds = config.getKeybinds();
 
-            mainWindow.webContents
-                .executeJavaScript(
-                    `
-                try {
-                    const savedKeybinds = localStorage.getItem('customKeybinds');
-                    
-                    return {
-                        keybinds: savedKeybinds ? JSON.parse(savedKeybinds) : null
-                    };
-                } catch (e) {
-                    return { keybinds: null };
-                }
-            `
-                )
-                .then(async savedSettings => {
-                    if (savedSettings.keybinds) {
-                        keybinds = { ...defaultKeybinds, ...savedSettings.keybinds };
-                    }
+            // Apply content protection setting
+            const advancedConfig = config.getAdvancedConfig();
+            mainWindow.setContentProtection(advancedConfig.contentProtection);
+            console.log('Content protection loaded from config:', advancedConfig.contentProtection);
 
-                    // Apply content protection setting via IPC handler
-                    try {
-                        const contentProtection = await mainWindow.webContents.executeJavaScript('cheddar.getContentProtection()');
-                        mainWindow.setContentProtection(contentProtection);
-                        console.log('Content protection loaded from settings:', contentProtection);
-                    } catch (error) {
-                        console.error('Error loading content protection:', error);
-                        mainWindow.setContentProtection(true);
-                    }
-
-                    updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessionRef);
-                })
-                .catch(() => {
-                    // Default to content protection enabled
-                    mainWindow.setContentProtection(true);
-                    updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessionRef);
-                });
+            updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessionRef);
         }, 150);
     });
 
@@ -442,16 +438,16 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
                 return { success: false, error: 'Window has been destroyed' };
             }
 
-            // Get current view and layout mode from renderer
-            let viewName, layoutMode;
+            // Get current view from renderer and layout mode from config
+            let viewName;
             try {
                 viewName = await event.sender.executeJavaScript('cheddar.getCurrentView()');
-                layoutMode = await event.sender.executeJavaScript('cheddar.getLayoutMode()');
             } catch (error) {
-                console.warn('Failed to get view/layout from renderer, using defaults:', error);
+                console.warn('Failed to get view from renderer, using default:', error);
                 viewName = 'main';
-                layoutMode = 'normal';
             }
+
+            const layoutMode = config.getWindowConfig().layoutMode;
 
             console.log('Size update requested for view:', viewName, 'layout:', layoutMode);
 

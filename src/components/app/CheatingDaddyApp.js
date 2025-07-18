@@ -1,13 +1,4 @@
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
-import { AppHeader } from './AppHeader.js';
-import { MainView } from '../views/MainView.js';
-import { CustomizeView } from '../views/CustomizeView.js';
-import { HelpView } from '../views/HelpView.js';
-import { HistoryView } from '../views/HistoryView.js';
-import { AssistantView } from '../views/AssistantView.js';
-import { OnboardingView } from '../views/OnboardingView.js';
-import { AdvancedView } from '../views/AdvancedView.js';
-
 export class CheatingDaddyApp extends LitElement {
     static styles = css`
         * {
@@ -101,10 +92,9 @@ export class CheatingDaddyApp extends LitElement {
         statusText: { type: String },
         startTime: { type: Number },
         isRecording: { type: Boolean },
-        sessionActive: { type: Boolean },
         selectedProfile: { type: String },
         selectedLanguage: { type: String },
-        responses: { type: Array },
+        responses: { type: Array, attribute: false },
         currentResponseIndex: { type: Number },
         selectedScreenshotInterval: { type: String },
         selectedImageQuality: { type: String },
@@ -118,17 +108,32 @@ export class CheatingDaddyApp extends LitElement {
 
     constructor() {
         super();
-        this.currentView = localStorage.getItem('onboardingCompleted') ? 'main' : 'onboarding';
+        console.log('CheatingDaddyApp constructor called');
+
+        // Helper function to safely get config values
+        const safeGetConfig = (key, defaultValue) => {
+            try {
+                if (!window.cheddar?.config) {
+                    console.warn('Config not available yet, using default for', key);
+                    return defaultValue;
+                }
+                return window.cheddar.config.getCached(key) ?? defaultValue;
+            } catch (error) {
+                console.warn(`Failed to get config for ${key}:`, error);
+                return defaultValue;
+            }
+        };
+
+        this.currentView = safeGetConfig('app.onboardingCompleted', false) ? 'main' : 'onboarding';
         this.statusText = '';
         this.startTime = null;
         this.isRecording = false;
-        this.sessionActive = false;
-        this.selectedProfile = localStorage.getItem('selectedProfile') || 'interview';
-        this.selectedLanguage = localStorage.getItem('selectedLanguage') || 'en-US';
-        this.selectedScreenshotInterval = localStorage.getItem('selectedScreenshotInterval') || '5';
-        this.selectedImageQuality = localStorage.getItem('selectedImageQuality') || 'medium';
-        this.layoutMode = localStorage.getItem('layoutMode') || 'normal';
-        this.advancedMode = localStorage.getItem('advancedMode') === 'true';
+        this.selectedProfile = safeGetConfig('app.selectedProfile', 'interview');
+        this.selectedLanguage = safeGetConfig('app.selectedLanguage', 'en-US');
+        this.selectedScreenshotInterval = safeGetConfig('app.selectedScreenshotInterval', '5');
+        this.selectedImageQuality = safeGetConfig('app.selectedImageQuality', 'medium');
+        this.layoutMode = safeGetConfig('window.layoutMode', 'normal');
+        this.advancedMode = safeGetConfig('app.advancedMode', false);
         this.responses = [];
         this.currentResponseIndex = -1;
         this._viewInstances = new Map();
@@ -143,6 +148,7 @@ export class CheatingDaddyApp extends LitElement {
 
     connectedCallback() {
         super.connectedCallback();
+        console.log('CheatingDaddyApp connectedCallback called');
 
         // Set up IPC listeners if needed
         if (window.require) {
@@ -157,6 +163,38 @@ export class CheatingDaddyApp extends LitElement {
                 this._isClickThrough = isEnabled;
             });
         }
+
+        // If config is now available and we used defaults, refresh from config
+        setTimeout(() => {
+            if (window.cheddar?.config && window.cheddar.config._initialized) {
+                console.log('Config now available, refreshing values');
+                this.refreshConfigValues();
+            }
+        }, 100);
+
+        console.log('CheatingDaddyApp setup complete');
+    }
+
+    refreshConfigValues() {
+        const safeGetConfig = (key, defaultValue) => {
+            try {
+                return window.cheddar?.config?.getCached(key) ?? defaultValue;
+            } catch (error) {
+                console.warn(`Failed to get config for ${key}:`, error);
+                return defaultValue;
+            }
+        };
+
+        this.currentView = safeGetConfig('app.onboardingCompleted', false) ? 'main' : 'onboarding';
+        this.selectedProfile = safeGetConfig('app.selectedProfile', 'interview');
+        this.selectedLanguage = safeGetConfig('app.selectedLanguage', 'en-US');
+        this.selectedScreenshotInterval = safeGetConfig('app.selectedScreenshotInterval', '5');
+        this.selectedImageQuality = safeGetConfig('app.selectedImageQuality', 'medium');
+        this.layoutMode = safeGetConfig('window.layoutMode', 'normal');
+        this.advancedMode = safeGetConfig('app.advancedMode', false);
+
+        this.updateLayoutMode();
+        this.requestUpdate();
     }
 
     disconnectedCallback() {
@@ -171,7 +209,7 @@ export class CheatingDaddyApp extends LitElement {
 
     setStatus(text) {
         this.statusText = text;
-        
+
         // Mark response as complete when we get certain status messages
         if (text.includes('Ready') || text.includes('Listening') || text.includes('Error')) {
             this._currentResponseIsComplete = true;
@@ -237,14 +275,13 @@ export class CheatingDaddyApp extends LitElement {
         if (this.currentView === 'customize' || this.currentView === 'help' || this.currentView === 'history') {
             this.currentView = 'main';
         } else if (this.currentView === 'assistant') {
-            cheddar.stopCapture();
+            window.cheddar?.stopCapture?.();
 
             // Close the session
             if (window.require) {
                 const { ipcRenderer } = window.require('electron');
                 await ipcRenderer.invoke('close-session');
             }
-            this.sessionActive = false;
             this.currentView = 'main';
             console.log('Session closed');
         } else {
@@ -265,8 +302,13 @@ export class CheatingDaddyApp extends LitElement {
 
     // Main view event handlers
     async handleStart() {
+        if (!window.cheddar) {
+            console.error('Cheddar API not available');
+            return;
+        }
+
         // check if api key is empty do nothing
-        const apiKey = localStorage.getItem('apiKey')?.trim();
+        const apiKey = window.cheddar.config?.getCached('app.apiKey')?.trim();
         if (!apiKey || apiKey === '') {
             // Trigger the red blink animation on the API key input
             const mainView = this.shadowRoot.querySelector('main-view');
@@ -276,13 +318,17 @@ export class CheatingDaddyApp extends LitElement {
             return;
         }
 
-        await cheddar.initializeGemini(this.selectedProfile, this.selectedLanguage);
-        // Pass the screenshot interval as string (including 'manual' option)
-        cheddar.startCapture(this.selectedScreenshotInterval, this.selectedImageQuality);
-        this.responses = [];
-        this.currentResponseIndex = -1;
-        this.startTime = Date.now();
-        this.currentView = 'assistant';
+        try {
+            await window.cheddar.initializeGemini(this.selectedProfile, this.selectedLanguage);
+            // Pass the screenshot interval as string (including 'manual' option)
+            window.cheddar.startCapture(this.selectedScreenshotInterval, this.selectedImageQuality);
+            this.responses = [];
+            this.currentResponseIndex = -1;
+            this.startTime = Date.now();
+            this.currentView = 'assistant';
+        } catch (error) {
+            console.error('Failed to start session:', error);
+        }
     }
 
     async handleAPIKeyHelp() {
@@ -307,12 +353,20 @@ export class CheatingDaddyApp extends LitElement {
 
     handleImageQualityChange(quality) {
         this.selectedImageQuality = quality;
-        localStorage.setItem('selectedImageQuality', quality);
+        try {
+            window.cheddar?.config?.set('app.selectedImageQuality', quality);
+        } catch (error) {
+            console.warn('Failed to save image quality setting:', error);
+        }
     }
 
     handleAdvancedModeChange(advancedMode) {
         this.advancedMode = advancedMode;
-        localStorage.setItem('advancedMode', advancedMode.toString());
+        try {
+            window.cheddar?.config?.set('app.advancedMode', advancedMode);
+        } catch (error) {
+            console.warn('Failed to save advanced mode setting:', error);
+        }
     }
 
     handleBackClick() {
@@ -330,14 +384,25 @@ export class CheatingDaddyApp extends LitElement {
 
     // Assistant view event handlers
     async handleSendText(message) {
-        const result = await window.cheddar.sendTextMessage(message);
+        if (!window.cheddar?.sendTextMessage) {
+            console.error('Cheddar sendTextMessage not available');
+            this.setStatus('Error: Chat service not available');
+            return;
+        }
 
-        if (!result.success) {
-            console.error('Failed to send message:', result.error);
-            this.setStatus('Error sending message: ' + result.error);
-        } else {
-            this.setStatus('Message sent...');
-            this._awaitingNewResponse = true;
+        try {
+            const result = await window.cheddar.sendTextMessage(message);
+
+            if (!result.success) {
+                console.error('Failed to send message:', result.error);
+                this.setStatus('Error sending message: ' + result.error);
+            } else {
+                this.setStatus('Message sent...');
+                this._awaitingNewResponse = true;
+            }
+        } catch (error) {
+            console.error('Error sending text message:', error);
+            this.setStatus('Error sending message');
         }
     }
 
@@ -370,24 +435,33 @@ export class CheatingDaddyApp extends LitElement {
             }
         }
 
-        // Only update localStorage when these specific properties change
+        // Helper function for safe config setting
+        const safeSetConfig = (key, value) => {
+            try {
+                window.cheddar?.config?.set(key, value);
+            } catch (error) {
+                console.warn(`Failed to set config for ${key}:`, error);
+            }
+        };
+
+        // Only update config when these specific properties change
         if (changedProperties.has('selectedProfile')) {
-            localStorage.setItem('selectedProfile', this.selectedProfile);
+            safeSetConfig('app.selectedProfile', this.selectedProfile);
         }
         if (changedProperties.has('selectedLanguage')) {
-            localStorage.setItem('selectedLanguage', this.selectedLanguage);
+            safeSetConfig('app.selectedLanguage', this.selectedLanguage);
         }
         if (changedProperties.has('selectedScreenshotInterval')) {
-            localStorage.setItem('selectedScreenshotInterval', this.selectedScreenshotInterval);
+            safeSetConfig('app.selectedScreenshotInterval', this.selectedScreenshotInterval);
         }
         if (changedProperties.has('selectedImageQuality')) {
-            localStorage.setItem('selectedImageQuality', this.selectedImageQuality);
+            safeSetConfig('app.selectedImageQuality', this.selectedImageQuality);
         }
         if (changedProperties.has('layoutMode')) {
             this.updateLayoutMode();
         }
         if (changedProperties.has('advancedMode')) {
-            localStorage.setItem('advancedMode', this.advancedMode.toString());
+            safeSetConfig('app.advancedMode', this.advancedMode);
         }
     }
 
@@ -501,7 +575,11 @@ export class CheatingDaddyApp extends LitElement {
 
     async handleLayoutModeChange(layoutMode) {
         this.layoutMode = layoutMode;
-        localStorage.setItem('layoutMode', layoutMode);
+        try {
+            window.cheddar?.config?.set('window.layoutMode', layoutMode);
+        } catch (error) {
+            console.warn('Failed to save layout mode setting:', error);
+        }
         this.updateLayoutMode();
 
         // Notify main process about layout change for window resizing

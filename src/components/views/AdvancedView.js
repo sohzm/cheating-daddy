@@ -362,8 +362,8 @@ export class AdvancedView extends LitElement {
         this.requestUpdate();
 
         try {
-            // Clear localStorage
-            localStorage.clear();
+            // Clear config data
+            cheddar.config.reset();
 
             // Clear sessionStorage
             sessionStorage.clear();
@@ -417,24 +417,24 @@ export class AdvancedView extends LitElement {
 
     // Rate limiting methods
     loadRateLimitSettings() {
-        const throttleTokens = localStorage.getItem('throttleTokens');
-        const maxTokensPerMin = localStorage.getItem('maxTokensPerMin');
-        const throttleAtPercent = localStorage.getItem('throttleAtPercent');
+        const throttleTokens = cheddar.config.getCached('advanced.throttleTokens');
+        const maxTokensPerMin = cheddar.config.getCached('advanced.maxTokensPerMin');
+        const throttleAtPercent = cheddar.config.getCached('advanced.throttleAtPercent');
 
         if (throttleTokens !== null) {
-            this.throttleTokens = throttleTokens === 'true';
+            this.throttleTokens = throttleTokens;
         }
         if (maxTokensPerMin !== null) {
-            this.maxTokensPerMin = parseInt(maxTokensPerMin, 10) || 1000000;
+            this.maxTokensPerMin = maxTokensPerMin;
         }
         if (throttleAtPercent !== null) {
-            this.throttleAtPercent = parseInt(throttleAtPercent, 10) || 75;
+            this.throttleAtPercent = throttleAtPercent;
         }
     }
 
     handleThrottleTokensChange(e) {
         this.throttleTokens = e.target.checked;
-        localStorage.setItem('throttleTokens', this.throttleTokens.toString());
+        cheddar.config.set('advanced.throttleTokens', this.throttleTokens);
         this.requestUpdate();
     }
 
@@ -442,7 +442,7 @@ export class AdvancedView extends LitElement {
         const value = parseInt(e.target.value, 10);
         if (!isNaN(value) && value > 0) {
             this.maxTokensPerMin = value;
-            localStorage.setItem('maxTokensPerMin', this.maxTokensPerMin.toString());
+            cheddar.config.set('advanced.maxTokensPerMin', this.maxTokensPerMin);
         }
     }
 
@@ -450,7 +450,7 @@ export class AdvancedView extends LitElement {
         const value = parseInt(e.target.value, 10);
         if (!isNaN(value) && value >= 0 && value <= 100) {
             this.throttleAtPercent = value;
-            localStorage.setItem('throttleAtPercent', this.throttleAtPercent.toString());
+            cheddar.config.set('advanced.throttleAtPercent', this.throttleAtPercent);
         }
     }
 
@@ -459,22 +459,23 @@ export class AdvancedView extends LitElement {
         this.maxTokensPerMin = 1000000;
         this.throttleAtPercent = 75;
 
-        localStorage.removeItem('throttleTokens');
-        localStorage.removeItem('maxTokensPerMin');
-        localStorage.removeItem('throttleAtPercent');
+        cheddar.config.set('advanced.throttleTokens', false);
+        // Using default values for the other settings
+        cheddar.config.set('advanced.maxTokensPerMin', this.maxTokensPerMin);
+        cheddar.config.set('advanced.throttleAtPercent', this.throttleAtPercent);
 
         this.requestUpdate();
     }
 
     // Content protection methods
     loadContentProtectionSetting() {
-        const contentProtection = localStorage.getItem('contentProtection');
-        this.contentProtection = contentProtection !== null ? contentProtection === 'true' : true;
+        const contentProtection = cheddar.config.getCached('advanced.contentProtection');
+        this.contentProtection = contentProtection !== null ? contentProtection : true;
     }
 
     async handleContentProtectionChange(e) {
         this.contentProtection = e.target.checked;
-        localStorage.setItem('contentProtection', this.contentProtection.toString());
+        cheddar.config.set('advanced.contentProtection', this.contentProtection);
         
         // Update the window's content protection in real-time
         if (window.require) {
@@ -558,7 +559,7 @@ export class AdvancedView extends LitElement {
                                     <input
                                         type="number"
                                         class="form-control"
-                                        .value=${this.maxTokensPerMin}
+                                        .value=${this.maxTokensPerMin.toString()}
                                         min="1000"
                                         max="10000000"
                                         step="1000"
@@ -573,7 +574,7 @@ export class AdvancedView extends LitElement {
                                     <input
                                         type="number"
                                         class="form-control"
-                                        .value=${this.throttleAtPercent}
+                                        .value=${this.throttleAtPercent.toString()}
                                         min="1"
                                         max="99"
                                         step="1"

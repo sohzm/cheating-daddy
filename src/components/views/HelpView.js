@@ -267,10 +267,10 @@ export class HelpView extends LitElement {
     }
 
     loadKeybinds() {
-        const savedKeybinds = localStorage.getItem('customKeybinds');
+        const savedKeybinds = cheddar.config.getCached('keybinds');
         if (savedKeybinds) {
             try {
-                this.keybinds = { ...this.getDefaultKeybinds(), ...JSON.parse(savedKeybinds) };
+                this.keybinds = { ...this.getDefaultKeybinds(), ...savedKeybinds };
             } catch (e) {
                 console.error('Failed to parse saved keybinds:', e);
                 this.keybinds = this.getDefaultKeybinds();
