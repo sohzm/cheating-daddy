@@ -237,9 +237,15 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                 onmessage: function (message) {
                     console.log('----------------', message);
 
-                    // Handle transcription input
-                    if (message.serverContent?.inputTranscription?.text) {
-                        currentTranscription += message.serverContent.inputTranscription.text;
+                    // MODIFIED: Handle speaker-tagged transcription
+                    if (message.serverContent?.inputTranscription?.results) {
+                        for (const result of message.serverContent.inputTranscription.results) {
+                            if (result.transcript && result.speakerId) {
+                                // Format the transcript with the speaker ID
+                                const speakerLabel = result.speakerId === 1 ? 'Interviewer' : 'Candidate';
+                                currentTranscription += `[${speakerLabel}]: ${result.transcript}\n`;
+                            }
+                        }
                     }
 
                     // Handle AI model response
@@ -321,7 +327,12 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
             config: {
                 responseModalities: ['TEXT'],
                 tools: enabledTools,
-                inputAudioTranscription: {},
+                // MODIFIED: Add speaker diarization configuration
+                inputAudioTranscription: {
+                    enableSpeakerDiarization: true,
+                    minSpeakerCount: 2,
+                    maxSpeakerCount: 2,
+                },
                 contextWindowCompression: { slidingWindow: {} },
                 speechConfig: { languageCode: language },
                 systemInstruction: {
@@ -520,11 +531,26 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
         try {
             process.stdout.write('.');
             await geminiSessionRef.current.sendRealtimeInput({
-                audio: { data: data, mimeType: mimeType },
+                audio: { data: data, mimeType: mimeType }
             });
             return { success: true };
         } catch (error) {
-            console.error('Error sending audio:', error);
+            console.error('Error sending system audio:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    // Add a new handler for microphone audio
+    ipcMain.handle('send-mic-audio-content', async (event, { data, mimeType }) => {
+        if (!geminiSessionRef.current) return { success: false, error: 'No active Gemini session' };
+        try {
+            process.stdout.write(','); // Use a different character for logging
+            await geminiSessionRef.current.sendRealtimeInput({
+                audio: { data: data, mimeType: mimeType }
+            });
+            return { success: true };
+        } catch (error) {
+            console.error('Error sending mic audio:', error);
             return { success: false, error: error.message };
         }
     });

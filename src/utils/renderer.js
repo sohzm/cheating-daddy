@@ -149,6 +149,41 @@ function arrayBufferToBase64(buffer) {
     return btoa(binary);
 }
 
+function setupLinuxMicProcessing(micStream) {
+    // Setup microphone audio processing for Linux
+    const micAudioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
+    const micSource = micAudioContext.createMediaStreamSource(micStream);
+    const micProcessor = micAudioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
+
+    let audioBuffer = [];
+    const samplesPerChunk = SAMPLE_RATE * AUDIO_CHUNK_DURATION;
+
+    micProcessor.onaudioprocess = async e => {
+        const inputData = e.inputBuffer.getChannelData(0);
+        audioBuffer.push(...inputData);
+
+        // Process audio in chunks
+        while (audioBuffer.length >= samplesPerChunk) {
+            const chunk = audioBuffer.splice(0, samplesPerChunk);
+            const pcmData16 = convertFloat32ToInt16(chunk);
+            const base64Data = arrayBufferToBase64(pcmData16.buffer);
+            
+            // Send mic audio on a new, separate channel
+            await ipcRenderer.invoke('send-mic-audio-content', {
+                data: base64Data,
+                mimeType: 'audio/pcm;rate=24000',
+            });
+        }
+    };
+
+    micSource.connect(micProcessor);
+    micProcessor.connect(micAudioContext.destination);
+
+    // Store processor reference for cleanup
+    micAudioProcessor = micProcessor;
+}
+
+
 async function initializeGemini(profile = 'interview', language = 'en-US') {
     const apiKey = localStorage.getItem('apiKey')?.trim();
     if (apiKey) {
@@ -182,6 +217,8 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
     tokenTracker.reset();
     console.log('🎯 Token tracker reset for new capture session');
 
+    const audioMode = localStorage.getItem('audioMode') || 'speaker_only'; // Read the new setting
+
     try {
         if (isMacOS) {
             // On macOS, use SystemAudioDump for audio and getDisplayMedia for screen
@@ -204,6 +241,27 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
             });
 
             console.log('macOS screen capture started - audio handled by SystemAudioDump');
+
+            // Add microphone capture for macOS
+            if (audioMode === 'mic_only' || audioMode === 'both') {
+                let micStream = null;
+                try {
+                    micStream = await navigator.mediaDevices.getUserMedia({
+                        audio: {
+                            sampleRate: SAMPLE_RATE,
+                            channelCount: 1,
+                            echoCancellation: true,
+                            noiseSuppression: true,
+                            autoGainControl: true,
+                        },
+                        video: false,
+                    });
+                    console.log('macOS microphone capture started');
+                    setupLinuxMicProcessing(micStream); // Re-use the same mic processor logic
+                } catch (micError) {
+                    console.warn('Failed to get microphone access on macOS:', micError);
+                }
+            }
         } else if (isLinux) {
             // Linux - use display media for screen capture and try to get system audio
             try {
@@ -242,30 +300,32 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
                 });
             }
 
-            // Additionally get microphone input for Linux
-            let micStream = null;
-            try {
-                micStream = await navigator.mediaDevices.getUserMedia({
-                    audio: {
-                        sampleRate: SAMPLE_RATE,
-                        channelCount: 1,
-                        echoCancellation: true,
-                        noiseSuppression: true,
-                        autoGainControl: true,
-                    },
-                    video: false,
-                });
+            // Additionally get microphone input for Linux based on audio mode
+            if (audioMode === 'mic_only' || audioMode === 'both') {
+                let micStream = null;
+                try {
+                    micStream = await navigator.mediaDevices.getUserMedia({
+                        audio: {
+                            sampleRate: SAMPLE_RATE,
+                            channelCount: 1,
+                            echoCancellation: true,
+                            noiseSuppression: true,
+                            autoGainControl: true,
+                        },
+                        video: false,
+                    });
 
-                console.log('Linux microphone capture started');
+                    console.log('Linux microphone capture started');
 
-                // Setup audio processing for microphone on Linux
-                setupLinuxMicProcessing(micStream);
-            } catch (micError) {
-                console.warn('Failed to get microphone access on Linux:', micError);
-                // Continue without microphone if permission denied
+                    // Setup audio processing for microphone on Linux
+                    setupLinuxMicProcessing(micStream);
+                } catch (micError) {
+                    console.warn('Failed to get microphone access on Linux:', micError);
+                    // Continue without microphone if permission denied
+                }
             }
 
-            console.log('Linux capture started - system audio:', mediaStream.getAudioTracks().length > 0, 'microphone:', micStream !== null);
+            console.log('Linux capture started - system audio:', mediaStream.getAudioTracks().length > 0, 'microphone mode:', audioMode);
         } else {
             // Windows - use display media with loopback for system audio
             mediaStream = await navigator.mediaDevices.getDisplayMedia({
@@ -287,6 +347,27 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
 
             // Setup audio processing for Windows loopback audio only
             setupWindowsLoopbackProcessing();
+
+            // Add microphone capture logic for Windows
+            if (audioMode === 'mic_only' || audioMode === 'both') {
+                let micStream = null;
+                try {
+                    micStream = await navigator.mediaDevices.getUserMedia({
+                        audio: {
+                            sampleRate: SAMPLE_RATE,
+                            channelCount: 1,
+                            echoCancellation: true,
+                            noiseSuppression: true,
+                            autoGainControl: true,
+                        },
+                        video: false,
+                    });
+                    console.log('Windows microphone capture started');
+                    setupLinuxMicProcessing(micStream); // Re-use the same mic processor logic
+                } catch (micError) {
+                    console.warn('Failed to get microphone access on Windows:', micError);
+                }
+            }
         }
 
         console.log('MediaStream obtained:', {
@@ -680,6 +761,14 @@ ipcRenderer.on('save-conversation-turn', async (event, data) => {
 
 // Initialize conversation storage when renderer loads
 initConversationStorage().catch(console.error);
+
+// Listen for emergency erase command from main process
+ipcRenderer.on('clear-sensitive-data', () => {
+    console.log('Clearing renderer-side sensitive data...');
+    localStorage.removeItem('apiKey');
+    localStorage.removeItem('customPrompt');
+    // Consider clearing IndexedDB as well for full erasure
+});
 
 // Handle shortcuts based on current view
 function handleShortcut(shortcutKey) {
