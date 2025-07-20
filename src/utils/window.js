@@ -26,9 +26,9 @@ function ensureDataDirectories() {
 }
 
 function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
-    // Get layout preference (default to 'normal')
-    let windowWidth = 1100;
-    let windowHeight = 600;
+    // Get layout preference (default to 'compact' for smaller initial size)
+    let windowWidth = 800;
+    let windowHeight = 400;
 
     const mainWindow = new BrowserWindow({
         width: windowWidth,
@@ -40,12 +40,13 @@ function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
         skipTaskbar: true,
         hiddenInMissionControl: true,
         webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false, // TODO: change to true
+            nodeIntegration: false,
+            contextIsolation: true,
             backgroundThrottling: false,
-            enableBlinkFeatures: 'GetDisplayMedia',
+            // Removed enableBlinkFeatures - GetDisplayMedia is now native in modern Electron
             webSecurity: true,
             allowRunningInsecureContent: false,
+            preload: path.join(__dirname, '../preload.js'),
         },
         backgroundColor: '#00000000',
     });
@@ -159,8 +160,26 @@ function getDefaultKeybinds() {
 function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessionRef) {
     console.log('Updating global shortcuts with:', keybinds);
 
-    // Unregister all existing shortcuts
-    globalShortcut.unregisterAll();
+    try {
+        // Store current shortcuts to avoid unnecessary unregistration/registration
+        const currentShortcuts = globalShortcut.getRegisteredAccelerators();
+        const newShortcuts = Object.values(keybinds);
+        
+        // Only unregister shortcuts that are changing
+        currentShortcuts.forEach(shortcut => {
+            if (!newShortcuts.includes(shortcut)) {
+                globalShortcut.unregister(shortcut);
+            }
+        });
+    } catch (error) {
+        console.warn('Error handling existing shortcuts:', error.message);
+        // Fallback: unregister all shortcuts
+        try {
+            globalShortcut.unregisterAll();
+        } catch (fallbackError) {
+            console.warn('Error in fallback unregister:', fallbackError.message);
+        }
+    }
 
     const primaryDisplay = screen.getPrimaryDisplay();
     const { width, height } = primaryDisplay.workAreaSize;
@@ -190,15 +209,15 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
         },
     };
 
-    // Register each movement shortcut
+    // Register each movement shortcut only if not already registered
     Object.keys(movementActions).forEach(action => {
         const keybind = keybinds[action];
-        if (keybind) {
+        if (keybind && !globalShortcut.isRegistered(keybind)) {
             try {
                 globalShortcut.register(keybind, movementActions[action]);
                 console.log(`Registered ${action}: ${keybind}`);
             } catch (error) {
-                console.error(`Failed to register ${action} (${keybind}):`, error);
+                console.error(`Failed to register ${action} (${keybind}):`, error.message);
             }
         }
     });
@@ -249,9 +268,13 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
                     const isMac = process.platform === 'darwin';
                     const shortcutKey = isMac ? 'cmd+enter' : 'ctrl+enter';
 
-                    // Use the new handleShortcut function
-                    mainWindow.webContents.executeJavaScript(`
-                        cheddar.handleShortcut('${shortcutKey}');
+                    // Use the new handleShortcut function with better error handling
+                    await mainWindow.webContents.executeJavaScript(`
+                        if (typeof cheddar !== 'undefined' && cheddar.handleShortcut) {
+                            cheddar.handleShortcut('${shortcutKey}');
+                        } else {
+                            console.warn('cheddar object not available or handleShortcut method missing');
+                        }
                     `);
                 } catch (error) {
                     console.error('Error handling next step shortcut:', error);
@@ -382,16 +405,13 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
             windowResizing = true;
             mainWindow.setResizable(true);
 
-            const frameRate = 60; // 60 FPS
-            const totalFrames = Math.floor(RESIZE_ANIMATION_DURATION / (1000 / frameRate));
-            let currentFrame = 0;
-
             const widthDiff = targetWidth - startWidth;
             const heightDiff = targetHeight - startHeight;
+            const startTime = Date.now();
 
-            resizeAnimation = setInterval(() => {
-                currentFrame++;
-                const progress = currentFrame / totalFrames;
+            const animate = () => {
+                const elapsed = Date.now() - startTime;
+                const progress = Math.min(elapsed / RESIZE_ANIMATION_DURATION, 1);
 
                 // Use easing function (ease-out)
                 const easedProgress = 1 - Math.pow(1 - progress, 3);
@@ -400,11 +420,10 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
                 const currentHeight = Math.round(startHeight + heightDiff * easedProgress);
 
                 if (!mainWindow || mainWindow.isDestroyed()) {
-                    clearInterval(resizeAnimation);
-                    resizeAnimation = null;
                     windowResizing = false;
                     return;
                 }
+                
                 mainWindow.setSize(currentWidth, currentHeight);
 
                 // Re-center the window during animation
@@ -414,11 +433,11 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
                 const y = 0;
                 mainWindow.setPosition(x, y);
 
-                if (currentFrame >= totalFrames) {
-                    clearInterval(resizeAnimation);
-                    resizeAnimation = null;
+                if (progress < 1) {
+                    setTimeout(animate, 16); // ~60fps
+                } else {
                     windowResizing = false;
-
+                    
                     // Check if window is still valid before final operations
                     if (!mainWindow.isDestroyed()) {
                         mainWindow.setResizable(false);
@@ -432,7 +451,9 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
                     console.log(`Animation complete: ${targetWidth}x${targetHeight}`);
                     resolve();
                 }
-            }, 1000 / frameRate);
+            };
+            
+            animate();
         });
     }
 
@@ -458,27 +479,27 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
             let targetWidth, targetHeight;
 
             // Determine base size from layout mode
-            const baseWidth = layoutMode === 'compact' ? 700 : 900;
-            const baseHeight = layoutMode === 'compact' ? 300 : 400;
+            const baseWidth = layoutMode === 'compact' ? 600 : 750;
+            const baseHeight = layoutMode === 'compact' ? 250 : 350;
 
             // Adjust height based on view
             switch (viewName) {
                 case 'customize':
                 case 'settings':
                     targetWidth = baseWidth;
-                    targetHeight = layoutMode === 'compact' ? 500 : 600;
+                    targetHeight = layoutMode === 'compact' ? 400 : 500;
                     break;
                 case 'help':
                     targetWidth = baseWidth;
-                    targetHeight = layoutMode === 'compact' ? 450 : 550;
+                    targetHeight = layoutMode === 'compact' ? 350 : 450;
                     break;
                 case 'history':
                     targetWidth = baseWidth;
-                    targetHeight = layoutMode === 'compact' ? 450 : 550;
+                    targetHeight = layoutMode === 'compact' ? 350 : 450;
                     break;
                 case 'advanced':
                     targetWidth = baseWidth;
-                    targetHeight = layoutMode === 'compact' ? 400 : 500;
+                    targetHeight = layoutMode === 'compact' ? 300 : 400;
                     break;
                 case 'main':
                 case 'assistant':

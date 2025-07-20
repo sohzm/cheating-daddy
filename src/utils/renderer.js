@@ -1,41 +1,51 @@
 // renderer.js
-const { ipcRenderer } = require('electron');
 
 // Initialize random display name for UI components
 window.randomDisplayName = null;
 
-// Request random display name from main process
-ipcRenderer
-    .invoke('get-random-display-name')
-    .then(name => {
-        window.randomDisplayName = name;
-        console.log('Set random display name:', name);
-    })
-    .catch(err => {
-        console.warn('Could not get random display name:', err);
-        window.randomDisplayName = 'System Monitor';
-    });
+// Platform detection using secure electronAPI - must be at the top
+var isLinux = false;
+var isMacOS = false;
+var isWindows = false;
 
-let mediaStream = null;
-let screenshotInterval = null;
-let audioContext = null;
-let audioProcessor = null;
-let micAudioProcessor = null;
-let audioBuffer = [];
+// Initialize platform detection when electronAPI is available
+if (window.electronAPI) {
+    isLinux = window.electronAPI.isLinux;
+    isMacOS = window.electronAPI.isMacOS;
+    isWindows = window.electronAPI.isWindows;
+}
+
+// Request random display name from main process
+if (window.electronAPI) {
+    window.electronAPI.getRandomDisplayName()
+        .then(name => {
+            window.randomDisplayName = name;
+            console.log('Set random display name:', name);
+        })
+        .catch(err => {
+            console.warn('Could not get random display name:', err);
+            window.randomDisplayName = 'System Monitor';
+        });
+}
+
+// Initialize variables at module level to prevent temporal dead zone issues
+var mediaStream = null;
+var screenshotInterval = null;
+var audioContext = null;
+var audioProcessor = null;
+var micAudioProcessor = null;
+var audioBuffer = [];
 const SAMPLE_RATE = 24000;
 const AUDIO_CHUNK_DURATION = 0.1; // seconds
 const BUFFER_SIZE = 4096; // Increased buffer size for smoother audio
 
-let hiddenVideo = null;
-let offscreenCanvas = null;
-let offscreenContext = null;
-let currentImageQuality = 'medium'; // Store current image quality for manual screenshots
+var hiddenVideo = null;
+var offscreenCanvas = null;
+var offscreenContext = null;
+var currentImageQuality = 'medium'; // Store current image quality for manual screenshots
 
-const isLinux = process.platform === 'linux';
-const isMacOS = process.platform === 'darwin';
-
-// Token tracking system for rate limiting
-let tokenTracker = {
+// Token tracking system for rate limiting (moved platform detection above)
+var tokenTracker = {
     tokens: [], // Array of {timestamp, count, type} objects
     audioStartTime: null,
 
@@ -101,13 +111,13 @@ let tokenTracker = {
     // Check if we should throttle based on settings
     shouldThrottle() {
         // Get rate limiting settings from localStorage
-        const throttleEnabled = localStorage.getItem('throttleTokens') === 'true';
+        const throttleEnabled = window.secureStorage?.getItem('throttleTokens') === 'true';
         if (!throttleEnabled) {
             return false;
         }
 
-        const maxTokensPerMin = parseInt(localStorage.getItem('maxTokensPerMin') || '1000000', 10);
-        const throttleAtPercent = parseInt(localStorage.getItem('throttleAtPercent') || '75', 10);
+        const maxTokensPerMin = parseInt(window.secureStorage?.getItem('maxTokensPerMin') || '1000000', 10);
+        const throttleAtPercent = parseInt(window.secureStorage?.getItem('throttleAtPercent') || '75', 10);
 
         const currentTokens = this.getTokensInLastMinute();
         const throttleThreshold = Math.floor((maxTokensPerMin * throttleAtPercent) / 100);
@@ -128,6 +138,12 @@ let tokenTracker = {
 setInterval(() => {
     tokenTracker.trackAudioTokens();
 }, 2000);
+
+// Expose global functions for app component
+window.initializeGemini = initializeGemini;
+window.startCapture = startCapture;
+window.stopCapture = stopCapture;
+window.takeManualScreenshot = () => captureScreenshot(currentImageQuality, true);
 
 function convertFloat32ToInt16(float32Array) {
     const int16Array = new Int16Array(float32Array.length);
@@ -150,22 +166,30 @@ function arrayBufferToBase64(buffer) {
 }
 
 async function initializeGemini(profile = 'interview', language = 'en-US') {
-    const apiKey = localStorage.getItem('apiKey')?.trim();
-    if (apiKey) {
-        const success = await ipcRenderer.invoke('initialize-gemini', apiKey, localStorage.getItem('customPrompt') || '', profile, language);
-        if (success) {
-            cheddar.setStatus('Live');
-        } else {
-            cheddar.setStatus('error');
+    try {
+        const apiKey = window.secureStorage?.getItem('apiKey')?.trim();
+        console.log('Initializing Gemini with profile:', profile, 'language:', language, 'hasApiKey:', !!apiKey);
+        
+        if (!apiKey) {
+            console.warn('No API key found in secure storage');
+            return { success: false, error: 'No API key found in secure storage' };
         }
+        const success = await window.electronAPI.initializeGemini(apiKey, window.secureStorage?.getItem('customPrompt') || '', profile, language);
+        console.log('Gemini initialization result:', success);
+        return { success };
+    } catch (error) {
+        console.error('Error initializing Gemini:', error);
+        return { success: false, error: error.message };
     }
 }
 
 // Listen for status updates
-ipcRenderer.on('update-status', (event, status) => {
-    console.log('Status update:', status);
-    cheddar.setStatus(status);
-});
+if (window.electronAPI) {
+    window.electronAPI.onUpdateStatus((status) => {
+        console.log('Status update:', status);
+        // UI status updates should be handled in the app component
+    });
+}
 
 // Listen for responses - REMOVED: This is handled in CheatingDaddyApp.js to avoid duplicates
 // ipcRenderer.on('update-response', (event, response) => {
@@ -178,9 +202,17 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
     // Store the image quality for manual screenshots
     currentImageQuality = imageQuality;
 
-    // Reset token tracker when starting new capture session
-    tokenTracker.reset();
-    console.log('🎯 Token tracker reset for new capture session');
+    // Reset token tracker when starting new capture session (with safety check)
+    try {
+        if (typeof tokenTracker !== 'undefined' && tokenTracker && typeof tokenTracker.reset === 'function') {
+            tokenTracker.reset();
+            console.log('🎯 Token tracker reset for new capture session');
+        } else {
+            console.warn('tokenTracker not available or reset method missing');
+        }
+    } catch (error) {
+        console.warn('Error resetting token tracker:', error);
+    }
 
     try {
         if (isMacOS) {
@@ -188,7 +220,7 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
             console.log('Starting macOS capture with SystemAudioDump...');
 
             // Start macOS audio capture
-            const audioResult = await ipcRenderer.invoke('start-macos-audio');
+            const audioResult = await window.electronAPI.startMacOSAudio();
             if (!audioResult.success) {
                 throw new Error('Failed to start macOS audio capture: ' + audioResult.error);
             }
@@ -303,12 +335,22 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
             const intervalMilliseconds = parseInt(screenshotIntervalSeconds) * 1000;
             screenshotInterval = setInterval(() => captureScreenshot(imageQuality), intervalMilliseconds);
 
-            // Capture first screenshot immediately
-            setTimeout(() => captureScreenshot(imageQuality), 100);
+            // Wait longer for video to be ready before first screenshot
+            setTimeout(() => {
+                // Double-check video readiness before capturing
+                if (hiddenVideo && hiddenVideo.readyState >= 2) {
+                    captureScreenshot(imageQuality);
+                } else {
+                    console.log('Video still not ready, will be captured on next interval');
+                }
+            }, 1000); // Increased delay to 1 second
         }
     } catch (err) {
         console.error('Error starting capture:', err);
-        cheddar.setStatus('error');
+        // Use safe status setting - check if app element exists
+        if (typeof cheatingDaddyApp !== 'undefined' && cheatingDaddyApp && typeof cheatingDaddyApp.setStatus === 'function') {
+            cheatingDaddyApp.setStatus('error');
+        }
     }
 }
 
@@ -331,7 +373,7 @@ function setupLinuxMicProcessing(micStream) {
             const pcmData16 = convertFloat32ToInt16(chunk);
             const base64Data = arrayBufferToBase64(pcmData16.buffer);
 
-            await ipcRenderer.invoke('send-audio-content', {
+            await window.electronAPI.sendAudioContent({
                 data: base64Data,
                 mimeType: 'audio/pcm;rate=24000',
             });
@@ -346,27 +388,69 @@ function setupLinuxMicProcessing(micStream) {
 }
 
 function setupLinuxSystemAudioProcessing() {
-    // Setup system audio processing for Linux (from getDisplayMedia)
+    // Setup system audio processing for Linux (from getDisplayMedia) with optimized buffering
     audioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
     const source = audioContext.createMediaStreamSource(mediaStream);
-    audioProcessor = audioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
+    
+    // Use AudioWorklet for better performance if available, fallback to ScriptProcessor
+    if (audioContext.audioWorklet) {
+        setupAudioWorkletProcessor(source);
+    } else {
+        setupScriptProcessor(source);
+    }
+}
 
+function setupAudioWorkletProcessor(source) {
+    // Modern Web Audio API approach for better performance using external file
+    audioContext.audioWorklet.addModule('./audio-processor.js').then(() => {
+        audioProcessor = new AudioWorkletNode(audioContext, 'audio-processor');
+        audioProcessor.port.onmessage = async (event) => {
+            if (event.data.type === 'audioChunk') {
+                const pcmData16 = convertFloat32ToInt16(new Float32Array(event.data.data));
+                const base64Data = arrayBufferToBase64(pcmData16.buffer);
+                
+                await window.electronAPI.sendAudioContent({
+                    data: base64Data,
+                    mimeType: 'audio/pcm;rate=24000',
+                });
+            }
+        };
+        source.connect(audioProcessor);
+        console.log('AudioWorkletProcessor setup successfully');
+    }).catch((err) => {
+        console.warn('AudioWorkletProcessor failed, falling back to ScriptProcessor:', err);
+        // Fallback to ScriptProcessor
+        setupScriptProcessor(source);
+    });
+}
+
+function setupScriptProcessor(source) {
+    // Fallback ScriptProcessor with optimized buffering
+    audioProcessor = audioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
+    
     let audioBuffer = [];
     const samplesPerChunk = SAMPLE_RATE * AUDIO_CHUNK_DURATION;
+    let processingQueue = Promise.resolve();
 
-    audioProcessor.onaudioprocess = async e => {
+    audioProcessor.onaudioprocess = (e) => {
         const inputData = e.inputBuffer.getChannelData(0);
         audioBuffer.push(...inputData);
 
-        // Process audio in chunks
+        // Process audio in chunks with non-blocking queue
         while (audioBuffer.length >= samplesPerChunk) {
             const chunk = audioBuffer.splice(0, samplesPerChunk);
-            const pcmData16 = convertFloat32ToInt16(chunk);
-            const base64Data = arrayBufferToBase64(pcmData16.buffer);
+            
+            // Queue processing to avoid blocking audio thread
+            processingQueue = processingQueue.then(async () => {
+                const pcmData16 = convertFloat32ToInt16(chunk);
+                const base64Data = arrayBufferToBase64(pcmData16.buffer);
 
-            await ipcRenderer.invoke('send-audio-content', {
-                data: base64Data,
-                mimeType: 'audio/pcm;rate=24000',
+                await window.electronAPI.sendAudioContent({
+                    data: base64Data,
+                    mimeType: 'audio/pcm;rate=24000',
+                });
+            }).catch(error => {
+                console.error('Audio processing error:', error);
             });
         }
     };
@@ -376,33 +460,16 @@ function setupLinuxSystemAudioProcessing() {
 }
 
 function setupWindowsLoopbackProcessing() {
-    // Setup audio processing for Windows loopback audio only
+    // Setup audio processing for Windows loopback audio with optimized buffering
     audioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
     const source = audioContext.createMediaStreamSource(mediaStream);
-    audioProcessor = audioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
-
-    let audioBuffer = [];
-    const samplesPerChunk = SAMPLE_RATE * AUDIO_CHUNK_DURATION;
-
-    audioProcessor.onaudioprocess = async e => {
-        const inputData = e.inputBuffer.getChannelData(0);
-        audioBuffer.push(...inputData);
-
-        // Process audio in chunks
-        while (audioBuffer.length >= samplesPerChunk) {
-            const chunk = audioBuffer.splice(0, samplesPerChunk);
-            const pcmData16 = convertFloat32ToInt16(chunk);
-            const base64Data = arrayBufferToBase64(pcmData16.buffer);
-
-            await ipcRenderer.invoke('send-audio-content', {
-                data: base64Data,
-                mimeType: 'audio/pcm;rate=24000',
-            });
-        }
-    };
-
-    source.connect(audioProcessor);
-    audioProcessor.connect(audioContext.destination);
+    
+    // Use AudioWorklet for better performance if available, fallback to ScriptProcessor
+    if (audioContext.audioWorklet) {
+        setupAudioWorkletProcessor(source);
+    } else {
+        setupScriptProcessor(source);
+    }
 }
 
 async function captureScreenshot(imageQuality = 'medium', isManual = false) {
@@ -432,7 +499,7 @@ async function captureScreenshot(imageQuality = 'medium', isManual = false) {
         offscreenCanvas = document.createElement('canvas');
         offscreenCanvas.width = hiddenVideo.videoWidth;
         offscreenCanvas.height = hiddenVideo.videoHeight;
-        offscreenContext = offscreenCanvas.getContext('2d');
+        offscreenContext = offscreenCanvas.getContext('2d', { willReadFrequently: true });
     }
 
     // Check if video is ready
@@ -486,7 +553,7 @@ async function captureScreenshot(imageQuality = 'medium', isManual = false) {
                     return;
                 }
 
-                const result = await ipcRenderer.invoke('send-image-content', {
+                const result = await window.electronAPI.sendImageContent({
                     data: base64data,
                 });
 
@@ -550,7 +617,7 @@ function stopCapture() {
 
     // Stop macOS audio capture if running
     if (isMacOS) {
-        ipcRenderer.invoke('stop-macos-audio').catch(err => {
+        window.electronAPI.stopMacOSAudio().catch(err => {
             console.error('Error stopping macOS audio:', err);
         });
     }
@@ -573,7 +640,7 @@ async function sendTextMessage(text) {
     }
 
     try {
-        const result = await ipcRenderer.invoke('send-text-message', text);
+        const result = await window.electronAPI.sendTextMessage(text);
         if (result.success) {
             console.log('Text message sent successfully');
         } else {
@@ -669,25 +736,31 @@ async function getAllConversationSessions() {
 }
 
 // Listen for conversation data from main process
-ipcRenderer.on('save-conversation-turn', async (event, data) => {
-    try {
-        await saveConversationSession(data.sessionId, data.fullHistory);
-        console.log('Conversation session saved:', data.sessionId);
-    } catch (error) {
-        console.error('Error saving conversation session:', error);
-    }
-});
+if (window.electronAPI) {
+    window.electronAPI.onSaveConversationTurn(async (data) => {
+        try {
+            await saveConversationSession(data.sessionId, data.fullHistory);
+            console.log('Conversation session saved:', data.sessionId);
+        } catch (error) {
+            console.error('Error saving conversation session:', error);
+        }
+    });
+}
 
 // Initialize conversation storage when renderer loads
 initConversationStorage().catch(console.error);
 
 // Handle shortcuts based on current view
 function handleShortcut(shortcutKey) {
-    const currentView = cheddar.getCurrentView();
+    // Safe way to get current view
+    const currentView = (typeof cheatingDaddyApp !== 'undefined' && cheatingDaddyApp) ? cheatingDaddyApp.currentView : 'main';
 
     if (shortcutKey === 'ctrl+enter' || shortcutKey === 'cmd+enter') {
         if (currentView === 'main') {
-            cheddar.element().handleStart();
+            // Safe way to call handleStart
+            if (typeof cheatingDaddyApp !== 'undefined' && cheatingDaddyApp && typeof cheatingDaddyApp.handleStart === 'function') {
+                cheatingDaddyApp.handleStart();
+            }
         } else {
             captureManualScreenshot();
         }
@@ -695,10 +768,10 @@ function handleShortcut(shortcutKey) {
 }
 
 // Create reference to the main app element
-const cheatingDaddyApp = document.querySelector('cheating-daddy-app');
+var cheatingDaddyApp = document.querySelector('cheating-daddy-app');
 
 // Consolidated cheddar object - all functions in one place
-const cheddar = {
+var cheddar = {
     // Element access
     element: () => cheatingDaddyApp,
     e: () => cheatingDaddyApp,
@@ -725,11 +798,11 @@ const cheddar = {
 
     // Content protection function
     getContentProtection: () => {
-        const contentProtection = localStorage.getItem('contentProtection');
+        const contentProtection = window.secureStorage?.getItem('contentProtection');
         return contentProtection !== null ? contentProtection === 'true' : true;
     },
 
-    // Platform detection
+    // Platform detection (use pre-defined constants)
     isLinux: isLinux,
     isMacOS: isMacOS,
 };

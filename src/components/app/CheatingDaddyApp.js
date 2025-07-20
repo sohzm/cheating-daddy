@@ -118,17 +118,17 @@ export class CheatingDaddyApp extends LitElement {
 
     constructor() {
         super();
-        this.currentView = localStorage.getItem('onboardingCompleted') ? 'main' : 'onboarding';
+        this.currentView = window.secureStorage?.getItem('onboardingCompleted') ? 'main' : 'onboarding';
         this.statusText = '';
         this.startTime = null;
         this.isRecording = false;
         this.sessionActive = false;
-        this.selectedProfile = localStorage.getItem('selectedProfile') || 'interview';
-        this.selectedLanguage = localStorage.getItem('selectedLanguage') || 'en-US';
-        this.selectedScreenshotInterval = localStorage.getItem('selectedScreenshotInterval') || '5';
-        this.selectedImageQuality = localStorage.getItem('selectedImageQuality') || 'medium';
-        this.layoutMode = localStorage.getItem('layoutMode') || 'normal';
-        this.advancedMode = localStorage.getItem('advancedMode') === 'true';
+        this.selectedProfile = window.secureStorage?.getItem('selectedProfile') || 'interview';
+        this.selectedLanguage = window.secureStorage?.getItem('selectedLanguage') || 'en-US';
+        this.selectedScreenshotInterval = window.secureStorage?.getItem('selectedScreenshotInterval') || '5';
+        this.selectedImageQuality = window.secureStorage?.getItem('selectedImageQuality') || 'medium';
+        this.layoutMode = window.secureStorage?.getItem('layoutMode') || 'normal';
+        this.advancedMode = window.secureStorage?.getItem('advancedMode') === 'true';
         this.responses = [];
         this.currentResponseIndex = -1;
         this._viewInstances = new Map();
@@ -144,28 +144,32 @@ export class CheatingDaddyApp extends LitElement {
     connectedCallback() {
         super.connectedCallback();
 
-        // Set up IPC listeners if needed
-        if (window.require) {
-            const { ipcRenderer } = window.require('electron');
-            ipcRenderer.on('update-response', (_, response) => {
+        // Set up IPC listeners using secure API
+        if (window.electronAPI) {
+            // Store cleanup functions
+            this._cleanup = [];
+            
+            this._cleanup.push(window.electronAPI.onUpdateResponse((response) => {
                 this.setResponse(response);
-            });
-            ipcRenderer.on('update-status', (_, status) => {
+            }));
+            
+            this._cleanup.push(window.electronAPI.onUpdateStatus((status) => {
                 this.setStatus(status);
-            });
-            ipcRenderer.on('click-through-toggled', (_, isEnabled) => {
+            }));
+            
+            this._cleanup.push(window.electronAPI.onClickThroughToggled((isEnabled) => {
                 this._isClickThrough = isEnabled;
-            });
+            }));
         }
     }
 
     disconnectedCallback() {
         super.disconnectedCallback();
-        if (window.require) {
-            const { ipcRenderer } = window.require('electron');
-            ipcRenderer.removeAllListeners('update-response');
-            ipcRenderer.removeAllListeners('update-status');
-            ipcRenderer.removeAllListeners('click-through-toggled');
+        
+        // Clean up event listeners
+        if (this._cleanup) {
+            this._cleanup.forEach(cleanup => cleanup());
+            this._cleanup = [];
         }
     }
 
@@ -237,36 +241,53 @@ export class CheatingDaddyApp extends LitElement {
         if (this.currentView === 'customize' || this.currentView === 'help' || this.currentView === 'history') {
             this.currentView = 'main';
         } else if (this.currentView === 'assistant') {
-            cheddar.stopCapture();
+            // Stop capture using the window function
+            if (typeof window.stopCapture === 'function') {
+                window.stopCapture();
+            }
 
             // Close the session
-            if (window.require) {
-                const { ipcRenderer } = window.require('electron');
-                await ipcRenderer.invoke('close-session');
+            if (window.electronAPI) {
+                await window.electronAPI.closeSession();
             }
             this.sessionActive = false;
             this.currentView = 'main';
             console.log('Session closed');
         } else {
             // Quit the entire application
-            if (window.require) {
-                const { ipcRenderer } = window.require('electron');
-                await ipcRenderer.invoke('quit-application');
+            if (window.electronAPI) {
+                await window.electronAPI.quitApplication();
             }
         }
     }
 
     async handleHideToggle() {
-        if (window.require) {
-            const { ipcRenderer } = window.require('electron');
-            await ipcRenderer.invoke('toggle-window-visibility');
+        if (window.electronAPI) {
+            await window.electronAPI.toggleWindowVisibility();
+        }
+    }
+
+    // Handle keyboard shortcuts
+    handleShortcut(shortcutKey) {
+        console.log('Handling shortcut:', shortcutKey, 'in view:', this.currentView);
+        
+        // For main view, start session. For assistant view, take manual screenshot
+        if (this.currentView === 'main') {
+            this.handleStart();
+        } else if (this.currentView === 'assistant') {
+            // Take manual screenshot
+            if (typeof window.takeManualScreenshot === 'function') {
+                window.takeManualScreenshot();
+            } else {
+                console.warn('Manual screenshot function not available');
+            }
         }
     }
 
     // Main view event handlers
     async handleStart() {
         // check if api key is empty do nothing
-        const apiKey = localStorage.getItem('apiKey')?.trim();
+        const apiKey = window.secureStorage?.getItem('apiKey')?.trim();
         if (!apiKey || apiKey === '') {
             // Trigger the red blink animation on the API key input
             const mainView = this.shadowRoot.querySelector('main-view');
@@ -276,19 +297,43 @@ export class CheatingDaddyApp extends LitElement {
             return;
         }
 
-        await cheddar.initializeGemini(this.selectedProfile, this.selectedLanguage);
-        // Pass the screenshot interval as string (including 'manual' option)
-        cheddar.startCapture(this.selectedScreenshotInterval, this.selectedImageQuality);
-        this.responses = [];
-        this.currentResponseIndex = -1;
-        this.startTime = Date.now();
-        this.currentView = 'assistant';
+        const result = await this.initializeGemini(this.selectedProfile, this.selectedLanguage);
+        if (result && result.success) {
+            this.setStatus('Live');
+            // Pass the screenshot interval as string (including 'manual' option)
+            this.startCapture(this.selectedScreenshotInterval, this.selectedImageQuality);
+            this.responses = [];
+            this.currentResponseIndex = -1;
+            this.startTime = Date.now();
+            this.currentView = 'assistant';
+        } else {
+            this.setStatus('error');
+            // Optionally show error to user
+            console.error('Failed to initialize Gemini:', result && result.error);
+        }
+    }
+
+    // Wrapper methods for renderer functions
+    async initializeGemini(profile, language) {
+        if (typeof window.initializeGemini === 'function') {
+            return await window.initializeGemini(profile, language);
+        } else {
+            console.error('initializeGemini function not available on window');
+            return false;
+        }
+    }
+
+    startCapture(screenshotInterval, imageQuality) {
+        if (typeof window.startCapture === 'function') {
+            return window.startCapture(screenshotInterval, imageQuality);
+        } else {
+            console.error('startCapture function not available on window');
+        }
     }
 
     async handleAPIKeyHelp() {
-        if (window.require) {
-            const { ipcRenderer } = window.require('electron');
-            await ipcRenderer.invoke('open-external', 'https://cheatingdaddy.com/help/api-key');
+        if (window.electronAPI) {
+            await window.electronAPI.openExternal('https://cheatingdaddy.com/help/api-key');
         }
     }
 
@@ -330,7 +375,13 @@ export class CheatingDaddyApp extends LitElement {
 
     // Assistant view event handlers
     async handleSendText(message) {
-        const result = await window.cheddar.sendTextMessage(message);
+        if (!window.electronAPI) {
+            console.error('electronAPI not available');
+            this.setStatus('Error: electronAPI not available');
+            return;
+        }
+
+        const result = await window.electronAPI.sendTextMessage(message);
 
         if (!result.success) {
             console.error('Failed to send message:', result.error);
@@ -356,9 +407,8 @@ export class CheatingDaddyApp extends LitElement {
         super.updated(changedProperties);
 
         // Only notify main process of view change if the view actually changed
-        if (changedProperties.has('currentView') && window.require) {
-            const { ipcRenderer } = window.require('electron');
-            ipcRenderer.send('view-changed', this.currentView);
+        if (changedProperties.has('currentView') && window.electronAPI) {
+            window.electronAPI.viewChanged(this.currentView);
 
             // Add a small delay to smooth out the transition
             const viewContainer = this.shadowRoot?.querySelector('.view-container');
@@ -372,22 +422,22 @@ export class CheatingDaddyApp extends LitElement {
 
         // Only update localStorage when these specific properties change
         if (changedProperties.has('selectedProfile')) {
-            localStorage.setItem('selectedProfile', this.selectedProfile);
+            window.secureStorage?.setItem('selectedProfile', this.selectedProfile);
         }
         if (changedProperties.has('selectedLanguage')) {
-            localStorage.setItem('selectedLanguage', this.selectedLanguage);
+            window.secureStorage?.setItem('selectedLanguage', this.selectedLanguage);
         }
         if (changedProperties.has('selectedScreenshotInterval')) {
-            localStorage.setItem('selectedScreenshotInterval', this.selectedScreenshotInterval);
+            window.secureStorage?.setItem('selectedScreenshotInterval', this.selectedScreenshotInterval);
         }
         if (changedProperties.has('selectedImageQuality')) {
-            localStorage.setItem('selectedImageQuality', this.selectedImageQuality);
+            window.secureStorage?.setItem('selectedImageQuality', this.selectedImageQuality);
         }
         if (changedProperties.has('layoutMode')) {
             this.updateLayoutMode();
         }
         if (changedProperties.has('advancedMode')) {
-            localStorage.setItem('advancedMode', this.advancedMode.toString());
+            window.secureStorage?.setItem('advancedMode', this.advancedMode.toString());
         }
     }
 
