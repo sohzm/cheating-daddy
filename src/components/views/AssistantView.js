@@ -113,18 +113,209 @@ export class AssistantView extends LitElement {
         }
 
         .response-container pre {
-            background: var(--input-background);
+            background: #1e1e1e;
             border: 1px solid var(--button-border);
-            border-radius: 6px;
-            padding: 1em;
+            border-radius: 8px;
+            padding: 1.2em;
             overflow-x: auto;
             margin: 1em 0;
+            position: relative;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
         }
 
         .response-container pre code {
             background: none;
             padding: 0;
             border-radius: 0;
+            font-family: 'Consolas', 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.9em;
+            line-height: 1.5;
+            color: #d4d4d4;
+        }
+
+        /* Enhanced code block styling with VS Code colors */
+        .response-container pre.hljs {
+            background: #1e1e1e !important;
+            border: 1px solid #404040;
+            color: #d4d4d4 !important;
+        }
+
+        /* VS Code Syntax Highlighting Colors */
+        
+        /* Keywords (blue) */
+        .response-container .hljs-keyword,
+        .response-container .hljs-selector-tag,
+        .response-container .hljs-literal,
+        .response-container .hljs-section,
+        .response-container .hljs-link,
+        .response-container .hljs-built_in {
+            color: #569cd6 !important;
+        }
+
+        /* Strings (orange/salmon) */
+        .response-container .hljs-string,
+        .response-container .hljs-char,
+        .response-container .hljs-template-variable,
+        .response-container .hljs-template-string {
+            color: #ce9178 !important;
+        }
+
+        /* Comments (green) */
+        .response-container .hljs-comment,
+        .response-container .hljs-quote {
+            color: #6a9955 !important;
+            font-style: italic;
+        }
+
+        /* Numbers (light green) */
+        .response-container .hljs-number,
+        .response-container .hljs-literal {
+            color: #b5cea8 !important;
+        }
+
+        /* Functions (yellow) */
+        .response-container .hljs-function,
+        .response-container .hljs-title,
+        .response-container .hljs-params,
+        .response-container .hljs-name {
+            color: #dcdcaa !important;
+        }
+
+        /* Variables and attributes (light blue) */
+        .response-container .hljs-variable,
+        .response-container .hljs-attr,
+        .response-container .hljs-property,
+        .response-container .hljs-attribute {
+            color: #9cdcfe !important;
+        }
+
+        /* Types and classes (teal) */
+        .response-container .hljs-type,
+        .response-container .hljs-class,
+        .response-container .hljs-title.class_,
+        .response-container .hljs-tag {
+            color: #4ec9b0 !important;
+        }
+
+        /* Operators and punctuation */
+        .response-container .hljs-operator,
+        .response-container .hljs-punctuation {
+            color: #d4d4d4 !important;
+        }
+
+        /* Special elements */
+        .response-container .hljs-meta,
+        .response-container .hljs-meta-keyword {
+            color: #569cd6 !important;
+        }
+
+        .response-container .hljs-meta-string {
+            color: #ce9178 !important;
+        }
+
+        /* Regular expressions */
+        .response-container .hljs-regexp {
+            color: #d16969 !important;
+        }
+
+        /* Symbols and constants */
+        .response-container .hljs-symbol,
+        .response-container .hljs-constant {
+            color: #4fc1ff !important;
+        }
+
+        /* Emphasis */
+        .response-container .hljs-emphasis {
+            font-style: italic;
+        }
+
+        .response-container .hljs-strong {
+            font-weight: bold;
+        }
+
+        /* Language indicator */
+        .response-container pre::before {
+            content: attr(data-language);
+            position: absolute;
+            top: 0.5em;
+            right: 0.8em;
+            font-size: 0.7em;
+            color: #858585;
+            text-transform: uppercase;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+
+        /* Language-specific enhancements */
+        
+        /* JavaScript/TypeScript */
+        .response-container .hljs-keyword.hljs-return,
+        .response-container .hljs-keyword.hljs-function,
+        .response-container .hljs-keyword.hljs-const,
+        .response-container .hljs-keyword.hljs-let,
+        .response-container .hljs-keyword.hljs-var {
+            color: #569cd6 !important;
+        }
+
+        /* Python */
+        .response-container .hljs-keyword.hljs-def,
+        .response-container .hljs-keyword.hljs-class,
+        .response-container .hljs-keyword.hljs-import,
+        .response-container .hljs-keyword.hljs-from {
+            color: #569cd6 !important;
+        }
+
+        /* HTML/XML */
+        .response-container .hljs-tag .hljs-name {
+            color: #569cd6 !important;
+        }
+
+        .response-container .hljs-tag .hljs-attr {
+            color: #9cdcfe !important;
+        }
+
+        /* CSS */
+        .response-container .hljs-selector-class,
+        .response-container .hljs-selector-id {
+            color: #d7ba7d !important;
+        }
+
+        .response-container .hljs-property {
+            color: #9cdcfe !important;
+        }
+
+        /* SQL */
+        .response-container .hljs-keyword.hljs-select,
+        .response-container .hljs-keyword.hljs-from,
+        .response-container .hljs-keyword.hljs-where {
+            color: #569cd6 !important;
+        }
+
+        /* JSON */
+        .response-container .hljs-attr {
+            color: #9cdcfe !important;
+        }
+
+        /* Markdown in code blocks */
+        .response-container .hljs-section {
+            color: #569cd6 !important;
+            font-weight: bold;
+        }
+
+        .response-container .hljs-code {
+            color: #ce9178 !important;
+        }
+
+        /* Better syntax highlighting for inline code */
+        .response-container code:not(pre code) {
+            background: rgba(255, 255, 255, 0.15);
+            color: #ce9178;
+            font-weight: 500;
+            padding: 0.15em 0.3em;
+            border-radius: 3px;
         }
 
         .response-container a {
@@ -342,9 +533,29 @@ export class AssistantView extends LitElement {
                     breaks: true,
                     gfm: true,
                     sanitize: false, // We trust the AI responses
+                    highlight: function(code, language) {
+                        // Use highlight.js for syntax highlighting if available
+                        if (typeof window !== 'undefined' && window.hljs) {
+                            if (language && window.hljs.getLanguage(language)) {
+                                try {
+                                    return window.hljs.highlight(code, { language: language }).value;
+                                } catch (err) {
+                                    console.warn('Error highlighting code:', err);
+                                }
+                            }
+                            // Auto-detect language if not specified
+                            try {
+                                return window.hljs.highlightAuto(code).value;
+                            } catch (err) {
+                                console.warn('Error auto-highlighting code:', err);
+                            }
+                        }
+                        return code; // Fallback to plain code
+                    }
                 });
                 let rendered = window.marked.parse(content);
                 rendered = this.wrapWordsInSpans(rendered);
+                rendered = this.enhanceCodeBlocks(rendered);
                 return rendered;
             } catch (error) {
                 console.warn('Error parsing markdown:', error);
@@ -380,6 +591,36 @@ export class AssistantView extends LitElement {
             }
         }
         Array.from(doc.body.childNodes).forEach(wrap);
+        return doc.body.innerHTML;
+    }
+
+    enhanceCodeBlocks(html) {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        
+        // Find all pre elements and enhance them
+        const preElements = doc.querySelectorAll('pre');
+        preElements.forEach(pre => {
+            const codeElement = pre.querySelector('code');
+            if (codeElement) {
+                // Extract language from class (hljs adds language-specific classes)
+                const classList = Array.from(codeElement.classList);
+                const languageClass = classList.find(cls => cls.startsWith('language-')) || classList.find(cls => cls !== 'hljs');
+                
+                if (languageClass) {
+                    const language = languageClass.replace('language-', '').replace('hljs-', '');
+                    if (language && language !== 'hljs') {
+                        pre.setAttribute('data-language', language);
+                    }
+                }
+                
+                // Add hljs class to pre element for consistent styling
+                if (codeElement.classList.contains('hljs') || classList.some(cls => cls.startsWith('language-'))) {
+                    pre.classList.add('hljs');
+                }
+            }
+        });
+        
         return doc.body.innerHTML;
     }
 
