@@ -59,6 +59,32 @@ function setupGeneralIpcHandlers() {
 
     ipcMain.handle('open-external', async (event, url) => {
         try {
+            // Validate URL
+            if (!url || typeof url !== 'string') {
+                throw new Error('Invalid URL provided');
+            }
+            
+            // Only allow HTTPS URLs and specific trusted domains
+            const allowedDomains = [
+                'cheatingdaddy.com',
+                'github.com',
+                'docs.google.com',
+                'support.google.com'
+            ];
+            
+            const urlObj = new URL(url);
+            if (urlObj.protocol !== 'https:') {
+                throw new Error('Only HTTPS URLs are allowed');
+            }
+            
+            const isAllowedDomain = allowedDomains.some(domain => 
+                urlObj.hostname === domain || urlObj.hostname.endsWith('.' + domain)
+            );
+            
+            if (!isAllowedDomain) {
+                throw new Error('Domain not in allowlist');
+            }
+            
             await shell.openExternal(url);
             return { success: true };
         } catch (error) {

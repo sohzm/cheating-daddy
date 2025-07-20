@@ -1,7 +1,7 @@
 <!doctype html>
 <html>
     <head>
-        <meta http-equiv="content-security-policy" content="script-src 'self' 'unsafe-inline'" />
+        <meta http-equiv="content-security-policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self'; connect-src 'self' https://generativelanguage.googleapis.com; font-src 'self';" />
         <title>Screen and Audio Capture</title>
         <style>
             :root {
@@ -104,7 +104,6 @@
         <script type="module" src="components/app/CheatingDaddyApp.js"></script>
 
         <cheating-daddy-app id="cheddar"></cheating-daddy-app>
-        <script src="script.js"></script>
         <script src="utils/renderer.js"></script>
     </body>
 </html>

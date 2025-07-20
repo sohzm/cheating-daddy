@@ -194,7 +194,7 @@ export class MainView extends LitElement {
     }
 
     handleInput(e) {
-        localStorage.setItem('apiKey', e.target.value);
+        window.secureStorage?.setItem('apiKey', e.target.value);
         // Clear error state when user starts typing
         if (this.showApiKeyError) {
             this.showApiKeyError = false;
@@ -219,7 +219,7 @@ export class MainView extends LitElement {
     }
 
     loadLayoutMode() {
-        const savedLayoutMode = localStorage.getItem('layoutMode');
+        const savedLayoutMode = window.secureStorage?.getItem('layoutMode');
         if (savedLayoutMode && savedLayoutMode !== 'normal') {
             // Notify parent component to apply the saved layout mode
             this.onLayoutModeChange(savedLayoutMode);
@@ -289,7 +289,7 @@ export class MainView extends LitElement {
                 <input
                     type="password"
                     placeholder="Enter your Gemini API Key"
-                    .value=${localStorage.getItem('apiKey') || ''}
+                    .value=${window.secureStorage?.getItem('apiKey') || ''}
                     @input=${this.handleInput}
                     class="${this.showApiKeyError ? 'api-key-error' : ''}"
                 />

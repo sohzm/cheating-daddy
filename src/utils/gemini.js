@@ -3,6 +3,7 @@ const { BrowserWindow, ipcMain } = require('electron');
 const { spawn } = require('child_process');
 const { saveDebugAudio } = require('../audioUtils');
 const { getSystemPrompt } = require('./prompts');
+const { geminiRateLimiter, imageRateLimiter, audioRateLimiter } = require('./rateLimiter');
 
 // Conversation tracking variables
 let currentSessionId = null;
@@ -119,24 +120,26 @@ async function getStoredSetting(key, defaultValue) {
             // Wait a bit for the renderer to be ready
             await new Promise(resolve => setTimeout(resolve, 100));
 
-            // Try to get setting from renderer process localStorage
-            const value = await windows[0].webContents.executeJavaScript(`
+            // Use IPC to safely get setting from renderer
+            const result = await windows[0].webContents.executeJavaScript(`
                 (function() {
                     try {
                         if (typeof localStorage === 'undefined') {
-                            console.log('localStorage not available yet for ${key}');
-                            return '${defaultValue}';
+                            return { success: false, value: null, error: 'localStorage not available' };
                         }
-                        const stored = localStorage.getItem('${key}');
-                        console.log('Retrieved setting ${key}:', stored);
-                        return stored || '${defaultValue}';
+                        const stored = localStorage.getItem(${JSON.stringify(key)});
+                        return { success: true, value: stored };
                     } catch (e) {
-                        console.error('Error accessing localStorage for ${key}:', e);
-                        return '${defaultValue}';
+                        return { success: false, value: null, error: e.message };
                     }
                 })()
             `);
-            return value;
+            
+            if (result.success) {
+                return result.value || defaultValue;
+            } else {
+                console.error('Error accessing localStorage for', key, ':', result.error);
+            }
         }
     } catch (error) {
         console.error('Error getting stored setting for', key, ':', error.message);
@@ -507,7 +510,30 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
     global.geminiSessionRef = geminiSessionRef;
 
     ipcMain.handle('initialize-gemini', async (event, apiKey, customPrompt, profile = 'interview', language = 'en-US') => {
-        const session = await initializeGeminiSession(apiKey, customPrompt, profile, language);
+        // Input validation
+        if (!apiKey || typeof apiKey !== 'string' || apiKey.trim().length === 0) {
+            console.error('Invalid API key provided');
+            return false;
+        }
+        
+        if (customPrompt && typeof customPrompt !== 'string') {
+            console.error('Invalid custom prompt provided');
+            return false;
+        }
+        
+        const allowedProfiles = ['interview', 'sales', 'meeting', 'exam'];
+        if (!allowedProfiles.includes(profile)) {
+            console.error('Invalid profile provided:', profile);
+            return false;
+        }
+        
+        const allowedLanguages = ['en-US', 'en-GB', 'es-ES', 'fr-FR', 'de-DE', 'it-IT', 'pt-BR', 'ja-JP', 'ko-KR', 'zh-CN'];
+        if (!allowedLanguages.includes(language)) {
+            console.error('Invalid language provided:', language);
+            return false;
+        }
+        
+        const session = await initializeGeminiSession(apiKey.trim(), customPrompt || '', profile, language);
         if (session) {
             geminiSessionRef.current = session;
             return true;
@@ -517,7 +543,31 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
 
     ipcMain.handle('send-audio-content', async (event, { data, mimeType }) => {
         if (!geminiSessionRef.current) return { success: false, error: 'No active Gemini session' };
+        
         try {
+            // Check rate limit
+            await audioRateLimiter.checkLimit();
+            
+            // Input validation
+            if (!data || typeof data !== 'string') {
+                return { success: false, error: 'Invalid audio data: must be a base64 string' };
+            }
+            
+            if (!mimeType || typeof mimeType !== 'string') {
+                return { success: false, error: 'Invalid mime type: must be a string' };
+            }
+            
+            // Validate mime type
+            const allowedMimeTypes = ['audio/pcm;rate=24000', 'audio/wav', 'audio/mp3'];
+            if (!allowedMimeTypes.includes(mimeType)) {
+                return { success: false, error: 'Unsupported audio mime type' };
+            }
+            
+            // Validate base64 data
+            if (!/^[A-Za-z0-9+/]*={0,2}$/.test(data)) {
+                return { success: false, error: 'Invalid base64 audio data' };
+            }
+            
             process.stdout.write('.');
             await geminiSessionRef.current.sendRealtimeInput({
                 audio: { data: data, mimeType: mimeType },
@@ -533,9 +583,19 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
         if (!geminiSessionRef.current) return { success: false, error: 'No active Gemini session' };
 
         try {
+            // Check rate limit
+            await imageRateLimiter.checkLimit();
+            
+            // Input validation
             if (!data || typeof data !== 'string') {
-                console.error('Invalid image data received');
-                return { success: false, error: 'Invalid image data' };
+                console.error('Invalid image data received: not a string');
+                return { success: false, error: 'Invalid image data: must be a base64 string' };
+            }
+            
+            // Validate base64 data
+            if (!/^[A-Za-z0-9+/]*={0,2}$/.test(data)) {
+                console.error('Invalid base64 format');
+                return { success: false, error: 'Invalid base64 image data' };
             }
 
             const buffer = Buffer.from(data, 'base64');
@@ -543,6 +603,16 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
             if (buffer.length < 1000) {
                 console.error(`Image buffer too small: ${buffer.length} bytes`);
                 return { success: false, error: 'Image buffer too small' };
+            }
+            
+            // Check if buffer starts with valid image magic bytes
+            const isJPEG = buffer[0] === 0xFF && buffer[1] === 0xD8;
+            const isPNG = buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47;
+            const isWebP = buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50;
+            
+            if (!isJPEG && !isPNG && !isWebP) {
+                console.error('Invalid image format detected');
+                return { success: false, error: 'Invalid image format' };
             }
 
             process.stdout.write('!');
@@ -561,6 +631,9 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
         if (!geminiSessionRef.current) return { success: false, error: 'No active Gemini session' };
 
         try {
+            // Check rate limit
+            await geminiRateLimiter.checkLimit();
+            
             if (!text || typeof text !== 'string' || text.trim().length === 0) {
                 return { success: false, error: 'Invalid text message' };
             }
