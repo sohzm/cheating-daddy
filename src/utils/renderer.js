@@ -591,7 +591,7 @@ let conversationDB = null;
 
 async function initConversationStorage() {
     return new Promise((resolve, reject) => {
-        const request = indexedDB.open('ConversationHistory', 1);
+        const request = indexedDB.open('ConversationHistory', 2);
 
         request.onerror = () => reject(request.error);
         request.onsuccess = () => {
@@ -601,11 +601,19 @@ async function initConversationStorage() {
 
         request.onupgradeneeded = event => {
             const db = event.target.result;
+            const oldVersion = event.oldVersion;
 
             // Create sessions store
             if (!db.objectStoreNames.contains('sessions')) {
                 const sessionStore = db.createObjectStore('sessions', { keyPath: 'sessionId' });
                 sessionStore.createIndex('timestamp', 'timestamp', { unique: false });
+            }
+
+            // Create custom profiles store (version 2)
+            if (oldVersion < 2 && !db.objectStoreNames.contains('customProfiles')) {
+                const profileStore = db.createObjectStore('customProfiles', { keyPath: 'id' });
+                profileStore.createIndex('name', 'name', { unique: false });
+                profileStore.createIndex('created', 'created', { unique: false });
             }
         };
     });
@@ -678,6 +686,120 @@ ipcRenderer.on('save-conversation-turn', async (event, data) => {
     }
 });
 
+// Custom Profile Storage Functions
+async function createCustomProfile(profileData) {
+    if (!conversationDB) {
+        await initConversationStorage();
+    }
+
+    const transaction = conversationDB.transaction(['customProfiles'], 'readwrite');
+    const store = transaction.objectStore('customProfiles');
+
+    const profile = {
+        id: `custom_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        name: profileData.name,
+        description: profileData.description || '',
+        intro: profileData.intro,
+        formatRequirements: profileData.formatRequirements,
+        searchUsage: profileData.searchUsage,
+        content: profileData.content,
+        outputInstructions: profileData.outputInstructions,
+        created: Date.now(),
+        modified: Date.now(),
+    };
+
+    return new Promise((resolve, reject) => {
+        const request = store.add(profile);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(profile);
+    });
+}
+
+async function updateCustomProfile(profileId, profileData) {
+    if (!conversationDB) {
+        await initConversationStorage();
+    }
+
+    const transaction = conversationDB.transaction(['customProfiles'], 'readwrite');
+    const store = transaction.objectStore('customProfiles');
+
+    // First get the existing profile
+    const getRequest = store.get(profileId);
+
+    return new Promise((resolve, reject) => {
+        getRequest.onerror = () => reject(getRequest.error);
+        getRequest.onsuccess = () => {
+            const existingProfile = getRequest.result;
+            if (!existingProfile) {
+                reject(new Error('Profile not found'));
+                return;
+            }
+
+            const updatedProfile = {
+                ...existingProfile,
+                ...profileData,
+                id: profileId, // Ensure ID doesn't change
+                created: existingProfile.created, // Preserve creation date
+                modified: Date.now(),
+            };
+
+            const putRequest = store.put(updatedProfile);
+            putRequest.onerror = () => reject(putRequest.error);
+            putRequest.onsuccess = () => resolve(updatedProfile);
+        };
+    });
+}
+
+async function deleteCustomProfile(profileId) {
+    if (!conversationDB) {
+        await initConversationStorage();
+    }
+
+    const transaction = conversationDB.transaction(['customProfiles'], 'readwrite');
+    const store = transaction.objectStore('customProfiles');
+
+    return new Promise((resolve, reject) => {
+        const request = store.delete(profileId);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(true);
+    });
+}
+
+async function getCustomProfile(profileId) {
+    if (!conversationDB) {
+        await initConversationStorage();
+    }
+
+    const transaction = conversationDB.transaction(['customProfiles'], 'readonly');
+    const store = transaction.objectStore('customProfiles');
+
+    return new Promise((resolve, reject) => {
+        const request = store.get(profileId);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(request.result);
+    });
+}
+
+async function getAllCustomProfiles() {
+    if (!conversationDB) {
+        await initConversationStorage();
+    }
+
+    const transaction = conversationDB.transaction(['customProfiles'], 'readonly');
+    const store = transaction.objectStore('customProfiles');
+    const index = store.index('created');
+
+    return new Promise((resolve, reject) => {
+        const request = index.getAll();
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+            // Sort by creation date descending (newest first)
+            const profiles = request.result.sort((a, b) => b.created - a.created);
+            resolve(profiles);
+        };
+    });
+}
+
 // Initialize conversation storage when renderer loads
 initConversationStorage().catch(console.error);
 
@@ -722,6 +844,13 @@ const cheddar = {
     getAllConversationSessions,
     getConversationSession,
     initConversationStorage,
+
+    // Custom profile functions
+    createCustomProfile,
+    updateCustomProfile,
+    deleteCustomProfile,
+    getCustomProfile,
+    getAllCustomProfiles,
 
     // Content protection function
     getContentProtection: () => {

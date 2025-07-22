@@ -1,5 +1,7 @@
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
 import { resizeLayout } from '../../utils/windowResize.js';
+import './CustomProfileManager.js';
+import './CustomProfileEditor.js';
 
 export class CustomizeView extends LitElement {
     static styles = css`
@@ -415,6 +417,10 @@ export class CustomizeView extends LitElement {
         onLayoutModeChange: { type: Function },
         advancedMode: { type: Boolean },
         onAdvancedModeChange: { type: Function },
+        showCustomProfileManager: { type: Boolean },
+        showCustomProfileEditor: { type: Boolean },
+        editingProfile: { type: Object },
+        customProfiles: { type: Array },
     };
 
     constructor() {
@@ -444,10 +450,17 @@ export class CustomizeView extends LitElement {
         // Font size default (in pixels)
         this.fontSize = 20;
 
+        // Custom profile management state
+        this.showCustomProfileManager = false;
+        this.showCustomProfileEditor = false;
+        this.editingProfile = null;
+        this.customProfiles = [];
+
         this.loadKeybinds();
         this.loadGoogleSearchSettings();
         this.loadAdvancedModeSettings();
         this.loadBackgroundTransparency();
+        this.loadCustomProfiles();
         this.loadFontSize();
     }
 
@@ -460,7 +473,7 @@ export class CustomizeView extends LitElement {
     }
 
     getProfiles() {
-        return [
+        const hardcodedProfiles = [
             {
                 value: 'interview',
                 name: 'Job Interview',
@@ -492,6 +505,16 @@ export class CustomizeView extends LitElement {
                 description: 'Academic assistance for test-taking and exam questions',
             },
         ];
+
+        // Add custom profiles
+        const customProfileOptions = this.customProfiles.map(profile => ({
+            value: profile.id,
+            name: profile.name,
+            description: profile.description || 'Custom profile',
+            isCustom: true,
+        }));
+
+        return [...hardcodedProfiles, ...customProfileOptions];
     }
 
     getLanguages() {
@@ -530,7 +553,7 @@ export class CustomizeView extends LitElement {
     }
 
     getProfileNames() {
-        return {
+        const hardcodedNames = {
             interview: 'Job Interview',
             sales: 'Sales Call',
             meeting: 'Business Meeting',
@@ -538,6 +561,14 @@ export class CustomizeView extends LitElement {
             negotiation: 'Negotiation',
             exam: 'Exam Assistant',
         };
+
+        // Add custom profile names
+        const customNames = {};
+        this.customProfiles.forEach(profile => {
+            customNames[profile.id] = profile.name;
+        });
+
+        return { ...hardcodedNames, ...customNames };
     }
 
     handleProfileSelect(e) {
@@ -571,6 +602,74 @@ export class CustomizeView extends LitElement {
 
     handleCustomPromptInput(e) {
         localStorage.setItem('customPrompt', e.target.value);
+    }
+
+    // Custom Profile Management Methods
+    async loadCustomProfiles() {
+        try {
+            if (window.cheddar && window.cheddar.getAllCustomProfiles) {
+                this.customProfiles = await window.cheddar.getAllCustomProfiles();
+            }
+        } catch (error) {
+            console.error('Error loading custom profiles:', error);
+        }
+    }
+
+    handleManageCustomProfiles() {
+        this.showCustomProfileManager = true;
+        this.showCustomProfileEditor = false;
+        this.editingProfile = null;
+    }
+
+    handleCreateCustomProfile() {
+        this.showCustomProfileManager = false;
+        this.showCustomProfileEditor = true;
+        this.editingProfile = null;
+    }
+
+    handleEditCustomProfile(profile) {
+        this.showCustomProfileManager = false;
+        this.showCustomProfileEditor = true;
+        this.editingProfile = profile;
+    }
+
+    async handleSaveCustomProfile(profileData) {
+        try {
+            if (this.editingProfile) {
+                // Update existing profile
+                await window.cheddar.updateCustomProfile(this.editingProfile.id, profileData);
+            } else {
+                // Create new profile
+                await window.cheddar.createCustomProfile(profileData);
+            }
+
+            // Reload profiles and close editor
+            await this.loadCustomProfiles();
+            this.showCustomProfileEditor = false;
+            this.showCustomProfileManager = true;
+            this.editingProfile = null;
+        } catch (error) {
+            console.error('Error saving custom profile:', error);
+            throw error; // Re-throw to let the editor handle the error display
+        }
+    }
+
+    handleCancelCustomProfileEdit() {
+        this.showCustomProfileEditor = false;
+        this.showCustomProfileManager = true;
+        this.editingProfile = null;
+    }
+
+    handleDeleteCustomProfile(profile) {
+        // Profile deletion is handled by the CustomProfileManager component
+        // Just reload the profiles list
+        this.loadCustomProfiles();
+    }
+
+    handleCloseCustomProfileManager() {
+        this.showCustomProfileManager = false;
+        this.showCustomProfileEditor = false;
+        this.editingProfile = null;
     }
 
     getDefaultKeybinds() {
@@ -887,6 +986,13 @@ export class CustomizeView extends LitElement {
                                         `
                                     )}
                                 </select>
+                                <button
+                                    class="form-control"
+                                    style="margin-top: 8px; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); color: white; cursor: pointer;"
+                                    @click=${this.handleManageCustomProfiles}
+                                >
+                                    Manage Custom Profiles
+                                </button>
                             </div>
                         </div>
 
@@ -1177,6 +1283,52 @@ export class CustomizeView extends LitElement {
                         </div>
                     </div>
                 </div>
+
+                <!-- Custom Profile Management Modal -->
+                ${this.showCustomProfileManager ? html`
+                    <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.8); z-index: 1000; display: flex; align-items: center; justify-content: center;">
+                        <div style="background: #1a1a1a; border-radius: 12px; max-width: 800px; width: 90%; max-height: 90%; overflow-y: auto; position: relative;">
+                            <div style="position: sticky; top: 0; background: #1a1a1a; padding: 20px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); display: flex; justify-content: space-between; align-items: center;">
+                                <h2 style="margin: 0; color: white;">Custom Profile Management</h2>
+                                <button
+                                    style="background: none; border: none; color: white; font-size: 24px; cursor: pointer;"
+                                    @click=${this.handleCloseCustomProfileManager}
+                                >×</button>
+                            </div>
+                            <div style="padding: 20px;">
+                                <custom-profile-manager
+                                    .customProfiles=${this.customProfiles}
+                                    .onCreateProfile=${() => this.handleCreateCustomProfile()}
+                                    .onEditProfile=${(profile) => this.handleEditCustomProfile(profile)}
+                                    .onDeleteProfile=${(profile) => this.handleDeleteCustomProfile(profile)}
+                                ></custom-profile-manager>
+                            </div>
+                        </div>
+                    </div>
+                ` : ''}
+
+                <!-- Custom Profile Editor Modal -->
+                ${this.showCustomProfileEditor ? html`
+                    <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.8); z-index: 1000; display: flex; align-items: center; justify-content: center;">
+                        <div style="background: #1a1a1a; border-radius: 12px; max-width: 900px; width: 95%; max-height: 95%; overflow-y: auto; position: relative;">
+                            <div style="position: sticky; top: 0; background: #1a1a1a; padding: 20px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); display: flex; justify-content: space-between; align-items: center;">
+                                <h2 style="margin: 0; color: white;">${this.editingProfile ? 'Edit Profile' : 'Create New Profile'}</h2>
+                                <button
+                                    style="background: none; border: none; color: white; font-size: 24px; cursor: pointer;"
+                                    @click=${this.handleCancelCustomProfileEdit}
+                                >×</button>
+                            </div>
+                            <div style="padding: 20px;">
+                                <custom-profile-editor
+                                    .profile=${this.editingProfile || {}}
+                                    .isEditing=${!!this.editingProfile}
+                                    .onSave=${(profileData) => this.handleSaveCustomProfile(profileData)}
+                                    .onCancel=${() => this.handleCancelCustomProfileEdit()}
+                                ></custom-profile-editor>
+                            </div>
+                        </div>
+                    </div>
+                ` : ''}
             </div>
         `;
     }

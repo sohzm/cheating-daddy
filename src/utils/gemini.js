@@ -2,7 +2,7 @@ const { GoogleGenAI } = require('@google/genai');
 const { BrowserWindow, ipcMain } = require('electron');
 const { spawn } = require('child_process');
 const { saveDebugAudio } = require('../audioUtils');
-const { getSystemPrompt } = require('./prompts');
+const { getSystemPrompt, getSystemPromptSync, buildSystemPrompt } = require('./prompts');
 
 // Conversation tracking variables
 let currentSessionId = null;
@@ -145,6 +145,39 @@ async function getStoredSetting(key, defaultValue) {
     return defaultValue;
 }
 
+async function getCustomProfileFromRenderer(profileId) {
+    try {
+        const windows = BrowserWindow.getAllWindows();
+        if (windows.length > 0) {
+            // Wait a bit for the renderer to be ready
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            // Get custom profile from renderer process IndexedDB
+            const profile = await windows[0].webContents.executeJavaScript(`
+                (async function() {
+                    try {
+                        if (typeof cheddar === 'undefined' || !cheddar.getCustomProfile) {
+                            console.log('Custom profile functions not available yet');
+                            return null;
+                        }
+                        const profile = await cheddar.getCustomProfile('${profileId}');
+                        console.log('Retrieved custom profile:', profile);
+                        return profile;
+                    } catch (e) {
+                        console.error('Error accessing custom profile ${profileId}:', e);
+                        return null;
+                    }
+                })()
+            `);
+            return profile;
+        }
+        return null;
+    } catch (error) {
+        console.error(`Error getting custom profile ${profileId}:`, error);
+        return null;
+    }
+}
+
 async function attemptReconnection() {
     if (!lastSessionParams || reconnectionAttempts >= maxReconnectionAttempts) {
         console.log('Max reconnection attempts reached or no session params stored');
@@ -220,7 +253,25 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
     const enabledTools = await getEnabledTools();
     const googleSearchEnabled = enabledTools.some(tool => tool.googleSearch);
 
-    const systemPrompt = getSystemPrompt(profile, customPrompt, googleSearchEnabled);
+    let systemPrompt;
+
+    // Handle custom profiles
+    if (profile && profile.startsWith('custom_')) {
+        try {
+            const customProfile = await getCustomProfileFromRenderer(profile);
+            if (customProfile) {
+                systemPrompt = buildSystemPrompt(customProfile, customPrompt, googleSearchEnabled);
+            } else {
+                console.warn(`Custom profile ${profile} not found, falling back to interview profile`);
+                systemPrompt = getSystemPromptSync('interview', customPrompt, googleSearchEnabled);
+            }
+        } catch (error) {
+            console.error('Error loading custom profile:', error);
+            systemPrompt = getSystemPromptSync('interview', customPrompt, googleSearchEnabled);
+        }
+    } else {
+        systemPrompt = getSystemPromptSync(profile, customPrompt, googleSearchEnabled);
+    }
 
     // Initialize new conversation session (only if not reconnecting)
     if (!isReconnection) {

@@ -9,7 +9,9 @@
         "package": "electron-forge package",
         "make": "electron-forge make",
         "publish": "electron-forge publish",
-        "lint": "echo \"No linting configured\""
+        "lint": "echo \"No linting configured\"",
+        "test": "node test/run-tests.js",
+        "test:custom-profiles": "node test/custom-profiles.test.js"
     },
     "keywords": [
         "cheating daddy",

@@ -15,6 +15,7 @@ A real-time AI assistant that provides contextual help during video calls, inter
 - **Live AI Assistance**: Real-time help powered by Google Gemini 2.0 Flash Live
 - **Screen & Audio Capture**: Analyzes what you see and hear for contextual responses
 - **Multiple Profiles**: Interview, Sales Call, Business Meeting, Presentation, Negotiation
+- **Custom Profiles**: Create your own AI behaviour configurations for any context
 - **Transparent Overlay**: Always-on-top window that can be positioned anywhere
 - **Click-through Mode**: Make window transparent to clicks when needed
 - **Cross-platform**: Works on macOS, Windows, and Linux (kinda, dont use, just for testing rn)
@@ -52,3 +53,22 @@ A real-time AI assistant that provides contextual help during video calls, inter
 - Gemini API key
 - Screen recording permissions
 - Microphone/audio permissions
+
+## Custom Profiles
+
+Create personalised AI behaviour configurations for any context:
+
+1. **Access**: Go to Customise → Manage Custom Profiles
+2. **Create**: Define AI role, response format, and behaviour examples
+3. **Use**: Select your custom profile from the dropdown
+4. **Share**: Export/import profiles as JSON files
+
+See [Custom Profiles Guide](docs/custom-profiles.md) for detailed instructions.
+
+## Testing
+
+Run the test suite to verify functionality:
+
+```bash
+npm test
+```
