@@ -214,7 +214,35 @@ function buildSystemPrompt(promptParts, customPrompt = '', googleSearchEnabled =
     return sections.join('');
 }
 
-function getSystemPrompt(profile, customPrompt = '', googleSearchEnabled = true) {
+async function getSystemPrompt(profile, customPrompt = '', googleSearchEnabled = true) {
+    let promptParts;
+
+    // Check if it's a custom profile (starts with 'custom_')
+    if (profile && profile.startsWith('custom_')) {
+        try {
+            // Try to get custom profile from storage
+            // Note: This will be called from the main process, so we need to handle this differently
+            promptParts = await getCustomProfilePromptParts(profile);
+        } catch (error) {
+            console.error('Error loading custom profile:', error);
+            promptParts = profilePrompts.interview; // Fallback to interview
+        }
+    } else {
+        // Use hardcoded profile
+        promptParts = profilePrompts[profile] || profilePrompts.interview;
+    }
+
+    return buildSystemPrompt(promptParts, customPrompt, googleSearchEnabled);
+}
+
+// Function to get custom profile prompt parts (to be implemented in main process)
+async function getCustomProfilePromptParts(profileId) {
+    // This will be overridden in the main process context
+    throw new Error('getCustomProfilePromptParts not implemented in this context');
+}
+
+// Synchronous version for backwards compatibility
+function getSystemPromptSync(profile, customPrompt = '', googleSearchEnabled = true) {
     const promptParts = profilePrompts[profile] || profilePrompts.interview;
     return buildSystemPrompt(promptParts, customPrompt, googleSearchEnabled);
 }
@@ -222,4 +250,7 @@ function getSystemPrompt(profile, customPrompt = '', googleSearchEnabled = true)
 module.exports = {
     profilePrompts,
     getSystemPrompt,
+    getSystemPromptSync,
+    buildSystemPrompt,
+    getCustomProfilePromptParts,
 };
