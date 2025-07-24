@@ -39,7 +39,8 @@
         "@electron-forge/plugin-fuses": "^7.8.1",
         "@electron/fuses": "^1.8.0",
         "@reforged/maker-appimage": "^5.0.0",
-        "vitest": "^1.6.1"
+        "vitest": "^1.6.1",
+        "jsdom": "^23.2.0",
         "electron": "^30.0.5"
     }
 }
