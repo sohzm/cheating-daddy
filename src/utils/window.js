@@ -153,6 +153,7 @@ function getDefaultKeybinds() {
         nextResponse: isMac ? 'Cmd+]' : 'Ctrl+]',
         scrollUp: isMac ? 'Cmd+Shift+Up' : 'Ctrl+Shift+Up',
         scrollDown: isMac ? 'Cmd+Shift+Down' : 'Ctrl+Shift+Down',
+        emergencyErase: isMac ? 'Cmd+Shift+E' : 'Ctrl+Shift+E',
     };
 }
 
@@ -312,6 +313,33 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
             console.log(`Registered scrollDown: ${keybinds.scrollDown}`);
         } catch (error) {
             console.error(`Failed to register scrollDown (${keybinds.scrollDown}):`, error);
+        }
+    }
+
+    // Register emergency erase shortcut
+    if (keybinds.emergencyErase) {
+        try {
+            globalShortcut.register(keybinds.emergencyErase, () => {
+                console.log('Emergency Erase triggered!');
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                    mainWindow.hide();
+
+                    if (geminiSessionRef.current) {
+                        geminiSessionRef.current.close();
+                        geminiSessionRef.current = null;
+                    }
+
+                    sendToRenderer('clear-sensitive-data');
+
+                    setTimeout(() => {
+                        const { app } = require('electron');
+                        app.quit();
+                    }, 300);
+                }
+            });
+            console.log(`Registered emergencyErase: ${keybinds.emergencyErase}`);
+        } catch (error) {
+            console.error(`Failed to register emergencyErase (${keybinds.emergencyErase}):`, error);
         }
     }
 }
