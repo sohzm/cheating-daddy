@@ -28,7 +28,7 @@ function ensureDataDirectories() {
 function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
     // Get layout preference (default to 'normal')
     let windowWidth = 1100;
-    let windowHeight = 600;
+    let windowHeight = 800;
 
     const mainWindow = new BrowserWindow({
         width: windowWidth,
@@ -153,6 +153,7 @@ function getDefaultKeybinds() {
         nextResponse: isMac ? 'Cmd+]' : 'Ctrl+]',
         scrollUp: isMac ? 'Cmd+Shift+Up' : 'Ctrl+Shift+Up',
         scrollDown: isMac ? 'Cmd+Shift+Down' : 'Ctrl+Shift+Down',
+        emergencyErase: isMac ? 'Cmd+Shift+E' : 'Ctrl+Shift+E',
     };
 }
 
@@ -314,6 +315,33 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
             console.error(`Failed to register scrollDown (${keybinds.scrollDown}):`, error);
         }
     }
+
+    // Register emergency erase shortcut
+    if (keybinds.emergencyErase) {
+        try {
+            globalShortcut.register(keybinds.emergencyErase, () => {
+                console.log('Emergency Erase triggered!');
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                    mainWindow.hide();
+
+                    if (geminiSessionRef.current) {
+                        geminiSessionRef.current.close();
+                        geminiSessionRef.current = null;
+                    }
+
+                    sendToRenderer('clear-sensitive-data');
+
+                    setTimeout(() => {
+                        const { app } = require('electron');
+                        app.quit();
+                    }, 300);
+                }
+            });
+            console.log(`Registered emergencyErase: ${keybinds.emergencyErase}`);
+        } catch (error) {
+            console.error(`Failed to register emergencyErase (${keybinds.emergencyErase}):`, error);
+        }
+    }
 }
 
 function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
@@ -459,26 +487,26 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
 
             // Determine base size from layout mode
             const baseWidth = layoutMode === 'compact' ? 700 : 900;
-            const baseHeight = layoutMode === 'compact' ? 300 : 400;
+            const baseHeight = layoutMode === 'compact' ? 500 : 600;
 
             // Adjust height based on view
             switch (viewName) {
                 case 'customize':
                 case 'settings':
                     targetWidth = baseWidth;
-                    targetHeight = layoutMode === 'compact' ? 500 : 600;
+                    targetHeight = layoutMode === 'compact' ? 700 : 800;
                     break;
                 case 'help':
                     targetWidth = baseWidth;
-                    targetHeight = layoutMode === 'compact' ? 450 : 550;
+                    targetHeight = layoutMode === 'compact' ? 650 : 750;
                     break;
                 case 'history':
                     targetWidth = baseWidth;
-                    targetHeight = layoutMode === 'compact' ? 450 : 550;
+                    targetHeight = layoutMode === 'compact' ? 650 : 750;
                     break;
                 case 'advanced':
                     targetWidth = baseWidth;
-                    targetHeight = layoutMode === 'compact' ? 400 : 500;
+                    targetHeight = layoutMode === 'compact' ? 600 : 700;
                     break;
                 case 'main':
                 case 'assistant':

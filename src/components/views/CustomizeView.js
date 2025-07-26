@@ -904,10 +904,55 @@ export class CustomizeView extends LitElement {
                             <div class="form-description">
                                 Personalize the AI's behavior with specific instructions that will be added to the
                                 ${profileNames[this.selectedProfile] || 'selected profile'} base prompts
+                </div>
+                </div>
+            </div>
+        </div>
+
+                <!-- Audio & Microphone Section -->
+                <div class="settings-section">
+                    <div class="section-title">
+                        <span>Audio & Microphone</span>
+                    </div>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label class="form-label">Audio Mode</label>
+                            <select class="form-control" .value=${localStorage.getItem('audioMode') || 'speaker_only'} @change=${e => localStorage.setItem('audioMode', e.target.value)}>
+                                <option value="speaker_only">Speaker Only (Interviewer)</option>
+                                <option value="mic_only">Microphone Only (Me)</option>
+                                <option value="both">Both Speaker & Microphone</option>
+                            </select>
+                            <div class="form-description">
+                                Choose which audio sources to capture for the AI.
                             </div>
                         </div>
                     </div>
                 </div>
+
+                <!-- Stealth Profile Section -->
+                <div class="settings-section">
+                    <div class="section-title">
+                        <span>Stealth Profile</span>
+                    </div>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label class="form-label">Profile</label>
+                            <select class="form-control" .value=${localStorage.getItem('stealthProfile') || 'balanced'} @change=${e => {
+                                localStorage.setItem('stealthProfile', e.target.value);
+                                // We need to notify the main process to restart for some settings to apply
+                                alert('Restart the application for stealth changes to take full effect.');
+                            }}>
+                                <option value="visible">Visible</option>
+                                <option value="balanced">Balanced</option>
+                                <option value="ultra">Ultra-Stealth</option>
+                            </select>
+                            <div class="form-description">
+                                Adjusts visibility and detection resistance. A restart is required for changes to apply.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
 
                 <!-- Language & Audio Section -->
                 <div class="settings-section">

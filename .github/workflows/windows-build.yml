@@ -1,0 +1,48 @@
+name: CI Desktop
+
+on:
+    pull_request:
+        branches: [main]
+    schedule:
+        - cron: '0 2 2 */4 *'
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+concurrency:
+    group: ci-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    build:
+        strategy:
+            fail-fast: true
+            matrix:
+                os: [windows-latest]
+
+        runs-on: ${{ matrix.os }}
+
+        steps:
+            - name: Checkout repo
+              uses: actions/checkout@v4
+
+            - name: Setup NodeJS
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 'lts/*'
+                  cache: 'npm'
+
+            - name: Install JS dependencies
+              run: npm install
+
+            - name: Run tests
+              run: npm test
+
+            - name: Build Electron app
+              uses: samuelmeuli/action-electron-builder@v1
+              with:
+                  release: false
+                  args: -w --x64
+              env:
+                  GH_TOKEN: ${{ secrets.github_token }}
