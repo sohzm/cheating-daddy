@@ -1,5 +1,6 @@
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
 import { resizeLayout } from '../../utils/windowResize.js';
+import  language  from '../../lang/language_module.mjs';
 
 export class CustomizeView extends LitElement {
     static styles = css`
@@ -397,10 +398,11 @@ export class CustomizeView extends LitElement {
             color: var(--description-color, rgba(255, 255, 255, 0.5));
         }
     `;
-
+ 
     static properties = {
         selectedProfile: { type: String },
         selectedLanguage: { type: String },
+        selectedAppLanguage: { type: String }, //TODO: OSCARDO
         selectedScreenshotInterval: { type: String },
         selectedImageQuality: { type: String },
         layoutMode: { type: String },
@@ -410,6 +412,7 @@ export class CustomizeView extends LitElement {
         fontSize: { type: Number },
         onProfileChange: { type: Function },
         onLanguageChange: { type: Function },
+        onLanguageAppChange: { type: Function }, //TODO: Oscardo
         onScreenshotIntervalChange: { type: Function },
         onImageQualityChange: { type: Function },
         onLayoutModeChange: { type: Function },
@@ -421,12 +424,14 @@ export class CustomizeView extends LitElement {
         super();
         this.selectedProfile = 'interview';
         this.selectedLanguage = 'en-US';
+        this.selectedAppLanguage = 'en-US'; //TODO: OSCARDO
         this.selectedScreenshotInterval = '5';
         this.selectedImageQuality = 'medium';
         this.layoutMode = 'normal';
         this.keybinds = this.getDefaultKeybinds();
         this.onProfileChange = () => {};
         this.onLanguageChange = () => {};
+        this.onLanguageAppChange = () => {}; //TODO: OSCARDO
         this.onScreenshotIntervalChange = () => {};
         this.onImageQualityChange = () => {};
         this.onLayoutModeChange = () => {};
@@ -444,11 +449,13 @@ export class CustomizeView extends LitElement {
         // Font size default (in pixels)
         this.fontSize = 20;
 
+        this.getLanguageAppSelect(); //TODO: OSCARDO
         this.loadKeybinds();
         this.loadGoogleSearchSettings();
         this.loadAdvancedModeSettings();
         this.loadBackgroundTransparency();
         this.loadFontSize();
+       // this.loadLayoutMode(); // Load layout mode for display purposes TODO: OSCARDO
     }
 
     connectedCallback() {
@@ -529,6 +536,63 @@ export class CustomizeView extends LitElement {
         ];
     }
 
+    //TODO: OSCARDO
+    
+    getLanguagesApp() {
+        return [
+            { value: 'en-US', name: 'English (US)' },
+            { value: 'pt-BR', name: 'Portuguese (Brazil)' },
+            { value: 'es-CO', name: 'Spanish (Colombia)' }
+        ];
+    }
+    
+    //  async translate(key){
+    //     // console.log("mensaje")
+    //     // console.log("key: ",key);
+    //     // console.log("lenguaje: ",language.getLanguage());
+    //     // console.log("mensaje")
+    //     const temp = '';
+    //     switch (key) {
+    //         case 'Speech_Language': 
+    //             //console.log("salida: ",await language.getMessages("Speech_Language", language.getLanguage() || 'en-US'));
+    //             temp = await new Promise(language.getMessages("Speech_Language", language.getLanguage() || 'en-US'));
+    //             break;
+    //         case 'greeting':
+    //             temp = await new Promise(language.getMessage("greeting", language.getLanguage() || 'en-US'));
+    //             break;
+    //         case 'welcome_message':
+    //             temp = await new Promise(language.getMessage("welcome_message", language.getLanguage() || 'en-US'));
+    //             break;
+    //         default: return await new Promise(language.getMessages("Speech_Language", 'en-US'));
+    //     }    
+    //     return temp;
+    //     this.requestUpdate();
+    //  }
+
+    async translate(key) {
+    let temp = ''; // Usa 'let' si vas a reasignar
+    switch (key) {
+        case 'Speech_Language':
+            // Asumiendo que language.getMessages devuelve una Promesa
+            temp = await language.getMessages("Speech_Language", language.getLanguage() || 'en-US');
+            break;
+        case 'greeting':
+            // Asumiendo que language.getMessage devuelve una Promesa
+            temp = await language.getMessage("greeting", language.getLanguage() || 'en-US');
+            break;
+        case 'welcome_message':
+            // Asumiendo que language.getMessage devuelve una Promesa
+            temp = await language.getMessage("welcome_message", language.getLanguage() || 'en-US');
+            break;
+        default:
+            // Si quieres un valor por defecto que también es una Promesa
+            return await language.getMessages("Speech_Language", 'en-US');
+    }
+    // Asegúrate de que 'temp' siempre sea una cadena o el tipo esperado
+        return temp;
+    }    
+    //TODO: OSCARDO
+
     getProfileNames() {
         return {
             interview: 'Job Interview',
@@ -551,6 +615,22 @@ export class CustomizeView extends LitElement {
         localStorage.setItem('selectedLanguage', this.selectedLanguage);
         this.onLanguageChange(this.selectedLanguage);
     }
+
+    /* Oscardo */
+    async handleLanguageAppSelect(e) {
+        this.selectedAppLanguage = e.target.value;
+        localStorage.setItem('selectedAppLanguage', this.selectedAppLanguage);
+        const respuesta = await language.getMessage("greeting", this.selectedAppLanguage);
+        console.log("Respuesta:", respuesta);
+        respuesta = this.translate('Speech_Language');
+        console.log("Respuesta traducida:", respuesta);
+        this.onLanguageAppChange(this.selectedAppLanguage);
+    }
+
+    getLanguageAppSelect(){
+        this.selectedAppLanguage = localStorage.getItem('selectedAppLanguage')
+    }
+    /* Oscardo */
 
     handleScreenshotIntervalSelect(e) {
         this.selectedScreenshotInterval = e.target.value;
@@ -856,16 +936,37 @@ export class CustomizeView extends LitElement {
         root.style.setProperty('--response-font-size', `${this.fontSize}px`);
     }
 
-    render() {
-        const profiles = this.getProfiles();
-        const languages = this.getLanguages();
-        const profileNames = this.getProfileNames();
-        const currentProfile = profiles.find(p => p.value === this.selectedProfile);
-        const currentLanguage = languages.find(l => l.value === this.selectedLanguage);
+    //TODO: OSCARDO
+    otraFuncionNoAsincrona() {
+        console.log("Iniciando otraFuncionNoAsincrona");
+        // Llamamos a translate, que devuelve una Promesa
+        this.translate('greeting')
+            .then(translatedText => {
+                // Este código se ejecutará *después* de que translate resuelva la Promesa
+                console.log("Texto traducido (dentro del .then()):", translatedText);
+                // Aquí puedes usar 'translatedText' para hacer lo que necesites
+                return translatedText; // Si esta función también devolverá una Promesa
+            })
+            .catch(error => {
+                // Manejar cualquier error que ocurra durante la traducción
+                console.error("Error al traducir:", error);
+                return "Error en la traducción"; // O algún valor de fallback
+            });
 
-        return html`
-            <div class="settings-container">
-                <!-- Profile & Behavior Section -->
+        console.log("Fin de otraFuncionNoAsincrona (el .then() se ejecutará más tarde)");
+        // Importante: No puedes retornar el 'translatedText' directamente aquí,
+        // porque el .then() se ejecuta de forma asíncrona.
+        // Esto se ejecutará antes de que la traducción esté disponible.
+        return "La traducción está pendiente...";
+    }
+
+    //modify for Oscardo
+    _Profile() {
+    const profiles = this.getProfiles();
+    const currentProfile = profiles.find(p => p.value === this.selectedProfile);
+    const profileNames = this.getProfileNames();
+    return html`
+      <!-- Profile & Behavior Section -->
                 <div class="settings-section">
                     <div class="section-title">
                         <span>AI Profile & Behavior</span>
@@ -899,19 +1000,61 @@ export class CustomizeView extends LitElement {
                                 }..."
                                 .value=${localStorage.getItem('customPrompt') || ''}
                                 rows="4"
-                                @input=${this.handleCustomPromptInput}
-                            ></textarea>
+                                @input=${this.handleCustomPromptInput}></textarea>
                             <div class="form-description">
                                 Personalize the AI's behavior with specific instructions that will be added to the
                                 ${profileNames[this.selectedProfile] || 'selected profile'} base prompts
                             </div>
                         </div>
                     </div>
-                </div>
+        `;
+    }//end _profile
 
-                <!-- Language & Audio Section -->
-                <div class="settings-section">
-                    <div class="section-title">
+    _language_application(){
+        const languages = this.getLanguages();
+        const currentLanguage = languages.find(l => l.value === this.selectedLanguage);
+        const languagesApp = this.getLanguagesApp(); //TODO OSCARDO
+        const currentApplicationLanguage = languagesApp.find(l => l.value === this.selectedAppLanguage); //TODO: OSCARDO
+
+        let Speech_Language = '';
+        return html`<div class="section-title">
+                        <span>Language Application</span>
+                        **** 
+                        ${Speech_Language}
+                    </div>
+
+                    <div class="form-grid">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">
+                                    Speech Language + ${this.translate('Speech_Language').then(resp => resp.toString())}
+                                    <span class="current-selection">${currentApplicationLanguage?.name || 'English '}</span>
+                                    <spam>Idioma de la aplicación: ${currentApplicationLanguage?.value || 'en-US'}</span>
+                                </label>
+                                <select class="form-control" .value=${this.selectedAppLanguage} @change=${this.handleLanguageAppSelect}>
+                                    ${languagesApp.map(
+                                        language => html`
+                                            <option value=${language.value} ?selected=${this.selectedAppLanguage === language.value}>
+                                                ${language.name}
+                                            </option>
+                                        `
+                                    )}
+                                </select>
+                                <div class="form-description">Language for speech recognition and AI responses</div>
+                            </div>
+                        </div>
+                    </div>
+        `;
+    }//end _lenguage_application
+
+
+    _language(){
+        const languages = this.getLanguages();
+        const currentLanguage = languages.find(l => l.value === this.selectedLanguage);
+        const languagesApp = this.getLanguagesApp(); //TODO OSCARDO
+        const currentApplicationLanguage = languagesApp.find(l => l.value === this.selectedAppLanguage); //TODO: OSCARDO
+        return html`
+        <div class="section-title">
                         <span>Language & Audio</span>
                     </div>
 
@@ -935,11 +1078,12 @@ export class CustomizeView extends LitElement {
                             </div>
                         </div>
                     </div>
-                </div>
+        `;
+    }
 
-                <!-- Interface Layout Section -->
-                <div class="settings-section">
-                    <div class="section-title">
+    _interface_layout(){
+        return html`
+        <div class="section-title">
                         <span>Interface Layout</span>
                     </div>
 
@@ -1013,14 +1157,13 @@ export class CustomizeView extends LitElement {
                                 </div>
                             </div>
                         </div>
-
-
                     </div>
-                </div>
+        `;
+    }//end _interface_layout
 
-                <!-- Screen Capture Section -->
-                <div class="settings-section">
-                    <div class="section-title">
+    _screen_capture(){
+        return html`
+        <div class="section-title">
                         <span>Screen Capture Settings</span>
                     </div>
 
@@ -1073,10 +1216,11 @@ export class CustomizeView extends LitElement {
                             </div>
                         </div>
                     </div>
-                </div>
+        `;
+    }//end _screen_capture
 
-                <!-- Keyboard Shortcuts Section -->
-                <div class="settings-section">
+    _keyboard_shortcuts(){
+            return html`
                     <div class="section-title">
                         <span>Keyboard Shortcuts</span>
                     </div>
@@ -1121,13 +1265,12 @@ export class CustomizeView extends LitElement {
                             </tr>
                         </tbody>
                     </table>
-                </div>
+            `;
+        }
 
-
-
-                <!-- Google Search Section -->
-                <div class="settings-section">
-                    <div class="section-title">
+        _google_search(){
+         return html`
+            <div class="section-title">
                         <span>Google Search</span>
                     </div>
 
@@ -1147,14 +1290,12 @@ export class CustomizeView extends LitElement {
                             <br /><strong>Note:</strong> Changes take effect when starting a new AI session
                         </div>
                     </div>
-                </div>
+         `;
+        }
 
-                <div class="settings-note">
-                    💡 Settings are automatically saved as you change them. Changes will take effect immediately or on the next session start.
-                </div>
 
-                <!-- Advanced Mode Section (Danger Zone) -->
-                <div class="settings-section" style="border-color: var(--danger-border, rgba(239, 68, 68, 0.3)); background: var(--danger-background, rgba(239, 68, 68, 0.05));">
+    _advanced_mode(){
+         return html`
                     <div class="section-title" style="color: var(--danger-color, #ef4444);">
                         <span>⚠️ Advanced Mode</span>
                     </div>
@@ -1176,10 +1317,56 @@ export class CustomizeView extends LitElement {
                             </div>
                         </div>
                     </div>
+         `;
+    }
+
+
+    render() {
+        return html`
+            <div class="settings-container">
+                <div class="settings-container">
+                    ${this._Profile()}    
+                </div>
+                <!-- Language Application - Oscardo -->
+                <div class="settings-section">
+                    ${this._language_application()}
+                </div>                    
+                <!-- Language Application - Oscardo -->
+
+                <!-- Language & Audio Section -->
+                <div class="settings-section">
+                    ${this._language()}
+                </div>
+
+                <!-- Interface Layout Section -->
+                <div class="settings-section">
+                    ${this._interface_layout()}
+                </div>
+
+                <!-- Screen Capture Section -->
+                <div class="settings-section">
+                    ${this._screen_capture()}
+                </div>
+
+                <!-- Keyboard Shortcuts Section -->
+                <div class="settings-section">
+                    ${this._keyboard_shortcuts()}
+                </div>
+
+                <!-- Google Search Section -->
+                <div class="settings-section">
+                    ${this._google_search()}
+                </div>
+                <div class="settings-note">
+                    💡 Settings are automatically saved as you change them. Changes will take effect immediately or on the next session start.
+                </div>
+                <!-- Advanced Mode Section (Danger Zone) -->
+                <div class="settings-section" style="border-color: var(--danger-border, rgba(239, 68, 68, 0.3)); background: var(--danger-background, rgba(239, 68, 68, 0.05));">
+                    ${this._advanced_mode()}
                 </div>
             </div>
         `;
-    }
-}
+    }//end the render
+}//end export class CustomizerView
 
 customElements.define('customize-view', CustomizeView);

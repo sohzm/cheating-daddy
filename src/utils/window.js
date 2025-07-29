@@ -4,6 +4,8 @@ const fs = require('node:fs');
 const os = require('os');
 const { applyStealthMeasures, startTitleRandomization } = require('./stealthFeatures');
 
+//const { getLanguage, getMessage }= require('../lang/language');
+
 let mouseEventsIgnored = false;
 let windowResizing = false;
 let resizeAnimation = null;
@@ -44,12 +46,37 @@ function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
             contextIsolation: false, // TODO: change to true
             backgroundThrottling: false,
             enableBlinkFeatures: 'GetDisplayMedia',
-            webSecurity: true,
+            webSecurity: true, 
             allowRunningInsecureContent: false,
+            devTools: true, //TODO: OSCARDO
         },
         backgroundColor: '#00000000',
     });
 
+    // Abre las DevTools automáticamente en desarrollo Oscardo 
+    if (process.env.NODE_ENV === 'development') {
+        mainWindow.webContents.openDevTools();
+    }
+    if (process.env.NODE_ENV === 'development') {
+         require('electron-debug')();
+    }
+
+
+
+    // Abre las DevTools automáticamente en desarrollo Oscardo 
+    //console.log('Current app language:', electronGlobals.selectedAppLanguage);
+    //console.log('Current app language:', getLanguage());
+    //console.log('Current app language:', getMessage("greeting", 'es-CO'));    
+
+    console.log('=== DEBUG INFO ===');
+    console.log('typeof window:', typeof window);
+    console.log('typeof localStorage:', typeof localStorage);
+    console.log('typeof require:', typeof require);
+    console.log('process.type:', typeof process !== 'undefined' ? process.type : 'undefined');
+    console.log('process.platform:', typeof process !== 'undefined' ? process.platform : 'undefined');
+    console.log('=== DEBUG INFO ===');
+    //console.log("Idioma de la aplicación Oscardo:", selectedAppLanguage || 'No definido');
+    
     const { session, desktopCapturer } = require('electron');
     session.defaultSession.setDisplayMediaRequestHandler(
         (request, callback) => {
@@ -135,7 +162,7 @@ function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
     });
 
     setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef);
-
+    
     return mainWindow;
 }
 

@@ -1,0 +1,30 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Electron: Main",
+            "type": "node",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/electron", // Ajusta si Electron está en otro lugar
+            "args": [
+                "."
+            ],
+            "outputCapture": "std",
+            "console": "internalConsole"
+        },
+        {
+            "name": "Electron: Renderer",
+            "type": "chrome",
+            "request": "attach",
+            "port": 9222, // Este es el puerto predeterminado para el renderizador
+            "webRoot": "${workspaceFolder}"
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Electron: All",
+            "configurations": ["Electron: Main", "Electron: Renderer"]
+        }
+    ]
+}

@@ -9,7 +9,12 @@
         "package": "electron-forge package",
         "make": "electron-forge make",
         "publish": "electron-forge publish",
-        "lint": "echo \"No linting configured\""
+        "lint": "echo \"No linting configured\"",
+        "_comment": "INTRODUCIDOS POR OSCARDO (dev, DEBUG, DEBUG-BRK, debug-renderer)",
+        "dev": "electron-forge start",
+        "debug": "electron-forge start -- --inspect=5858",
+        "debug-brk": "electron-forge start -- --inspect-brk=5858",
+        "debug-renderer": "NODE_ENV=development electron-forge start"
     },
     "keywords": [
         "cheating daddy",
@@ -38,6 +43,9 @@
         "@electron-forge/plugin-fuses": "^7.8.1",
         "@electron/fuses": "^1.8.0",
         "@reforged/maker-appimage": "^5.0.0",
-        "electron": "30.0.0"
+        "devtron": "^1.4.0",
+        "electron": "30.0.0",
+        "electron-debug": "^4.1.0",
+        "electron-devtools-installer": "^4.0.0"
     }
 }
