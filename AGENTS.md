@@ -36,6 +36,23 @@ rules in mind as new files are created:
 - **Non‑blocking audio** – heavy processing must stay off the UI thread.
 - **Tests** – every new feature requires tests once the test suite is available.
 
+
+## Shadcn and Electron
+
+The interface is being rebuilt with [shadcn/ui](https://ui.shadcn.com) components.
+Follow these guidelines when working on UI code:
+
+- **Component directory** – place generated files under `src/components/ui` and export them from that folder.
+- **Add components with the CLI** – run `npx shadcn@latest add <component>`; never hand-roll components.
+- **Component pattern** – use `React.forwardRef` with the `cn()` helper for class names.
+- **Path aliases** – import modules from `src` using the `@/` prefix.
+- **React 19 + Compiler** – target React 19 with the new compiler when available.
+- **Context isolation** – maintain Electron's context isolation pattern for IPC.
+- **TypeScript strict mode** – run `npm run typecheck` before claiming work complete.
+- **Tailwind theming** – rely on CSS variables and utilities in `@/utils/tailwind` for styling.
+- **Testing without running** – confirm `npm run typecheck` and module resolution with `node -e "require('<file>')"`.
+
+
 ## Tests
 
 No automated tests yet. When a suite is added, run `npm test` before each
@@ -79,6 +96,9 @@ uses Electron. Key goals are:
 3. Investigate speaker diarization options and integrate when feasible.
 4. Plan a migration path toward a proper testing setup (Jest or similar).
 5. Document security considerations for audio storage and processing.
+
+6. Rebuild the entire UI using shadcn components.
+
 
 These plans are aspirational; implement them gradually while keeping the app
 functional.
