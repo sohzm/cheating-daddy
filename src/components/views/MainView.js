@@ -1,6 +1,6 @@
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
 import { resizeLayout } from '../../utils/windowResize.js';
-
+import  language  from '../../lang/language_module.mjs';
 export class MainView extends LitElement {
     static styles = css`
         * {
@@ -149,6 +149,11 @@ export class MainView extends LitElement {
         isInitializing: { type: Boolean },
         onLayoutModeChange: { type: Function },
         showApiKeyError: { type: Boolean },
+        Main_api: { type: String },
+        Main_GetApi: { type: String },
+        Main_Welcome: {type: String},
+        Main_APIKey:  {type: String},
+        Main_Start: {type: String},
     };
 
     constructor() {
@@ -159,6 +164,24 @@ export class MainView extends LitElement {
         this.onLayoutModeChange = () => {};
         this.showApiKeyError = false;
         this.boundKeydownHandler = this.handleKeydown.bind(this);
+        this.translate("Main_api").then((lang)=> 
+            this.Main_api = lang
+        );
+        this.translate("Main_GetApi").then((lang)=> 
+            this.Main_GetApi = lang
+        );
+        this.translate("Main_Welcome").then((lang)=> 
+            this.Main_Welcome = lang
+        );
+        this.translate("Main_APIKey").then((lang)=> 
+            this.Main_APIKey = lang
+        );
+        this.translate("Main_Start").then((lang)=> 
+            this.Main_Start = lang
+        );
+
+        
+        
     }
 
     connectedCallback() {
@@ -182,6 +205,32 @@ export class MainView extends LitElement {
         // Remove keyboard event listener
         document.removeEventListener('keydown', this.boundKeydownHandler);
     }
+
+    async translate(key) {
+    //await new Promise(resolve => setTimeout(resolve, 500));
+    let temp = ''; // Usa 'let' si vas a reasignar
+    switch (key) {
+        case 'Main_api':
+            temp = await language.getMessages("Main_api", language.getLanguage() || 'en-US');
+            break;
+        case 'Main_GetApi':
+            temp = await language.getMessages("Main_GetApi", language.getLanguage() || 'en-US');
+            break;
+        case 'Main_Welcome':
+            temp = await language.getMessages("Main_Welcome", language.getLanguage() || 'en-US');
+            break;
+        case 'Main_APIKey':
+            temp = await language.getMessages("Main_APIKey", language.getLanguage() || 'en-US');
+            break;
+        case 'Main_Start':
+            temp = await language.getMessages("Main_Start", language.getLanguage() || 'en-US');
+            break;
+        default:
+            // Si quieres un valor por defecto que también es una Promesa
+            return await language.getMessages("unknowledge", 'en-US');
+        }//end switch
+        return temp || 'Unknowledge';
+    }//end translate
 
     handleKeydown(e) {
         const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
@@ -275,20 +324,20 @@ export class MainView extends LitElement {
         </svg>`;
 
         if (isMac) {
-            return html`Start Session <span class="shortcut-icons">${cmdIcon}${enterIcon}</span>`;
+            return html`${this.Main_Start} <span class="shortcut-icons">${cmdIcon}${enterIcon}</span>`;
         } else {
-            return html`Start Session <span class="shortcut-icons">Ctrl${enterIcon}</span>`;
+            return html`${this.Main_Start} <span class="shortcut-icons">Ctrl${enterIcon}</span>`;
         }
     }
 
     render() {
         return html`
-            <div class="welcome">Welcome</div>
+            <div class="welcome">${this.Main_Welcome}</div>
 
             <div class="input-group">
                 <input
                     type="password"
-                    placeholder="Enter your Gemini API Key"
+                    placeholder="${this.Main_APIKey || 'Enter your Gemini API Key'} "
                     .value=${localStorage.getItem('apiKey') || ''}
                     @input=${this.handleInput}
                     class="${this.showApiKeyError ? 'api-key-error' : ''}"
@@ -298,8 +347,8 @@ export class MainView extends LitElement {
                 </button>
             </div>
             <p class="description">
-                dont have an api key?
-                <span @click=${this.handleAPIKeyHelpClick} class="link">get one here</span>
+                ${this.Main_api}
+                <span @click=${this.handleAPIKeyHelpClick} class="link">${this.Main_GetApi}</span>
             </p>
         `;
     }
