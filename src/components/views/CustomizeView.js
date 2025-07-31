@@ -1,403 +1,10 @@
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
 import { resizeLayout } from '../../utils/windowResize.js';
 import  language  from '../../lang/language_module.mjs';
+import { CustomizeStyle } from '../../style/CustomizeStyle.js';
 
 export class CustomizeView extends LitElement {
-    static styles = css`
-        * {
-            font-family:
-                'Inter',
-                -apple-system,
-                BlinkMacSystemFont,
-                sans-serif;
-            cursor: default;
-            user-select: none;
-        }
-
-        :host {
-            display: block;
-            padding: 12px;
-            margin: 0 auto;
-            max-width: 700px;
-        }
-
-        .settings-container {
-            display: grid;
-            gap: 12px;
-            padding-bottom: 20px;
-        }
-
-        .settings-section {
-            background: var(--card-background, rgba(255, 255, 255, 0.04));
-            border: 1px solid var(--card-border, rgba(255, 255, 255, 0.1));
-            border-radius: 6px;
-            padding: 16px;
-            backdrop-filter: blur(10px);
-        }
-
-        .section-title {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 12px;
-            font-size: 14px;
-            font-weight: 600;
-            color: var(--text-color);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .section-title::before {
-            content: '';
-            width: 3px;
-            height: 14px;
-            background: var(--accent-color, #007aff);
-            border-radius: 1.5px;
-        }
-
-        .form-grid {
-            display: grid;
-            gap: 12px;
-        }
-
-        .form-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            align-items: start;
-        }
-
-        @media (max-width: 600px) {
-            .form-row {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        .form-group {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-
-        .form-group.full-width {
-            grid-column: 1 / -1;
-        }
-
-        .form-label {
-            font-weight: 500;
-            font-size: 12px;
-            color: var(--label-color, rgba(255, 255, 255, 0.9));
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .form-description {
-            font-size: 11px;
-            color: var(--description-color, rgba(255, 255, 255, 0.5));
-            line-height: 1.3;
-            margin-top: 2px;
-        }
-
-        .form-control {
-            background: var(--input-background, rgba(0, 0, 0, 0.3));
-            color: var(--text-color);
-            border: 1px solid var(--input-border, rgba(255, 255, 255, 0.15));
-            padding: 8px 10px;
-            border-radius: 4px;
-            font-size: 12px;
-            transition: all 0.15s ease;
-            min-height: 16px;
-            font-weight: 400;
-        }
-
-        .form-control:focus {
-            outline: none;
-            border-color: var(--focus-border-color, #007aff);
-            box-shadow: 0 0 0 2px var(--focus-shadow, rgba(0, 122, 255, 0.1));
-            background: var(--input-focus-background, rgba(0, 0, 0, 0.4));
-        }
-
-        .form-control:hover:not(:focus) {
-            border-color: var(--input-hover-border, rgba(255, 255, 255, 0.2));
-            background: var(--input-hover-background, rgba(0, 0, 0, 0.35));
-        }
-
-        select.form-control {
-            cursor: pointer;
-            appearance: none;
-            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
-            background-position: right 8px center;
-            background-repeat: no-repeat;
-            background-size: 12px;
-            padding-right: 28px;
-        }
-
-        textarea.form-control {
-            resize: vertical;
-            min-height: 60px;
-            line-height: 1.4;
-            font-family: inherit;
-        }
-
-        textarea.form-control::placeholder {
-            color: var(--placeholder-color, rgba(255, 255, 255, 0.4));
-        }
-
-        .profile-option {
-            display: flex;
-            flex-direction: column;
-            gap: 3px;
-        }
-
-        .current-selection {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            font-size: 10px;
-            color: var(--success-color, #34d399);
-            background: var(--success-background, rgba(52, 211, 153, 0.1));
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-weight: 500;
-            border: 1px solid var(--success-border, rgba(52, 211, 153, 0.2));
-        }
-
-        .current-selection::before {
-            content: '✓';
-            font-weight: 600;
-        }
-
-        .keybind-input {
-            cursor: pointer;
-            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace;
-            text-align: center;
-            letter-spacing: 0.5px;
-            font-weight: 500;
-        }
-
-        .keybind-input:focus {
-            cursor: text;
-            background: var(--input-focus-background, rgba(0, 122, 255, 0.1));
-        }
-
-        .keybind-input::placeholder {
-            color: var(--placeholder-color, rgba(255, 255, 255, 0.4));
-            font-style: italic;
-        }
-
-        .reset-keybinds-button {
-            background: var(--button-background, rgba(255, 255, 255, 0.1));
-            color: var(--text-color);
-            border: 1px solid var(--button-border, rgba(255, 255, 255, 0.15));
-            padding: 6px 10px;
-            border-radius: 4px;
-            font-size: 11px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.15s ease;
-        }
-
-        .reset-keybinds-button:hover {
-            background: var(--button-hover-background, rgba(255, 255, 255, 0.15));
-            border-color: var(--button-hover-border, rgba(255, 255, 255, 0.25));
-        }
-
-        .reset-keybinds-button:active {
-            transform: translateY(1px);
-        }
-
-        .keybinds-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 8px;
-            border-radius: 4px;
-            overflow: hidden;
-        }
-
-        .keybinds-table th,
-        .keybinds-table td {
-            padding: 8px 10px;
-            text-align: left;
-            border-bottom: 1px solid var(--table-border, rgba(255, 255, 255, 0.08));
-        }
-
-        .keybinds-table th {
-            background: var(--table-header-background, rgba(255, 255, 255, 0.04));
-            font-weight: 600;
-            font-size: 11px;
-            color: var(--label-color, rgba(255, 255, 255, 0.8));
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .keybinds-table td {
-            vertical-align: middle;
-        }
-
-        .keybinds-table .action-name {
-            font-weight: 500;
-            color: var(--text-color);
-            font-size: 12px;
-        }
-
-        .keybinds-table .action-description {
-            font-size: 10px;
-            color: var(--description-color, rgba(255, 255, 255, 0.5));
-            margin-top: 1px;
-        }
-
-        .keybinds-table .keybind-input {
-            min-width: 100px;
-            padding: 4px 8px;
-            margin: 0;
-            font-size: 11px;
-        }
-
-        .keybinds-table tr:hover {
-            background: var(--table-row-hover, rgba(255, 255, 255, 0.02));
-        }
-
-        .keybinds-table tr:last-child td {
-            border-bottom: none;
-        }
-
-        .table-reset-row {
-            border-top: 1px solid var(--table-border, rgba(255, 255, 255, 0.08));
-        }
-
-        .table-reset-row td {
-            padding-top: 10px;
-            padding-bottom: 8px;
-            border-bottom: none;
-        }
-
-        .settings-note {
-            font-size: 10px;
-            color: var(--note-color, rgba(255, 255, 255, 0.4));
-            font-style: italic;
-            text-align: center;
-            margin-top: 10px;
-            padding: 8px;
-            background: var(--note-background, rgba(255, 255, 255, 0.02));
-            border-radius: 4px;
-            border: 1px solid var(--note-border, rgba(255, 255, 255, 0.08));
-        }
-
-        .checkbox-group {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 10px;
-            padding: 8px;
-            background: var(--checkbox-background, rgba(255, 255, 255, 0.02));
-            border-radius: 4px;
-            border: 1px solid var(--checkbox-border, rgba(255, 255, 255, 0.06));
-        }
-
-        .checkbox-input {
-            width: 14px;
-            height: 14px;
-            accent-color: var(--focus-border-color, #007aff);
-            cursor: pointer;
-        }
-
-        .checkbox-label {
-            font-weight: 500;
-            font-size: 12px;
-            color: var(--label-color, rgba(255, 255, 255, 0.9));
-            cursor: pointer;
-            user-select: none;
-        }
-
-        /* Better focus indicators */
-        .form-control:focus-visible {
-            outline: none;
-            border-color: var(--focus-border-color, #007aff);
-            box-shadow: 0 0 0 2px var(--focus-shadow, rgba(0, 122, 255, 0.1));
-        }
-
-        /* Improved button states */
-        .reset-keybinds-button:focus-visible {
-            outline: none;
-            border-color: var(--focus-border-color, #007aff);
-            box-shadow: 0 0 0 2px var(--focus-shadow, rgba(0, 122, 255, 0.1));
-        }
-
-        /* Slider styles */
-        .slider-container {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .slider-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .slider-value {
-            font-size: 11px;
-            color: var(--success-color, #34d399);
-            background: var(--success-background, rgba(52, 211, 153, 0.1));
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-weight: 500;
-            border: 1px solid var(--success-border, rgba(52, 211, 153, 0.2));
-            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace;
-        }
-
-        .slider-input {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 100%;
-            height: 4px;
-            border-radius: 2px;
-            background: var(--input-background, rgba(0, 0, 0, 0.3));
-            outline: none;
-            border: 1px solid var(--input-border, rgba(255, 255, 255, 0.15));
-            cursor: pointer;
-        }
-
-        .slider-input::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            background: var(--focus-border-color, #007aff);
-            cursor: pointer;
-            border: 2px solid var(--text-color, white);
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-        }
-
-        .slider-input::-moz-range-thumb {
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            background: var(--focus-border-color, #007aff);
-            cursor: pointer;
-            border: 2px solid var(--text-color, white);
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-        }
-
-        .slider-input:hover::-webkit-slider-thumb {
-            background: var(--text-input-button-hover, #0056b3);
-        }
-
-        .slider-input:hover::-moz-range-thumb {
-            background: var(--text-input-button-hover, #0056b3);
-        }
-
-        .slider-labels {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 4px;
-            font-size: 10px;
-            color: var(--description-color, rgba(255, 255, 255, 0.5));
-        }
-    `;
+    static styles = CustomizeStyle; // Importing the styles from CustomizeStyle.js
  
     static properties = {
         selectedProfile: { type: String },
@@ -495,6 +102,7 @@ export class CustomizeView extends LitElement {
         getKeybind_Scroll_Response_Up_Message: {type: String},
         getKeybind_Scroll_Response_Down: {type: String},
         getKeybind_Scroll_Response_Down_Message: {type: String},
+        Language_App_Accept: {type: String}
     };
 
     constructor() {
@@ -514,8 +122,39 @@ export class CustomizeView extends LitElement {
         this.onLayoutModeChange = () => {};
         this.onAdvancedModeChange = () => {};
 
+        this.onTranslate(); // Initialize translations
+        
+        // Google Search default
+        this.googleSearchEnabled = true;
 
-        //TODO: OSCARDO
+        // Advanced mode default
+        this.advancedMode = false;
+
+        // Background transparency default
+        this.backgroundTransparency = 0.8;
+
+        // Font size default (in pixels)
+        this.fontSize = 20;
+
+        this.getLanguageAppSelect(); //TODO: OSCARDO
+
+        this.loadKeybinds();
+        this.loadGoogleSearchSettings();
+        this.loadAdvancedModeSettings();
+        this.loadBackgroundTransparency();
+        this.loadFontSize();
+       // this.loadLayoutMode(); // Load layout mode for display purposes TODO: OSCARDO
+    }
+
+    /** * Handles the translation of the component's text content.
+     *  This method is called to update the component's properties with translated text.
+     *  * @async
+     *  * @function onTranslate
+     *  *  @returns {void}
+     * This method does not return a value. It updates the component's properties with translated text.
+     * @memberof CustomizeView
+     * */
+    onTranslate(){
         this.translate("greeting").then((lang)=> 
             this.temp = lang
         );
@@ -705,7 +344,6 @@ export class CustomizeView extends LitElement {
         this.translate("Advanced_Advanced_mode").then((lang) => {
             this.Advanced_Advanced_mode = lang;
         });
-
         //getKeyBing
         this.translate("getKeybind_Move_Window_Up").then((lang)=> 
             this.getKeybind_Move_Window_Up = lang
@@ -773,27 +411,9 @@ export class CustomizeView extends LitElement {
         this.translate("getKeybind_Scroll_Response_Down_Message").then((lang)=> 
             this.getKeybind_Scroll_Response_Down_Message = lang
         );
-
-        // Google Search default
-        this.googleSearchEnabled = true;
-
-        // Advanced mode default
-        this.advancedMode = false;
-
-        // Background transparency default
-        this.backgroundTransparency = 0.8;
-
-        // Font size default (in pixels)
-        this.fontSize = 20;
-
-        this.getLanguageAppSelect(); //TODO: OSCARDO
-
-        this.loadKeybinds();
-        this.loadGoogleSearchSettings();
-        this.loadAdvancedModeSettings();
-        this.loadBackgroundTransparency();
-        this.loadFontSize();
-       // this.loadLayoutMode(); // Load layout mode for display purposes TODO: OSCARDO
+        this.translate("Language_App_Accept").then((lang)=> 
+            this.Language_App_Accept = lang 
+        );
     }
 
     connectedCallback() {
@@ -884,8 +504,23 @@ export class CustomizeView extends LitElement {
         ];
     }
     
+    /**
+    * Translates a specified key into a localized message, using the current system language.
+    * @async
+    * @function translate
+    * @param {string} key - Message key to translate.
+    * Expected values:
+    * 'Main_api', 'Main_GetApi', 'Main_Welcome',
+    * 'Main_APIKey', 'Main_Start'.
+    * If the key does not match, 'unknowledge' will be used as the default key.
+    * @returns {Promise<string>} - Returns a Promise that resolves to the translated text
+    * corresponding to the provided key.
+    * If the text is not found, 'Unknowledge' is returned.
+    * @example
+    * const message = await translate("Main_Welcome");
+    * console. log(message); // "Welcome to the app" (depends on the current language)
+    */
     async translate(key) {
-    //await new Promise(resolve => setTimeout(resolve, 500));
     let temp = ''; // Usa 'let' si vas a reasignar
     switch (key) {
         case 'Profile_AI_Profile':
@@ -1125,6 +760,9 @@ export class CustomizeView extends LitElement {
         case 'getKeybind_Scroll_Response_Down_Message':
             temp = await language.getMessage("getKeybind_Scroll_Response_Down_Message", language.getLanguage() || 'en-US');
             break;    
+        case 'Language_App_Accept':
+            temp = await language.getMessage("Language_App_Accept", language.getLanguage() || 'en-US');
+            break;    
         default:
             // Si quieres un valor por defecto que también es una Promesa
             return await language.getMessages("Speech_Language", 'en-US');
@@ -1138,6 +776,14 @@ export class CustomizeView extends LitElement {
         this.selectedAppLanguage = e.target.value;
         localStorage.setItem('selectedAppLanguage', this.selectedAppLanguage);
         this.onLanguageAppChange(this.selectedAppLanguage);
+        this.requestUpdate();
+        // Update the language in the main process
+        if (window.require) {
+            const { ipcRenderer } = window.require('electron');
+            ipcRenderer.send('update-app-language', this.selectedAppLanguage);
+        }
+        // Update the language in the translate function
+        
     }
 
     async getLanguageAppSelect(){
@@ -1546,6 +1192,9 @@ export class CustomizeView extends LitElement {
                                     ${this.Language_Speech_Language}
                                     <span class="current-selection">${currentApplicationLanguage?.name || 'English '}</span>
                                 </label>
+                                <table class="form-control">
+                                <tr>    
+                                <td>
                                 <select class="form-control" .value=${this.selectedAppLanguage} @change=${this.handleLanguageAppSelect}>
                                     ${languagesApp.map(
                                         language => html`
@@ -1555,6 +1204,12 @@ export class CustomizeView extends LitElement {
                                         `
                                     )}
                                 </select>
+                                </td>
+                                <td>
+                                    
+                                </td>
+                                </tr>
+                                </table>
                                 <div class="form-description">${this.Language_Message}</div>
                             </div>
                         </div>
@@ -1695,7 +1350,7 @@ export class CustomizeView extends LitElement {
                                     <option value="manual" ?selected=${this.selectedScreenshotInterval === 'manual'}>${this.Screen_Manual}</option>
                                     <option value="1" ?selected=${this.selectedScreenshotInterval === '1'}>${this.Screen_1}</option>
                                     <option value="2" ?selected=${this.selectedScreenshotInterval === '2'}>${this.Screen_2}</option>
-                                    <option value="5" ?selected=${this.selectedScreenshotInterval === '5'}>${this.Screen_5}>/option>
+                                    <option value="5" ?selected=${this.selectedScreenshotInterval === '5'}>${this.Screen_5}</option>
                                     <option value="10" ?selected=${this.selectedScreenshotInterval === '10'}>${this.Screen_10}</option>
                                 </select>
                                 <div class="form-description">
