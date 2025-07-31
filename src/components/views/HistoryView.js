@@ -10,6 +10,8 @@ export class HistoryView extends LitElement {
         sessions: { type: Array },
         selectedSession: { type: Object },
         loading: { type: Boolean },
+        savedResponses: { type: Array },
+        activeTab: { type: String },
         History_No_conversation_yet: { type: String },
         History_Loading_conversation_history: { type: String },
         History_Start_a_session: { type: String },
@@ -24,8 +26,15 @@ export class HistoryView extends LitElement {
         this.sessions = [];
         this.selectedSession = null;
         this.loading = true;
+        this.activeTab = 'sessions';
         this.loadSessions();
         this.onTranslate(); // Initialize translations
+        // Load saved responses from localStorage
+        try {
+            this.savedResponses = JSON.parse(localStorage.getItem('savedResponses') || '[]');
+        } catch (e) {
+            this.savedResponses = [];
+        }
     }
 
     /** Translates the view's text content into the current system language.
@@ -171,6 +180,58 @@ export class HistoryView extends LitElement {
         this.selectedSession = null;
     }
 
+    handleTabClick(tab) {
+        this.activeTab = tab;
+    }
+
+    deleteSavedResponse(index) {
+        this.savedResponses = this.savedResponses.filter((_, i) => i !== index);
+        localStorage.setItem('savedResponses', JSON.stringify(this.savedResponses));
+        this.requestUpdate();
+    }
+
+    getProfileNames() {
+        return {
+            interview: 'Job Interview',
+            sales: 'Sales Call',
+            meeting: 'Business Meeting',
+            presentation: 'Presentation',
+            negotiation: 'Negotiation',
+            exam: 'Exam Assistant',
+        };
+    }
+
+    // renderSessionsList() {
+    //     if (this.loading) {
+    //         return html`<div class="loading">${this.History_Loading_conversation_history}</div>`;
+    //     }
+
+    //     if (this.sessions.length === 0) {
+    //         return html`
+    //             <div class="empty-state">
+    //                 <div class="empty-state-title">${this.History_No_conversation_yet}</div>
+    //                 <div>${this.History_Start_a_session}</div>
+    //             </div>
+    //         `;
+    //     }
+
+    //     return html`
+    //         <div class="sessions-list">
+    //             ${this.sessions.map(
+    //                 session => html`
+    //                     <div class="session-item" @click=${() => this.handleSessionClick(session)}>
+    //                         <div class="session-header">
+    //                             <div class="session-date">${this.formatDate(session.timestamp)}</div>
+    //                             <div class="session-time">${this.formatTime(session.timestamp)}</div>
+    //                         </div>
+    //                         <div class="session-preview">${this.getSessionPreview(session)}</div>
+    //                     </div>
+    //                 `
+    //             )}
+    //         </div>
+    //         `;
+    // }
+
     renderSessionsList() {
         if (this.loading) {
             return html`<div class="loading">${this.History_Loading_conversation_history}</div>`;
@@ -195,6 +256,55 @@ export class HistoryView extends LitElement {
                                 <div class="session-time">${this.formatTime(session.timestamp)}</div>
                             </div>
                             <div class="session-preview">${this.getSessionPreview(session)}</div>
+                        </div>
+                    `
+                )}
+            </div>
+        `;
+    }
+
+    renderSavedResponses() {
+        if (this.savedResponses.length === 0) {
+            return html`
+                <div class="empty-state">
+                    <div class="empty-state-title">No saved responses</div>
+                    <div>Use the save button during conversations to save important responses</div>
+                </div>
+            `;
+        }
+
+        const profileNames = this.getProfileNames();
+
+        return html`
+            <div class="sessions-list">
+                ${this.savedResponses.map(
+                    (saved, index) => html`
+                        <div class="saved-response-item">
+                            <div class="saved-response-header">
+                                <div>
+                                    <div class="saved-response-profile">${profileNames[saved.profile] || saved.profile}</div>
+                                    <div class="saved-response-date">${this.formatTimestamp(saved.timestamp)}</div>
+                                </div>
+                                <button class="delete-button" @click=${() => this.deleteSavedResponse(index)} title="Delete saved response">
+                                    <svg
+                                        width="16px"
+                                        height="16px"
+                                        stroke-width="1.7"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        xmlns="http://www.w3.org/2000/svg"
+                                    >
+                                        <path
+                                            d="M6 6L18 18M6 18L18 6"
+                                            stroke="currentColor"
+                                            stroke-width="1.7"
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"
+                                        ></path>
+                                    </svg>
+                                </button>
+                            </div>
+                            <div class="saved-response-content">${saved.response}</div>
                         </div>
                     `
                 )}

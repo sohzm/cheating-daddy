@@ -4,11 +4,13 @@ const fs = require('node:fs');
 const os = require('os');
 const { applyStealthMeasures, startTitleRandomization } = require('./stealthFeatures');
 
-//const { getLanguage, getMessage }= require('../lang/language');
-
 let mouseEventsIgnored = false;
 let windowResizing = false;
 let resizeAnimation = null;
+
+let tray = null; // Initialize tray if needed, currently not used TODO: OSCARDO
+let isQuitting = false; // Flag to prevent multiple quit calls TODO: OSCARDO
+
 const RESIZE_ANIMATION_DURATION = 500; // milliseconds
 
 function ensureDataDirectories() {
@@ -30,7 +32,7 @@ function ensureDataDirectories() {
 function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
     // Get layout preference (default to 'normal')
     let windowWidth = 1100;
-    let windowHeight = 600;
+    let windowHeight = 800;
 
     const mainWindow = new BrowserWindow({
         width: windowWidth,
@@ -53,14 +55,14 @@ function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
         backgroundColor: '#00000000',
     });
 
-    // Abre las DevTools automáticamente en desarrollo Oscardo 
+    // Abre las DevTools automáticamente en desarrollo TODO: Oscardo 
     if (process.env.NODE_ENV === 'development') {
         mainWindow.webContents.openDevTools();
     }
     if (process.env.NODE_ENV === 'development') {
          require('electron-debug')();
     }
-
+    // Abre las DevTools automáticamente en desarrollo TODO: Oscardo 
 
 
     // Abre las DevTools automáticamente en desarrollo Oscardo 
@@ -162,9 +164,83 @@ function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
     });
 
     setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef);
+    //tray.setContextMenu(contextMenu); //TODO: OSCARDO
+
+    // Hacer clic izquierdo en el tray para mostrar/ocultar ventana TODO: OSCARDO   
+    // tray.on('click', () => {
+    // if (mainWindow.isVisible()) {
+    //         mainWindow.hide();
+    //     } else {
+    //         mainWindow.show();
+    //         mainWindow.focus();
+    //     }
+    // });
+    // // Función para mostrar el tray
+    // function showTray() {
+    // if (!tray) {
+    //     createTray();
+    // }
+    //     console.log('Tray mostrado');
+    // }
+    // // Función para ocultar el tray
+    // function hideTray() {
+    //     if (tray) {
+    //         tray.destroy();
+    //         tray = null;
+    //         console.log('Tray ocultado');
+    //     }
+    // }
+
+    // // Crear un ícono simple programáticamente
+    // function createTrayIcon() {
+    //     // Crear un ícono de 16x16 píxeles
+    //     const image = nativeImage.createEmpty();
+  
+    //     // Para desarrollo, puedes usar un ícono existente del sistema
+    //     // o crear uno simple con canvas
+    //     const canvas = require('canvas');
+    //     const canvasInstance = canvas.createCanvas(16, 16);
+    //     const ctx = canvasInstance.getContext('2d');
     
+    //     // Dibujar un círculo simple
+    //     ctx.fillStyle = '#007ACC';
+    //     ctx.beginPath();
+    //     ctx.arc(8, 8, 6, 0, 2 * Math.PI);
+    //     ctx.fill();
+        
+    //     const buffer = canvasInstance.toBuffer('image/png');
+    // return nativeImage.createFromBuffer(buffer);
+    // }
+
+    //  // Eventos de la aplicación
+    // app.whenReady().then(() => {
+    //     createWindow();
+    //     createTray();
+        
+    // app.on('activate', () => {
+    //         if (BrowserWindow.getAllWindows().length === 0) {
+    //         createWindow();
+    //         } else {
+    //         mainWindow.show();
+    //         }
+    //     });
+    // });
+
+    // app.on('window-all-closed', () => {
+    //     if (process.platform !== 'darwin') {
+    //         app.quit();
+    //     }
+    // });
+
+    // app.on('before-quit', () => {
+    //     isQuitting = true;
+    // });
+    // Hacer clic izquierdo en el tray para mostrar/ocultar ventana TODO: OSCARDO  
+
+   
+
     return mainWindow;
-}
+}//end createWindow
 
 function getDefaultKeybinds() {
     const isMac = process.platform === 'darwin';
@@ -180,6 +256,7 @@ function getDefaultKeybinds() {
         nextResponse: isMac ? 'Cmd+]' : 'Ctrl+]',
         scrollUp: isMac ? 'Cmd+Shift+Up' : 'Ctrl+Shift+Up',
         scrollDown: isMac ? 'Cmd+Shift+Down' : 'Ctrl+Shift+Down',
+        emergencyErase: isMac ? 'Cmd+Shift+E' : 'Ctrl+Shift+E',
     };
 }
 
@@ -341,6 +418,33 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
             console.error(`Failed to register scrollDown (${keybinds.scrollDown}):`, error);
         }
     }
+
+    // Register emergency erase shortcut
+    if (keybinds.emergencyErase) {
+        try {
+            globalShortcut.register(keybinds.emergencyErase, () => {
+                console.log('Emergency Erase triggered!');
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                    mainWindow.hide();
+
+                    if (geminiSessionRef.current) {
+                        geminiSessionRef.current.close();
+                        geminiSessionRef.current = null;
+                    }
+
+                    sendToRenderer('clear-sensitive-data');
+
+                    setTimeout(() => {
+                        const { app } = require('electron');
+                        app.quit();
+                    }, 300);
+                }
+            });
+            console.log(`Registered emergencyErase: ${keybinds.emergencyErase}`);
+        } catch (error) {
+            console.error(`Failed to register emergencyErase (${keybinds.emergencyErase}):`, error);
+        }
+    }
 }
 
 function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
@@ -486,26 +590,26 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
 
             // Determine base size from layout mode
             const baseWidth = layoutMode === 'compact' ? 700 : 900;
-            const baseHeight = layoutMode === 'compact' ? 300 : 400;
+            const baseHeight = layoutMode === 'compact' ? 500 : 600;
 
             // Adjust height based on view
             switch (viewName) {
                 case 'customize':
                 case 'settings':
                     targetWidth = baseWidth;
-                    targetHeight = layoutMode === 'compact' ? 500 : 600;
+                    targetHeight = layoutMode === 'compact' ? 700 : 800;
                     break;
                 case 'help':
                     targetWidth = baseWidth;
-                    targetHeight = layoutMode === 'compact' ? 450 : 550;
+                    targetHeight = layoutMode === 'compact' ? 650 : 750;
                     break;
                 case 'history':
                     targetWidth = baseWidth;
-                    targetHeight = layoutMode === 'compact' ? 450 : 550;
+                    targetHeight = layoutMode === 'compact' ? 650 : 750;
                     break;
                 case 'advanced':
                     targetWidth = baseWidth;
-                    targetHeight = layoutMode === 'compact' ? 400 : 500;
+                    targetHeight = layoutMode === 'compact' ? 600 : 700;
                     break;
                 case 'main':
                 case 'assistant':
@@ -533,6 +637,7 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
         }
     });
 }
+
 
 module.exports = {
     ensureDataDirectories,

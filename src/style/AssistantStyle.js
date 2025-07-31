@@ -244,7 +244,7 @@ export const AssistantStyle =  css`
 
         .nav-button:hover {
             background: rgba(255, 255, 255, 0.1);
-        }   
+        }
 
         .nav-button:disabled {
             opacity: 0.3;
@@ -261,5 +261,33 @@ export const AssistantStyle =  css`
             min-width: 60px;
             text-align: center;
         }
+
+        .save-button {
+            background: transparent;
+            color: var(--start-button-background);
+            border: none;
+            padding: 4px;
+            border-radius: 50%;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            width: 36px;
+            height: 36px;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .save-button:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .save-button.saved {
+            color: #4caf50;
+        }
+
+        .save-button svg {
+            stroke: currentColor !important;
+        }
     `;
+    
 export default AssistantStyle;

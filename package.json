@@ -10,6 +10,7 @@
         "make": "electron-forge make",
         "publish": "electron-forge publish",
         "lint": "echo \"No linting configured\"",
+	    "test": "vitest run",
         "_comment": "INTRODUCIDOS POR OSCARDO (dev, DEBUG, DEBUG-BRK, debug-renderer)",
         "dev": "electron-forge start",
         "debug": "electron-forge start -- --inspect=5858",
@@ -44,8 +45,10 @@
         "@electron/fuses": "^1.8.0",
         "@reforged/maker-appimage": "^5.0.0",
         "devtron": "^1.4.0",
-        "electron": "30.0.0",
+        "electron": "30.0.5",
         "electron-debug": "^4.1.0",
-        "electron-devtools-installer": "^4.0.0"
+        "electron-devtools-installer": "^4.0.0",
+    	"vitest": "^1.6.1",
+        "jsdom": "^23.2.0"
     }
 }

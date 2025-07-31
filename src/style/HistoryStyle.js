@@ -217,6 +217,88 @@ export const HistoryStyle =  css`
 
         .conversation-view::-webkit-scrollbar-thumb:hover {
             background: var(--scrollbar-thumb-hover, rgba(255, 255, 255, 0.3));
-        }`;
+        }
+        .tabs-container {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            border-bottom: 1px solid var(--button-border);
+            padding-bottom: 8px;
+        }
+
+        .tab {
+            background: transparent;
+            color: var(--description-color);
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px 4px 0 0;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .tab:hover {
+            background: var(--hover-background);
+            color: var(--text-color);
+        }
+
+        .tab.active {
+            background: var(--focus-box-shadow);
+            color: var(--text-color);
+            border-bottom: 2px solid var(--focus-border-color);
+        }
+
+        .saved-response-item {
+            background: var(--input-background);
+            border: 1px solid var(--button-border);
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 8px;
+            transition: all 0.15s ease;
+        }
+
+        .saved-response-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 8px;
+        }
+
+        .saved-response-profile {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--focus-border-color);
+            text-transform: capitalize;
+        }
+
+        .saved-response-date {
+            font-size: 10px;
+            color: var(--description-color);
+        }
+
+        .saved-response-content {
+            font-size: 12px;
+            color: var(--text-color);
+            line-height: 1.4;
+            user-select: text;
+            cursor: text;
+        }
+
+        .delete-button {
+            background: transparent;
+            color: var(--description-color);
+            border: none;
+            padding: 4px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .delete-button:hover {
+            background: rgba(255, 0, 0, 0.1);
+            color: #ff4444;
+        }
+        `;
 
 export default HistoryStyle;

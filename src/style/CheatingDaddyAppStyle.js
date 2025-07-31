@@ -3,11 +3,7 @@ import { css } from '../assets/lit-core-2.7.4.min.js';
 export const CheatingDaddyAppStyle =  css`
     * {
             box-sizing: border-box;
-            font-family:
-                'Inter',
-                -apple-system,
-                BlinkMacSystemFont,
-                sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             margin: 0px;
             padding: 0px;
             cursor: default;
@@ -62,9 +58,7 @@ export const CheatingDaddyAppStyle =  css`
         .view-container {
             opacity: 1;
             transform: translateY(0);
-            transition:
-                opacity 0.15s ease-out,
-                transform 0.15s ease-out;
+            transition: opacity 0.15s ease-out, transform 0.15s ease-out;
             height: 100%;
         }
 
