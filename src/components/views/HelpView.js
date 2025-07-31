@@ -37,6 +37,24 @@ export class HelpView extends LitElement {
         Help_You_Can: {type: String},
         Help_Get_AI_Help: {type: String},
         Help_The_AI_will: {type: String},
+        Help_Window_Movement: {type: String},
+        Help_Window_Control: {type: String},
+        Help_AI_Actions: {type: String},
+        Help_AI_Response_Navigation: {type: String},
+        Help_Text_Input: {type: String},
+        GetKeybind_Move_Window_Up: {type: String},
+        GetKeybind_Move_Window_Down: {type: String},
+        GetKeybind_Move_Window_Left: {type: String},
+        GetKeybind_Move_Window_Right: {type: String},
+        GetKeybind_Toggle_Window_Visibility: {type: String},
+        GetKeybind_Toggle_Click_through_Mode: {type: String},
+        GetKeybind_Ask_Next_Step: {type: String},
+        GetKeybind_Previous_Response: {type: String},
+        GetKeybind_Next_Response: {type: String},
+        GetKeybind_Scroll_Response_Up: {type: String},
+        GetKeybind_Scroll_Response_Down: {type: String},
+        GetKeybind_Send: {type: String},
+        GetKeybind_New_line: {type: String},
     };
 
     constructor() {
@@ -140,6 +158,65 @@ export class HelpView extends LitElement {
         this.translate("Help_The_AI_will").then((lang) => {
             this.Help_The_AI_will = lang;
         });
+        this.translate("Help_Window_Movement").then((lang) => {
+            this.Help_Window_Movement = lang;
+        });
+        this.translate("Help_Window_Control").then((lang) => {
+            this.Help_Window_Control = lang;
+        });
+        this.translate("Help_The_AI_will").then((lang) => {
+            this.Help_The_AI_will = lang;
+        });
+        this.translate("Help_AI_Actions").then((lang) => {
+            this.Help_AI_Actions = lang;
+        });
+        this.translate("Help_AI_Response_Navigation").then((lang) => {
+            this.Help_AI_Response_Navigation = lang;
+        });
+        this.translate("Help_Text_Input").then((lang) => {
+            this.Help_Text_Input = lang;
+        });
+        //getKeyBing
+        this.translate("GetKeybind_Move_Window_Up").then((lang)=> 
+            this.GetKeybind_Move_Window_Up = lang
+        );
+        this.translate("GetKeybind_Move_Window_Down").then((lang)=> 
+            this.GetKeybind_Move_Window_Down = lang
+        );
+        this.translate("GetKeybind_Move_Window_Left").then((lang)=> 
+            this.GetKeybind_Move_Window_Left = lang
+        );
+        this.translate("GetKeybind_Move_Window_Right").then((lang)=> 
+            this.GetKeybind_Move_Window_Right = lang
+        );
+        this.translate("GetKeybind_Toggle_Window_Visibility").then((lang)=> 
+            this.GetKeybind_Toggle_Window_Visibility = lang
+        );
+        this.translate("GetKeybind_Toggle_Click_through_Mode").then((lang)=> 
+            this.GetKeybind_Toggle_Click_through_Mode = lang
+        );
+        this.translate("GetKeybind_Ask_Next_Step").then((lang)=> 
+            this.GetKeybind_Ask_Next_Step = lang
+        );
+        this.translate("GetKeybind_Previous_Response").then((lang)=> 
+            this.GetKeybind_Previous_Response = lang
+        );
+        this.translate("GetKeybind_Next_Response").then((lang)=> 
+            this.GetKeybind_Next_Response = lang
+        );
+        this.translate("GetKeybind_Scroll_Response_Up").then((lang)=> 
+            this.GetKeybind_Scroll_Response_Up = lang
+        );
+        this.translate("GetKeybind_Scroll_Response_Down").then((lang)=> 
+            this.GetKeybind_Scroll_Response_Down = lang
+        );
+        this.translate("GetKeybind_Send").then((lang)=> 
+            this.GetKeybind_Send = lang
+        );
+        this.translate("GetKeybind_New_line").then((lang)=> 
+            this.GetKeybind_New_line = lang
+        );
+        //end getKeyBing
     }
 
     /**
@@ -243,6 +320,61 @@ export class HelpView extends LitElement {
             case 'Help_The_AI_will':
                 temp = await language.getMessages("Help_The_AI_will", language.getLanguage() || 'en-US');
                 break;
+            case 'Help_Window_Movement':
+                temp = await language.getMessages("Help_Window_Movement", language.getLanguage() || 'en-US');
+                break;
+            case 'Help_Window_Control':
+                temp = await language.getMessages("Help_Window_Control", language.getLanguage() || 'en-US');
+                break;
+            case 'Help_AI_Actions':
+                temp = await language.getMessages("Help_AI_Actions", language.getLanguage() || 'en-US');
+                break;
+            case 'Help_AI_Response_Navigation':
+                temp = await language.getMessages("Help_AI_Response_Navigation", language.getLanguage() || 'en-US');
+                break;
+            case 'Help_Text_Input':
+                temp = await language.getMessages("Help_Text_Input", language.getLanguage() || 'en-US');
+                break;
+            case 'GetKeybind_Move_Window_Up':
+                temp = await language.getMessage("GetKeybind_Move_Window_Up", language.getLanguage() || 'en-US');
+                break;
+            case 'GetKeybind_Move_Window_Down':
+                temp = await language.getMessage("GetKeybind_Move_Window_Down", language.getLanguage() || 'en-US');
+                break;
+            case 'GetKeybind_Move_Window_Left':
+                temp = await language.getMessage("GetKeybind_Move_Window_Left", language.getLanguage() || 'en-US');
+                break;
+            case 'GetKeybind_Move_Window_Right':
+                temp = await language.getMessage("GetKeybind_Move_Window_Right", language.getLanguage() || 'en-US');
+                break;
+            case 'GetKeybind_Toggle_Window_Visibility':
+                temp = await language.getMessage("GetKeybind_Toggle_Window_Visibility", language.getLanguage() || 'en-US');
+                break;
+            case 'GetKeybind_Toggle_Click_through_Mode':
+                temp = await language.getMessage("GetKeybind_Toggle_Click_through_Mode", language.getLanguage() || 'en-US');
+                break;
+            case 'GetKeybind_Ask_Next_Step':
+                temp = await language.getMessage("GetKeybind_Ask_Next_Step", language.getLanguage() || 'en-US');
+                break;
+            case 'GetKeybind_Previous_Response':
+                temp = await language.getMessage("GetKeybind_Previous_Response", language.getLanguage() || 'en-US');
+                break;
+            case 'GetKeybind_Next_Response':
+                temp = await language.getMessage("GetKeybind_Next_Response", language.getLanguage() || 'en-US');
+                break;
+            case 'GetKeybind_Scroll_Response_Up':
+                temp = await language.getMessage("GetKeybind_Scroll_Response_Up", language.getLanguage() || 'en-US');
+                break;
+            case 'GetKeybind_Scroll_Response_Down':
+                temp = await language.getMessage("GetKeybind_Scroll_Response_Down", language.getLanguage() || 'en-US');
+                break;
+            case 'GetKeybind_Send':
+                temp = await language.getMessage("GetKeybind_Send", language.getLanguage() || 'en-US');
+                break;
+            case 'GetKeybind_New_line':
+                temp = await language.getMessage("GetKeybind_New_line", language.getLanguage() || 'en-US');
+                break;
+
             default:
                 // Si quieres un valor por defecto que también es una Promesa
                 return await language.getMessages("unknowledge", 'en-US');
@@ -316,79 +448,81 @@ export class HelpView extends LitElement {
     }
 
     _Keyboard_Shortcuts(){
-        return html`<div class="option-group">
+        return html`
+                    <div class="option-group">
                     <div class="option-label">
                         <span>${this.Help_Keyboard}</span>
                     </div>
                     <div class="keyboard-section">
                         <div class="keyboard-group">
-                            <div class="keyboard-group-title">Window Movement</div>
+                            <div class="keyboard-group-title">${this.Help_Window_Movement}</div>
                             <div class="shortcut-item">
-                                <span class="shortcut-description">Move window up</span>
+                                <span class="shortcut-description">${this.GetKeybind_Move_Window_Up}</span>
                                 <div class="shortcut-keys">${this.formatKeybind(this.keybinds.moveUp)}</div>
                             </div>
                             <div class="shortcut-item">
-                                <span class="shortcut-description">Move window down</span>
+                                <span class="shortcut-description">${this.GetKeybind_Move_Window_Down}</span>
                                 <div class="shortcut-keys">${this.formatKeybind(this.keybinds.moveDown)}</div>
                             </div>
                             <div class="shortcut-item">
-                                <span class="shortcut-description">Move window left</span>
+                                <span class="shortcut-description">${this.GetKeybind_Move_Window_Left}</span>
                                 <div class="shortcut-keys">${this.formatKeybind(this.keybinds.moveLeft)}</div>
                             </div>
                             <div class="shortcut-item">
-                                <span class="shortcut-description">Move window right</span>
+                                <span class="shortcut-description">${this.GetKeybind_Move_Window_Right}</span>
                                 <div class="shortcut-keys">${this.formatKeybind(this.keybinds.moveRight)}</div>
                             </div>
                         </div>
 
                         <div class="keyboard-group">
-                            <div class="keyboard-group-title">Window Control</div>
+                            <div class="keyboard-group-title">${this.Help_Window_Control}</div>
                             <div class="shortcut-item">
-                                <span class="shortcut-description">Toggle click-through mode</span>
+                                <span class="shortcut-description">${this.GetKeybind_Toggle_Click_through_Mode}</span>
                                 <div class="shortcut-keys">${this.formatKeybind(this.keybinds.toggleClickThrough)}</div>
                             </div>
                             <div class="shortcut-item">
-                                <span class="shortcut-description">Toggle window visibility</span>
+                                <span class="shortcut-description">${this.GetKeybind_Toggle_Window_Visibility}</span>
                                 <div class="shortcut-keys">${this.formatKeybind(this.keybinds.toggleVisibility)}</div>
                             </div>
                         </div>
 
                         <div class="keyboard-group">
-                            <div class="keyboard-group-title">AI Actions</div>
+                            <div class="keyboard-group-title">${this.Help_AI_Actions}</div>
                             <div class="shortcut-item">
-                                <span class="shortcut-description">Take screenshot and ask for next step</span>
+                                <span class="shortcut-description">${this.GetKeybind_Ask_Next_Step || "Take screenshot and ask for next step"} </span>
+
                                 <div class="shortcut-keys">${this.formatKeybind(this.keybinds.nextStep)}</div>
                             </div>
                         </div>
 
                         <div class="keyboard-group">
-                            <div class="keyboard-group-title">Response Navigation</div>
+                            <div class="keyboard-group-title">${this.Help_AI_Response_Navigation}</div>
                             <div class="shortcut-item">
-                                <span class="shortcut-description">Previous response</span>
+                                <span class="shortcut-description">${this.GetKeybind_Previous_Response}</span>
                                 <div class="shortcut-keys">${this.formatKeybind(this.keybinds.previousResponse)}</div>
                             </div>
                             <div class="shortcut-item">
-                                <span class="shortcut-description">Next response</span>
+                                <span class="shortcut-description">${this.GetKeybind_Next_Response}</span>
                                 <div class="shortcut-keys">${this.formatKeybind(this.keybinds.nextResponse)}</div>
                             </div>
                             <div class="shortcut-item">
-                                <span class="shortcut-description">Scroll response up</span>
+                                <span class="shortcut-description">${this.GetKeybind_Scroll_Response_Up}</span>
                                 <div class="shortcut-keys">${this.formatKeybind(this.keybinds.scrollUp)}</div>
                             </div>
                             <div class="shortcut-item">
-                                <span class="shortcut-description">Scroll response down</span>
+                                <span class="shortcut-description">${this.GetKeybind_Scroll_Response_Down}</span>
                                 <div class="shortcut-keys">${this.formatKeybind(this.keybinds.scrollDown)}</div>
                             </div>
                         </div>
 
                         <div class="keyboard-group">
-                            <div class="keyboard-group-title">Text Input</div>
+                            <div class="keyboard-group-title">${this.Help_Text_Input}</div>
                             <div class="shortcut-item">
-                                <span class="shortcut-description">Send message to AI</span>
+                                <span class="shortcut-description">${this.GetKeybind_Send}</span>
                                 <div class="shortcut-keys"><span class="key">Enter</span></div>
                             </div>
                             <div class="shortcut-item">
-                                <span class="shortcut-description">New line in text input</span>
+                                <span class="shortcut-description">${this.GetKeybind_New_line}</span>
                                 <div class="shortcut-keys"><span class="key">Shift</span><span class="key">Enter</span></div>
                             </div>
                         </div>
