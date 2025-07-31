@@ -80,28 +80,28 @@ export class CustomizeView extends LitElement {
         Advanced_Enable:  {type: String},        
         Advanced_Unlock:  {type: String},        
         Advanced_Advanced_mode:  {type: String},        
-        getKeybind_Move_Window_Up: {type: String},
-        getKeybind_Move_Window_Up_Message: {type: String},
-        getKeybind_Move_Window_Down: {type: String},
-        getKeybind_Move_Window_Down_Message: {type: String},
-        getKeybind_Move_Window_Left: {type: String},
-        getKeybind_Move_Window_Message: {type: String},
-        getKeybind_Move_Window_Right: {type: String},
-        getKeybind_Move_Window_Right_Message: {type: String},
-        getKeybind_Toggle_Window_Visibility: {type: String},
-        getKeybind_Toggle_Window_Visibility_Message: {type: String},
-        getKeybind_Toggle_Click_through_Mode: {type: String},
-        getKeybind_Toggle_Click_through_Msg: {type: String},
-        getKeybind_Ask_Next_Step: {type: String},
-        getKeybind_Ask_Next_Step_Message: {type: String},
-        getKeybind_Previous_Response: {type: String},
-        getKeybind_Previous_Response_Message: {type: String},
-        getKeybind_Next_Response: {type: String},
-        getKeybind_Next_Response_Message: {type: String},
-        getKeybind_Scroll_Response_Up: {type: String},
-        getKeybind_Scroll_Response_Up_Message: {type: String},
-        getKeybind_Scroll_Response_Down: {type: String},
-        getKeybind_Scroll_Response_Down_Message: {type: String},
+        GetKeybind_Move_Window_Up: {type: String},
+        GetKeybind_Move_Window_Up_Message: {type: String},
+        GetKeybind_Move_Window_Down: {type: String},
+        GetKeybind_Move_Window_Down_Message: {type: String},
+        GetKeybind_Move_Window_Left: {type: String},
+        GetKeybind_Move_Window_Left_Message: {type: String},
+        GetKeybind_Move_Window_Right: {type: String},
+        GetKeybind_Move_Window_Right_Message: {type: String},
+        GetKeybind_Toggle_Window_Visibility: {type: String},
+        GetKeybind_Toggle_Window_Visibility_Message: {type: String},
+        GetKeybind_Toggle_Click_through_Mode: {type: String},
+        GetKeybind_Toggle_Click_through_Msg: {type: String},
+        GetKeybind_Ask_Next_Step: {type: String},
+        GetKeybind_Ask_Next_Step_Message: {type: String},
+        GetKeybind_Previous_Response: {type: String},
+        GetKeybind_Previous_Response_Message: {type: String},
+        GetKeybind_Next_Response: {type: String},
+        GetKeybind_Next_Response_Message: {type: String},
+        GetKeybind_Scroll_Response_Up: {type: String},
+        GetKeybind_Scroll_Response_Up_Message: {type: String},
+        GetKeybind_Scroll_Response_Down: {type: String},
+        GetKeybind_Scroll_Response_Down_Message: {type: String},
         Language_App_Accept: {type: String}
     };
 
@@ -345,72 +345,72 @@ export class CustomizeView extends LitElement {
             this.Advanced_Advanced_mode = lang;
         });
         //getKeyBing
-        this.translate("getKeybind_Move_Window_Up").then((lang)=> 
-            this.getKeybind_Move_Window_Up = lang
+        this.translate("GetKeybind_Move_Window_Up").then((lang)=> 
+            this.GetKeybind_Move_Window_Up = lang
         );
-        this.translate("getKeybind_Move_Window_Up_Message").then((lang)=> 
-            this.getKeybind_Move_Window_Up_Message = lang
+        this.translate("GetKeybind_Move_Window_Up_Message").then((lang)=> 
+            this.GetKeybind_Move_Window_Up_Message = lang
         );
-        this.translate("getKeybind_Move_Window_Down").then((lang)=> 
-            this.getKeybind_Move_Window_Down = lang
+        this.translate("GetKeybind_Move_Window_Down").then((lang)=> 
+            this.GetKeybind_Move_Window_Down = lang
         );
-        this.translate("getKeybind_Move_Window_Down_Message").then((lang)=> 
-            this.getKeybind_Move_Window_Down_Message = lang
+        this.translate("GetKeybind_Move_Window_Down_Message").then((lang)=> 
+            this.GetKeybind_Move_Window_Down_Message = lang
         );
-        this.translate("getKeybind_Move_Window_Left").then((lang)=> 
-            this.getKeybind_Move_Window_Left = lang
+        this.translate("GetKeybind_Move_Window_Left").then((lang)=> 
+            this.GetKeybind_Move_Window_Left = lang
         );
-        this.translate("getKeybind_Move_Window_Message").then((lang)=> 
-            this.getKeybind_Move_Window_Message = lang
+        this.translate("GetKeybind_Move_Window_Left_Message").then((lang)=> 
+            this.GetKeybind_Move_Window_Left_Message = lang
         );
-        this.translate("getKeybind_Move_Window_Right").then((lang)=> 
-            this.getKeybind_Move_Window_Right = lang
+        this.translate("GetKeybind_Move_Window_Right").then((lang)=> 
+            this.GetKeybind_Move_Window_Right = lang
         );
-        this.translate("getKeybind_Move_Window_Right_Message").then((lang)=> 
-            this.getKeybind_Move_Window_Right_Message = lang
+        this.translate("GetKeybind_Move_Window_Right_Message").then((lang)=> 
+            this.GetKeybind_Move_Window_Right_Message = lang
         );
-        this.translate("getKeybind_Toggle_Window_Visibility").then((lang)=> 
-            this.getKeybind_Toggle_Window_Visibility = lang
+        this.translate("GetKeybind_Toggle_Window_Visibility").then((lang)=> 
+            this.GetKeybind_Toggle_Window_Visibility = lang
         );
-        this.translate("getKeybind_Toggle_Window_Visibility_Message").then((lang)=> 
-            this.getKeybind_Toggle_Window_Visibility_Message = lang
+        this.translate("GetKeybind_Toggle_Window_Visibility_Message").then((lang)=> 
+            this.GetKeybind_Toggle_Window_Visibility_Message = lang
         );
-        this.translate("getKeybind_Toggle_Click_through_Mode").then((lang)=> 
-            this.getKeybind_Toggle_Click_through_Mode = lang
+        this.translate("GetKeybind_Toggle_Click_through_Mode").then((lang)=> 
+            this.GetKeybind_Toggle_Click_through_Mode = lang
         );
-        this.translate("getKeybind_Toggle_Click_through_Msg").then((lang)=> 
-            this.getKeybind_Toggle_Click_through_Msg = lang
+        this.translate("GetKeybind_Toggle_Click_through_Msg").then((lang)=> 
+            this.GetKeybind_Toggle_Click_through_Msg = lang
         );
-        this.translate("getKeybind_Ask_Next_Step").then((lang)=> 
-            this.getKeybind_Ask_Next_Step = lang
+        this.translate("GetKeybind_Ask_Next_Step").then((lang)=> 
+            this.GetKeybind_Ask_Next_Step = lang
         );
-        this.translate("getKeybind_Ask_Next_Step_Message").then((lang)=> 
-            this.getKeybind_Ask_Next_Step_Message = lang
+        this.translate("GetKeybind_Ask_Next_Step_Message").then((lang)=> 
+            this.GetKeybind_Ask_Next_Step_Message = lang
         );
-        this.translate("getKeybind_Previous_Response").then((lang)=> 
-            this.getKeybind_Previous_Response = lang
+        this.translate("GetKeybind_Previous_Response").then((lang)=> 
+            this.GetKeybind_Previous_Response = lang
         );
-        this.translate("getKeybind_Previous_Response_Message").then((lang)=> 
-            this.getKeybind_Previous_Response_Message = lang
+        this.translate("GetKeybind_Previous_Response_Message").then((lang)=> 
+            this.GetKeybind_Previous_Response_Message = lang
         );
-        this.translate("getKeybind_Next_Response").then((lang)=> 
-            this.getKeybind_Next_Response = lang
+        this.translate("GetKeybind_Next_Response").then((lang)=> 
+            this.GetKeybind_Next_Response = lang
         );
-        this.translate("getKeybind_Next_Response_Message").then((lang)=> 
-            this.getKeybind_Next_Response_Message = lang
+        this.translate("GetKeybind_Next_Response_Message").then((lang)=> 
+            this.GetKeybind_Next_Response_Message = lang
         );
-        this.translate("getKeybind_Scroll_Response_Up").then((lang)=> 
-            this.getKeybind_Scroll_Response_Up = lang
+        this.translate("GetKeybind_Scroll_Response_Up").then((lang)=> 
+            this.GetKeybind_Scroll_Response_Up = lang
         );
-        this.translate("getKeybind_Scroll_Response_Up_Message").then((lang)=> 
-            this.getKeybind_Scroll_Response_Up_Message = lang
+        this.translate("GetKeybind_Scroll_Response_Up_Message").then((lang)=> 
+            this.GetKeybind_Scroll_Response_Up_Message = lang
         );
-        this.translate("getKeybind_Scroll_Response_Down").then((lang)=> 
-            this.getKeybind_Scroll_Response_Down = lang
+        this.translate("GetKeybind_Scroll_Response_Down").then((lang)=> 
+            this.GetKeybind_Scroll_Response_Down = lang
         );
-        this.translate("getKeybind_Scroll_Response_Down_Message").then((lang)=> 
-            this.getKeybind_Scroll_Response_Down_Message = lang
-        );
+        this.translate("GetKeybind_Scroll_Response_Down_Message").then((lang)=> 
+            this.GetKeybind_Scroll_Response_Down_Message = lang
+        );  
         this.translate("Language_App_Accept").then((lang)=> 
             this.Language_App_Accept = lang 
         );
@@ -694,72 +694,72 @@ export class CustomizeView extends LitElement {
             // Asumiendo que language.getMessage devuelve una Promesa
             temp = await language.getMessage("welcome_message", language.getLanguage() || 'en-US');
             break;
-        case 'getKeybind_Move_Window_Up':
-            temp = await language.getMessage("getKeybind_Move_Window_Up", language.getLanguage() || 'en-US');
+        case 'GetKeybind_Move_Window_Up':
+            temp = await language.getMessage("GetKeybind_Move_Window_Up", language.getLanguage() || 'en-US');
             break;
-        case 'getKeybind_Move_Window_Up_Message':
-            temp = await language.getMessage("getKeybind_Move_Window_Up_Message", language.getLanguage() || 'en-US');
+        case 'GetKeybind_Move_Window_Up_Message':
+            temp = await language.getMessage("GetKeybind_Move_Window_Up_Message", language.getLanguage() || 'en-US');
             break;
-        case 'getKeybind_Move_Window_Down':
-            temp = await language.getMessage("getKeybind_Move_Window_Down", language.getLanguage() || 'en-US');
+        case 'GetKeybind_Move_Window_Down':
+            temp = await language.getMessage("GetKeybind_Move_Window_Down", language.getLanguage() || 'en-US');
             break;
-        case 'getKeybind_Move_Window_Down_Message':
-            temp = await language.getMessage("getKeybind_Move_Window_Down_Message", language.getLanguage() || 'en-US');
+        case 'GetKeybind_Move_Window_Down_Message':
+            temp = await language.getMessage("GetKeybind_Move_Window_Down_Message", language.getLanguage() || 'en-US');
             break;
-        case 'getKeybind_Move_Window_Left':
-            temp = await language.getMessage("getKeybind_Move_Window_Left", language.getLanguage() || 'en-US');
+        case 'GetKeybind_Move_Window_Left':
+            temp = await language.getMessage("GetKeybind_Move_Window_Left", language.getLanguage() || 'en-US');
             break;
-        case 'getKeybind_Move_Window_Message':
-            temp = await language.getMessage("getKeybind_Move_Window_Message", language.getLanguage() || 'en-US');
+        case 'GetKeybind_Move_Window_Left_Message':
+            temp = await language.getMessage("GetKeybind_Move_Window_Left_Message", language.getLanguage() || 'en-US');
             break;
-        case 'getKeybind_Move_Window_Right':
-            temp = await language.getMessage("getKeybind_Move_Window_Right", language.getLanguage() || 'en-US');
+        case 'GetKeybind_Move_Window_Right':
+            temp = await language.getMessage("GetKeybind_Move_Window_Right", language.getLanguage() || 'en-US');
             break;
-        case 'getKeybind_Move_Window_Right_Message':
-            temp = await language.getMessage("getKeybind_Move_Window_Right_Message", language.getLanguage() || 'en-US');
+        case 'GetKeybind_Move_Window_Right_Message':
+            temp = await language.getMessage("GetKeybind_Move_Window_Right_Message", language.getLanguage() || 'en-US');
             break;
-        case 'getKeybind_Toggle_Window_Visibility':
-            temp = await language.getMessage("getKeybind_Toggle_Window_Visibility", language.getLanguage() || 'en-US');
+        case 'GetKeybind_Toggle_Window_Visibility':
+            temp = await language.getMessage("GetKeybind_Toggle_Window_Visibility", language.getLanguage() || 'en-US');
             break;
-        case 'getKeybind_Toggle_Window_Visibility_Message':
-            temp = await language.getMessage("getKeybind_Toggle_Window_Visibility_Message", language.getLanguage() || 'en-US');
+        case 'GetKeybind_Toggle_Window_Visibility_Message':
+            temp = await language.getMessage("GetKeybind_Toggle_Window_Visibility_Message", language.getLanguage() || 'en-US');
             break;
-        case 'getKeybind_Toggle_Click_through_Mode':
-            temp = await language.getMessage("getKeybind_Toggle_Click_through_Mode", language.getLanguage() || 'en-US');
+        case 'GetKeybind_Toggle_Click_through_Mode':
+            temp = await language.getMessage("GetKeybind_Toggle_Click_through_Mode", language.getLanguage() || 'en-US');
             break;
-        case 'getKeybind_Toggle_Click_through_Msg':
-            temp = await language.getMessage("getKeybind_Toggle_Click_through_Msg", language.getLanguage() || 'en-US');
+        case 'GetKeybind_Toggle_Click_through_Msg':
+            temp = await language.getMessage("GetKeybind_Toggle_Click_through_Msg", language.getLanguage() || 'en-US');
             break;
-        case 'getKeybind_Ask_Next_Step':
-            temp = await language.getMessage("getKeybind_Ask_Next_Step", language.getLanguage() || 'en-US');
+        case 'GetKeybind_Ask_Next_Step':
+            temp = await language.getMessage("GetKeybind_Ask_Next_Step", language.getLanguage() || 'en-US');
             break;
-        case 'getKeybind_Ask_Next_Step_Message':
-            temp = await language.getMessage("getKeybind_Ask_Next_Step_Message", language.getLanguage() || 'en-US');
+        case 'GetKeybind_Ask_Next_Step_Message':
+            temp = await language.getMessage("GetKeybind_Ask_Next_Step_Message", language.getLanguage() || 'en-US');
             break;
-        case 'getKeybind_Previous_Response':
-            temp = await language.getMessage("getKeybind_Previous_Response", language.getLanguage() || 'en-US');
+        case 'GetKeybind_Previous_Response':
+            temp = await language.getMessage("GetKeybind_Previous_Response", language.getLanguage() || 'en-US');
             break;
-        case 'getKeybind_Previous_Response_Message':
-            temp = await language.getMessage("getKeybind_Previous_Response_Message", language.getLanguage() || 'en-US');
+        case 'GetKeybind_Previous_Response_Message':
+            temp = await language.getMessage("GetKeybind_Previous_Response_Message", language.getLanguage() || 'en-US');
             break;
-        case 'getKeybind_Next_Response':
-            temp = await language.getMessage("getKeybind_Next_Response", language.getLanguage() || 'en-US');
+        case 'GetKeybind_Next_Response':
+            temp = await language.getMessage("GetKeybind_Next_Response", language.getLanguage() || 'en-US');
             break;
-        case 'getKeybind_Next_Response_Message':
-            temp = await language.getMessage("getKeybind_Next_Response_Message", language.getLanguage() || 'en-US');
+        case 'GetKeybind_Next_Response_Message':
+            temp = await language.getMessage("GetKeybind_Next_Response_Message", language.getLanguage() || 'en-US');
             break;
-        case 'getKeybind_Scroll_Response_Up':
-            temp = await language.getMessage("getKeybind_Scroll_Response_Up", language.getLanguage() || 'en-US');
+        case 'GetKeybind_Scroll_Response_Up':
+            temp = await language.getMessage("GetKeybind_Scroll_Response_Up", language.getLanguage() || 'en-US');
             break;
-        case 'getKeybind_Scroll_Response_Up_Message':
-            temp = await language.getMessage("getKeybind_Scroll_Response_Up_Message", language.getLanguage() || 'en-US');
+        case 'GetKeybind_Scroll_Response_Up_Message':
+            temp = await language.getMessage("GetKeybind_Scroll_Response_Up_Message", language.getLanguage() || 'en-US');
             break;
-        case 'getKeybind_Scroll_Response_Down':
-            temp = await language.getMessage("getKeybind_Scroll_Response_Down", language.getLanguage() || 'en-US');
+        case 'GetKeybind_Scroll_Response_Down':
+            temp = await language.getMessage("GetKeybind_Scroll_Response_Down", language.getLanguage() || 'en-US');
             break;
-        case 'getKeybind_Scroll_Response_Down_Message':
-            temp = await language.getMessage("getKeybind_Scroll_Response_Down_Message", language.getLanguage() || 'en-US');
-            break;    
+        case 'GetKeybind_Scroll_Response_Down_Message':
+            temp = await language.getMessage("GetKeybind_Scroll_Response_Down_Message", language.getLanguage() || 'en-US');
+            break;
         case 'Language_App_Accept':
             temp = await language.getMessage("Language_App_Accept", language.getLanguage() || 'en-US');
             break;    
@@ -896,63 +896,63 @@ export class CustomizeView extends LitElement {
     }
 
     getKeybindActions() {
-        return [
-            {
-                key: 'moveUp',
-                name: `${this.getKeybind_Move_Window_Up || 'Move Window Up'}`, 
-                description: `${this.getKeybind_Move_Window_Up_Message || 'Move the application window up'}`,
-            },
-            {
-                key: 'moveDown',
-                name: `${this.getKeybind_Move_Window_Down || 'Move Window Up'}`, 
-                description: `${this.getKeybind_Move_Window_Down_Message || 'Move the application window down'}`,
-            },
-            {
-                key: 'moveLeft',
-                name: `${this.getKeybind_Move_Window_Left || 'Move Window Left'}`, 
-                description: `${this.getKeybind_Move_Window_Left_Message || 'Move the application window left'}`,
-            },
-            {
-                key: 'moveRight',
-                name: `${this.getKeybind_Move_Window_Right || 'Move Window Right'}`, 
-                description: `${this.getKeybind_Move_Window_Right_Message || 'Move the application window right'}`,
-            },
-            {
-                key: 'toggleVisibility',
-                name: `${this.getKeybind_Toggle_Window_Visibility || 'Toggle Window Visibility'}`, 
-                description: `${this.getKeybind_Toggle_Window_Visibility_Message || 'Show/hide the application window'}`,
-            },
-            {
-                key: 'toggleClickThrough',
-                name: `${this.getKeybind_Toggle_Click_through_Mode || 'Toggle Click-through Mode'}`, 
-                description: `${this.getKeybind_Toggle_Click_through_Msg || 'Enable/disable click-through functionality'}`,
-            },
-            {
-                key: 'nextStep',
-                name: `${this.getKeybind_Ask_Next_Step || 'Ask Next Step'}`, 
-                description: `${this.getKeybind_Ask_Next_Step_Message || 'Take screenshot and ask AI for the next step suggestion'}`,
-            },
-            {
-                key: 'previousResponse',
-                name: `${this.getKeybind_Previous_Response || 'Previous Response'}`, 
-                description: `${this.getKeybind_Previous_Response_Message || 'Navigate to the previous AI response'}`,
-            },
-            {
-                key: 'nextResponse',
-                name: `${this.getKeybind_Next_Response || 'Next Response'}`, 
-                description: `${this.getKeybind_Next_Response_Message || 'Navigate to the next AI response'}`,
-            },
-            {
-                key: 'scrollUp',
-                name: `${this.getKeybind_Scroll_Response_Up || 'Scroll Response Up'}`, 
-                description: `${this.getKeybind_Scroll_Response_Up_Message || 'Scroll the AI response content up'}`,
-            },
-            {
-                key: 'scrollDown',
-                name: `${this.getKeybind_Scroll_Response_Down || 'Scroll Response Down'}`,
-                description: `${this.getKeybind_Scroll_Response_Down_Message || 'Scroll the AI response content down'}`,
-            },
-        ];
+    return [
+        {
+            key: 'moveUp',
+            name: `${this.GetKeybind_Move_Window_Up || 'Move Window Up'}`, 
+            description: `${this.GetKeybind_Move_Window_Up_Message || 'Move the application window up'}`,
+        },
+        {
+            key: 'moveDown',
+            name: `${this.GetKeybind_Move_Window_Down || 'Move Window Up'}`, 
+            description: `${this.GetKeybind_Move_Window_Down_Message || 'Move the application window down'}`,
+        },
+        {
+            key: 'moveLeft',
+            name: `${this.GetKeybind_Move_Window_Left || 'Move Window Left'}`, 
+            description: `${this.GetKeybind_Move_Window_Left_Message || 'Move the application window left'}`,
+        },
+        {
+            key: 'moveRight',
+            name: `${this.GetKeybind_Move_Window_Right || 'Move Window Right'}`, 
+            description: `${this.GetKeybind_Move_Window_Right_Message || 'Move the application window right'}`,
+        },
+        {
+            key: 'toggleVisibility',
+            name: `${this.GetKeybind_Toggle_Window_Visibility || 'Toggle Window Visibility'}`, 
+            description: `${this.GetKeybind_Toggle_Window_Visibility_Message || 'Show/hide the application window'}`,
+        },
+        {
+            key: 'toggleClickThrough',
+            name: `${this.GetKeybind_Toggle_Click_through_Mode || 'Toggle Click-through Mode'}`, 
+            description: `${this.GetKeybind_Toggle_Click_through_Msg || 'Enable/disable click-through functionality'}`,
+        },
+        {
+            key: 'nextStep',
+            name: `${this.GetKeybind_Ask_Next_Step || 'Ask Next Step'}`, 
+            description: `${this.GetKeybind_Ask_Next_Step_Message || 'Take screenshot and ask AI for the next step suggestion'}`,
+        },
+        {
+            key: 'previousResponse',
+            name: `${this.GetKeybind_Previous_Response || 'Previous Response'}`, 
+            description: `${this.GetKeybind_Previous_Response_Message || 'Navigate to the previous AI response'}`,
+        },
+        {
+            key: 'nextResponse',
+            name: `${this.GetKeybind_Next_Response || 'Next Response'}`, 
+            description: `${this.GetKeybind_Next_Response_Message || 'Navigate to the next AI response'}`,
+        },
+        {
+            key: 'scrollUp',
+            name: `${this.GetKeybind_Scroll_Response_Up || 'Scroll Response Up'}`, 
+            description: `${this.GetKeybind_Scroll_Response_Up_Message || 'Scroll the AI response content up'}`,
+        },
+        {
+            key: 'scrollDown',
+            name: `${this.GetKeybind_Scroll_Response_Down || 'Scroll Response Down'}`,
+            description: `${this.GetKeybind_Scroll_Response_Down_Message || 'Scroll the AI response content down'}`,
+        },
+    ];
     }
 
     handleKeybindFocus(e) {
