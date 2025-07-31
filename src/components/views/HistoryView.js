@@ -1,5 +1,6 @@
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
 import { resizeLayout } from '../../utils/windowResize.js';
+import language from '../../lang/language_module.mjs'; 
 
 export class HistoryView extends LitElement {
     static styles = css`
@@ -226,6 +227,13 @@ export class HistoryView extends LitElement {
         sessions: { type: Array },
         selectedSession: { type: Object },
         loading: { type: Boolean },
+        History_No_conversation_yet: { type: String },
+        History_Loading_conversation_history: { type: String },
+        History_Start_a_session: { type: String },
+        History_Them: { type: String },
+        History_Suggestion: { type: String },
+        History_No_conversation: { type: String },
+        History_Back_to_Sessions: { type: String }
     };
 
     constructor() {
@@ -234,6 +242,28 @@ export class HistoryView extends LitElement {
         this.selectedSession = null;
         this.loading = true;
         this.loadSessions();
+
+        this.translate("History_No_conversation_yet").then((lang) => {
+            this.History_No_conversation_yet = lang;
+        });
+        this.translate("History_Loading_conversation_history").then((lang) => {
+            this.History_Loading_conversation_history = lang;
+        });
+        this.translate("History_Start_a_session").then((lang) => {
+            this.History_Start_a_session = lang;
+        });
+        this.translate("History_Them").then((lang) => {
+            this.History_Them = lang;
+        });
+        this.translate("History_Suggestion").then((lang) => {
+            this.History_Suggestion = lang;
+        });
+        this.translate("History_No_conversation").then((lang) => {
+            this.History_No_conversation = lang;
+        });
+        this.translate("History_Back_to_Sessions").then((lang) => {
+            this.History_Back_to_Sessions = lang;
+        });
     }
 
     connectedCallback() {
@@ -253,6 +283,54 @@ export class HistoryView extends LitElement {
             this.loading = false;
         }
     }
+
+    /**
+    * Translates a specified key into a localized message, using the current system language.
+    * @async
+    * @function translate
+    * @param {string} key - Message key to translate.
+    * Expected values:
+    * 'Main_api', 'Main_GetApi', 'Main_Welcome',
+    * 'Main_APIKey', 'Main_Start'.
+    * If the key does not match, 'unknowledge' will be used as the default key.
+    * @returns {Promise<string>} - Returns a Promise that resolves to the translated text
+    * corresponding to the provided key.
+    * If the text is not found, 'Unknowledge' is returned.
+    * @example
+    * const message = await translate("Main_Welcome");
+    * console. log(message); // "Welcome to the app" (depends on the current language)
+    */
+    async translate(key) {
+    //await new Promise(resolve => setTimeout(resolve, 500));
+    let temp = ''; // Usa 'let' si vas a reasignar
+    switch (key) {
+            case 'History_No_conversation_yet':
+                temp = await language.getMessages("History_No_conversation_yet", language.getLanguage() || 'en-US');
+                break;
+            case 'History_Loading_conversation_history':
+                temp = await language.getMessages("History_Loading_conversation_history", language.getLanguage() || 'en-US');
+                break;
+            case 'History_Start_a_session':
+                temp = await language.getMessages("History_Start_a_session", language.getLanguage() || 'en-US');
+                break;
+            case 'History_Them':
+                temp = await language.getMessages("History_Them", language.getLanguage() || 'en-US');
+                break;
+            case 'History_Suggestion':
+                temp = await language.getMessages("History_Suggestion", language.getLanguage() || 'en-US');
+                break;
+            case 'History_No_conversation':
+                temp = await language.getMessages("History_No_conversation", language.getLanguage() || 'en-US');
+                break;
+            case 'History_Back_to_Sessions':
+                temp = await language.getMessages("History_No_conversation", language.getLanguage() || 'en-US');
+                break;
+            default:
+                return await language.getMessages("unknowledge", 'en-US');
+        }//end switch
+        return temp || 'Unknowledge';
+    }//end translate
+
 
     formatDate(timestamp) {
         const date = new Date(timestamp);
@@ -281,9 +359,10 @@ export class HistoryView extends LitElement {
         });
     }
 
+
     getSessionPreview(session) {
         if (!session.conversationHistory || session.conversationHistory.length === 0) {
-            return 'No conversation yet';
+            return `${this.History_No_conversation_yet}`;
         }
 
         const firstTurn = session.conversationHistory[0];
@@ -301,14 +380,14 @@ export class HistoryView extends LitElement {
 
     renderSessionsList() {
         if (this.loading) {
-            return html`<div class="loading">Loading conversation history...</div>`;
+            return html`<div class="loading">${this.History_Loading_conversation_history}</div>`;
         }
 
         if (this.sessions.length === 0) {
             return html`
                 <div class="empty-state">
-                    <div class="empty-state-title">No conversations yet</div>
-                    <div>Start a session to see your conversation history here</div>
+                    <div class="empty-state-title">${this.History_No_conversation_yet}</div>
+                    <div>${this.History_Start_a_session}</div>
                 </div>
             `;
         }
@@ -370,23 +449,23 @@ export class HistoryView extends LitElement {
                     >
                         <path d="M15 6L9 12L15 18" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
                     </svg>
-                    Back to Sessions
+                    ${this.History_Back_to_Sessions}
                 </button>
                 <div class="legend">
                     <div class="legend-item">
                         <div class="legend-dot user"></div>
-                        <span>Them</span>
+                        <span>${this.History_Them}</span>
                     </div>
                     <div class="legend-item">
                         <div class="legend-dot ai"></div>
-                        <span>Suggestion</span>
+                        <span>${this.History_Suggestion}</span>
                     </div>
                 </div>
             </div>
             <div class="conversation-view">
                 ${messages.length > 0
                     ? messages.map(message => html` <div class="message ${message.type}">${message.content}</div> `)
-                    : html`<div class="empty-state">No conversation data available</div>`}
+                    : html`<div class="empty-state">${this.History_No_conversation}</div>`}
             </div>
         `;
     }

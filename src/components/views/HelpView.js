@@ -1,6 +1,6 @@
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
 import { resizeLayout } from '../../utils/windowResize.js';
-
+import  language  from '../../lang/language_module.mjs';
 export class HelpView extends LitElement {
     static styles = css`
         * {
@@ -234,6 +234,33 @@ export class HelpView extends LitElement {
     static properties = {
         onExternalLinkClick: { type: Function },
         keybinds: { type: Object },
+        Help_Community: { type: String },
+        Help_Website: { type: String },
+        Help_Repository: { type: String },
+        Help_Discord: { type: String },
+        Help_Keyboard: { type: String },
+        Help_How: { type: String },
+        Help_Start: { type: String },
+        Help_Customize: { type: String },
+        Help_Position: { type: String },
+        Help_Click: { type: String },
+        Help_Click2: { type: String },
+        Help_Text: { type: String },
+        Help_Navigate: { type: String },
+        Help_and: { type: String },
+        Help_browse: { type: String },
+        Help_Supported: { type: String },
+        Help_Get_help: { type: String },
+        Help_Assistance: { type: String },
+        Help_Support: { type: String },
+        Help_Help_with_presentations: { type: String },
+        Help_Guidance: { type: String },
+        Help_Academic: { type: String },
+        Help_Audio_Input: { type: String },
+        Help_The_AI: { type: String },
+        Help_You_Can: {type: String},
+        Help_Get_AI_Help: {type: String},
+        Help_The_AI_will: {type: String},
     };
 
     constructor() {
@@ -241,7 +268,203 @@ export class HelpView extends LitElement {
         this.onExternalLinkClick = () => {};
         this.keybinds = this.getDefaultKeybinds();
         this.loadKeybinds();
+        this.translate("Main_api").then((lang)=> 
+            this.Main_api = lang
+        );
+        this.translate("Help_Community").then((lang) => {
+            this.Help_Community = lang;
+        });
+        this.translate("Help_Website").then((lang) => {
+            this.Help_Website = lang;
+        });
+        this.translate("Help_Repository").then((lang) => {
+            this.Help_Repository = lang;
+        });
+        this.translate("Help_Discord").then((lang) => {
+            this.Help_Discord = lang;
+        });
+        this.translate("Help_Keyboard").then((lang) => {
+            this.Help_Keyboard = lang;
+        });
+        this.translate("Help_How").then((lang) => {
+            this.Help_How = lang;
+        });
+        this.translate("Help_Start").then((lang) => {
+            this.Help_Start = lang;
+        });
+        this.translate("Help_Customize").then((lang) => {
+            this.Help_Customize = lang;
+        });
+        this.translate("Help_Position").then((lang) => {
+            this.Help_Position = lang;
+
+        });
+        this.translate("Help_Click").then((lang) => {
+            this.Help_Click = lang;
+        });
+        this.translate("Help_Click2").then((lang) => {
+            this.Help_Click2 = lang;
+        });
+        this.translate("Help_Text").then((lang) => {
+            this.Help_Text = lang;
+        });
+        this.translate("Help_Navigate").then((lang) => {
+            this.Help_Navigate = lang;
+        });
+        this.translate("Help_and").then((lang) => {
+            this.Help_and = lang;
+        });
+        this.translate("Help_browse").then((lang) => {
+            this.Help_browse = lang;
+        });
+        this.translate("Help_Supported").then((lang) => {
+            this.Help_Supported = lang;
+        });
+        this.translate("Help_Get_help").then((lang) => {
+            this.Help_Get_help = lang;
+        });
+        this.translate("Help_Assistance").then((lang) => {
+            this.Help_Assistance = lang;
+        });
+        this.translate("Help_Support").then((lang) => {
+            this.Help_Support = lang;
+        });
+        this.translate("Help_Help_with_presentations").then((lang) => {
+            this.Help_Help_with_presentations = lang;
+        });
+        this.translate("Help_Guidance").then((lang) => {
+            this.Help_Guidance = lang;
+        });
+        this.translate("Help_Academic").then((lang) => {
+            this.Help_Academic = lang;
+        });
+        this.translate("Help_Audio_Input").then((lang) => {
+            this.Help_Audio_Input = lang;
+        });
+        this.translate("Help_The_AI").then((lang) => {
+            this.Help_The_AI = lang;
+        });
+        this.translate("Help_You_Can").then((lang) => {
+            this.Help_You_Can = lang;
+        });
+        this.translate("Help_Get_AI_Help").then((lang) => {
+            this.Help_Get_AI_Help = lang;
+        });
+        this.translate("Help_The_AI_will").then((lang) => {
+            this.Help_The_AI_will = lang;
+        });
     }
+
+
+
+    /**
+    * Translates a specified key into a localized message, using the current system language.
+    * @async
+    * @function translate
+    * @param {string} key - Message key to translate.
+    * Expected values:
+    * 'Main_api', 'Main_GetApi', 'Main_Welcome',
+    * 'Main_APIKey', 'Main_Start'.
+    * If the key does not match, 'unknowledge' will be used as the default key.
+    * @returns {Promise<string>} - Returns a Promise that resolves to the translated text
+    * corresponding to the provided key.
+    * If the text is not found, 'Unknowledge' is returned.
+    * @example
+    * const message = await translate("Main_Welcome");
+    * console. log(message); // "Welcome to the app" (depends on the current language)
+    */
+    async translate(key) {
+    //await new Promise(resolve => setTimeout(resolve, 500));
+    let temp = ''; // Usa 'let' si vas a reasignar
+    switch (key) {
+            case 'Help_Community':
+                temp = await language.getMessages("Help_Community", language.getLanguage() || 'en-US');
+                break;
+            case 'Help_Website':
+                temp = await language.getMessages("Help_Website", language.getLanguage() || 'en-US');
+                break;
+            case 'Help_Repository':
+                temp = await language.getMessages("Help_Repository", language.getLanguage() || 'en-US');
+                break;
+            case 'Help_Discord':
+                temp = await language.getMessages("Help_Discord", language.getLanguage() || 'en-US');
+                break;
+            case 'Help_Keyboard':
+                temp = await language.getMessages("Help_Keyboard", language.getLanguage() || 'en-US');
+                break;
+            case 'Help_How':
+                temp = await language.getMessages("Help_How", language.getLanguage() || 'en-US');
+                break;
+            case 'Help_Start':
+                temp = await language.getMessages("Help_Start", language.getLanguage() || 'en-US');
+                break;
+            case 'Help_Customize':
+                temp = await language.getMessages("Help_Customize", language.getLanguage() || 'en-US');
+                break;
+            case 'Help_Position':
+                temp = await language.getMessages("Help_Position", language.getLanguage() || 'en-US');
+                break;
+            case 'Help_Click':
+                temp = await language.getMessages("Help_Click", language.getLanguage() || 'en-US');
+                break;
+            case 'Help_Click2':
+                temp = await language.getMessages("Help_Click2", language.getLanguage() || 'en-US');
+                break;
+            case 'Help_Text':
+                temp = await language.getMessages("Help_Text", language.getLanguage() || 'en-US');
+                break;
+            case 'Help_Navigate':
+                temp = await language.getMessages("Help_Navigate", language.getLanguage() || 'en-US');
+                break;
+            case 'Help_and':
+                temp = await language.getMessages("Help_and", language.getLanguage() || 'en-US');
+                break;
+            case 'Help_browse':
+                temp = await language.getMessages("Help_browse", language.getLanguage() || 'en-US');
+                break;
+            case 'Help_Supported':
+                temp = await language.getMessages("Help_Supported", language.getLanguage() || 'en-US');
+                break;
+            case 'Help_Get_help':
+                temp = await language.getMessages("Help_Get_help", language.getLanguage() || 'en-US');
+                break;
+            case 'Help_Assistance':
+                temp = await language.getMessages("Help_Assistance", language.getLanguage() || 'en-US');
+                break;
+            case 'Help_Support':
+                temp = await language.getMessages("Help_Support", language.getLanguage() || 'en-US');
+                break;
+            case 'Help_Help_with_presentations':
+                temp = await language.getMessages("Help_Help_with_presentations", language.getLanguage() || 'en-US');
+                break;
+            case 'Help_Guidance':
+                temp = await language.getMessages("Help_Guidance", language.getLanguage() || 'en-US');
+                break;
+            case 'Help_Academic':
+                temp = await language.getMessages("Help_Academic", language.getLanguage() || 'en-US');
+                break;
+            case 'Help_Audio_Input':
+                temp = await language.getMessages("Help_Audio_Input", language.getLanguage() || 'en-US');
+                break;
+            case 'Help_The_AI':
+                temp = await language.getMessages("Help_The_AI", language.getLanguage() || 'en-US');
+                break;
+            case 'Help_You_Can':
+                temp = await language.getMessages("Help_You_Can", language.getLanguage() || 'en-US');
+                break;
+            case 'Help_Get_AI_Help':
+                temp = await language.getMessages("Help_Get_AI_Help", language.getLanguage() || 'en-US');
+                break;
+            case 'Help_The_AI_will':
+                temp = await language.getMessages("Help_The_AI_will", language.getLanguage() || 'en-US');
+                break;
+            default:
+                // Si quieres un valor por defecto que también es una Promesa
+                return await language.getMessages("unknowledge", 'en-US');
+        }//end switch
+        return temp || 'Unknowledge';
+    }//end translate
+
 
     connectedCallback() {
         super.connectedCallback();
@@ -286,32 +509,31 @@ export class HelpView extends LitElement {
         this.onExternalLinkClick(url);
     }
 
-    render() {
-        const isMacOS = cheddar.isMacOS || false;
-        const isLinux = cheddar.isLinux || false;
 
-        return html`
-            <div class="help-container">
-                <div class="option-group">
+    
+    _Community(){
+        return html`<div class="option-group">
                     <div class="option-label">
-                        <span>Community & Support</span>
+                        <span>${this.Help_Community}</span>
                     </div>
                     <div class="community-links">
                         <div class="community-link" @click=${() => this.handleExternalLinkClick('https://cheatingdaddy.com')}>
-                            🌐 Official Website
+                            ${this.Help_Website}
                         </div>
                         <div class="community-link" @click=${() => this.handleExternalLinkClick('https://github.com/sohzm/cheating-daddy')}>
-                            📂 GitHub Repository
+                            ${this.Help_Repository}
                         </div>
                         <div class="community-link" @click=${() => this.handleExternalLinkClick('https://discord.gg/GCBdubnXfJ')}>
-                            💬 Discord Community
+                            ${this.Help_Discord}
                         </div>
                     </div>
-                </div>
+                </div>`;
+    }
 
-                <div class="option-group">
+    _Keyboard_Shortcuts(){
+        return html`<div class="option-group">
                     <div class="option-label">
-                        <span>Keyboard Shortcuts</span>
+                        <span>${this.Help_Keyboard}</span>
                     </div>
                     <div class="keyboard-section">
                         <div class="keyboard-group">
@@ -387,71 +609,93 @@ export class HelpView extends LitElement {
                         </div>
                     </div>
                     <div class="description" style="margin-top: 12px; font-style: italic; text-align: center;">
-                        💡 You can customize these shortcuts in the Settings page!
+                        ${this.Help_You_Can}
                     </div>
-                </div>
+                </div>`;
+        }
 
-                <div class="option-group">
+    _Use(){
+        return html`<div class="option-group">
                     <div class="option-label">
-                        <span>How to Use</span>
+                        <span>${this.Help_How}</span>
                     </div>
                     <div class="usage-steps">
-                        <div class="usage-step"><strong>Start a Session:</strong> Enter your Gemini API key and click "Start Session"</div>
-                        <div class="usage-step"><strong>Customize:</strong> Choose your profile and language in the settings</div>
+                        <div class="usage-step"><strong>${this.Help_Start}</strong></div>
+                        <div class="usage-step"><strong>${this.Help_Customize}</strong></div>
                         <div class="usage-step">
-                            <strong>Position Window:</strong> Use keyboard shortcuts to move the window to your desired location
+                            <strong>${this.Help_Position}</strong>
                         </div>
                         <div class="usage-step">
-                            <strong>Click-through Mode:</strong> Use ${this.formatKeybind(this.keybinds.toggleClickThrough)} to make the window
-                            click-through
+                            <strong>${this.Help_Click} ${this.formatKeybind(this.keybinds.toggleClickThrough)} ${this.Help_Click2}</strong>
                         </div>
-                        <div class="usage-step"><strong>Get AI Help:</strong> The AI will analyze your screen and audio to provide assistance</div>
-                        <div class="usage-step"><strong>Text Messages:</strong> Type questions or requests to the AI using the text input</div>
+                        <div class="usage-step"><strong>${this.Help_Get_AI_Help} ${this.Help_The_AI_will}</strong></div>
+                        <div class="usage-step"><strong>${this.Help_Text}</strong></div>
                         <div class="usage-step">
-                            <strong>Navigate Responses:</strong> Use ${this.formatKeybind(this.keybinds.previousResponse)} and
-                            ${this.formatKeybind(this.keybinds.nextResponse)} to browse through AI responses
+                            <strong>
+                            ${this.Help_Navigate} ${this.formatKeybind(this.keybinds.previousResponse)} ${this.Help_and}
+                            ${this.formatKeybind(this.keybinds.nextResponse)} ${this.Help_browse}
+                            </strong>
                         </div>
                     </div>
                 </div>
+                `;
+    }
 
-                <div class="option-group">
+    _Supported_Profiles(){
+            return html`<div class="option-group">
                     <div class="option-label">
-                        <span>Supported Profiles</span>
+                        <span>${this.Help_Supported}</span>
                     </div>
                     <div class="profiles-grid">
                         <div class="profile-item">
                             <div class="profile-name">Job Interview</div>
-                            <div class="profile-description">Get help with interview questions and responses</div>
+                            <div class="profile-description">${this.Help_Get_help}</div>
                         </div>
                         <div class="profile-item">
                             <div class="profile-name">Sales Call</div>
-                            <div class="profile-description">Assistance with sales conversations and objection handling</div>
+                            <div class="profile-description">${this.Help_Assistance}</div>
                         </div>
                         <div class="profile-item">
                             <div class="profile-name">Business Meeting</div>
-                            <div class="profile-description">Support for professional meetings and discussions</div>
+                            <div class="profile-description">${this.Help_Support}</div>
                         </div>
                         <div class="profile-item">
                             <div class="profile-name">Presentation</div>
-                            <div class="profile-description">Help with presentations and public speaking</div>
+                            <div class="profile-description">${this.Help_Help_with_presentations}</div>
                         </div>
                         <div class="profile-item">
                             <div class="profile-name">Negotiation</div>
-                            <div class="profile-description">Guidance for business negotiations and deals</div>
+                            <div class="profile-description">${this.Help_Guidance}</div>
                         </div>
                         <div class="profile-item">
                             <div class="profile-name">Exam Assistant</div>
-                            <div class="profile-description">Academic assistance for test-taking and exam questions</div>
+                            <div class="profile-description">${this.Help_Academic}</div>
                         </div>
                     </div>
                 </div>
+                `;
+    }
 
-                <div class="option-group">
+    _Audio(){
+        return html`<div class="option-group">
                     <div class="option-label">
-                        <span>Audio Input</span>
+                        <span>${this.Help_Audio_Input}</span>
                     </div>
-                    <div class="description">The AI listens to conversations and provides contextual assistance based on what it hears.</div>
-                </div>
+                    <div class="description">${this.Help_The_AI}</div>
+                </div>`;
+    }
+
+    render() {
+        const isMacOS = cheddar.isMacOS || false;
+        const isLinux = cheddar.isLinux || false;
+
+        return html`
+            <div class="help-container">
+                ${this._Community()}
+                ${this._Keyboard_Shortcuts()}
+                ${this._Use()}
+                ${this._Supported_Profiles()}
+                ${this._Audio()}
             </div>
         `;
     }
