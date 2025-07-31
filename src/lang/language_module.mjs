@@ -1,13 +1,24 @@
 /**
- * language.js
- * Soluciones para cargar archivos JSON con problemas de CORS
- * REQUIERE archivos JSON externos
- */
+ * @author: Oscar Ortiz Pinzón (@Oscardo)
+ * @City: Bogotá, Colombia
+ * @date: 2024-01-01
+ * @version: 1.0.0
+ * @file language_module.mjs
+ * @description
+ * Language module for handling translations in a web application
+ * Supports dynamic imports, fetch API, XMLHttpRequest, and Node.js file system
+ * Provides functions to get the current language, load language files, and retrieve messages
+ * REQUIRES external JSON files
+*/
 
 const isNode = typeof process !== 'undefined' && process.versions && process.versions.node;
 const isBrowser = typeof window !== 'undefined';
 const languageCache = {};
 
+// Functions to get the current language and language file
+/** Gets the current language from localStorage or defaults to 'en-US'
+* @return {string} - Current language code (e.g., 'es-CO',  'pt-BR', 'en-US')
+*/
 export function getLanguage() {
     if (isBrowser && window.localStorage) {
         return localStorage.getItem('selectedAppLanguage') || 'en-US';
@@ -15,6 +26,11 @@ export function getLanguage() {
     return 'en-US';
 }
 
+/**  Gets the language file based on the language code
+* Returns 'en-US.json' if the language is not found
+* @param {string} lang - Language code (e.g., 'es-CO', 'pt-BR', 'en-US')
+* @return {string} - Name of the corresponding JSON file
+*/
 export function getLanguageFile(lang) {
     const map = {
         'es-CO': 'es-CO.json',
@@ -24,10 +40,12 @@ export function getLanguageFile(lang) {
     return map[lang] || map['en-US'];
 }
 
-/**
- * SOLUCIÓN 1: Dynamic Import de JSON (ES2022+)
- * Los navegadores modernos soportan import de JSON
- */
+/** * SOLUTION 1: Dynamic Import (ESM)
+* Requires dynamic import support
+* Uses dynamic import syntax to load JSON files
+* @param {string} lang - Language code (e.g., 'es-CO', 'pt-BR', 'en-US')
+* @return {Promise<Object>} - Returns a promise that resolves to the JSON data
+* */
 export async function loadLanguageDataDynamicImport(lang) {
     try {
         //console.log(`🔄 Trying dynamic import for: ${lang}`);
@@ -55,9 +73,12 @@ export async function loadLanguageDataDynamicImport(lang) {
     }
 }
 
-/**
- * SOLUCIÓN 2: Fetch con diferentes estrategias de ruta
- */
+/** * SOLUTION 2: Fetch API (more compatible)
+* Use fetch to load JSON files
+* Try multiple common paths to find the file
+* @param {string} langFile - Name of the language file (e.g., 'es-CO.json')
+* @return {Promise<Object>} - Returns a promise that resolves to the JSON data
+* */
 export async function loadLanguageDataFetch(langFile) {
     if (!isBrowser || typeof fetch === 'undefined') return null;
     
@@ -124,9 +145,12 @@ export async function loadLanguageDataFetch(langFile) {
     return null;
 }
 
-/**
- * SOLUCIÓN 3: XMLHttpRequest (fallback para navegadores antiguos)
- */
+/** * SOLUTION 3: XMLHttpRequest (fallback)
+ * Uses XMLHttpRequest to load JSON files   
+ * Tries multiple paths until one succeeds
+ * @param {string} langFile - Name of the language file (e.g., 'es-CO.json')
+ * @return {Promise<Object>} - Returns a promise that resolves to the JSON data
+ * */
 export async function loadLanguageDataXHR(langFile) {
     if (!isBrowser) return null;
     
@@ -180,9 +204,12 @@ export async function loadLanguageDataXHR(langFile) {
     });
 }
 
-/**
- * SOLUCIÓN 4: Node.js (funciona siempre)
- */
+/** * SOLUTION 4: Node.js File System (for server-side)
+ * Uses Node.js fs module to read JSON files from disk
+ * Tries multiple paths until one succeeds
+ * @param {string} langFile - Name of the language file (e.g., 'es-CO.json')
+ * @return {Promise<Object>} - Returns a promise that resolves to the JSON data
+ * */
 export async function loadLanguageDataNode(langFile) {
     if (!isNode) return null;
     
@@ -221,9 +248,13 @@ export async function loadLanguageDataNode(langFile) {
     return null;
 }
 
-/**
- * FUNCIÓN PRINCIPAL: Intenta todos los métodos en orden
- */
+/** * Main function to get a message
+* Attempts to load the language file and return the corresponding message
+* If the message is not found, returns the original key
+* @param {string} messageKey - Message key to get
+* @param {string|null} lang - Language code (optional, if not provided, use the current one)
+* @return {Promise<string>} - Translated message or the original key if not found
+* */
 export async function getMessage(messageKey, lang = null) {
     try {
         const selectedLang = lang || getLanguage();
@@ -279,9 +310,14 @@ export async function getMessage(messageKey, lang = null) {
     }
 }
 
-/**
- * Versión para múltiples mensajes
- */
+/** * Function to get multiple messages
+* If a string is passed, getMessage is called
+* If an array is passed, all messages are fetched
+* @param {string|Array<string>} messageKeys - Key or array of keys of the
+* messages to fetch
+* @param {string|null} lang - Language code (optional, if not provided, the current one is used)
+* @return {Promise<Object>} - Object with the keys and their messages
+* */
 export async function getMessages(messageKeys, lang = null) {
     if (typeof messageKeys === 'string') {
         return await getMessage(messageKeys, lang);
@@ -294,17 +330,20 @@ export async function getMessages(messageKeys, lang = null) {
     return result;
 }
 
-/**
- * Función para limpiar caché
- */
+/** * Function to clear the language cache
+* Deletes all cached language data  
+* Useful for debugging or when language files change
+* */
 export function clearLanguageCache() {
     Object.keys(languageCache).forEach(key => delete languageCache[key]);
     console.log('🗑️ Cache cleared');
 }
 
-/**
- * Función de diagnóstico
- */
+/** * Function to diagnose the environment
+ * Logs the current environment, URL, and selected language
+ * Also checks if fetch and XMLHttpRequest are available
+  * @return {Promise<void>} - Returns a promise that resolves when the diagnosis is complete
+ * */
 export async function diagnoseEnvironment() {
     console.log('🔍 ENVIRONMENT DIAGNOSIS:');
     console.log('Environment:', isNode ? 'Node.js' : isBrowser ? 'Browser' : 'Unknown');
@@ -321,7 +360,14 @@ export async function diagnoseEnvironment() {
     await getMessage('test', 'es-CO');
 }
 
-// Exportación por defecto
+// Export the language module
+// This allows importing the functions in other modules 
+// Example: import language from './language_module.mjs';
+// or import { getMessage } from './language_module.mjs';
+// and using them like: language.getMessage('hello', 'es-CO');
+// or getMessage('hello', 'es-CO');
+// Exporting the language module
+// This allows importing the functions in other modules 
 const language = {
     getLanguage,
     getMessage,
