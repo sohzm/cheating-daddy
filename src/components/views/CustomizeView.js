@@ -500,7 +500,9 @@ export class CustomizeView extends LitElement {
         return [
             { value: 'en-US', name: 'English (US)' },
             { value: 'pt-BR', name: 'Portuguese (Brazil)' },
-            { value: 'es-CO', name: 'Spanish (Colombia)' }
+            { value: 'es-CO', name: 'Spanish (Colombia)' },
+            { value: 'fr-FR', name: 'French (France)' },
+            { value: 'cmn-CN', name: 'Mandarin Chinese (China)' },
         ];
     }
     
@@ -789,7 +791,7 @@ export class CustomizeView extends LitElement {
     async getLanguageAppSelect(){
         try{
             this.selectedAppLanguage = localStorage.getItem('selectedAppLanguage') || 'en-US';
-            return this.translate('Speech_Language');
+            return this.selectedAppLanguage;
         }catch(error){
             console.error(error);
         }

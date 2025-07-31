@@ -36,6 +36,8 @@ export function getLanguageFile(lang) {
         'es-CO': 'es-CO.json',
         'pt-BR': 'pt-BR.json', 
         'en-US': 'en-US.json',
+        'fr-FR': 'fr-FR.json',
+        'cmn-CN': 'cmn-CN.json',
     };
     return map[lang] || map['en-US'];
 }
@@ -55,6 +57,8 @@ export async function loadLanguageDataDynamicImport(lang) {
             'es-CO': './es-CO.json',
             'pt-BR': './pt-BR.json', 
             'en-US': './en-US.json',
+            'fr-FR': './fr-FR.json',
+            'cmn-CN': './cmn-CN.json',
         };
         
         const modulePath = jsonModules[lang] || jsonModules['es-CO'];
