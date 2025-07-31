@@ -138,5 +138,14 @@
   "History_Suggestion": "Suggestion",
   "History_No_conversation": "No conversation data available",
   "History_Back_to_Sessions": "Back to Sessions",
+  "AppHeader_main": "Cheating Daddy",
+  "AppHeader_customize": "Customize",
+  "AppHeader_help": "Help & Shortcuts",
+  "AppHeader_history": "Conversation History",
+  "AppHeader_advanced": "Advanced Tools",
+  "AppHeader_assistant": "Cheating Daddy",
+  "AppHeader_Hide": "Hide",
+  "Assistant_Message": "Hey, Im listening to your.",
+  "Assistant_Type_message": "Type a message to the AI...",
   "unknowledge": "Unknowledge"
 }

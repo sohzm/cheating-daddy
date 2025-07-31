@@ -1,4 +1,5 @@
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
+import language from '../../lang/language_module.mjs';
 
 export class AssistantView extends LitElement {
     static styles = css`
@@ -245,7 +246,7 @@ export class AssistantView extends LitElement {
 
         .nav-button:hover {
             background: rgba(255, 255, 255, 0.1);
-        }
+        }   
 
         .nav-button:disabled {
             opacity: 0.3;
@@ -270,6 +271,8 @@ export class AssistantView extends LitElement {
         selectedProfile: { type: String },
         onSendText: { type: Function },
         shouldAnimateResponse: { type: Boolean },
+        Assistant_Message: { type: String },
+        Assistant_Type_message: { type: String }
     };
 
     constructor() {
@@ -279,6 +282,43 @@ export class AssistantView extends LitElement {
         this.selectedProfile = 'interview';
         this.onSendText = () => {};
         this._lastAnimatedWordCount = 0;
+        this.translate("Assistant_Message").then((lang) => {
+            this.Assistant_Message = lang;
+        });
+        this.translate("Assistant_Type_message").then((lang) => {
+            this.Assistant_Type_message = lang;
+        });
+    }
+
+    /**
+    * Translates a specified key into a localized message, using the current system language.
+    * @async
+    * @function translate
+    * @param {string} key - Message key to translate.
+    * Expected values:
+    * 'Main_api', 'Main_GetApi', 'Main_Welcome',
+    * 'Main_APIKey', 'Main_Start'.
+    * If the key does not match, 'unknowledge' will be used as the default key.
+    * @returns {Promise<string>} - Returns a Promise that resolves to the translated text
+    * corresponding to the provided key.
+    * If the text is not found, 'Unknowledge' is returned.
+    * @example
+    * const message = await translate("Main_Welcome");
+    * console. log(message); // "Welcome to the app" (depends on the current language)
+    */
+    async translate(key) {
+        let temp;
+        switch (key) {
+            case 'Assistant_Message':
+                temp = await language.getMessages("Assistant_Message", language.getLanguage() || 'en-US');
+                break;
+            case 'Assistant_Type_message':
+                temp = await language.getMessages("Assistant_Type_message", language.getLanguage() || 'en-US');
+                break;
+            default:
+                return await language.getMessages("unknowledge", 'en-US');
+        }//end switch
+        return temp || 'Unknowledge';
     }
 
     getProfileNames() {
@@ -294,9 +334,10 @@ export class AssistantView extends LitElement {
 
     getCurrentResponse() {
         const profileNames = this.getProfileNames();
+        const mensaje = this.Assistant_Message;
         return this.responses.length > 0 && this.currentResponseIndex >= 0
             ? this.responses[this.currentResponseIndex]
-            : `Hey, Im listening to your ${profileNames[this.selectedProfile] || 'session'}?`;
+            : `${mensaje || "Hey, Im listening to your."}: ${profileNames[this.selectedProfile] || 'session'}?`;
     }
 
     renderMarkdown(content) {
@@ -538,7 +579,7 @@ export class AssistantView extends LitElement {
         const responseCounter = this.getResponseCounter();
 
         return html`
-            <div class="response-container" id="responseContainer"></div>
+        <div class="response-container" id="responseContainer"></div>
 
             <div class="text-input-container">
                 <button class="nav-button" @click=${this.navigateToPreviousResponse} ?disabled=${this.currentResponseIndex <= 0}>
@@ -556,8 +597,8 @@ export class AssistantView extends LitElement {
                 </button>
 
                 ${this.responses.length > 0 ? html` <span class="response-counter">${responseCounter}</span> ` : ''}
-
-                <input type="text" id="textInput" placeholder="Type a message to the AI..." @keydown=${this.handleTextKeydown} />
+                
+                <input type="text" id="textInput" placeholder="${this.Assistant_Type_message}" @keydown=${this.handleTextKeydown} />
 
                 <button class="nav-button" @click=${this.navigateToNextResponse} ?disabled=${this.currentResponseIndex >= this.responses.length - 1}>
                     <?xml version="1.0" encoding="UTF-8"?><svg

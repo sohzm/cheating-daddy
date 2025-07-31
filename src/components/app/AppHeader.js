@@ -1,4 +1,5 @@
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
+import language from '../../lang/language_module.mjs';
 
 export class AppHeader extends LitElement {
     static styles = css`
@@ -101,6 +102,13 @@ export class AppHeader extends LitElement {
         isClickThrough: { type: Boolean, reflect: true },
         advancedMode: { type: Boolean },
         onAdvancedClick: { type: Function },
+        AppHeader_main: { type: String },
+        AppHeader_customize: { type: String },
+        AppHeader_help: { type: String },
+        AppHeader_history: { type: String },
+        AppHeader_advanced: { type: String },
+        AppHeader_assistant: { type: String },
+        AppHeader_Hide: { type: String }
     };
 
     constructor() {
@@ -118,6 +126,27 @@ export class AppHeader extends LitElement {
         this.advancedMode = false;
         this.onAdvancedClick = () => {};
         this._timerInterval = null;
+        this.translate("AppHeader_main").then((lang) => {
+            this.AppHeader_main = lang;
+        });
+        this.translate("AppHeader_customize").then((lang) => {
+            this.AppHeader_customize = lang;
+        });
+        this.translate("AppHeader_help").then((lang) => {
+            this.AppHeader_help = lang;
+        });
+        this.translate("AppHeader_history").then((lang) => {
+            this.AppHeader_history = lang;
+        });
+        this.translate("AppHeader_advanced").then((lang) => {
+            this.AppHeader_advanced = lang;
+        });
+        this.translate("AppHeader_assistant").then((lang) => {
+            this.AppHeader_assistant = lang;
+        });
+        this.translate("AppHeader_Hide").then((lang) => {
+            this.AppHeader_Hide = lang;
+        });
     }
 
     connectedCallback() {
@@ -130,6 +159,53 @@ export class AppHeader extends LitElement {
         this._stopTimer();
     }
 
+
+    /**
+    * Translates a specified key into a localized message, using the current system language.
+    * @async
+    * @function translate
+    * @param {string} key - Message key to translate.
+    * Expected values:
+    * 'Main_api', 'Main_GetApi', 'Main_Welcome',
+    * 'Main_APIKey', 'Main_Start'.
+    * If the key does not match, 'unknowledge' will be used as the default key.
+    * @returns {Promise<string>} - Returns a Promise that resolves to the translated text
+    * corresponding to the provided key.
+    * If the text is not found, 'Unknowledge' is returned.
+    * @example
+    * const message = await translate("Main_Welcome");
+    * console. log(message); // "Welcome to the app" (depends on the current language)
+    */
+    async translate(key) {
+        let temp;
+        switch (key) {
+            case 'AppHeader_main':
+                temp = await language.getMessages("AppHeader_main", language.getLanguage() || 'en-US');
+                break;
+            case 'AppHeader_customize':
+                temp = await language.getMessages("AppHeader_customize", language.getLanguage() || 'en-US');
+                break;
+            case 'AppHeader_help':
+                temp = await language.getMessages("AppHeader_help", language.getLanguage() || 'en-US');
+                break;
+            case 'AppHeader_history':
+                temp = await language.getMessages("AppHeader_history", language.getLanguage() || 'en-US');
+                break;
+            case 'AppHeader_advanced':
+                temp = await language.getMessages("AppHeader_advanced", language.getLanguage() || 'en-US');
+                break;
+            case 'AppHeader_assistant':
+                temp = await language.getMessages("AppHeader_assistant", language.getLanguage() || 'en-US');
+                break;
+            case 'AppHeader_Hide':
+                temp = await language.getMessages("AppHeader_Hide", language.getLanguage() || 'en-US');
+                break;
+            default:
+                return await language.getMessages("unknowledge", 'en-US');
+        }//end switch
+        return temp || 'Unknowledge';
+    }
+    
     updated(changedProperties) {
         super.updated(changedProperties);
 
@@ -175,22 +251,93 @@ export class AppHeader extends LitElement {
     getViewTitle() {
         const titles = {
             onboarding: 'Welcome to Cheating Daddy',
-            main: 'Cheating Daddy',
-            customize: 'Customize',
-            help: 'Help & Shortcuts',
-            history: 'Conversation History',
-            advanced: 'Advanced Tools',
-            assistant: 'Cheating Daddy',
+            main: `${this.AppHeader_main}`,
+            customize: `${this.AppHeader_customize}`,
+            help: `${this.AppHeader_help}`,
+            history: `${this.AppHeader_history}`,
+            advanced: `${this.AppHeader_advanced}`,
+            assistant: `${this.AppHeader_assistant}`
         };
         return titles[this.currentView] || 'Cheating Daddy';
     }
 
+    // getElapsedTime() {
+    //     if (this.currentView === 'assistant' && this.startTime) {
+    //         const elapsed = Math.floor((Date.now() - this.startTime) / 1000);
+    //         return `${elapsed}s`;
+    //     }
+    //     return '';
+    // }
+
+    /** * Calculates the elapsed time since the start time in a human-readable format.
+     * The format is
+     * - Seconds if less than 60 seconds
+     * - Minutes if less than 60 minutes
+     * - Hours if less than 24 hours
+     * - If 24 hours or more have passed, it restarts the cycle of seconds, minutes, and hours.
+     * * @returns {string} - The elapsed time in a human-readable format.
+     */
     getElapsedTime() {
-        if (this.currentView === 'assistant' && this.startTime) {
-            const elapsed = Math.floor((Date.now() - this.startTime) / 1000);
-            return `${elapsed}s`;
+    if (this.currentView === 'assistant' && this.startTime) {
+        const elapsedSeconds = Math.floor((Date.now() - this.startTime) / 1000);
+
+        // If less than 60 seconds have passed
+        if (elapsedSeconds < 60) {
+            return `${elapsedSeconds}s`;
         }
-        return '';
+
+        const elapsedMinutes = Math.floor(elapsedSeconds / 60);
+
+        // If less than 60 minutes have passed
+        if (elapsedMinutes < 60) {
+            // Ensure it only shows minutes if seconds are zero
+            const remainingSeconds = elapsedSeconds % 60;
+            if (remainingSeconds === 0) {
+                return `${elapsedMinutes}m`;
+            }
+            return `${elapsedMinutes}m ${remainingSeconds}s`;
+        }
+
+        const elapsedHours = Math.floor(elapsedMinutes / 60);
+
+        // If less than 24 hours have passed
+        if (elapsedHours < 24) {
+            const remainingMinutes = elapsedMinutes % 60;
+            const remainingSeconds = elapsedSeconds % 60;
+
+            if (remainingMinutes === 0 && remainingSeconds === 0) {
+                return `${elapsedHours}h`;
+            } else if (remainingMinutes === 0) {
+                return `${elapsedHours}h ${remainingSeconds}s`;
+            } else if (remainingSeconds === 0) {
+                return `${elapsedHours}h ${remainingMinutes}m`;
+            }
+            return `${elapsedHours}h ${remainingMinutes}m ${remainingSeconds}s`;
+        }
+
+        // If 24 hours or more have passed, according to your request,
+        // we want to restart the cycle of seconds, minutes, and hours
+        // This involves calculating the elapsed time "within" the last day.
+        const totalElapsedDays = Math.floor(elapsedHours / 24);
+        const timeWithinCurrentDaySeconds = elapsedSeconds % (24 * 60 * 60); // Seconds elapsed within the current day
+
+        const currentCycleHours = Math.floor(timeWithinCurrentDaySeconds / (60 * 60));
+        const currentCycleMinutes = Math.floor((timeWithinCurrentDaySeconds % (60 * 60)) / 60);
+        const currentCycleSeconds = timeWithinCurrentDaySeconds % 60;
+
+        let displayString = '';
+
+        if (currentCycleHours > 0) {
+            displayString += `${currentCycleHours}h `;
+        }
+        if (currentCycleMinutes > 0 || currentCycleHours > 0) { // Show minutes if there are hours or if minutes are > 0
+            displayString += `${currentCycleMinutes}m `;
+        }
+        displayString += `${currentCycleSeconds}s`; // Always show seconds at the end of the cycle
+
+        return displayString.trim(); // Remove extra space at the end if any
+        }
+        return ''; // If currentView is not 'assistant' or startTime does not exist
     }
 
     isNavigationView() {
@@ -362,7 +509,7 @@ export class AppHeader extends LitElement {
                     ${this.currentView === 'assistant'
                         ? html`
                               <button @click=${this.onHideToggleClick} class="button">
-                                  Hide&nbsp;&nbsp;<span class="key" style="pointer-events: none;">${cheddar.isMacOS ? 'Cmd' : 'Ctrl'}</span
+                                  ${this.AppHeader_Hide}&nbsp;&nbsp;<span class="key" style="pointer-events: none;">${cheddar.isMacOS ? 'Cmd' : 'Ctrl'}</span
                                   >&nbsp;&nbsp;<span class="key">&bsol;</span>
                               </button>
                               <button @click=${this.onCloseClick} class="icon-button window-close">

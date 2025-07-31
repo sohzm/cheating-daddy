@@ -138,5 +138,14 @@
   "History_Suggestion": "Sugerencia",
   "History_No_conversation": "No hay datos de conversación disponibles",
   "History_Back_to_Sessions": "Regresar a la sesiones",
+  "AppHeader_main": "Cheating Daddy Español",
+  "AppHeader_customize": "Personalizar",
+  "AppHeader_help": "Ayuda y Atajos",
+  "AppHeader_history": "Historial de Conversación",
+  "AppHeader_advanced": "Herramientas Avanzadas",
+  "AppHeader_assistant": "Cheating Daddy Asistente",
+  "AppHeader_Hide": "Ocultar",
+  "Assistant_Message": "Hola, estoy escuchando tu mensaje. ¿Cómo puedo ayudarte hoy?",
+  "Assistant_Type_message": "Escribe un mensaje a la IA... ",
   "unknowledge": "Unknowledge"
 }
