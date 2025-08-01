@@ -1,5 +1,5 @@
 # Normas del Repositorio
-Este repositorio es una bifurcación de [`cheating-daddy`] (https://github.com/sohzm/cheating-daddy\).
+Este repositorio es una bifurcación de [`cheating-daddy`] (https://github.com/sohzm/cheating-daddy).
 Proporciona un asistente en tiempo real basado en Electron que captura la pantalla y el audio
 para respuestas contextuales de IA. El código está en JavaScript y utiliza Electron Forge para
 el empaquetado.
