@@ -73,12 +73,10 @@ export class AppHeader extends LitElement {
         super.connectedCallback();
         this._startTimer();
     }
-
     disconnectedCallback() {
         super.disconnectedCallback();
         this._stopTimer();
     }
-
     /**
     * Translates a specified key into a localized message, using the current system language.
     * @async
@@ -124,7 +122,7 @@ export class AppHeader extends LitElement {
         }//end switch
         return temp || 'Unknowledge';
     }
-    
+   
     updated(changedProperties) {
         super.updated(changedProperties);
 
@@ -180,6 +178,7 @@ export class AppHeader extends LitElement {
         return titles[this.currentView] || 'Cheating Daddy';
     }
 
+    //Borrar
     // getElapsedTime() {
     //     if (this.currentView === 'assistant' && this.startTime) {
     //         const elapsed = Math.floor((Date.now() - this.startTime) / 1000);

@@ -39,6 +39,7 @@ export class AdvancedView extends LitElement {
     };
 
     constructor() {
+        //
         super();
         this.isClearing = false;
         this.statusMessage = '';

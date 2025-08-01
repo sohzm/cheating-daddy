@@ -8,6 +8,7 @@ let mouseEventsIgnored = false;
 let windowResizing = false;
 let resizeAnimation = null;
 
+//tray TODO: OSCARDO
 let tray = null; // Initialize tray if needed, currently not used TODO: OSCARDO
 let isQuitting = false; // Flag to prevent multiple quit calls TODO: OSCARDO
 

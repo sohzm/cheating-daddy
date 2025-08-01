@@ -24,6 +24,7 @@ module.exports = {
         //    appleIdPassword: 'app specific password',
         //    teamId: 'your team id',
         // },
+        // 
     },
     rebuildConfig: {},
     makers: [

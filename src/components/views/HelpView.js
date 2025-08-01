@@ -4,7 +4,7 @@ import  language  from '../../lang/language_module.mjs';
 import HelpStyle from '../../style/HelpStyle.js';
 
 export class HelpView extends LitElement {
-    
+    //static styles = HelpStyle; 
     static styles = HelpStyle; // Importing the styles from HelpStyle.js
 
     static properties = {

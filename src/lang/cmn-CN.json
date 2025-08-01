@@ -156,5 +156,6 @@
   "button_text": "点击我",
   "greeting": "你好，Electron！",
   "unknowledge": "未知",
-  "welcome_message": "欢迎使用我们的应用程序。"
+  "welcome_message": "欢迎使用我们的应用程序。",
+  "welcome_message_": "欢迎使用我们的应用程序。"
 }

@@ -1,6 +1,7 @@
 // Main app components
 export { CheatingDaddyApp } from './app/CheatingDaddyApp.js';
 export { AppHeader } from './app/AppHeader.js';
+// Main app components
 
 // View components
 export { MainView } from './views/MainView.js';
@@ -10,3 +11,4 @@ export { HistoryView } from './views/HistoryView.js';
 export { AssistantView } from './views/AssistantView.js';
 export { OnboardingView } from './views/OnboardingView.js';
 export { AdvancedView } from './views/AdvancedView.js';
+// View components

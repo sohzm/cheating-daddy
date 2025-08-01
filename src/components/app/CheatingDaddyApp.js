@@ -10,8 +10,9 @@ import { AdvancedView } from '../views/AdvancedView.js';
 import CheatingDaddyAppStyle from '../../style/CheatingDaddyAppStyle.js';
 
 export class CheatingDaddyApp extends LitElement {
+    //
     static styles = CheatingDaddyAppStyle; // Importing the styles from CheatingDaddyAppStyle.js
-
+    
     static properties = {
         currentView: { type: String },
         statusText: { type: String },
@@ -32,6 +33,9 @@ export class CheatingDaddyApp extends LitElement {
         shouldAnimateResponse: { type: Boolean },
     };
 
+    /*
+    Constructor
+    */ 
     constructor() {
         super();
         this.currentView = localStorage.getItem('onboardingCompleted') ? 'main' : 'onboarding';

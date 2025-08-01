@@ -7,7 +7,7 @@ function pcmToWav(pcmBuffer, outputPath, sampleRate = 24000, channels = 1, bitDe
     const blockAlign = channels * (bitDepth / 8);
     const dataSize = pcmBuffer.length;
 
-    // Create WAV header
+    // Create WAV header  WELL   
     const header = Buffer.alloc(44);
 
     // "RIFF" chunk descriptor

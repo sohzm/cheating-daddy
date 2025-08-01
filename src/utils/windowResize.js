@@ -2,6 +2,8 @@
  * Utility function to resize the window for the current view
  * The main process will call back to get the current view name and layout mode
  */
+
+/* export async function resizeLayout() */
 export async function resizeLayout() {
     try {
         if (window.require) {

@@ -18,7 +18,8 @@ export class MainView extends LitElement {
         Main_APIKey:  {type: String},
         Main_Start: {type: String},
     };
-
+    
+    //Constructor
     constructor() {
         super();
         this.onStart = () => {};

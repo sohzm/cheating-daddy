@@ -4,6 +4,7 @@ import language from '../../lang/language_module.mjs';
 import HistoryStyle from '../../style/HistoryStyle.js';
 
 export class HistoryView extends LitElement {
+    
     static styles = HistoryStyle; // Importing the styles from HistoryStyle.js
 
     static properties = {
@@ -20,7 +21,7 @@ export class HistoryView extends LitElement {
         History_No_conversation: { type: String },
         History_Back_to_Sessions: { type: String }
     };
-
+    /*Constructor*/ 
     constructor() {
         super();
         this.sessions = [];

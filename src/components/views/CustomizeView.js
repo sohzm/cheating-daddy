@@ -103,6 +103,7 @@ export class CustomizeView extends LitElement {
         GetKeybind_Scroll_Response_Down: {type: String},
         GetKeybind_Scroll_Response_Down_Message: {type: String},
         Language_App_Accept: {type: String}
+        //
     };
 
     constructor() {

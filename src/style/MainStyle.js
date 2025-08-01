@@ -1,5 +1,5 @@
 import { css } from '../assets/lit-core-2.7.4.min.js';
-
+//export const MainStyle =  css
 export const MainStyle =  css`
         * {
             font-family: 'Inter', sans-serif;

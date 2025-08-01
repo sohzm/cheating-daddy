@@ -156,5 +156,6 @@
   "button_text": "Faz clice aquí",
   "greeting": "Ola, Electron!",
   "unknowledge": "Unknowledge",
-  "welcome_message": "Bemvindo a nostra aplicacao."
+  "welcome_message": "Bemvindo a nostra aplicacao.",
+  "welcome_message_": "Bemvindo a nostra aplicacao."
 }

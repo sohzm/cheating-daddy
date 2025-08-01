@@ -11,6 +11,7 @@ const DEFAULT_CONFIG = {
 
 // Get the config directory path based on OS
 function getConfigDir() {
+    //os
     const platform = os.platform();
     let configDir;
     

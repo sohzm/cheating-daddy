@@ -12,7 +12,7 @@ const { getLocalConfig, writeConfig } = require('./config');
 const geminiSessionRef = { current: null };
 let mainWindow = null;
 
-// Initialize random process names for stealth
+// Initialize random process names for stealth ... 
 const randomNames = initializeRandomProcessNames();
 
 function createMainWindow() {

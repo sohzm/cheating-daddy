@@ -11,6 +11,7 @@ export class OnboardingView extends LitElement {
         onClose: { type: Function },
     };
 
+    //constructor
     constructor() {
         super();
         this.currentSlide = 0;
