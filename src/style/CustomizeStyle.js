@@ -393,6 +393,100 @@ export const CustomizeStyle =  css`
             margin-top: 4px;
             font-size: 10px;
             color: var(--description-color, rgba(255, 255, 255, 0.5));
-        }`;
+        }
+        
+        //Work by Oscardo
+        .profile-buttons {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+            align-items: center;
+            max-width: 20%;
+            margin-left: auto;
+            margin-right: 0;
+            min-width: 50px;
+            position: sticky;
+            top: 8px;
+            z-index: 10;
+            background: var(--card-background, rgba(255,255,255,0.04));
+            padding: 6px 0;
+        }
+        
+        .open-button,
+        .save-button {
+            background: transparent;
+            color: var(--start-button-background);
+            border: none;
+            padding: 4px;
+            border-radius: 50%;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            width: 36px;
+            height: 36px;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .open-button:hover,
+        .save-button:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .open-button.saved,
+        .save-button.saved {
+            color: #4caf50;
+        }
+        .open-button svg,
+        .save-button svg {
+            stroke: currentColor !important;
+        }
+
+        .main-container {
+            display: flex;
+            width: 100%;
+            border: 1px;
+            height: 80px; /* Altura de ejemplo */
+        }
+
+        .info-area {
+            flex: 1; /* Ocupa todo el espacio restante */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-right: 1px;
+        }
+
+        .actions-section {
+            display: flex;
+            flex-direction: column;
+            width: 80px; /* Ancho fijo para la sección de acciones */
+        }
+
+        .header-row,
+        .data-row {
+            display: flex;
+            flex: 1;
+        }
+
+        .header-row {
+            border-bottom: 1px;
+        }
+
+        .action-cell,
+        .data-cell {
+            flex: 1; /* Ocupan la misma anchura dentro de su fila */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-right: 1px;
+        }
+
+        .action-cell:last-child,
+        .data-cell:last-child {
+            border-right: none;
+        }
+        //Work by Oscardo
+        `;
 
 export default CustomizeStyle;

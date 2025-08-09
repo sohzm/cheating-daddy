@@ -5,18 +5,20 @@ export class AssistantView extends LitElement {
     static styles = AssistantStyle; //
 
     static properties = {
+        Assistant_Message: { type: String },
+        Assistant_Type_message: { type: String },
         responses: { type: Array },
         currentResponseIndex: { type: Number },
         selectedProfile: { type: String },
         onSendText: { type: Function },
         shouldAnimateResponse: { type: Boolean },
         savedResponses: { type: Array },
-        Assistant_Message: { type: String },
-        Assistant_Type_message: { type: String },
     };
 
     constructor() {
         super();
+        this.Assistant_Message = "";
+        this.requestUpdate();
         this.responses = [];
         this.currentResponseIndex = -1;
         this.selectedProfile = 'interview';
@@ -30,9 +32,11 @@ export class AssistantView extends LitElement {
         }
         this.translate("Assistant_Message").then((lang) => {
             this.Assistant_Message = lang;
+            this.requestUpdate();
         });
         this.translate("Assistant_Type_message").then((lang) => {
             this.Assistant_Type_message = lang;
+            this.requestUpdate();
         });
     }
 
@@ -82,7 +86,7 @@ export class AssistantView extends LitElement {
         const profileNames = this.getProfileNames();
         return this.responses.length > 0 && this.currentResponseIndex >= 0
             ? this.responses[this.currentResponseIndex]
-            : `${this.Assistant_Message} ${profileNames[this.selectedProfile] || 'session'}`;
+            : ` ${this.Assistant_Message} ${profileNames[this.selectedProfile] || 'session'}`;
     }
 
     renderMarkdown(content) {
