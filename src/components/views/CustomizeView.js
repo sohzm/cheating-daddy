@@ -33,6 +33,12 @@ export class CustomizeView extends LitElement {
         Profile_Add_placeholder: {type: String},
         Profile_Personalize: {type: String},
         Profile_base_prompts: {type: String},
+        Audio_Mic_Title: {type: String },
+        Audio_Mic_Audio_Mode: {type: String },
+        Audio_Mic_Speaker_Only: {type: String },
+        Audio_Mic_Microphone_Only: {type: String },
+        Audio_Mic_Both_Speaker: {type: String },
+        Audio_Mic_audio_sources: {type: String },
         Language_Language_Application: {type: String},
         Language_Speech_Language: {type: String},
         Language_Message: {type: String},
@@ -177,6 +183,25 @@ export class CustomizeView extends LitElement {
         );
 		this.translate("Profile_base_prompts").then((lang)=> 
             this.Profile_base_prompts = lang
+        );
+        //audio
+        this.translate("Audio_Mic_Title").then((lang)=> 
+            this.Audio_Mic_Title = lang
+        );
+        this.translate("Audio_Mic_Audio_Mode").then((lang)=> 
+            this.Audio_Mic_Audio_Mode = lang
+        );
+        this.translate("Audio_Mic_Speaker_Only").then((lang)=> 
+            this.Audio_Mic_Speaker_Only = lang
+        );
+        this.translate("Audio_Mic_Microphone_Only").then((lang)=> 
+            this.Audio_Mic_Microphone_Only = lang
+        );
+        this.translate("Audio_Mic_Both_Speaker").then((lang)=> 
+            this.Audio_Mic_Both_Speaker = lang
+        );
+        this.translate("Audio_Mic_audio_sources").then((lang)=> 
+            this.Audio_Mic_audio_sources = lang
         );
         //Language app
         this.translate("Language_Language_Application").then((lang)=> 
@@ -543,6 +568,24 @@ export class CustomizeView extends LitElement {
             break;
         case 'Profile_base_prompts':
             temp = await language.getMessages("Profile_base_prompts", language.getLanguage() || 'en-US');
+            break;
+        case 'Audio_Mic_Title':
+            temp = await language.getMessages("Audio_Mic_Title", language.getLanguage() || 'en-US');
+            break;
+        case 'Audio_Mic_Audio_Mode':
+            temp = await language.getMessages("Audio_Mic_Audio_Mode", language.getLanguage() || 'en-US');
+            break;
+        case 'Audio_Mic_Speaker_Only':
+            temp = await language.getMessages("Audio_Mic_Speaker_Only", language.getLanguage() || 'en-US');
+            break;
+        case 'Audio_Mic_Microphone_Only':
+            temp = await language.getMessages("Audio_Mic_Microphone_Only", language.getLanguage() || 'en-US');
+            break;
+        case 'Audio_Mic_Both_Speaker':
+            temp = await language.getMessages("Audio_Mic_Both_Speaker", language.getLanguage() || 'en-US');
+            break;
+        case 'Audio_Mic_audio_sources':
+            temp = await language.getMessages("Audio_Mic_audio_sources", language.getLanguage() || 'en-US');
             break;
         case 'Language_Language_Application':
             temp = await language.getMessages("Language_Language_Application", language.getLanguage() || 'en-US');
@@ -1177,6 +1220,27 @@ export class CustomizeView extends LitElement {
         `;
     }//end _profile
 
+    _Sound_Microphone(){
+                return html`<!-- Audio & Microphone Section -->
+                    <div class="section-title">
+                        <span>${this.Audio_Mic_Title}</span>
+                    </div>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label class="form-label">${this.Audio_Mic_Audio_Mode}</label>
+                            <select class="form-control" .value=${localStorage.getItem('audioMode') || 'speaker_only'} @change=${e => localStorage.setItem('audioMode', e.target.value)}>
+                                <option value="speaker_only">${this.Audio_Mic_Speaker_Only}</option>
+                                <option value="mic_only">${this.Audio_Mic_Microphone_Only}</option>
+                                <option value="both">${this.Audio_Mic_Both_Speaker}</option>
+                            </select>
+                            <div class="form-description">
+                                ${this.Audio_Mic_audio_sources} 
+                            </div>
+                        </div>
+                    </div>
+                `;
+    }//end Sound and Mics
+
     _language_application(){
         const languages = this.getLanguages();
         const currentLanguage = languages.find(l => l.value === this.selectedLanguage);
@@ -1500,6 +1564,12 @@ export class CustomizeView extends LitElement {
                 <div class="settings-container">
                     ${this._Profile()}    
                 </div>
+
+                <!-- Audio & Microphone Section -->
+                <div class="settings-section">
+                    ${this._Sound_Microphone()}
+                </div>
+
                 <!-- Language Application - Oscardo -->
                 <div class="settings-section">
                     ${this._language_application()}

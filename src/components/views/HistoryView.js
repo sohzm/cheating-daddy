@@ -19,7 +19,9 @@ export class HistoryView extends LitElement {
         History_Them: { type: String },
         History_Suggestion: { type: String },
         History_No_conversation: { type: String },
-        History_Back_to_Sessions: { type: String }
+        History_Back_to_Sessions: { type: String },
+        History_Conversation_History: {type: String},
+        History_Saved_Responses:  {type: String},
     };
     /*Constructor*/ 
     constructor() {
@@ -66,6 +68,12 @@ export class HistoryView extends LitElement {
         });
         this.translate("History_Back_to_Sessions").then((lang) => {
             this.History_Back_to_Sessions = lang;
+        });
+        this.translate("History_Conversation_History").then((lang) => {
+            this.History_Conversation_History = lang;
+        });
+        this.translate("History_Saved_Responses").then((lang) => {
+            this.History_Saved_Responses = lang;
         });
     }
 
@@ -127,6 +135,12 @@ export class HistoryView extends LitElement {
                 break;
             case 'History_Back_to_Sessions':
                 temp = await language.getMessages("History_No_conversation", language.getLanguage() || 'en-US');
+                break;
+            case 'History_Conversation_History':
+                temp = await language.getMessages("History_Conversation_History", language.getLanguage() || 'en-US');
+                break;
+            case 'History_Saved_Responses':
+                temp = await language.getMessages("History_Saved_Responses", language.getLanguage() || 'en-US');
                 break;
             default:
                 return await language.getMessages("unknowledge", 'en-US');
@@ -375,7 +389,23 @@ export class HistoryView extends LitElement {
     }
 
     render() {
+        if (this.selectedSession) {
         return html` <div class="history-container">${this.selectedSession ? this.renderConversationView() : this.renderSessionsList()}</div> `;
+        }
+
+        return  html`
+            <div class="history-container">
+                <div class="tabs-container">
+                    <button class="tab ${this.activeTab === 'sessions' ? 'active' : ''}" @click=${() => this.handleTabClick('sessions')}>
+                        ${this.History_Conversation_History}
+                    </button>
+                    <button class="tab ${this.activeTab === 'saved' ? 'active' : ''}" @click=${() => this.handleTabClick('saved')}>
+                        ${this.History_Saved_Responses} (${this.savedResponses.length})
+                    </button>
+                </div>
+                ${this.activeTab === 'sessions' ? this.renderSessionsList() : this.renderSavedResponses()}
+            </div>
+        `;
     }
 }
 

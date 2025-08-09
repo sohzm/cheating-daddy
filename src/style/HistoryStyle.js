@@ -218,6 +218,7 @@ export const HistoryStyle =  css`
         .conversation-view::-webkit-scrollbar-thumb:hover {
             background: var(--scrollbar-thumb-hover, rgba(255, 255, 255, 0.3));
         }
+
         .tabs-container {
             display: flex;
             gap: 8px;

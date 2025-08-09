@@ -227,6 +227,6 @@ export const HelpStyle =  css`
             color: var(--text-color);
             user-select: text;
         }
-`;
+    `;
 
 export default HelpStyle;
