@@ -1,5 +1,4 @@
 import { css } from '../assets/lit-core-2.7.4.min.js';
-//export const CustomizeStyle =  css
 export const CustomizeStyle =  css`
         * {
             font-family:
@@ -485,6 +484,152 @@ export const CustomizeStyle =  css`
         .action-cell:last-child,
         .data-cell:last-child {
             border-right: none;
+        }
+        
+        /* QWEN ASSISTANT - Enhanced theme selection styling with visual previews */
+        .theme-selector {
+            display: flex;
+            gap: 16px;
+            margin-top: 12px;
+            justify-content: center;
+        }
+        
+        .theme-option {
+            flex: 1;
+            padding: 16px 12px;
+            border-radius: 8px;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+            font-size: 12px;
+            font-weight: 500;
+            max-width: 120px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .theme-option:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+        }
+        
+        .theme-option.selected {
+            border-color: var(--focus-border-color, #007aff);
+            box-shadow: 0 0 0 3px var(--focus-shadow, rgba(0, 122, 255, 0.25));
+            background: var(--theme-option-selected, rgba(0, 122, 255, 0.1));
+        }
+        
+        .theme-option.light {
+            background: rgba(255, 255, 255, 0.9);
+            color: #000000;
+            border-color: rgba(0, 0, 0, 0.1);
+        }
+        
+        .theme-option.dark {
+            background: rgba(30, 30, 30, 0.9);
+            color: #ffffff;
+        }
+        
+        .theme-option.system {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 50%, rgba(30, 30, 30, 0.9) 50%);
+            color: #000000;
+        }
+        
+        .theme-preview {
+            width: 60px;
+            height: 40px;
+            margin: 0 auto 8px;
+            border-radius: 4px;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .light-preview {
+            background: #ffffff;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+        }
+        
+        .light-preview::before {
+            content: '';
+            position: absolute;
+            top: 4px;
+            left: 4px;
+            right: 4px;
+            height: 8px;
+            background: #f0f0f0;
+            border-radius: 2px;
+        }
+        
+        .light-preview::after {
+            content: '';
+            position: absolute;
+            bottom: 4px;
+            left: 4px;
+            width: 20px;
+            height: 12px;
+            background: #007aff;
+            border-radius: 2px;
+        }
+        
+        .dark-preview {
+            background: #1e1e1e;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .dark-preview::before {
+            content: '';
+            position: absolute;
+            top: 4px;
+            left: 4px;
+            right: 4px;
+            height: 8px;
+            background: #2d2d2d;
+            border-radius: 2px;
+        }
+        
+        .dark-preview::after {
+            content: '';
+            position: absolute;
+            bottom: 4px;
+            left: 4px;
+            width: 20px;
+            height: 12px;
+            background: #0a84ff;
+            border-radius: 2px;
+        }
+        
+        .system-preview {
+            background: linear-gradient(135deg, #ffffff 50%, #1e1e1e 50%);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+        }
+        
+        .system-preview::before {
+            content: '';
+            position: absolute;
+            top: 4px;
+            left: 4px;
+            right: 4px;
+            height: 8px;
+            background: linear-gradient(90deg, #f0f0f0 50%, #2d2d2d 50%);
+            border-radius: 2px;
+        }
+        
+        .system-preview::after {
+            content: '';
+            position: absolute;
+            bottom: 4px;
+            left: 4px;
+            width: 20px;
+            height: 12px;
+            background: linear-gradient(90deg, #007aff 50%, #0a84ff 50%);
+            border-radius: 2px;
+        }
+        
+        .theme-label {
+            display: block;
+            margin-top: 6px;
+            font-weight: 500;
         }
         //Work by Oscardo
         `;

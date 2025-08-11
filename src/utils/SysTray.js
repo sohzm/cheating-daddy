@@ -1,11 +1,23 @@
+const path = require('path');
+const fs = require('fs');
+
 function createTray() {
-  // Crear un ícono simple programáticamente si no tienes uno
-  const iconPath = createTrayIcon();
-  
+  // Validar y seleccionar el ícono según el sistema operativo
+  let iconFile;
+
+  if (process.platform === 'win32') {
+    iconFile = path.join(__dirname, '../assets/logo.ico');
+  } else if (process.platform === 'darwin') {
+    iconFile = path.join(__dirname, '../assets/logo.icns');
+  } else {
+    iconFile = path.join(__dirname, '../assets/logo.png');
+  }
+
+  // Verificar si el archivo existe, si no, usar un ícono por defecto
+  const iconPath = fs.existsSync(iconFile) ? iconFile : createTrayIcon();
   tray = new Tray(iconPath);
-  
-  // Tooltip que aparece al pasar el mouse
-  tray.setToolTip('Mi Aplicación Electron');
+    // Tooltip que aparece al pasar el mouse
+  tray.setToolTip('Cheating Daddy');
   
   // Menú contextual del tray
   const contextMenu = Menu.buildFromTemplate([

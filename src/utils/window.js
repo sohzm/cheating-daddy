@@ -1,4 +1,4 @@
-const { BrowserWindow, globalShortcut, ipcMain, screen } = require('electron');
+const { BrowserWindow, globalShortcut, ipcMain, screen, Tray, Menu, nativeImage } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const os = require('os');
@@ -8,9 +8,9 @@ let mouseEventsIgnored = false;
 let windowResizing = false;
 let resizeAnimation = null;
 
-//tray TODO: OSCARDO
-let tray = null; // Initialize tray if needed, currently not used TODO: OSCARDO
-let isQuitting = false; // Flag to prevent multiple quit calls TODO: OSCARDO
+// Tray icon for showing/hiding the window
+let tray = null;
+let isQuitting = false; // Flag to prevent multiple quit calls
 
 const RESIZE_ANIMATION_DURATION = 500; // milliseconds
 
@@ -80,7 +80,7 @@ function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
     console.log('=== DEBUG INFO ===');
     //console.log("Idioma de la aplicación Oscardo:", selectedAppLanguage || 'No definido');
     
-    const { session, desktopCapturer } = require('electron');
+    const { session, desktopCapturer, app } = require('electron');
     session.defaultSession.setDisplayMediaRequestHandler(
         (request, callback) => {
             desktopCapturer.getSources({ types: ['screen'] }).then(sources => {
@@ -118,6 +118,23 @@ function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
 
     // Start periodic title randomization for additional stealth
     startTitleRandomization(mainWindow);
+
+    // Handle the window close event properly
+    mainWindow.on('close', (event) => {
+        // Check if the app is actually quitting
+        const { app } = require('electron');
+        if (!app.isQuitting) {
+            // Prevent the default close behavior
+            event.preventDefault();
+            
+            // Hide the window instead of closing it
+            mainWindow.hide();
+        }
+        // If app.isQuitting is true, the window will close normally
+    });
+
+    // Create tray icon
+    createTray(mainWindow);
 
     // After window is created, check for layout preference and resize if needed
     mainWindow.webContents.once('dom-ready', () => {
@@ -461,6 +478,22 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
         }
     });
 
+    ipcMain.handle('window-toggle-minimize', async () => {
+        try {
+            if (!mainWindow.isDestroyed()) {
+                if (mainWindow.isMinimized()) {
+                    mainWindow.restore();
+                } else {
+                    mainWindow.minimize();
+                }
+            }
+            return { success: true };
+        } catch (error) {
+            console.error('Error toggling window minimize state:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
     ipcMain.on('update-keybinds', (event, newKeybinds) => {
         if (!mainWindow.isDestroyed()) {
             updateGlobalShortcuts(newKeybinds, mainWindow, sendToRenderer, geminiSessionRef);
@@ -639,6 +672,52 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
     });
 }
 
+function createTray(mainWindow) {
+    // Create tray icon
+    try {
+        // Create a simple text-based tray icon as fallback
+        tray = new Tray(nativeImage.createEmpty());
+        
+        const contextMenu = Menu.buildFromTemplate([
+            {
+                label: 'Show Window',
+                click: () => {
+                    mainWindow.show();
+                    mainWindow.focus();
+                }
+            },
+            {
+                label: 'Hide Window',
+                click: () => {
+                    mainWindow.hide();
+                }
+            },
+            {
+                label: 'Quit',
+                click: () => {
+                    const { app } = require('electron');
+                    app.isQuitting = true;
+                    app.quit();
+                }
+            }
+        ]);
+        
+        tray.setContextMenu(contextMenu);
+        tray.setTitle('Cheating Daddy');
+        
+        // Show window when tray icon is clicked
+        tray.on('click', () => {
+            if (mainWindow.isVisible()) {
+                mainWindow.hide();
+            } else {
+                mainWindow.show();
+                mainWindow.focus();
+            }
+        });
+    } catch (error) {
+        console.error('Failed to create tray icon:', error);
+    }
+}
 
 module.exports = {
     ensureDataDirectories,

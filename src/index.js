@@ -11,6 +11,7 @@ const { getLocalConfig, writeConfig } = require('./config');
 
 const geminiSessionRef = { current: null };
 let mainWindow = null;
+let isQuitting = false; // Flag to track if app is actually quitting
 
 // Initialize random process names for stealth ... 
 const randomNames = initializeRandomProcessNames();
@@ -31,13 +32,16 @@ app.whenReady().then(async () => {
 
 app.on('window-all-closed', () => {
     stopMacOSAudioCapture();
-    if (process.platform !== 'darwin') {
-        app.quit();
-    }
+    // Don't quit the app when all windows are closed, since we have a tray icon
+    // if (process.platform !== 'darwin') {
+    //     app.quit();
+    // }
 });
 
 app.on('before-quit', () => {
     stopMacOSAudioCapture();
+    // Set a global property to indicate we're quitting
+    app.isQuitting = true;
 });
 
 app.on('activate', () => {

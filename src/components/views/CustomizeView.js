@@ -17,12 +17,14 @@ export class CustomizeView extends LitElement {
         googleSearchEnabled: { type: Boolean },
         backgroundTransparency: { type: Number },
         fontSize: { type: Number },
+        themeMode: { type: String }, // Add theme mode property
         onProfileChange: { type: Function },
         onLanguageChange: { type: Function },
         onLanguageAppChange: { type: Function }, //TODO: Oscardo
         onScreenshotIntervalChange: { type: Function },
         onImageQualityChange: { type: Function },
         onLayoutModeChange: { type: Function },
+        onThemeModeChange: { type: Function }, // Add theme mode change handler
         advancedMode: { type: Boolean },
         onAdvancedModeChange: { type: Function },
 
@@ -58,6 +60,10 @@ export class CustomizeView extends LitElement {
         Layout_Adjust: { type: String },
         Layout_Font: { type: String },
         Layout_AdjustFont: { type: String },
+        Theme_Color_Theme: { type: String }, // Add theme translation property
+        Theme_System: { type: String }, // Add system theme translation
+        Theme_Light: { type: String }, // Add light theme translation
+        Theme_Dark: { type: String }, // Add dark theme translation
         Screen_Capture: { type: String },
         Screen_Capture_Interval: { type: String },
         Screen_Manual: { type: String },
@@ -123,6 +129,7 @@ export class CustomizeView extends LitElement {
         this.selectedScreenshotInterval = '5';
         this.selectedImageQuality = 'medium';
         this.layoutMode = 'normal';
+        this.themeMode = 'system'; // Default to system theme
         this.keybinds = this.getDefaultKeybinds();
         this.onProfileChange = () => {};
         this.onLanguageChange = () => {};
@@ -130,6 +137,7 @@ export class CustomizeView extends LitElement {
         this.onScreenshotIntervalChange = () => {};
         this.onImageQualityChange = () => {};
         this.onLayoutModeChange = () => {};
+        this.onThemeModeChange = () => {}; // Initialize theme mode change handler
         this.onAdvancedModeChange = () => {};
 
         this.onTranslate(); // Initialize translations
@@ -153,6 +161,7 @@ export class CustomizeView extends LitElement {
         this.loadAdvancedModeSettings();
         this.loadBackgroundTransparency();
         this.loadFontSize();
+        this.loadThemeMode(); // Load theme mode
         // this.loadLayoutMode(); // Load layout mode for display purposes TODO: OSCARDO
     }
 
@@ -202,6 +211,11 @@ export class CustomizeView extends LitElement {
         this.translate('Layout_Adjust').then(lang => (this.Layout_Adjust = lang));
         this.translate('Layout_Font').then(lang => (this.Layout_Font = lang));
         this.translate('Layout_AdjustFont').then(lang => (this.Layout_AdjustFont = lang));
+        //Theme
+        this.translate('Theme_Color_Theme').then(lang => (this.Theme_Color_Theme = lang));
+        this.translate('Theme_System').then(lang => (this.Theme_System = lang));
+        this.translate('Theme_Light').then(lang => (this.Theme_Light = lang));
+        this.translate('Theme_Dark').then(lang => (this.Theme_Dark = lang));
         //Screen
         this.translate('Screen_Capture').then(lang => (this.Screen_Capture = lang));
         this.translate('Screen_Capture_Interval').then(lang => (this.Screen_Capture_Interval = lang));
@@ -705,10 +719,159 @@ export class CustomizeView extends LitElement {
         this.onImageQualityChange(e.target.value);
     }
 
+    loadLayoutMode() {
+        const savedLayoutMode = localStorage.getItem('layoutMode');
+        if (savedLayoutMode) {
+            this.layoutMode = savedLayoutMode;
+        }
+    }
+
+    loadThemeMode() {
+        const savedThemeMode = localStorage.getItem('themeMode');
+        if (savedThemeMode) {
+            this.themeMode = savedThemeMode;
+        }
+        this.applyThemeMode();
+    }
+
     handleLayoutModeSelect(e) {
         this.layoutMode = e.target.value;
         localStorage.setItem('layoutMode', this.layoutMode);
         this.onLayoutModeChange(e.target.value);
+    }
+
+    handleThemeModeSelect(e) {
+        this.themeMode = e.target.value;
+        localStorage.setItem('themeMode', this.themeMode);
+        this.onThemeModeChange(e.target.value);
+        this.applyThemeMode();
+    }
+
+    applyThemeMode() {
+        const root = document.documentElement;
+        
+        switch (this.themeMode) {
+            case 'light':
+                // Light theme - black text on white background
+                root.style.setProperty('--text-color', '#000000');
+                root.style.setProperty('--background-transparent', '#ffffff');
+                root.style.setProperty('--border-color', 'rgba(0, 0, 0, 0.2)');
+                root.style.setProperty('--header-background', 'rgba(255, 255, 255, 0.8)');
+                root.style.setProperty('--header-actions-color', 'rgba(0, 0, 0, 0.6)');
+                root.style.setProperty('--main-content-background', 'rgba(255, 255, 255, 0.8)');
+                root.style.setProperty('--button-background', 'rgba(255, 255, 255, 0.5)');
+                root.style.setProperty('--button-border', 'rgba(0, 0, 0, 0.1)');
+                root.style.setProperty('--icon-button-color', 'rgb(25, 25, 25)');
+                root.style.setProperty('--hover-background', 'rgba(0, 0, 0, 0.1)');
+                root.style.setProperty('--input-background', 'rgba(255, 255, 255, 0.3)');
+                root.style.setProperty('--placeholder-color', 'rgba(0, 0, 0, 0.4)');
+                root.style.setProperty('--focus-border-color', '#007aff');
+                root.style.setProperty('--focus-box-shadow', 'rgba(0, 122, 255, 0.2)');
+                root.style.setProperty('--input-focus-background', 'rgba(255, 255, 255, 0.5)');
+                root.style.setProperty('--scrollbar-track', 'rgba(255, 255, 255, 0.2)');
+                root.style.setProperty('--scrollbar-thumb', 'rgba(0, 0, 0, 0.2)');
+                root.style.setProperty('--scrollbar-thumb-hover', 'rgba(0, 0, 0, 0.3)');
+                root.style.setProperty('--preview-video-background', 'rgba(255, 255, 255, 0.9)');
+                root.style.setProperty('--preview-video-border', 'rgba(0, 0, 0, 0.15)');
+                root.style.setProperty('--option-label-color', 'rgba(0, 0, 0, 0.8)');
+                root.style.setProperty('--screen-option-background', 'rgba(255, 255, 255, 0.4)');
+                root.style.setProperty('--screen-option-hover-background', 'rgba(255, 255, 255, 0.6)');
+                root.style.setProperty('--screen-option-selected-background', 'rgba(0, 122, 255, 0.15)');
+                root.style.setProperty('--screen-option-text', 'rgba(0, 0, 0, 0.7)');
+                root.style.setProperty('--description-color', 'rgba(0, 0, 0, 0.6)');
+                root.style.setProperty('--start-button-background', 'black');
+                root.style.setProperty('--start-button-color', 'white');
+                root.style.setProperty('--start-button-border', 'black');
+                root.style.setProperty('--start-button-hover-background', 'rgba(0, 0, 0, 0.8)');
+                root.style.setProperty('--start-button-hover-border', 'rgba(255, 255, 255, 0.2)');
+                root.style.setProperty('--text-input-button-background', '#007aff');
+                root.style.setProperty('--text-input-button-hover', '#0056b3');
+                root.style.setProperty('--link-color', '#007aff');
+                root.style.setProperty('--key-background', 'rgba(0, 0, 0, 0.1)');
+                root.style.setProperty('--scrollbar-background', 'rgba(255, 255, 255, 0.4)');
+                break;
+                
+            case 'dark':
+                // Dark theme - white text on black background
+                root.style.setProperty('--text-color', '#e5e5e7');
+                root.style.setProperty('--background-transparent', 'transparent');
+                root.style.setProperty('--border-color', 'rgba(255, 255, 255, 0.2)');
+                root.style.setProperty('--header-background', 'rgba(0, 0, 0, 0.8)');
+                root.style.setProperty('--header-actions-color', 'rgba(255, 255, 255, 0.6)');
+                root.style.setProperty('--main-content-background', 'rgba(0, 0, 0, 0.8)');
+                root.style.setProperty('--button-background', 'rgba(0, 0, 0, 0.5)');
+                root.style.setProperty('--button-border', 'rgba(255, 255, 255, 0.1)');
+                root.style.setProperty('--icon-button-color', 'rgb(229, 229, 231)');
+                root.style.setProperty('--hover-background', 'rgba(255, 255, 255, 0.1)');
+                root.style.setProperty('--input-background', 'rgba(0, 0, 0, 0.3)');
+                root.style.setProperty('--placeholder-color', 'rgba(255, 255, 255, 0.4)');
+                root.style.setProperty('--focus-border-color', '#007aff');
+                root.style.setProperty('--focus-box-shadow', 'rgba(0, 122, 255, 0.2)');
+                root.style.setProperty('--input-focus-background', 'rgba(0, 0, 0, 0.5)');
+                root.style.setProperty('--scrollbar-track', 'rgba(0, 0, 0, 0.2)');
+                root.style.setProperty('--scrollbar-thumb', 'rgba(255, 255, 255, 0.2)');
+                root.style.setProperty('--scrollbar-thumb-hover', 'rgba(255, 255, 255, 0.3)');
+                root.style.setProperty('--preview-video-background', 'rgba(0, 0, 0, 0.9)');
+                root.style.setProperty('--preview-video-border', 'rgba(255, 255, 255, 0.15)');
+                root.style.setProperty('--option-label-color', 'rgba(255, 255, 255, 0.8)');
+                root.style.setProperty('--screen-option-background', 'rgba(0, 0, 0, 0.4)');
+                root.style.setProperty('--screen-option-hover-background', 'rgba(0, 0, 0, 0.6)');
+                root.style.setProperty('--screen-option-selected-background', 'rgba(0, 122, 255, 0.15)');
+                root.style.setProperty('--screen-option-text', 'rgba(255, 255, 255, 0.7)');
+                root.style.setProperty('--description-color', 'rgba(255, 255, 255, 0.6)');
+                root.style.setProperty('--start-button-background', 'white');
+                root.style.setProperty('--start-button-color', 'black');
+                root.style.setProperty('--start-button-border', 'white');
+                root.style.setProperty('--start-button-hover-background', 'rgba(255, 255, 255, 0.8)');
+                root.style.setProperty('--start-button-hover-border', 'rgba(0, 0, 0, 0.2)');
+                root.style.setProperty('--text-input-button-background', '#007aff');
+                root.style.setProperty('--text-input-button-hover', '#0056b3');
+                root.style.setProperty('--link-color', '#007aff');
+                root.style.setProperty('--key-background', 'rgba(255, 255, 255, 0.1)');
+                root.style.setProperty('--scrollbar-background', 'rgba(0, 0, 0, 0.4)');
+                break;
+                
+            case 'system':
+            default:
+                // System theme - reset to defaults
+                root.style.removeProperty('--text-color');
+                root.style.removeProperty('--background-transparent');
+                root.style.removeProperty('--border-color');
+                root.style.removeProperty('--header-background');
+                root.style.removeProperty('--header-actions-color');
+                root.style.removeProperty('--main-content-background');
+                root.style.removeProperty('--button-background');
+                root.style.removeProperty('--button-border');
+                root.style.removeProperty('--icon-button-color');
+                root.style.removeProperty('--hover-background');
+                root.style.removeProperty('--input-background');
+                root.style.removeProperty('--placeholder-color');
+                root.style.removeProperty('--focus-border-color');
+                root.style.removeProperty('--focus-box-shadow');
+                root.style.removeProperty('--input-focus-background');
+                root.style.removeProperty('--scrollbar-track');
+                root.style.removeProperty('--scrollbar-thumb');
+                root.style.removeProperty('--scrollbar-thumb-hover');
+                root.style.removeProperty('--preview-video-background');
+                root.style.removeProperty('--preview-video-border');
+                root.style.removeProperty('--option-label-color');
+                root.style.removeProperty('--screen-option-background');
+                root.style.removeProperty('--screen-option-hover-background');
+                root.style.removeProperty('--screen-option-selected-background');
+                root.style.removeProperty('--screen-option-text');
+                root.style.removeProperty('--description-color');
+                root.style.removeProperty('--start-button-background');
+                root.style.removeProperty('--start-button-color');
+                root.style.removeProperty('--start-button-border');
+                root.style.removeProperty('--start-button-hover-background');
+                root.style.removeProperty('--start-button-hover-border');
+                root.style.removeProperty('--text-input-button-background');
+                root.style.removeProperty('--text-input-button-hover');
+                root.style.removeProperty('--link-color');
+                root.style.removeProperty('--key-background');
+                root.style.removeProperty('--scrollbar-background');
+                break;
+        }
     }
 
     handleCustomPromptInput(e) {
@@ -1298,6 +1461,32 @@ export class CustomizeView extends LitElement {
                             <option value="compact" ?selected=${this.layoutMode === 'compact'}>Compact</option>
                         </select>
                         <div class="form-description">${this.layoutMode === 'compact' ? `${this.Layout_Smaller}` : `${this.Layout_Standard}`}</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">
+                            ${this.Theme_Color_Theme}
+                        </label>
+                        <div class="theme-selector">
+                            <!-- QWEN ASSISTANT - Enhanced theme options with visual previews -->
+                            <div class="theme-option system ${this.themeMode === 'system' ? 'selected' : ''}" @click=${() => this.handleThemeModeSelect({ target: { value: 'system' } })}>
+                                <div class="theme-preview system-preview"></div>
+                                <span class="theme-label">${this.Theme_System}</span>
+                            </div>
+                            <div class="theme-option light ${this.themeMode === 'light' ? 'selected' : ''}" @click=${() => this.handleThemeModeSelect({ target: { value: 'light' } })}>
+                                <div class="theme-preview light-preview"></div>
+                                <span class="theme-label">${this.Theme_Light}</span>
+                            </div>
+                            <div class="theme-option dark ${this.themeMode === 'dark' ? 'selected' : ''}" @click=${() => this.handleThemeModeSelect({ target: { value: 'dark' } })}>
+                                <div class="theme-preview dark-preview"></div>
+                                <span class="theme-label">${this.Theme_Dark}</span>
+                            </div>
+                        </div>
+                        <div class="form-description">
+                            ${this.themeMode === 'light' ? this.Theme_Light : 
+                              this.themeMode === 'dark' ? this.Theme_Dark : 
+                              this.Theme_System}
+                        </div>
                     </div>
                 </div>
 

@@ -77,6 +77,7 @@ export class AppHeader extends LitElement {
         super.disconnectedCallback();
         this._stopTimer();
     }
+
     /**
     * Translates a specified key into a localized message, using the current system language.
     * @async
@@ -145,6 +146,17 @@ export class AppHeader extends LitElement {
         }
     }
 
+    async handleMinimizeClick() {
+        if (window.require) {
+            try {
+                const { ipcRenderer } = window.require('electron');
+                await ipcRenderer.invoke('window-toggle-minimize');
+            } catch (error) {
+                console.error('Failed to minimize window:', error);
+            }
+        }
+    }
+
     _startTimer() {
         // Clear any existing timer
         this._stopTimer();
@@ -177,15 +189,6 @@ export class AppHeader extends LitElement {
         };
         return titles[this.currentView] || 'Cheating Daddy';
     }
-
-    //Borrar
-    // getElapsedTime() {
-    //     if (this.currentView === 'assistant' && this.startTime) {
-    //         const elapsed = Math.floor((Date.now() - this.startTime) / 1000);
-    //         return `${elapsed}s`;
-    //     }
-    //     return '';
-    // }
 
     /** * Calculates the elapsed time since the start time in a human-readable format.
      * The format is
@@ -426,9 +429,28 @@ export class AppHeader extends LitElement {
                         : ''}
                     ${this.currentView === 'assistant'
                         ? html`
-                              <button @click=${this.onHideToggleClick} class="button">
+                            <button @click=${this.onHideToggleClick} class="button">
                                   ${this.AppHeader_Hide}&nbsp;&nbsp;<span class="key" style="pointer-events: none;">${cheddar.isMacOS ? 'Cmd' : 'Ctrl'}</span
-                                  >&nbsp;&nbsp;<span class="key">&bsol;</span>
+                                  >&nbsp;&nbsp;<span class="key">\\</span>
+                            </button>
+                            <button @click=${this.handleMinimizeClick} class="icon-button window-minimize">
+                                  <?xml version="1.0" encoding="UTF-8"?><svg
+                                      width="24px"
+                                      height="24px"
+                                      stroke-width="1.7"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      color="currentColor"
+                                  >
+                                      <path
+                                          d="M5 12H19"
+                                          stroke="currentColor"
+                                          stroke-width="1.7"
+                                          stroke-linecap="round"
+                                          stroke-linejoin="round"
+                                      ></path> 
+                                  </svg>
                               </button>
                               <button @click=${this.onCloseClick} class="icon-button window-close">
                                   <?xml version="1.0" encoding="UTF-8"?><svg

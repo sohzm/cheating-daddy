@@ -7,17 +7,33 @@ export const MainStyle =  css`
             user-select: none;
         }
 
+        :host {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+        }
+
         .welcome {
             font-size: 24px;
             margin-bottom: 8px;
             font-weight: 600;
             margin-top: auto;
+            text-align: center;
+            width: 100%;
         }
 
         .input-group {
             display: flex;
             gap: 12px;
             margin-bottom: 20px;
+            width: 100%;
         }
 
         .input-group input {
@@ -81,11 +97,15 @@ export const MainStyle =  css`
             display: flex;
             align-items: center;
             gap: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
         }
 
         .start-button:hover {
             background: var(--start-button-hover-background);
             border-color: var(--start-button-hover-border);
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
         .start-button.initializing {
@@ -95,6 +115,8 @@ export const MainStyle =  css`
         .start-button.initializing:hover {
             background: var(--start-button-background);
             border-color: var(--start-button-border);
+            transform: none;
+            box-shadow: none;
         }
 
         .shortcut-icons {
@@ -118,6 +140,8 @@ export const MainStyle =  css`
             font-size: 14px;
             margin-bottom: 24px;
             line-height: 1.5;
+            text-align: center;
+            width: 100%;
         }
 
         .link {
@@ -132,12 +156,31 @@ export const MainStyle =  css`
             opacity: 0.8;
         }
 
-        :host {
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            width: 100%;
-            max-width: 500px;
+        /* QWEN ASSISTANT - Enhanced styling for centered login form */
+        @media (min-width: 768px) {
+            :host {
+                padding: 40px;
+            }
+            
+            .welcome {
+                font-size: 28px;
+                margin-bottom: 16px;
+            }
+            
+            .input-group {
+                gap: 16px;
+                margin-bottom: 24px;
+            }
+            
+            input {
+                padding: 12px 16px;
+                font-size: 16px;
+            }
+            
+            .start-button {
+                padding: 10px 20px;
+                font-size: 14px;
+            }
         }
 `;
 

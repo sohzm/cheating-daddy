@@ -57,6 +57,8 @@ export const AppHeaderStyle =  css`
             display: flex;
             opacity: 0.6;
             transition: opacity 0.2s ease;
+            align-items: center;
+            justify-content: center;
         }
 
         .icon-button svg {
@@ -84,6 +86,24 @@ export const AppHeaderStyle =  css`
             border-radius: 4px;
             font-size: 12px;
             margin: 0px;
+        }
+
+        /* QWEN ASSISTANT - Enhanced minimize button styling */
+        .window-minimize {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .window-minimize:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* QWEN ASSISTANT - Enhanced close button styling */
+        .window-close {
+            background: rgba(255, 59, 48, 0.15);
+        }
+
+        .window-close:hover {
+            background: rgba(255, 59, 48, 0.3);
         }
 `;
 
