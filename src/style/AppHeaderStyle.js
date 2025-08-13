@@ -105,6 +105,46 @@ export const AppHeaderStyle =  css`
         .window-close:hover {
             background: rgba(255, 59, 48, 0.3);
         }
+
+        /* QWEN ASSISTANT - Theme button styling */
+        .theme-button {
+            background: transparent;
+            color: var(--start-button-background);
+            border: none;
+            padding: 4px;
+            border-radius: 50%;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            width: 36px;
+            height: 36px;
+            justify-content: center;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .theme-button:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .theme-icon {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .light-theme-icon {
+            display: none;
+        }
+
+        .dark-theme-icon {
+            display: block;
+        }
+
+        .theme-button:hover .theme-icon {
+            color: var(--icon-button-color);
+        }
 `;
 
 export default AppHeaderStyle;

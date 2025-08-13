@@ -24,7 +24,8 @@ export class AppHeader extends LitElement {
         AppHeader_history: { type: String },
         AppHeader_advanced: { type: String },
         AppHeader_assistant: { type: String },
-        AppHeader_Hide: { type: String }
+        AppHeader_Hide: { type: String },
+        themeMode: { type: String }, // QWEN ASSISTANT - Theme mode property
     };
 
     constructor() {
@@ -43,6 +44,8 @@ export class AppHeader extends LitElement {
         this.onAdvancedClick = () => {};
         this._timerInterval = null;
         this.onTranslate(); // Initialize translations
+        // QWEN ASSISTANT - Initialize theme mode
+        this.themeMode = localStorage.getItem('themeMode') || 'dark';
     }
 
     onTranslate(){
@@ -72,12 +75,32 @@ export class AppHeader extends LitElement {
     connectedCallback() {
         super.connectedCallback();
         this._startTimer();
+        // QWEN ASSISTANT - Load and apply theme
+        this.loadTheme();
+        
+        // Listen for translation refresh messages
+        if (window.require) {
+            const { ipcRenderer } = window.require('electron');
+            ipcRenderer.on('refresh-app-header-translations', () => {
+                this.refreshTranslations();
+            });
+        }
+    }
+    
+    disconnectedCallback() {
+        super.disconnectedCallback();
+        this._stopTimer();
+        
+        // Remove IPC listeners
+        if (window.require) {
+            const { ipcRenderer } = window.require('electron');
+            ipcRenderer.removeAllListeners('refresh-app-header-translations');
+        }
     }
     disconnectedCallback() {
         super.disconnectedCallback();
         this._stopTimer();
     }
-
     /**
     * Translates a specified key into a localized message, using the current system language.
     * @async
@@ -145,6 +168,144 @@ export class AppHeader extends LitElement {
             }
         }
     }
+    
+    // Method to refresh translations when language changes
+    async refreshTranslations() {
+        // Clear language cache to ensure new translations are loaded
+        language.clearLanguageCache();
+        
+        await this.onTranslate();
+        this.requestUpdate();
+    }
+
+    // QWEN ASSISTANT - Load and apply theme
+    loadTheme() {
+        const themeMode = localStorage.getItem('themeMode') || 'dark';
+        this.applyTheme(themeMode);
+    }
+
+
+    // QWEN ASSISTANT - Toggle theme method for AssistantView
+    toggleTheme() {
+        // Get current theme from localStorage or default to 'dark'
+        const currentTheme = localStorage.getItem('themeMode') || 'dark';
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        
+        // Save new theme to localStorage
+        localStorage.setItem('themeMode', newTheme);
+        
+        // Apply the theme
+        this.applyTheme(newTheme);
+        
+        // Dispatch event to notify other components
+        this.dispatchEvent(new CustomEvent('theme-changed', { 
+            detail: { theme: newTheme },
+            bubbles: true,
+            composed: true
+        }));
+    }
+    
+    // QWEN ASSISTANT - Apply theme method for AssistantView
+    applyTheme(themeMode) {
+        const root = document.documentElement;
+        if (themeMode === 'light') {
+            // Light theme - black text on white background
+            root.style.setProperty('--text-color', '#000000');
+            root.style.setProperty('--background-transparent', '#ffffff');
+            root.style.setProperty('--border-color', 'rgba(0, 0, 0, 0.2)');
+            root.style.setProperty('--header-background', 'rgba(255, 255, 255, 0.8)');
+            root.style.setProperty('--header-actions-color', 'rgba(0, 0, 0, 0.6)');
+            root.style.setProperty('--main-content-background', 'rgba(255, 255, 255, 0.8)');
+            root.style.setProperty('--button-background', 'rgba(255, 255, 255, 0.5)');
+            root.style.setProperty('--button-border', 'rgba(0, 0, 0, 0.1)');
+            root.style.setProperty('--icon-button-color', 'rgb(25, 25, 25)');
+            root.style.setProperty('--hover-background', 'rgba(0, 0, 0, 0.1)');
+            root.style.setProperty('--input-background', 'rgba(255, 255, 255, 0.3)');
+            root.style.setProperty('--placeholder-color', 'rgba(0, 0, 0, 0.4)');
+            root.style.setProperty('--focus-border-color', '#007aff');
+            root.style.setProperty('--focus-box-shadow', 'rgba(0, 122, 255, 0.2)');
+            root.style.setProperty('--input-focus-background', 'rgba(255, 255, 255, 0.5)');
+            root.style.setProperty('--scrollbar-track', 'rgba(255, 255, 255, 0.2)');
+            root.style.setProperty('--scrollbar-thumb', 'rgba(0, 0, 0, 0.2)');
+            root.style.setProperty('--scrollbar-thumb-hover', 'rgba(0, 0, 0, 0.3)');
+            root.style.setProperty('--preview-video-background', 'rgba(255, 255, 255, 0.9)');
+            root.style.setProperty('--preview-video-border', 'rgba(0, 0, 0, 0.15)');
+            root.style.setProperty('--option-label-color', 'rgba(0, 0, 0, 0.8)');
+            root.style.setProperty('--screen-option-background', 'rgba(255, 255, 255, 0.4)');
+            root.style.setProperty('--screen-option-hover-background', 'rgba(255, 255, 255, 0.6)');
+            root.style.setProperty('--screen-option-selected-background', 'rgba(0, 122, 255, 0.15)');
+            root.style.setProperty('--screen-option-text', 'rgba(0, 0, 0, 0.7)');
+            root.style.setProperty('--description-color', 'rgba(0, 0, 0, 0.6)');
+            root.style.setProperty('--start-button-background', 'black');
+            root.style.setProperty('--start-button-color', 'white');
+            root.style.setProperty('--start-button-border', 'black');
+            root.style.setProperty('--start-button-hover-background', 'rgba(0, 0, 0, 0.8)');
+            root.style.setProperty('--start-button-hover-border', 'rgba(255, 255, 255, 0.2)');
+            root.style.setProperty('--text-input-button-background', '#007aff');
+            root.style.setProperty('--text-input-button-hover', '#0056b3');
+            root.style.setProperty('--link-color', '#007aff');
+            root.style.setProperty('--key-background', 'rgba(0, 0, 0, 0.1)');
+            root.style.setProperty('--scrollbar-background', 'rgba(255, 255, 255, 0.4)');
+        } else {
+            // Dark theme - white text on black background
+            root.style.setProperty('--text-color', '#e5e5e7');
+            root.style.setProperty('--background-transparent', 'transparent');
+            root.style.setProperty('--border-color', 'rgba(255, 255, 255, 0.2)');
+            root.style.setProperty('--header-background', 'rgba(0, 0, 0, 0.8)');
+            root.style.setProperty('--header-actions-color', 'rgba(255, 255, 255, 0.6)');
+            root.style.setProperty('--main-content-background', 'rgba(0, 0, 0, 0.8)');
+            root.style.setProperty('--button-background', 'rgba(0, 0, 0, 0.5)');
+            root.style.setProperty('--button-border', 'rgba(255, 255, 255, 0.1)');
+            root.style.setProperty('--icon-button-color', 'rgb(229, 229, 231)');
+            root.style.setProperty('--hover-background', 'rgba(255, 255, 255, 0.1)');
+            root.style.setProperty('--input-background', 'rgba(0, 0, 0, 0.3)');
+            root.style.setProperty('--placeholder-color', 'rgba(255, 255, 255, 0.4)');
+            root.style.setProperty('--focus-border-color', '#007aff');
+            root.style.setProperty('--focus-box-shadow', 'rgba(0, 122, 255, 0.2)');
+            root.style.setProperty('--input-focus-background', 'rgba(0, 0, 0, 0.5)');
+            root.style.setProperty('--scrollbar-track', 'rgba(0, 0, 0, 0.2)');
+            root.style.setProperty('--scrollbar-thumb', 'rgba(255, 255, 255, 0.2)');
+            root.style.setProperty('--scrollbar-thumb-hover', 'rgba(255, 255, 255, 0.3)');
+            root.style.setProperty('--preview-video-background', 'rgba(0, 0, 0, 0.9)');
+            root.style.setProperty('--preview-video-border', 'rgba(255, 255, 255, 0.15)');
+            root.style.setProperty('--option-label-color', 'rgba(255, 255, 255, 0.8)');
+            root.style.setProperty('--screen-option-background', 'rgba(0, 0, 0, 0.4)');
+            root.style.setProperty('--screen-option-hover-background', 'rgba(0, 0, 0, 0.6)');
+            root.style.setProperty('--screen-option-selected-background', 'rgba(0, 122, 255, 0.15)');
+            root.style.setProperty('--screen-option-text', 'rgba(255, 255, 255, 0.7)');
+            root.style.setProperty('--description-color', 'rgba(255, 255, 255, 0.6)');
+            root.style.setProperty('--start-button-background', 'white');
+            root.style.setProperty('--start-button-color', 'black');
+            root.style.setProperty('--start-button-border', 'white');
+            root.style.setProperty('--start-button-hover-background', 'rgba(255, 255, 255, 0.8)');
+            root.style.setProperty('--start-button-hover-border', 'rgba(0, 0, 0, 0.2)');
+            root.style.setProperty('--text-input-button-background', '#007aff');
+            root.style.setProperty('--text-input-button-hover', '#0056b3');
+            root.style.setProperty('--link-color', '#007aff');
+            root.style.setProperty('--key-background', 'rgba(255, 255, 255, 0.1)');
+            root.style.setProperty('--scrollbar-background', 'rgba(0, 0, 0, 0.4)');
+        }
+        
+        // Update theme button icons visibility
+        this.updateThemeButtonIcons(themeMode);
+    }
+    
+    // QWEN ASSISTANT - Update theme button icons visibility
+    updateThemeButtonIcons(themeMode) {
+        const themeButton = this.shadowRoot.querySelector('.theme-button');
+        if (themeButton) {
+            const darkIcon = themeButton.querySelector('.dark-theme-icon');
+            const lightIcon = themeButton.querySelector('.light-theme-icon');
+            
+            if (themeMode === 'light') {
+                darkIcon.style.display = 'block';
+                lightIcon.style.display = 'none';
+            } else {
+                darkIcon.style.display = 'none';
+                lightIcon.style.display = 'block';
+            }
+        }
+    }
 
     async handleMinimizeClick() {
         if (window.require) {
@@ -153,6 +314,8 @@ export class AppHeader extends LitElement {
                 await ipcRenderer.invoke('window-toggle-minimize');
             } catch (error) {
                 console.error('Failed to minimize window:', error);
+                // QWEN ASSISTANT - Fallback behavior if IPC fails
+                // This could be expanded to show a user notification
             }
         }
     }
@@ -429,11 +592,48 @@ export class AppHeader extends LitElement {
                         : ''}
                     ${this.currentView === 'assistant'
                         ? html`
-                            <button @click=${this.onHideToggleClick} class="button">
+                              <button @click=${this.onHideToggleClick} class="button">
                                   ${this.AppHeader_Hide}&nbsp;&nbsp;<span class="key" style="pointer-events: none;">${cheddar.isMacOS ? 'Cmd' : 'Ctrl'}</span
                                   >&nbsp;&nbsp;<span class="key">\\</span>
+                              </button>
+                              
+                              
+                            <!-- QWEN ASSISTANT - Theme switching icons for AssistantView only -->
+                            <button class="theme-button" @click=${this.toggleTheme} title="Toggle theme">
+                                <!-- Dark theme icon -->
+                                <svg 
+                                    width="24px" 
+                                    height="24px" 
+                                    viewBox="0 0 24 24" 
+                                    fill="none" 
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    class="theme-icon dark-theme-icon"
+                                >
+                                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" fill="currentColor"/>
+                                </svg>
+                                <!-- Light theme icon -->
+                                <svg 
+                                    width="24px" 
+                                    height="24px" 
+                                    viewBox="0 0 24 24" 
+                                    fill="none" 
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    class="theme-icon light-theme-icon"
+                                >
+                                    <circle cx="12" cy="12" r="5" fill="currentColor"/>
+                                    <line x1="12" y1="1" x2="12" y2="3" stroke="currentColor" stroke-width="2"/>
+                                    <line x1="12" y1="21" x2="12" y2="23" stroke="currentColor" stroke-width="2"/>
+                                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" stroke="currentColor" stroke-width="2"/>
+                                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" stroke="currentColor" stroke-width="2"/>
+                                    <line x1="1" y1="12" x2="3" y2="12" stroke="currentColor" stroke-width="2"/>
+                                    <line x1="21" y1="12" x2="23" y2="12" stroke="currentColor" stroke-width="2"/>
+                                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" stroke="currentColor" stroke-width="2"/>
+                                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" stroke="currentColor" stroke-width="2"/>
+                                </svg>
                             </button>
-                            <button @click=${this.handleMinimizeClick} class="icon-button window-minimize">
+                            <!-- End QWEN ASSISTANT theme icons -->
+                              
+                              <button @click=${this.handleMinimizeClick} class="icon-button window-minimize">
                                   <?xml version="1.0" encoding="UTF-8"?><svg
                                       width="24px"
                                       height="24px"

@@ -135,6 +135,20 @@ function setupGeneralIpcHandlers() {
         }
     });
 
+    ipcMain.on('update-app-language', (event, newLanguage) => {
+        if (mainWindow) {
+            // Send a message to all renderer processes to update their language
+            mainWindow.webContents.send('app-language-changed', newLanguage);
+        }
+    });
+
+    ipcMain.on('refresh-app-header-translations', (event) => {
+        if (mainWindow) {
+            // Send a message to refresh AppHeader translations
+            mainWindow.webContents.send('refresh-app-header-translations');
+        }
+    });
+
     ipcMain.handle('update-content-protection', async (event, contentProtection) => {
         try {
             if (mainWindow) {

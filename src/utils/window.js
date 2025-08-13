@@ -3,6 +3,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const os = require('os');
 const { applyStealthMeasures, startTitleRandomization } = require('./stealthFeatures');
+const { shell } = require('electron');
 
 let mouseEventsIgnored = false;
 let windowResizing = false;
@@ -182,81 +183,6 @@ function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
     });
 
     setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef);
-    //tray.setContextMenu(contextMenu); //TODO: OSCARDO
-
-    // Hacer clic izquierdo en el tray para mostrar/ocultar ventana TODO: OSCARDO   
-    // tray.on('click', () => {
-    // if (mainWindow.isVisible()) {
-    //         mainWindow.hide();
-    //     } else {
-    //         mainWindow.show();
-    //         mainWindow.focus();
-    //     }
-    // });
-    // // Función para mostrar el tray
-    // function showTray() {
-    // if (!tray) {
-    //     createTray();
-    // }
-    //     console.log('Tray mostrado');
-    // }
-    // // Función para ocultar el tray
-    // function hideTray() {
-    //     if (tray) {
-    //         tray.destroy();
-    //         tray = null;
-    //         console.log('Tray ocultado');
-    //     }
-    // }
-
-    // // Crear un ícono simple programáticamente
-    // function createTrayIcon() {
-    //     // Crear un ícono de 16x16 píxeles
-    //     const image = nativeImage.createEmpty();
-  
-    //     // Para desarrollo, puedes usar un ícono existente del sistema
-    //     // o crear uno simple con canvas
-    //     const canvas = require('canvas');
-    //     const canvasInstance = canvas.createCanvas(16, 16);
-    //     const ctx = canvasInstance.getContext('2d');
-    
-    //     // Dibujar un círculo simple
-    //     ctx.fillStyle = '#007ACC';
-    //     ctx.beginPath();
-    //     ctx.arc(8, 8, 6, 0, 2 * Math.PI);
-    //     ctx.fill();
-        
-    //     const buffer = canvasInstance.toBuffer('image/png');
-    // return nativeImage.createFromBuffer(buffer);
-    // }
-
-    //  // Eventos de la aplicación
-    // app.whenReady().then(() => {
-    //     createWindow();
-    //     createTray();
-        
-    // app.on('activate', () => {
-    //         if (BrowserWindow.getAllWindows().length === 0) {
-    //         createWindow();
-    //         } else {
-    //         mainWindow.show();
-    //         }
-    //     });
-    // });
-
-    // app.on('window-all-closed', () => {
-    //     if (process.platform !== 'darwin') {
-    //         app.quit();
-    //     }
-    // });
-
-    // app.on('before-quit', () => {
-    //     isQuitting = true;
-    // });
-    // Hacer clic izquierdo en el tray para mostrar/ocultar ventana TODO: OSCARDO  
-
-   
-
     return mainWindow;
 }//end createWindow
 
@@ -675,8 +601,29 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
 function createTray(mainWindow) {
     // Create tray icon
     try {
-        // Create a simple text-based tray icon as fallback
-        tray = new Tray(nativeImage.createEmpty());
+        const path = require('node:path');
+        const fs = require('node:fs');
+        
+        // Determine the icon file based on the platform
+        let iconFile;
+        if (process.platform === 'win32') {
+            iconFile = path.join(__dirname, '../assets/logo.ico');
+        } else if (process.platform === 'darwin') {
+            iconFile = path.join(__dirname, '../assets/logo.icns');
+        } else {
+            iconFile = path.join(__dirname, '../assets/logo.png');
+        }
+        
+        // Check if the icon file exists, otherwise use a fallback
+        let trayIcon;
+        if (fs.existsSync(iconFile)) {
+            trayIcon = iconFile;
+        } else {
+            // Create a simple text-based tray icon as fallback
+            trayIcon = nativeImage.createEmpty();
+        }
+        
+        tray = new Tray(trayIcon);
         
         const contextMenu = Menu.buildFromTemplate([
             {
@@ -690,6 +637,18 @@ function createTray(mainWindow) {
                 label: 'Hide Window',
                 click: () => {
                     mainWindow.hide();
+                }
+            },
+            {
+                label: 'Web Official',
+                click: () => {
+                    shell.openExternal('https://cheatingdaddy.com/');
+                }
+            },
+            {
+                label: 'Start us on Github',
+                click: () => {
+                    shell.openExternal('https://github.com/sohzm/cheating-daddy');
                 }
             },
             {

@@ -38,6 +38,7 @@ export class AssistantView extends LitElement {
             this.Assistant_Type_message = lang;
             this.requestUpdate();
         });
+        
     }
 
     getProfileNames() {

@@ -282,6 +282,26 @@ export class CustomizeView extends LitElement {
         this.loadLayoutMode();
         // Resize window for this view
         resizeLayout();
+        
+        // Listen for language change messages from the main process
+        if (window.require) {
+            const { ipcRenderer } = window.require('electron');
+            ipcRenderer.on('app-language-changed', async (event, newLanguage) => {
+                // Update the language and refresh translations
+                this.selectedAppLanguage = newLanguage;
+                await this.refreshTranslations();
+            });
+        }
+    }
+    
+    disconnectedCallback() {
+        super.disconnectedCallback();
+        
+        // Remove IPC listeners
+        if (window.require) {
+            const { ipcRenderer } = window.require('electron');
+            ipcRenderer.removeAllListeners('app-language-changed');
+        }
     }
 
     getProfiles() {
@@ -652,6 +672,20 @@ export class CustomizeView extends LitElement {
             case 'Language_App_Accept':
                 temp = await language.getMessage('Language_App_Accept', language.getLanguage() || 'en-US');
                 break;
+            case 'Theme_Color_Theme':
+                temp = await language.getMessage('Theme_Color_Theme', language.getLanguage() || 'en-US');
+                break;
+            case 'Theme_System':
+                temp = await language.getMessage('Theme_System', language.getLanguage() || 'en-US');
+                break;
+            case 'Theme_Light':
+                temp = await language.getMessage('Theme_Light', language.getLanguage() || 'en-US');
+                break;
+            case 'Theme_Dark':
+                temp = await language.getMessage('Theme_Dark', language.getLanguage() || 'en-US');
+                break;    
+
+
             default:
                 // Si quieres un valor por defecto que también es una Promesa
                 return await language.getMessages('Speech_Language', 'en-US');
@@ -665,13 +699,42 @@ export class CustomizeView extends LitElement {
         this.selectedAppLanguage = e.target.value;
         localStorage.setItem('selectedAppLanguage', this.selectedAppLanguage);
         this.onLanguageAppChange(this.selectedAppLanguage);
-        this.requestUpdate();
+        
         // Update the language in the main process
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
             ipcRenderer.send('update-app-language', this.selectedAppLanguage);
         }
-        // Update the language in the translate function
+        
+        // Refresh all translations immediately
+        await this.refreshTranslations();
+        
+        this.requestUpdate();
+    }
+    
+    // Method to refresh all translations when language changes
+    async refreshTranslations() {
+        // Clear language cache to ensure new translations are loaded
+        language.clearLanguageCache();
+        
+        // Refresh CustomizeView translations
+        await this.onTranslate();
+        
+        // Refresh AppHeader translations
+        if (window.require) {
+            const { ipcRenderer } = window.require('electron');
+            // Send a message to refresh AppHeader translations
+            ipcRenderer.send('refresh-app-header-translations');
+        }
+        
+        // Dispatch an event to notify that translations have been updated
+        this.dispatchEvent(new CustomEvent('translations-updated', {
+            bubbles: true,
+            composed: true
+        }));
+        
+        // Force update of the view
+        this.requestUpdate();
     }
 
     async getLanguageAppSelect() {
@@ -745,6 +808,7 @@ export class CustomizeView extends LitElement {
         localStorage.setItem('themeMode', this.themeMode);
         this.onThemeModeChange(e.target.value);
         this.applyThemeMode();
+        this.requestUpdate();
     }
 
     applyThemeMode() {

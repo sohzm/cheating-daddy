@@ -18,6 +18,9 @@ A real-time AI assistant that provides contextual help during video calls, inter
 - **Transparent Overlay**: Always-on-top window that can be positioned anywhere
 - **Click-through Mode**: Make window transparent to clicks when needed
 - **Cross-platform**: Works on macOS, Windows, and Linux (kinda, dont use, just for testing rn)
+- **Theme Support**: Light, Dark, and System themes with real-time switching
+- **Minimize Functionality**: Minimize button in assistant view for quick access
+- **Centered Login**: Clean, centered login form for better first impression
 
 ## Setup
 
@@ -39,6 +42,7 @@ A real-time AI assistant that provides contextual help during video calls, inter
 - **Click-through**: `Ctrl/Cmd + M` - Toggle mouse events
 - **Close/Back**: `Ctrl/Cmd + \` - Close window or go back
 - **Send Message**: `Enter` - Send text to AI
+- **Minimize Window**: Available in assistant view (top right button)
 
 ## Audio Capture
 
@@ -46,9 +50,46 @@ A real-time AI assistant that provides contextual help during video calls, inter
 - **Windows**: Loopback audio capture
 - **Linux**: Microphone input
 
-## Requirements
+## Customization
 
-- Electron-compatible OS (macOS, Windows, Linux)
-- Gemini API key
-- Screen recording permissions
-- Microphone/audio permissions
+### Theme Options
+- **Light Mode**: Clean white background with black text
+- **Dark Mode**: Dark background with white text
+- **System Mode**: Automatically follows your OS theme preference
+
+### Interface Layout
+- **Normal Mode**: Standard interface size
+- **Compact Mode**: Smaller interface for less screen space usage
+
+### Background Transparency
+- Adjustable transparency from 0% (opaque) to 100% (transparent)
+
+### Font Size
+- Adjustable font size from 12px to 32px
+
+## Version History
+
+### Version 1.4
+- **System Tray Icon Support**: Platform-specific icons (logo.ico for Windows, logo.icns for macOS, logo.png for Linux)
+- **Enhanced Theme Switching**: Visual theme previews with improved styling
+- **Improved Minimize Button**: Enhanced styling and better visibility
+- **Centered Login Form**: Improved visual consistency and alignment
+
+### Version 1.3
+- **Minimize Button**: Added minimize functionality to assistant view
+- **Centered Login Form**: Improved visual presentation of login screen
+- **Theme Switching**: Added light, dark, and system theme options
+- **Enhanced Styling**: Improved UI consistency across components
+
+### Version 1.2
+- **Improved Error Handling**: Better documentation of errors and warnings
+- **Enhanced UI Components**: Refined styling for better user experience
+- **Bug Fixes**: Various stability improvements
+
+### Version 1.1
+- **Initial Theme Implementation**: Basic light/dark mode support
+- **Minimize Functionality**: Basic window minimize feature
+- **UI Improvements**: Enhanced visual design and consistency
+
+### Version 1.0
+- **Initial Release**: Core functionality with screen capture and AI assistance

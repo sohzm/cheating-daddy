@@ -1,7 +1,7 @@
 {
     "name": "cheating-daddy",
     "productName": "cheating-daddy",
-    "version": "0.4.0",
+    "version": "1.4.0",
     "description": "cheating daddy",
     "main": "src/index.js",
     "scripts": {
@@ -10,7 +10,7 @@
         "make": "electron-forge make",
         "publish": "electron-forge publish",
         "lint": "echo \"No linting configured\"",
-	    "test": "vitest run",
+        "test": "vitest run",
         "_comment": "INTRODUCIDOS POR OSCARDO (dev, DEBUG, DEBUG-BRK, debug-renderer)",
         "dev": "electron-forge start",
         "debug": "electron-forge start -- --inspect=5858",
@@ -31,7 +31,9 @@
     "license": "GPL-3.0",
     "dependencies": {
         "@google/genai": "^1.2.0",
-        "electron-squirrel-startup": "^1.0.1"
+        "electron-squirrel-startup": "^1.0.1",
+        "qwen": "^0.0.0",
+        "update": "^0.7.4"
     },
     "devDependencies": {
         "@electron-forge/cli": "^7.8.1",
@@ -48,7 +50,7 @@
         "electron": "30.0.5",
         "electron-debug": "^4.1.0",
         "electron-devtools-installer": "^4.0.0",
-    	"vitest": "^1.6.1",
-        "jsdom": "^23.2.0"
+        "jsdom": "^23.2.0",
+        "vitest": "^1.6.1"
     }
 }
