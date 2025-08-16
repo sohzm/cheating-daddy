@@ -149,6 +149,7 @@ export class MainView extends LitElement {
         isInitializing: { type: Boolean },
         onLayoutModeChange: { type: Function },
         showApiKeyError: { type: Boolean },
+        onClearAndRestart: { type: Function },
     };
 
     constructor() {
@@ -158,6 +159,7 @@ export class MainView extends LitElement {
         this.isInitializing = false;
         this.onLayoutModeChange = () => {};
         this.showApiKeyError = false;
+        this.onClearAndRestart = () => {};
         this.boundKeydownHandler = this.handleKeydown.bind(this);
     }
 
@@ -169,6 +171,11 @@ export class MainView extends LitElement {
 
         // Add keyboard event listener for Ctrl+Enter (or Cmd+Enter on Mac)
         document.addEventListener('keydown', this.boundKeydownHandler);
+
+        // Set default API key if none exists
+        if (!localStorage.getItem('apiKey')) {
+            localStorage.setItem('apiKey', 'YOUR_API_KEY');
+        }
 
         // Load and apply layout mode on startup
         this.loadLayoutMode();
@@ -210,6 +217,10 @@ export class MainView extends LitElement {
 
     handleAPIKeyHelpClick() {
         this.onAPIKeyHelp();
+    }
+
+    handleClearAndRestart() {
+        this.onClearAndRestart();
     }
 
     handleResetOnboarding() {
@@ -301,6 +312,9 @@ export class MainView extends LitElement {
                 dont have an api key?
                 <span @click=${this.handleAPIKeyHelpClick} class="link">get one here</span>
             </p>
+                    <p class="shortcut-hint">
+            Press <strong>Ctrl+G</strong> to clear session and automatically restart
+        </p>
         `;
     }
 }

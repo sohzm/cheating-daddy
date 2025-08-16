@@ -157,6 +157,10 @@ export class CheatingDaddyApp extends LitElement {
                 this._isClickThrough = isEnabled;
             });
         }
+
+        // Add global keyboard event listener for Ctrl+G
+        this.boundKeydownHandler = this.handleGlobalKeydown.bind(this);
+        document.addEventListener('keydown', this.boundKeydownHandler);
     }
 
     disconnectedCallback() {
@@ -166,6 +170,11 @@ export class CheatingDaddyApp extends LitElement {
             ipcRenderer.removeAllListeners('update-response');
             ipcRenderer.removeAllListeners('update-status');
             ipcRenderer.removeAllListeners('click-through-toggled');
+        }
+        
+        // Remove global keyboard event listener
+        if (this.boundKeydownHandler) {
+            document.removeEventListener('keydown', this.boundKeydownHandler);
         }
     }
 
@@ -292,6 +301,42 @@ export class CheatingDaddyApp extends LitElement {
         }
     }
 
+        handleClearAndRestart() {
+        // Clear the current session and responses
+        this.responses = [];
+        this.currentResponseIndex = -1;
+        this.startTime = null;
+
+        // Stop any ongoing capture if in assistant view
+        if (this.currentView === 'assistant' && window.cheddar) {
+            window.cheddar.stopCapture();
+        }
+
+        // Return to main view
+        this.currentView = 'main';
+        this.setStatus('Session cleared. Starting new session...');
+
+        // Request update to refresh the UI
+        this.requestUpdate();
+
+        // Automatically start a new session after a brief delay
+        setTimeout(() => {
+            this.handleStart();
+        }, 100);
+    }
+
+    handleGlobalKeydown(e) {
+        // Handle Ctrl+G (or Cmd+G on Mac) for clearing session
+        const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+        const isClearShortcut = isMac ? e.metaKey && e.key === 'g' : e.ctrlKey && e.key === 'g';
+
+        if (isClearShortcut) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.handleClearAndRestart();
+        }
+    }
+
     // Customize view event handlers
     handleProfileChange(profile) {
         this.selectedProfile = profile;
@@ -407,6 +452,7 @@ export class CheatingDaddyApp extends LitElement {
                         .onStart=${() => this.handleStart()}
                         .onAPIKeyHelp=${() => this.handleAPIKeyHelp()}
                         .onLayoutModeChange=${layoutMode => this.handleLayoutModeChange(layoutMode)}
+                        .onClearAndRestart=${() => this.handleClearAndRestart()}
                     ></main-view>
                 `;
 
@@ -480,6 +526,7 @@ export class CheatingDaddyApp extends LitElement {
                         .onCloseClick=${() => this.handleClose()}
                         .onBackClick=${() => this.handleBackClick()}
                         .onHideToggleClick=${() => this.handleHideToggle()}
+                        .onRestartClick=${() => this.handleClearAndRestart()}
                         ?isClickThrough=${this._isClickThrough}
                     ></app-header>
                     <div class="${mainContentClass}">

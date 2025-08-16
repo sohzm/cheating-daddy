@@ -380,6 +380,16 @@ export class AssistantView extends LitElement {
             background: var(--scrollbar-thumb-hover);
         }
 
+        .shortcut-hint {
+            color: var(--description-color);
+            font-size: 11px;
+            opacity: 0.8;
+            text-align: center;
+            padding: 8px 16px;
+            background: var(--main-content-background);
+            border-top: 1px solid var(--border-color);
+        }
+
         .text-input-container {
             display: flex;
             gap: 10px;
@@ -837,6 +847,10 @@ export class AssistantView extends LitElement {
 
         return html`
             <div class="response-container" id="responseContainer"></div>
+
+                    <div class="shortcut-hint">
+            Press <strong>Ctrl+G</strong> to clear session and automatically restart
+        </div>
 
             <div class="text-input-container">
                 <button class="nav-button" @click=${this.navigateToPreviousResponse} ?disabled=${this.currentResponseIndex <= 0}>
