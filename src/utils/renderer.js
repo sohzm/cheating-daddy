@@ -1,6 +1,16 @@
 // renderer.js
 const { ipcRenderer } = require('electron');
 
+// Import VAD functionality
+let VADProcessor;
+try {
+    const vad = require('./vad.js');
+    VADProcessor = vad.VADProcessor;
+} catch (error) {
+    console.warn('VAD module not available:', error);
+    VADProcessor = null;
+}
+
 // Initialize random display name for UI components
 window.randomDisplayName = null;
 
@@ -22,6 +32,7 @@ let audioContext = null;
 let audioProcessor = null;
 let micAudioProcessor = null;
 let audioBuffer = [];
+let vadProcessor = null; // VAD processor instance
 const SAMPLE_RATE = 24000;
 const AUDIO_CHUNK_DURATION = 0.1; // seconds
 const BUFFER_SIZE = 4096; // Increased buffer size for smoother audio
@@ -394,6 +405,21 @@ function setupLinuxSystemAudioProcessing() {
     const source = audioContext.createMediaStreamSource(mediaStream);
     audioProcessor = audioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
 
+    // Initialize VAD if enabled and available
+    let isVADEnabled = false;
+    if (VADProcessor) {
+        try {
+            const vadEnabled = localStorage.getItem('vadEnabled') === 'true';
+            if (vadEnabled) {
+                vadProcessor = new VADProcessor();
+                isVADEnabled = true;
+                console.log('VAD enabled for Linux system audio processing');
+            }
+        } catch (error) {
+            console.error('Failed to initialize VAD:', error);
+        }
+    }
+
     let audioBuffer = [];
     const samplesPerChunk = SAMPLE_RATE * AUDIO_CHUNK_DURATION;
 
@@ -404,13 +430,26 @@ function setupLinuxSystemAudioProcessing() {
         // Process audio in chunks
         while (audioBuffer.length >= samplesPerChunk) {
             const chunk = audioBuffer.splice(0, samplesPerChunk);
-            const pcmData16 = convertFloat32ToInt16(chunk);
-            const base64Data = arrayBufferToBase64(pcmData16.buffer);
+            
+            if (isVADEnabled && vadProcessor) {
+                // Process with VAD
+                vadProcessor.processAudio(chunk, async (audioSegment) => {
+                    try {
+                        await ipcRenderer.invoke('send-vad-audio-segment', audioSegment);
+                    } catch (error) {
+                        console.error('Failed to send VAD audio segment:', error);
+                    }
+                });
+            } else {
+                // Process without VAD (original behavior)
+                const pcmData16 = convertFloat32ToInt16(chunk);
+                const base64Data = arrayBufferToBase64(pcmData16.buffer);
 
-            await ipcRenderer.invoke('send-audio-content', {
-                data: base64Data,
-                mimeType: 'audio/pcm;rate=24000',
-            });
+                await ipcRenderer.invoke('send-audio-content', {
+                    data: base64Data,
+                    mimeType: 'audio/pcm;rate=24000',
+                });
+            }
         }
     };
 
@@ -424,6 +463,21 @@ function setupWindowsLoopbackProcessing() {
     const source = audioContext.createMediaStreamSource(mediaStream);
     audioProcessor = audioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
 
+    // Initialize VAD if enabled and available
+    let isVADEnabled = false;
+    if (VADProcessor) {
+        try {
+            const vadEnabled = localStorage.getItem('vadEnabled') === 'true';
+            if (vadEnabled) {
+                vadProcessor = new VADProcessor();
+                isVADEnabled = true;
+                console.log('VAD enabled for Windows loopback processing');
+            }
+        } catch (error) {
+            console.error('Failed to initialize VAD:', error);
+        }
+    }
+
     let audioBuffer = [];
     const samplesPerChunk = SAMPLE_RATE * AUDIO_CHUNK_DURATION;
 
@@ -434,13 +488,26 @@ function setupWindowsLoopbackProcessing() {
         // Process audio in chunks
         while (audioBuffer.length >= samplesPerChunk) {
             const chunk = audioBuffer.splice(0, samplesPerChunk);
-            const pcmData16 = convertFloat32ToInt16(chunk);
-            const base64Data = arrayBufferToBase64(pcmData16.buffer);
+            
+            if (isVADEnabled && vadProcessor) {
+                // Process with VAD
+                vadProcessor.processAudio(chunk, async (audioSegment) => {
+                    try {
+                        await ipcRenderer.invoke('send-vad-audio-segment', audioSegment);
+                    } catch (error) {
+                        console.error('Failed to send VAD audio segment:', error);
+                    }
+                });
+            } else {
+                // Process without VAD (original behavior)
+                const pcmData16 = convertFloat32ToInt16(chunk);
+                const base64Data = arrayBufferToBase64(pcmData16.buffer);
 
-            await ipcRenderer.invoke('send-audio-content', {
-                data: base64Data,
-                mimeType: 'audio/pcm;rate=24000',
-            });
+                await ipcRenderer.invoke('send-audio-content', {
+                    data: base64Data,
+                    mimeType: 'audio/pcm;rate=24000',
+                });
+            }
         }
     };
 

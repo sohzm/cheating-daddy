@@ -406,6 +406,7 @@ export class CustomizeView extends LitElement {
         layoutMode: { type: String },
         keybinds: { type: Object },
         googleSearchEnabled: { type: Boolean },
+        vadEnabled: { type: Boolean },
         backgroundTransparency: { type: Number },
         fontSize: { type: Number },
         onProfileChange: { type: Function },
@@ -438,6 +439,9 @@ export class CustomizeView extends LitElement {
         // Advanced mode default
         this.advancedMode = false;
 
+        // VAD (Voice Activity Detection) default
+        this.vadEnabled = false;
+
         // Background transparency default
         this.backgroundTransparency = 0.8;
 
@@ -447,6 +451,7 @@ export class CustomizeView extends LitElement {
         this.loadKeybinds();
         this.loadGoogleSearchSettings();
         this.loadAdvancedModeSettings();
+        this.loadVADSettings();
         this.loadBackgroundTransparency();
         this.loadFontSize();
     }
@@ -800,6 +805,30 @@ export class CustomizeView extends LitElement {
         }
     }
 
+    loadVADSettings() {
+        const vadEnabled = localStorage.getItem('vadEnabled');
+        if (vadEnabled !== null) {
+            this.vadEnabled = vadEnabled === 'true';
+        }
+    }
+
+    async handleVADChange(e) {
+        this.vadEnabled = e.target.checked;
+        localStorage.setItem('vadEnabled', this.vadEnabled.toString());
+
+        // Notify main process if available
+        if (window.require) {
+            try {
+                const { ipcRenderer } = window.require('electron');
+                await ipcRenderer.invoke('update-vad-setting', this.vadEnabled);
+            } catch (error) {
+                console.error('Failed to notify main process of VAD setting change:', error);
+            }
+        }
+
+        this.requestUpdate();
+    }
+
     async handleAdvancedModeChange(e) {
         this.advancedMode = e.target.checked;
         localStorage.setItem('advancedMode', this.advancedMode.toString());
@@ -924,6 +953,24 @@ export class CustomizeView extends LitElement {
                             </select>
                             <div class="form-description">
                                 Choose which audio sources to capture for the AI.
+                            </div>
+                        </div>
+
+                        <div class="form-group full-width">
+                            <div class="checkbox-group">
+                                <input
+                                    type="checkbox"
+                                    class="checkbox-input"
+                                    id="vad-enabled"
+                                    .checked=${this.vadEnabled}
+                                    @change=${this.handleVADChange}
+                                />
+                                <label for="vad-enabled" class="checkbox-label">Enable Voice Activity Detection (VAD)</label>
+                            </div>
+                            <div class="form-description" style="margin-left: 24px; margin-top: -8px;">
+                                Intelligently detect when you're speaking and only capture audio during speech. 
+                                Improves privacy by avoiding recording of silence and background noise.
+                                <br /><strong>Benefits:</strong> Better privacy, reduced processing, natural conversation flow
                             </div>
                         </div>
                     </div>

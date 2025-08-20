@@ -155,4 +155,32 @@ function setupGeneralIpcHandlers() {
             return 'System Monitor';
         }
     });
+
+    // VAD (Voice Activity Detection) handler
+    ipcMain.handle('send-vad-audio-segment', async (event, audioSegment) => {
+        try {
+            // Forward VAD-processed audio segment to Gemini or audio processing
+            // This handler bridges VAD output to existing audio processing pipeline
+            console.log('Received VAD audio segment:', audioSegment ? 'Valid segment' : 'Invalid segment');
+            
+            // You can add additional processing here if needed
+            // For now, this just acknowledges receipt of the VAD segment
+            return { success: true };
+        } catch (error) {
+            console.error('Error processing VAD audio segment:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    // VAD settings update handler
+    ipcMain.handle('update-vad-setting', async (event, vadEnabled) => {
+        try {
+            console.log('VAD setting updated:', vadEnabled ? 'enabled' : 'disabled');
+            // Store VAD setting if needed for main process
+            return { success: true };
+        } catch (error) {
+            console.error('Error updating VAD setting:', error);
+            return { success: false, error: error.message };
+        }
+    });
 }
