@@ -92,15 +92,8 @@ export class AppHeader extends LitElement {
         currentView: { type: String },
         statusText: { type: String },
         startTime: { type: Number },
-        onCustomizeClick: { type: Function },
-        onHelpClick: { type: Function },
-        onHistoryClick: { type: Function },
-        onCloseClick: { type: Function },
-        onBackClick: { type: Function },
-        onHideToggleClick: { type: Function },
         isClickThrough: { type: Boolean, reflect: true },
         advancedMode: { type: Boolean },
-        onAdvancedClick: { type: Function },
     };
 
     constructor() {
@@ -108,16 +101,59 @@ export class AppHeader extends LitElement {
         this.currentView = 'main';
         this.statusText = '';
         this.startTime = null;
-        this.onCustomizeClick = () => {};
-        this.onHelpClick = () => {};
-        this.onHistoryClick = () => {};
-        this.onCloseClick = () => {};
-        this.onBackClick = () => {};
-        this.onHideToggleClick = () => {};
         this.isClickThrough = false;
         this.advancedMode = false;
-        this.onAdvancedClick = () => {};
         this._timerInterval = null;
+    }
+
+    _handleHistoryClick() {
+        if (window.changePage) {
+            window.changePage('history');
+        }
+    }
+
+    _handleCustomizeClick() {
+        console.log('Settings button clicked');
+        if (window.changePage) {
+            window.changePage('settings');
+        } else {
+            console.error('changePage function not available');
+        }
+    }
+
+    _handleHelpClick() {
+        console.log('Help button clicked');
+        if (window.changePage) {
+            window.changePage('help');
+        } else {
+            console.error('changePage function not available');
+        }
+    }
+
+    _handleAdvancedClick() {
+        if (window.changePage) {
+            window.changePage('advanced');
+        }
+    }
+
+    _handleCloseClick() {
+        if (window.electronAPI && window.electronAPI.invoke) {
+            window.electronAPI.invoke('quit-application');
+        }
+    }
+
+    _handleBackClick() {
+        if (window.changePage) {
+            window.changePage('home');
+        }
+    }
+
+    _handleHideToggleClick() {
+        // Toggle window visibility
+        if (window.electronAPI && window.electronAPI.invoke) {
+            // This could be implemented to hide/show the window
+            console.log('Hide toggle clicked');
+        }
     }
 
     connectedCallback() {
@@ -213,7 +249,7 @@ export class AppHeader extends LitElement {
                         : ''}
                     ${this.currentView === 'main'
                         ? html`
-                              <button class="icon-button" @click=${this.onHistoryClick}>
+                              <button class="icon-button" @click=${this._handleHistoryClick}>
                                   <?xml version="1.0" encoding="UTF-8"?><svg
                                       width="24px"
                                       height="24px"
@@ -255,7 +291,7 @@ export class AppHeader extends LitElement {
                               </button>
                               ${this.advancedMode
                                   ? html`
-                                        <button class="icon-button" @click=${this.onAdvancedClick} title="Advanced Tools">
+                                        <button class="icon-button" @click=${this._handleAdvancedClick} title="Advanced Tools">
                                             <?xml version="1.0" encoding="UTF-8"?><svg
                                                 width="24px"
                                                 stroke-width="1.7"
@@ -298,7 +334,7 @@ export class AppHeader extends LitElement {
                                         </button>
                                     `
                                   : ''}
-                              <button class="icon-button" @click=${this.onCustomizeClick}>
+                              <button class="icon-button" @click=${this._handleCustomizeClick}>
                                   <?xml version="1.0" encoding="UTF-8"?><svg
                                       width="24px"
                                       height="24px"
@@ -324,7 +360,7 @@ export class AppHeader extends LitElement {
                                       ></path>
                                   </svg>
                               </button>
-                              <button class="icon-button" @click=${this.onHelpClick}>
+                              <button class="icon-button" @click=${this._handleHelpClick}>
                                   <?xml version="1.0" encoding="UTF-8"?><svg
                                       width="24px"
                                       height="24px"
@@ -361,11 +397,11 @@ export class AppHeader extends LitElement {
                         : ''}
                     ${this.currentView === 'assistant'
                         ? html`
-                              <button @click=${this.onHideToggleClick} class="button">
-                                  Hide&nbsp;&nbsp;<span class="key" style="pointer-events: none;">${cheddar.isMacOS ? 'Cmd' : 'Ctrl'}</span
+                              <button @click=${this._handleHideToggleClick} class="button">
+                                  Hide&nbsp;&nbsp;<span class="key" style="pointer-events: none;">${navigator.platform.includes('Mac') ? 'Cmd' : 'Ctrl'}</span
                                   >&nbsp;&nbsp;<span class="key">&bsol;</span>
                               </button>
-                              <button @click=${this.onCloseClick} class="icon-button window-close">
+                              <button @click=${this._handleCloseClick} class="icon-button window-close">
                                   <?xml version="1.0" encoding="UTF-8"?><svg
                                       width="24px"
                                       height="24px"
@@ -386,7 +422,7 @@ export class AppHeader extends LitElement {
                               </button>
                           `
                         : html`
-                              <button @click=${this.isNavigationView() ? this.onBackClick : this.onCloseClick} class="icon-button window-close">
+                              <button @click=${this.isNavigationView() ? this._handleBackClick : this._handleCloseClick} class="icon-button window-close">
                                   <?xml version="1.0" encoding="UTF-8"?><svg
                                       width="24px"
                                       height="24px"

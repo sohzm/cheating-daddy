@@ -5,7 +5,7 @@ const os = require('os');
 // Default configuration
 const DEFAULT_CONFIG = {
     onboarded: false,
-    stealthLevel: "balanced", // "no", "balanced", "hyper"
+    stealthLevel: "balanced", // "visible", "balanced", "ultra"
     layout: "normal"
 };
 

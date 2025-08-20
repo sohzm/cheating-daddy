@@ -404,7 +404,7 @@ async function startMacOSAudioCapture(geminiSessionRef) {
     if (app.isPackaged) {
         systemAudioPath = path.join(process.resourcesPath, 'SystemAudioDump');
     } else {
-        systemAudioPath = path.join(__dirname, '../assets', 'SystemAudioDump');
+        systemAudioPath = path.join(__dirname, '../../web/assets', 'SystemAudioDump');
     }
 
     console.log('SystemAudioDump path:', systemAudioPath);

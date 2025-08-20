@@ -276,13 +276,23 @@ export class CheatingDaddyApp extends LitElement {
             return;
         }
 
-        await cheddar.initializeGemini(this.selectedProfile, this.selectedLanguage);
-        // Pass the screenshot interval as string (including 'manual' option)
-        cheddar.startCapture(this.selectedScreenshotInterval, this.selectedImageQuality);
-        this.responses = [];
-        this.currentResponseIndex = -1;
-        this.startTime = Date.now();
-        this.currentView = 'assistant';
+        // Navigate to live page instead of just changing the view
+        if (window.changePage) {
+            await window.changePage('live');
+        } else {
+            // Fallback: if on the main page, change view to assistant
+            await cheddar.initializeGemini(this.selectedProfile, this.selectedLanguage);
+            // Pass the screenshot interval as string (including 'manual' option)
+            try {
+                await cheddar.startCapture(this.selectedScreenshotInterval, this.selectedImageQuality);
+            } catch (captureError) {
+                console.error('Failed to start capture:', captureError);
+            }
+            this.responses = [];
+            this.currentResponseIndex = -1;
+            this.startTime = Date.now();
+            this.currentView = 'assistant';
+        }
     }
 
     async handleAPIKeyHelp() {

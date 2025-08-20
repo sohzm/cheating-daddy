@@ -1,0 +1,61 @@
+<!doctype html>
+<html>
+    <head>
+        <meta http-equiv="content-security-policy" content="script-src 'self' 'unsafe-inline'" />
+        <title>Cheating Daddy - Settings</title>
+        <link rel="stylesheet" href="../assets/shared-styles.css" />
+        <link rel="stylesheet" href="../assets/highlight-vscode-dark.min.css" />
+        <style>
+            .page-container {
+                display: block;
+                width: 100%;
+                height: 100vh;
+                background-color: var(--background-transparent);
+                color: var(--text-color);
+            }
+
+            .window-container {
+                height: 100vh;
+                border-radius: 7px;
+                overflow: hidden;
+            }
+
+            .container {
+                display: flex;
+                flex-direction: column;
+                height: 100%;
+            }
+
+            .main-content {
+                flex: 1;
+                padding: var(--main-content-padding);
+                overflow-y: auto;
+                margin-top: var(--main-content-margin-top);
+                border-radius: var(--content-border-radius);
+                transition: all 0.15s ease-out;
+                background: var(--main-content-background);
+                border: 1px solid var(--border-color);
+            }
+        </style>
+    </head>
+    <body>
+        <div class="page-container">
+            <div class="window-container">
+                <div class="container">
+                    <app-header current-view="customize"></app-header>
+                    <div class="main-content">
+                        <customize-view></customize-view>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script src="../assets/marked-4.3.0.min.js"></script>
+        <script src="../assets/highlight-11.9.0.min.js"></script>
+        <script src="../assets/lit-all-2.7.4.min.js"></script>
+        <script src="../assets/shared.js"></script>
+        <script type="module" src="../components/app/AppHeader.js"></script>
+        <script type="module" src="../components/views/CustomizeView.js"></script>
+        <script src="../utils/renderer.js"></script>
+    </body>
+</html>

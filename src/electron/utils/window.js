@@ -29,8 +29,8 @@ function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
     // Get config to check stealth level
     const { getLocalConfig } = require('../config');
     const config = getLocalConfig();
-    const isHyperStealth = config.stealthLevel === 'hyper';
-    const enableContentProtection = config.stealthLevel !== 'no'; // true for 'balanced' and 'hyper', false for 'no'
+    const isUltraStealth = config.stealthLevel === 'ultra';
+    const enableContentProtection = config.stealthLevel !== 'visible'; // true for 'balanced' and 'ultra', false for 'visible'
 
     // Get layout preference (default to 'normal')
     let windowWidth = 1100;
@@ -43,11 +43,12 @@ function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
         transparent: true,
         hasShadow: false,
         alwaysOnTop: true,
-        skipTaskbar: isHyperStealth,
-        hiddenInMissionControl: isHyperStealth,
+        skipTaskbar: isUltraStealth,
+        hiddenInMissionControl: isUltraStealth,
         webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false, // TODO: change to true
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: path.join(__dirname, '../preload.js'),
             backgroundThrottling: false,
             enableBlinkFeatures: 'GetDisplayMedia',
             webSecurity: true,
@@ -61,13 +62,17 @@ function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
         (request, callback) => {
             desktopCapturer.getSources({ types: ['screen'] }).then(sources => {
                 callback({ video: sources[0], audio: 'loopback' });
+            }).catch(error => {
+                console.error('Failed to get sources:', error);
+                // Call callback with null to indicate failure
+                callback(null);
             });
         },
         { useSystemPicker: true }
     );
 
     mainWindow.setResizable(false);
-    // Set content protection based on stealth level (true for balanced/hyper, false for no)
+    // Set content protection based on stealth level (true for balanced/ultra, false for visible)
     mainWindow.setContentProtection(enableContentProtection);
     mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 
@@ -82,10 +87,10 @@ function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
         mainWindow.setAlwaysOnTop(true, 'screen-saver', 1);
     }
 
-    mainWindow.loadFile(path.join(__dirname, '../index.html'));
+    mainWindow.loadFile(path.join(__dirname, '../../web/pages/home.html'));
 
-    // Only apply stealth features if hyper stealth mode is enabled
-    if (isHyperStealth) {
+    // Only apply stealth features if ultra stealth mode is enabled
+    if (isUltraStealth) {
         // Set window title to random name if provided
         if (randomNames && randomNames.windowTitle) {
             mainWindow.setTitle(randomNames.windowTitle);

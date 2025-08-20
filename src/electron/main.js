@@ -3,6 +3,7 @@ if (require('electron-squirrel-startup')) {
 }
 
 const { app, BrowserWindow, shell, ipcMain } = require('electron');
+const path = require('node:path');
 const { createWindow, updateGlobalShortcuts } = require('./utils/window');
 const { setupGeminiIpcHandlers, stopMacOSAudioCapture, sendToRenderer } = require('./utils/gemini');
 const { initializeRandomProcessNames } = require('./utils/processRandomizer');
@@ -16,10 +17,10 @@ let randomNames = null; // Store random names globally
 function createMainWindow() {
     // Get config to check stealth level
     const config = getLocalConfig();
-    const isHyperStealth = config.stealthLevel === 'hyper';
-    
-    // Only initialize random process names for hyper stealth
-    if (isHyperStealth) {
+    const isUltraStealth = config.stealthLevel === 'ultra';
+
+    // Only initialize random process names for ultra stealth
+    if (isUltraStealth) {
         randomNames = initializeRandomProcessNames();
     } else {
         randomNames = null;
@@ -32,10 +33,10 @@ function createMainWindow() {
 app.whenReady().then(async () => {
     // Get config to check stealth level
     const config = getLocalConfig();
-    const isHyperStealth = config.stealthLevel === 'hyper';
-    
-    // Only apply anti-analysis measures if hyper stealth mode is enabled
-    if (isHyperStealth) {
+    const isUltraStealth = config.stealthLevel === 'ultra';
+
+    // Only apply anti-analysis measures if ultra stealth mode is enabled
+    if (isUltraStealth) {
         await applyAntiAnalysisMeasures();
     }
 
@@ -151,7 +152,7 @@ function setupGeneralIpcHandlers() {
             if (mainWindow) {
                 // Get config to check stealth level
                 const config = getLocalConfig();
-                const enableContentProtection = config.stealthLevel !== 'no'; // true for 'balanced' and 'hyper', false for 'no'
+                const enableContentProtection = config.stealthLevel !== 'visible'; // true for 'balanced' and 'ultra', false for 'visible'
 
                 if (enableContentProtection) {
                     // Get content protection setting from localStorage via cheddar
@@ -171,12 +172,48 @@ function setupGeneralIpcHandlers() {
         }
     });
 
-    ipcMain.handle('get-random-display-name', async event => {
+        ipcMain.handle('get-random-display-name', async event => {
         try {
             return randomNames ? randomNames.displayName : 'System Monitor';
         } catch (error) {
             console.error('Error getting random display name:', error);
             return 'System Monitor';
+        }
+    });
+
+    ipcMain.handle('change-page-to', async (event, pageName) => {
+        console.log('Received change-page-to request for:', pageName);
+        try {
+            const pageMap = {
+                'home': 'home.html',
+                'main': 'home.html',
+                'onboarding': 'onboarding.html',
+                'settings': 'settings.html',
+                'customize': 'settings.html',
+                'live': 'live.html',
+                'assistant': 'live.html',
+                'history': 'history.html',
+                'advanced': 'advanced.html',
+                'help': 'help.html'
+            };
+
+            const htmlFile = pageMap[pageName];
+            if (!htmlFile) {
+                throw new Error(`Unknown page: ${pageName}`);
+            }
+
+            if (mainWindow) {
+                const pagePath = path.join(__dirname, '../web/pages', htmlFile);
+                console.log('Loading page:', pagePath);
+                await mainWindow.loadFile(pagePath);
+                console.log('Page loaded successfully');
+                return { success: true };
+            } else {
+                throw new Error('Main window not available');
+            }
+        } catch (error) {
+            console.error('Error changing page:', error);
+            return { success: false, error: error.message };
         }
     });
 }

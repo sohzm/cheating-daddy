@@ -404,6 +404,7 @@ export class CustomizeView extends LitElement {
         selectedScreenshotInterval: { type: String },
         selectedImageQuality: { type: String },
         layoutMode: { type: String },
+        selectedStealthLevel: { type: String },
         keybinds: { type: Object },
         googleSearchEnabled: { type: Boolean },
         backgroundTransparency: { type: Number },
@@ -413,6 +414,7 @@ export class CustomizeView extends LitElement {
         onScreenshotIntervalChange: { type: Function },
         onImageQualityChange: { type: Function },
         onLayoutModeChange: { type: Function },
+        onStealthLevelChange: { type: Function },
         advancedMode: { type: Boolean },
         onAdvancedModeChange: { type: Function },
     };
@@ -424,12 +426,14 @@ export class CustomizeView extends LitElement {
         this.selectedScreenshotInterval = '5';
         this.selectedImageQuality = 'medium';
         this.layoutMode = 'normal';
+        this.selectedStealthLevel = 'balanced';
         this.keybinds = this.getDefaultKeybinds();
         this.onProfileChange = () => {};
         this.onLanguageChange = () => {};
         this.onScreenshotIntervalChange = () => {};
         this.onImageQualityChange = () => {};
         this.onLayoutModeChange = () => {};
+        this.onStealthLevelChange = () => {};
         this.onAdvancedModeChange = () => {};
 
         // Google Search default
@@ -451,10 +455,36 @@ export class CustomizeView extends LitElement {
         this.loadFontSize();
     }
 
-    connectedCallback() {
+    async loadSettings() {
+        try {
+            // Load config from main process
+            const configResult = await window.electronAPI.invoke('get-config');
+            if (configResult.success) {
+                const config = configResult.config;
+                this.selectedStealthLevel = config.stealthLevel || 'balanced';
+                this.layoutMode = config.layout || 'normal';
+            }
+        } catch (error) {
+            console.warn('Could not load config from main process:', error);
+        }
+
+        // Load other settings from localStorage as before
+        this.selectedProfile = localStorage.getItem('selectedProfile') || 'interview';
+        this.selectedLanguage = localStorage.getItem('selectedLanguage') || 'en-US';
+        this.selectedScreenshotInterval = localStorage.getItem('screenshotInterval') || '5';
+        this.selectedImageQuality = localStorage.getItem('imageQuality') || 'medium';
+        this.googleSearchEnabled = localStorage.getItem('googleSearchEnabled') !== 'false';
+        this.advancedMode = localStorage.getItem('advancedMode') === 'true';
+        
+        this.requestUpdate();
+    }
+
+    async connectedCallback() {
         super.connectedCallback();
         // Load layout mode for display purposes
         this.loadLayoutMode();
+        // Load settings from config on initialization
+        await this.loadSettings();
         // Resize window for this view
         resizeLayout();
     }
@@ -565,8 +595,33 @@ export class CustomizeView extends LitElement {
 
     handleLayoutModeSelect(e) {
         this.layoutMode = e.target.value;
-        localStorage.setItem('layoutMode', this.layoutMode);
+        localStorage.setItem('layout', e.target.value);
         this.onLayoutModeChange(e.target.value);
+    }
+
+    async handleStealthLevelSelect(e) {
+        const newStealthLevel = e.target.value;
+        try {
+            const result = await window.electronAPI.invoke('set-stealth-level', newStealthLevel);
+            if (result.success) {
+                this.selectedStealthLevel = newStealthLevel;
+                // Also store in localStorage for backwards compatibility
+                localStorage.setItem('stealthProfile', newStealthLevel);
+                this.onStealthLevelChange(newStealthLevel);
+                // Show restart notification for stealth changes
+                alert('Stealth level updated. A restart is recommended for all changes to take full effect.');
+            } else {
+                console.error('Failed to set stealth level:', result.error);
+                alert('Failed to update stealth level: ' + result.error);
+                // Reset the select to the previous value
+                e.target.value = this.selectedStealthLevel;
+            }
+        } catch (error) {
+            console.error('Error setting stealth level:', error);
+            alert('Error updating stealth level: ' + error.message);
+            // Reset the select to the previous value
+            e.target.value = this.selectedStealthLevel;
+        }
     }
 
     handleCustomPromptInput(e) {
@@ -937,17 +992,13 @@ export class CustomizeView extends LitElement {
                     <div class="form-grid">
                         <div class="form-group">
                             <label class="form-label">Profile</label>
-                            <select class="form-control" .value=${localStorage.getItem('stealthProfile') || 'balanced'} @change=${e => {
-                                localStorage.setItem('stealthProfile', e.target.value);
-                                // We need to notify the main process to restart for some settings to apply
-                                alert('Restart the application for stealth changes to take full effect.');
-                            }}>
+                            <select class="form-control" .value=${this.selectedStealthLevel} @change=${this.handleStealthLevelSelect}>
                                 <option value="visible">Visible</option>
                                 <option value="balanced">Balanced</option>
                                 <option value="ultra">Ultra-Stealth</option>
                             </select>
                             <div class="form-description">
-                                Adjusts visibility and detection resistance. A restart is required for changes to apply.
+                                Adjusts visibility and detection resistance. Changes are saved automatically and take effect on restart.
                             </div>
                         </div>
                     </div>
