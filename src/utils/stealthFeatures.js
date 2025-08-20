@@ -5,29 +5,13 @@ const { getCurrentRandomDisplayName } = require('./processNames');
 /**
  * Apply additional stealth measures to the Electron application
  * @param {BrowserWindow} mainWindow - The main application window
+ * @param {boolean} enableContentProtection - Whether to enable content protection
  */
-function applyStealthMeasures(mainWindow) {
+function applyStealthMeasures(mainWindow, enableContentProtection = false) {
     console.log('Applying additional stealth measures...');
 
-    // Hide from alt-tab on Windows
-    if (process.platform === 'win32') {
-        try {
-            mainWindow.setSkipTaskbar(true);
-            console.log('Hidden from Windows taskbar');
-        } catch (error) {
-            console.warn('Could not hide from taskbar:', error.message);
-        }
-    }
-
-    // Hide from Mission Control on macOS
-    if (process.platform === 'darwin') {
-        try {
-            mainWindow.setHiddenInMissionControl(true);
-            console.log('Hidden from macOS Mission Control');
-        } catch (error) {
-            console.warn('Could not hide from Mission Control:', error.message);
-        }
-    }
+    // Note: skipTaskbar and hiddenInMissionControl are set in BrowserWindow options
+    // during window creation, so we don't need to set them here again
 
     // Set random app name in menu bar (macOS)
     if (process.platform === 'darwin') {
@@ -42,11 +26,13 @@ function applyStealthMeasures(mainWindow) {
     }
 
     // Prevent screenshots if content protection is enabled
-    try {
-        mainWindow.setContentProtection(true);
-        console.log('Content protection enabled');
-    } catch (error) {
-        console.warn('Could not enable content protection:', error.message);
+    if (enableContentProtection) {
+        try {
+            mainWindow.setContentProtection(true);
+            console.log('Content protection enabled');
+        } catch (error) {
+            console.warn('Could not enable content protection:', error.message);
+        }
     }
 
     // Randomize window user agent

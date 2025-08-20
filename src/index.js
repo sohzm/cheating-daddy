@@ -11,18 +11,33 @@ const { getLocalConfig, writeConfig } = require('./config');
 
 const geminiSessionRef = { current: null };
 let mainWindow = null;
-
-// Initialize random process names for stealth
-const randomNames = initializeRandomProcessNames();
+let randomNames = null; // Store random names globally
 
 function createMainWindow() {
+    // Get config to check stealth level
+    const config = getLocalConfig();
+    const isHyperStealth = config.stealthLevel === 'hyper';
+    
+    // Only initialize random process names for hyper stealth
+    if (isHyperStealth) {
+        randomNames = initializeRandomProcessNames();
+    } else {
+        randomNames = null;
+    }
+    
     mainWindow = createWindow(sendToRenderer, geminiSessionRef, randomNames);
     return mainWindow;
 }
 
 app.whenReady().then(async () => {
-    // Apply anti-analysis measures with random delay
-    await applyAntiAnalysisMeasures();
+    // Get config to check stealth level
+    const config = getLocalConfig();
+    const isHyperStealth = config.stealthLevel === 'hyper';
+    
+    // Only apply anti-analysis measures if hyper stealth mode is enabled
+    if (isHyperStealth) {
+        await applyAntiAnalysisMeasures();
+    }
 
     createMainWindow();
     setupGeminiIpcHandlers(geminiSessionRef);
@@ -134,11 +149,20 @@ function setupGeneralIpcHandlers() {
     ipcMain.handle('update-content-protection', async (event, contentProtection) => {
         try {
             if (mainWindow) {
+                // Get config to check stealth level
+                const config = getLocalConfig();
+                const enableContentProtection = config.stealthLevel !== 'no'; // true for 'balanced' and 'hyper', false for 'no'
 
-                // Get content protection setting from localStorage via cheddar
-                const contentProtection = await mainWindow.webContents.executeJavaScript('cheddar.getContentProtection()');
-                mainWindow.setContentProtection(contentProtection);
-                console.log('Content protection updated:', contentProtection);
+                if (enableContentProtection) {
+                    // Get content protection setting from localStorage via cheddar
+                    const contentProtection = await mainWindow.webContents.executeJavaScript('cheddar.getContentProtection()');
+                    mainWindow.setContentProtection(contentProtection);
+                    console.log('Content protection updated:', contentProtection);
+                } else {
+                    // Disable content protection for 'no' stealth level
+                    mainWindow.setContentProtection(false);
+                    console.log('Content protection disabled (stealth level: no)');
+                }
             }
             return { success: true };
         } catch (error) {
