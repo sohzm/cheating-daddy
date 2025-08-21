@@ -26,9 +26,9 @@ function ensureDataDirectories() {
 }
 
 function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
-    // Get layout preference (default to 'normal')
-    let windowWidth = 1100;
-    let windowHeight = 800;
+    // Get layout preference (default to 'normal') - Optimal height, comfortable width
+    let windowWidth = 800;
+    let windowHeight = 450;
 
     const mainWindow = new BrowserWindow({
         width: windowWidth,
@@ -485,28 +485,28 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
 
             let targetWidth, targetHeight;
 
-            // Determine base size from layout mode
-            const baseWidth = layoutMode === 'compact' ? 700 : 900;
-            const baseHeight = layoutMode === 'compact' ? 500 : 600;
+            // Determine base size from layout mode - Optimal height, comfortable width
+            const baseWidth = layoutMode === 'compact' ? 650 : 800;
+            const baseHeight = layoutMode === 'compact' ? 350 : 450;
 
             // Adjust height based on view
             switch (viewName) {
                 case 'customize':
                 case 'settings':
                     targetWidth = baseWidth;
-                    targetHeight = layoutMode === 'compact' ? 620 : 720;
+                    targetHeight = layoutMode === 'compact' ? 480 : 580;
                     break;
                 case 'help':
                     targetWidth = baseWidth;
-                    targetHeight = layoutMode === 'compact' ? 650 : 750;
+                    targetHeight = layoutMode === 'compact' ? 450 : 550;
                     break;
                 case 'history':
                     targetWidth = baseWidth;
-                    targetHeight = layoutMode === 'compact' ? 650 : 750;
+                    targetHeight = layoutMode === 'compact' ? 450 : 550;
                     break;
                 case 'advanced':
                     targetWidth = baseWidth;
-                    targetHeight = layoutMode === 'compact' ? 600 : 700;
+                    targetHeight = layoutMode === 'compact' ? 400 : 500;
                     break;
                 case 'main':
                 case 'assistant':
