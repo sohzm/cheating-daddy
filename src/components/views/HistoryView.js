@@ -302,6 +302,152 @@ export class HistoryView extends LitElement {
             background: rgba(255, 0, 0, 0.1);
             color: #ff4444;
         }
+
+        .export-button {
+            background: var(--button-background);
+            color: var(--text-color);
+            border: 1px solid var(--button-border);
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s ease;
+            margin-bottom: 16px;
+        }
+
+        .export-button:hover {
+            background: var(--hover-background);
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal {
+            background: var(--main-content-background);
+            border: 1px solid var(--button-border);
+            border-radius: 8px;
+            padding: 20px;
+            min-width: 300px;
+            max-width: 400px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .modal-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-color);
+        }
+
+        .modal-close {
+            background: transparent;
+            border: none;
+            color: var(--description-color);
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            transition: all 0.15s ease;
+        }
+
+        .modal-close:hover {
+            background: var(--hover-background);
+            color: var(--text-color);
+        }
+
+        .modal-content {
+            margin-bottom: 20px;
+        }
+
+        .modal-description {
+            font-size: 12px;
+            color: var(--description-color);
+            margin-bottom: 16px;
+            line-height: 1.4;
+        }
+
+        .export-options {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .export-option {
+            background: var(--input-background);
+            border: 1px solid var(--button-border);
+            border-radius: 6px;
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .export-option:hover {
+            background: var(--hover-background);
+            border-color: var(--focus-border-color);
+        }
+
+        .export-option-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-color);
+            margin-bottom: 4px;
+        }
+
+        .export-option-description {
+            font-size: 11px;
+            color: var(--description-color);
+        }
+
+        .modal-footer {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+
+        .modal-button {
+            background: var(--button-background);
+            color: var(--text-color);
+            border: 1px solid var(--button-border);
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .modal-button:hover {
+            background: var(--hover-background);
+        }
+
+        .modal-button.secondary {
+            background: transparent;
+            color: var(--description-color);
+        }
+
+        .modal-button.secondary:hover {
+            background: var(--hover-background);
+            color: var(--text-color);
+        }
     `;
 
     static properties = {
@@ -310,6 +456,8 @@ export class HistoryView extends LitElement {
         loading: { type: Boolean },
         activeTab: { type: String },
         savedResponses: { type: Array },
+        showExportModal: { type: Boolean },
+        exportType: { type: String },
     };
 
     constructor() {
@@ -318,6 +466,8 @@ export class HistoryView extends LitElement {
         this.selectedSession = null;
         this.loading = true;
         this.activeTab = 'sessions';
+        this.showExportModal = false;
+        this.exportType = '';
         // Load saved responses from localStorage
         try {
             this.savedResponses = JSON.parse(localStorage.getItem('savedResponses') || '[]');
@@ -400,6 +550,128 @@ export class HistoryView extends LitElement {
         this.requestUpdate();
     }
 
+    openExportModal(type) {
+        this.exportType = type;
+        this.showExportModal = true;
+        this.requestUpdate();
+    }
+
+    closeExportModal() {
+        this.showExportModal = false;
+        this.exportType = '';
+        this.requestUpdate();
+    }
+
+    handleExportClick() {
+        if (this.activeTab === 'sessions') {
+            this.openExportModal('sessions');
+        } else {
+            this.openExportModal('saved');
+        }
+    }
+
+    exportSessionsToMarkdown() {
+        if (this.sessions.length === 0) {
+            alert('No sessions to export');
+            return;
+        }
+
+        let markdown = '# Interview Sessions\n\n';
+        
+        this.sessions.forEach(session => {
+            const sessionDate = this.formatDate(session.timestamp);
+            markdown += `## ${sessionDate}\n\n`;
+            
+            if (session.conversationHistory) {
+                session.conversationHistory.forEach(turn => {
+                    if (turn.timestamp) {
+                        const time = this.formatTime(turn.timestamp);
+                        markdown += `### ${time}\n`;
+                    }
+                    
+                    if (turn.transcription) {
+                        markdown += `**Them**: ${turn.transcription}\n\n`;
+                    }
+                    
+                    if (turn.ai_response) {
+                        markdown += `**Suggestion**: ${turn.ai_response}\n\n`;
+                    }
+                });
+            }
+            
+            markdown += '---\n\n';
+        });
+
+        this.downloadFile(markdown, 'interview-sessions.md');
+        this.closeExportModal();
+    }
+
+    exportSavedResponsesToMarkdown() {
+        if (this.savedResponses.length === 0) {
+            alert('No saved responses to export');
+            return;
+        }
+
+        let markdown = '# Saved Responses\n\n';
+        const profileNames = this.getProfileNames();
+        
+        this.savedResponses.forEach((saved, index) => {
+            const timestamp = this.formatTimestamp(saved.timestamp);
+            const profileName = profileNames[saved.profile] || saved.profile;
+            
+            markdown += `## Response ${index + 1}\n\n`;
+            markdown += `**Profile**: ${profileName}\n`;
+            markdown += `**Date**: ${timestamp}\n\n`;
+            markdown += `**Response**:\n\n${saved.response}\n\n`;
+            markdown += '---\n\n';
+        });
+
+        this.downloadFile(markdown, 'saved-responses.md');
+        this.closeExportModal();
+    }
+
+    exportCurrentSessionToMarkdown() {
+        if (!this.selectedSession) {
+            alert('No session selected');
+            return;
+        }
+
+        const sessionDate = this.formatDate(this.selectedSession.timestamp);
+        let markdown = `# Interview Session - ${sessionDate}\n\n`;
+        
+        if (this.selectedSession.conversationHistory) {
+            this.selectedSession.conversationHistory.forEach(turn => {
+                if (turn.timestamp) {
+                    const time = this.formatTime(turn.timestamp);
+                    markdown += `## ${time}\n`;
+                }
+                
+                if (turn.transcription) {
+                    markdown += `**Them**: ${turn.transcription}\n\n`;
+                }
+                
+                if (turn.ai_response) {
+                    markdown += `**Suggestion**: ${turn.ai_response}\n\n`;
+                }
+            });
+        }
+
+        this.downloadFile(markdown, `interview-session-${sessionDate.replace(/[^a-zA-Z0-9]/g, '-')}.md`);
+        this.closeExportModal();
+    }
+
+    downloadFile(content, filename) {
+        const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    }
+
     getProfileNames() {
         return {
             interview: 'Job Interview',
@@ -427,6 +699,13 @@ export class HistoryView extends LitElement {
 
         return html`
             <div class="sessions-list">
+                <button class="export-button" @click=${this.handleExportClick}>
+                    <svg width="16px" height="16px" stroke-width="1.7" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 3V21M3 9L12 2L21 9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
+                        <path d="M7 16V19H17V16" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
+                    </svg>
+                    Export All Sessions
+                </button>
                 ${this.sessions.map(
                     session => html`
                         <div class="session-item" @click=${() => this.handleSessionClick(session)}>
@@ -456,6 +735,13 @@ export class HistoryView extends LitElement {
 
         return html`
             <div class="sessions-list">
+                <button class="export-button" @click=${this.handleExportClick}>
+                    <svg width="16px" height="16px" stroke-width="1.7" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 3V21M3 9L12 2L21 9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
+                        <path d="M7 16V19H17V16" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
+                    </svg>
+                    Export All Saved Responses
+                </button>
                 ${this.savedResponses.map(
                     (saved, index) => html`
                         <div class="saved-response-item">
@@ -543,6 +829,13 @@ export class HistoryView extends LitElement {
                         <span>Suggestion</span>
                     </div>
                 </div>
+                <button class="export-button" @click=${() => this.exportCurrentSessionToMarkdown()}>
+                    <svg width="16px" height="16px" stroke-width="1.7" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 3V21M3 9L12 2L21 9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
+                        <path d="M7 16V19H17V16" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
+                    </svg>
+                    Export Session
+                </button>
             </div>
             <div class="conversation-view">
                 ${messages.length > 0
@@ -552,9 +845,72 @@ export class HistoryView extends LitElement {
         `;
     }
 
-    render() {
+    renderExportModal() {
+        if (!this.showExportModal) return html``;
+
+        let title, description, options;
+
+        if (this.exportType === 'sessions') {
+            title = 'Export Sessions';
+            description = 'Choose how you want to export your conversation sessions:';
+            options = [
+                {
+                    title: 'Export All Sessions',
+                    description: 'Export all conversation sessions to a single markdown file',
+                    action: this.exportSessionsToMarkdown
+                },
+                {
+                    title: 'Export Current Session',
+                    description: 'Export only the currently selected session to a markdown file',
+                    action: this.exportCurrentSessionToMarkdown
+                }
+            ];
+        } else if (this.exportType === 'saved') {
+            title = 'Export Saved Responses';
+            description = 'Export all your saved responses to a markdown file:';
+            options = [
+                {
+                    title: 'Export All Saved Responses',
+                    description: 'Export all saved responses with profile and timestamp metadata',
+                    action: this.exportSavedResponsesToMarkdown
+                }
+            ];
+        }
+
+        return html`
+            <div class="modal-overlay" @click=${this.closeExportModal}>
+                <div class="modal" @click=${e => e.stopPropagation()}>
+                    <div class="modal-header">
+                        <div class="modal-title">${title}</div>
+                        <button class="modal-close" @click=${this.closeExportModal}>×</button>
+                    </div>
+                    <div class="modal-content">
+                        <div class="modal-description">${description}</div>
+                        <div class="export-options">
+                            ${options.map(option => html`
+                                <div class="export-option" @click=${option.action}>
+                                    <div class="export-option-title">${option.title}</div>
+                                    <div class="export-option-description">${option.description}</div>
+                                </div>
+                            `)}
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="modal-button secondary" @click=${this.closeExportModal}>Cancel</button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+  render() {
         if (this.selectedSession) {
-            return html`<div class="history-container">${this.renderConversationView()}</div>`;
+            return html`
+                <div class="history-container">
+                    ${this.renderConversationView()}
+                    ${this.renderExportModal()}
+                </div>
+            `;
         }
 
         return html`
@@ -568,6 +924,7 @@ export class HistoryView extends LitElement {
                     </button>
                 </div>
                 ${this.activeTab === 'sessions' ? this.renderSessionsList() : this.renderSavedResponses()}
+                ${this.renderExportModal()}
             </div>
         `;
     }
