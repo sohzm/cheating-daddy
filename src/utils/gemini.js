@@ -242,7 +242,7 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
 
     try {
         const session = await client.live.connect({
-            model: 'gemini-live-2.5-flash-preview',
+            model: 'gemini-2.5-flash-live-preview',
             callbacks: {
                 onopen: function () {
                     sendToRenderer('update-status', 'Live session connected');
