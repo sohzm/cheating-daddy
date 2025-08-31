@@ -170,32 +170,12 @@ export class MainView extends LitElement {
             transform: scale(1);
         }
 
-        .api-key-popup-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 16px;
-        }
-
         .api-key-popup-title {
             font-size: 16px;
             font-weight: 600;
             color: var(--text-color);
-        }
-
-        .api-key-popup-close {
-            background: none;
-            border: none;
-            color: var(--description-color);
-            cursor: pointer;
-            padding: 4px;
-            border-radius: 4px;
-            transition: all 0.2s ease;
-        }
-
-        .api-key-popup-close:hover {
-            background: var(--input-focus-background);
-            color: var(--text-color);
+            margin-bottom: 16px;
+            text-align: center;
         }
 
         .api-key-popup-content {
@@ -219,6 +199,21 @@ export class MainView extends LitElement {
             letter-spacing: 2px;
         }
 
+        .api-key-info {
+            font-size: 12px;
+            color: var(--description-color);
+            opacity: 0.8;
+            text-align: center;
+            margin-top: 8px;
+        }
+
+        .api-key-popup-bottom {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-top: 20px;
+        }
+
         .api-key-button {
             background: var(--start-button-background);
             color: var(--start-button-color);
@@ -230,19 +225,13 @@ export class MainView extends LitElement {
             cursor: pointer;
             transition: all 0.2s ease;
             white-space: nowrap;
+            align-self: flex-end;
+            margin-left: auto;
         }
 
         .api-key-button:hover {
             background: var(--start-button-hover-background);
             border-color: var(--start-button-hover-border);
-        }
-
-        .api-key-info {
-            font-size: 12px;
-            color: var(--description-color);
-            opacity: 0.8;
-            text-align: center;
-            margin-top: 8px;
         }
 
         .show-key-button {
@@ -440,8 +429,8 @@ export class MainView extends LitElement {
                     @input=${this.handleInput}
                     class="${this.showApiKeyError ? 'api-key-error' : ''}"
                 />
-                <button @click=${this.handleApiKeyButtonClick} class="show-key-button" title="Show last 4 letters of API key">
-                    🔒
+                <button @click=${this.handleApiKeyButtonClick} class="show-key-button" title="Show the last 4 letters of the API key">
+                    👁️
                 </button>
                 <button @click=${this.handleStartClick} class="start-button ${this.isInitializing ? 'initializing' : ''}">
                     ${this.getStartButtonText()}
@@ -456,26 +445,20 @@ export class MainView extends LitElement {
             ${this.showApiKeyPopup ? html`
                 <div class="api-key-popup-overlay show" @click=${this.handleCloseApiKeyPopup}>
                     <div class="api-key-popup" @click=${(e) => e.stopPropagation()}>
-                        <div class="api-key-popup-header">
-                            <div class="api-key-popup-title">API Key Identifier</div>
-                            <button @click=${this.handleCloseApiKeyPopup} class="api-key-popup-close" title="Close">
-                                <svg width="16" height="16" viewBox="0 0 24 24" stroke-width="2" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-                                    <path d="M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-                                </svg>
-                            </button>
-                        </div>
+                        <div class="api-key-popup-title">API Key Identifier</div>
                         <div class="api-key-popup-content">
                             Last 4 letters of your API key to help identify which Google account you're using:
                         </div>
                         <div class="api-key-display">
                             ${this.getLastFourLetters()}
                         </div>
-                        <button @click=${this.handleCloseApiKeyPopup} class="api-key-button">
-                            Got it
-                        </button>
-                        <div class="api-key-info">
-                            This only shows the last 4 letters for identification purposes
+                        <div class="api-key-popup-bottom">
+                            <div class="api-key-info">
+                                This only shows the last 4 letters for identification purposes
+                            </div>
+                            <button @click=${this.handleCloseApiKeyPopup} class="api-key-button">
+                                Got it
+                            </button>
                         </div>
                     </div>
                 </div>
