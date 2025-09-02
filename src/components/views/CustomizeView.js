@@ -15,22 +15,22 @@ export class CustomizeView extends LitElement {
 
         :host {
             display: block;
-            padding: 12px;
+            padding: 8px;
             margin: 0 auto;
-            max-width: 700px;
+            max-width: 750px;
         }
 
         .settings-container {
             display: grid;
-            gap: 12px;
-            padding-bottom: 20px;
+            gap: 8px;
+            padding-bottom: 10px;
         }
 
         .settings-section {
             background: var(--card-background, rgba(255, 255, 255, 0.04));
             border: 1px solid var(--card-border, rgba(255, 255, 255, 0.1));
             border-radius: 6px;
-            padding: 16px;
+            padding: 12px;
             backdrop-filter: blur(10px);
         }
 
@@ -38,7 +38,7 @@ export class CustomizeView extends LitElement {
             display: flex;
             align-items: center;
             gap: 8px;
-            margin-bottom: 12px;
+            margin-bottom: 8px;
             font-size: 14px;
             font-weight: 600;
             color: var(--text-color);
@@ -56,13 +56,13 @@ export class CustomizeView extends LitElement {
 
         .form-grid {
             display: grid;
-            gap: 12px;
+            gap: 8px;
         }
 
         .form-row {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 12px;
+            gap: 8px;
             align-items: start;
         }
 
@@ -75,7 +75,7 @@ export class CustomizeView extends LitElement {
         .form-group {
             display: flex;
             flex-direction: column;
-            gap: 6px;
+            gap: 4px;
         }
 
         .form-group.full-width {
@@ -95,7 +95,7 @@ export class CustomizeView extends LitElement {
             font-size: 11px;
             color: var(--description-color, rgba(255, 255, 255, 0.5));
             line-height: 1.3;
-            margin-top: 2px;
+            margin-top: 1px;
         }
 
         .form-control {
@@ -276,8 +276,8 @@ export class CustomizeView extends LitElement {
             color: var(--note-color, rgba(255, 255, 255, 0.4));
             font-style: italic;
             text-align: center;
-            margin-top: 10px;
-            padding: 8px;
+            margin-top: 6px;
+            padding: 6px;
             background: var(--note-background, rgba(255, 255, 255, 0.02));
             border-radius: 4px;
             border: 1px solid var(--note-border, rgba(255, 255, 255, 0.08));
@@ -287,8 +287,8 @@ export class CustomizeView extends LitElement {
             display: flex;
             align-items: center;
             gap: 8px;
-            margin-bottom: 10px;
-            padding: 8px;
+            margin-bottom: 6px;
+            padding: 6px;
             background: var(--checkbox-background, rgba(255, 255, 255, 0.02));
             border-radius: 4px;
             border: 1px solid var(--checkbox-border, rgba(255, 255, 255, 0.06));
@@ -406,6 +406,7 @@ export class CustomizeView extends LitElement {
         layoutMode: { type: String },
         keybinds: { type: Object },
         googleSearchEnabled: { type: Boolean },
+        vadEnabled: { type: Boolean },
         backgroundTransparency: { type: Number },
         fontSize: { type: Number },
         onProfileChange: { type: Function },
@@ -438,6 +439,9 @@ export class CustomizeView extends LitElement {
         // Advanced mode default
         this.advancedMode = false;
 
+        // VAD (Voice Activity Detection) default
+        this.vadEnabled = false;
+
         // Background transparency default
         this.backgroundTransparency = 0.8;
 
@@ -447,6 +451,7 @@ export class CustomizeView extends LitElement {
         this.loadKeybinds();
         this.loadGoogleSearchSettings();
         this.loadAdvancedModeSettings();
+        this.loadVADSettings();
         this.loadBackgroundTransparency();
         this.loadFontSize();
     }
@@ -800,6 +805,30 @@ export class CustomizeView extends LitElement {
         }
     }
 
+    loadVADSettings() {
+        const vadEnabled = localStorage.getItem('vadEnabled');
+        if (vadEnabled !== null) {
+            this.vadEnabled = vadEnabled === 'true';
+        }
+    }
+
+    async handleVADChange(e) {
+        this.vadEnabled = e.target.checked;
+        localStorage.setItem('vadEnabled', this.vadEnabled.toString());
+
+        // Notify main process if available
+        if (window.require) {
+            try {
+                const { ipcRenderer } = window.require('electron');
+                await ipcRenderer.invoke('update-vad-setting', this.vadEnabled);
+            } catch (error) {
+                console.error('Failed to notify main process of VAD setting change:', error);
+            }
+        }
+
+        this.requestUpdate();
+    }
+
     async handleAdvancedModeChange(e) {
         this.advancedMode = e.target.checked;
         localStorage.setItem('advancedMode', this.advancedMode.toString());
@@ -924,6 +953,24 @@ export class CustomizeView extends LitElement {
                             </select>
                             <div class="form-description">
                                 Choose which audio sources to capture for the AI.
+                            </div>
+                        </div>
+
+                        <div class="form-group full-width">
+                            <div class="checkbox-group">
+                                <input
+                                    type="checkbox"
+                                    class="checkbox-input"
+                                    id="vad-enabled"
+                                    .checked=${this.vadEnabled}
+                                    @change=${this.handleVADChange}
+                                />
+                                <label for="vad-enabled" class="checkbox-label">Enable Voice Activity Detection (VAD)</label>
+                            </div>
+                            <div class="form-description" style="margin-left: 24px; margin-top: -8px;">
+                                Intelligently detect when you're speaking and only capture audio during speech. 
+                                Improves privacy by avoiding recording of silence and background noise.
+                                <br /><strong>Benefits:</strong> Better privacy, reduced processing, natural conversation flow
                             </div>
                         </div>
                     </div>
