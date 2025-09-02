@@ -1,46 +1,59 @@
 {
-    "name": "cheating-daddy",
-    "productName": "cheating-daddy",
-    "version": "0.4.0",
-    "description": "cheating daddy",
-    "main": "src/index.js",
-    "scripts": {
-        "start": "electron-forge start",
-        "package": "electron-forge package",
-        "make": "electron-forge make",
-        "publish": "electron-forge publish",
-        "lint": "echo \"No linting configured\"",
-        "test": "vitest run"
-    },
-    "keywords": [
-        "cheating daddy",
-        "cheating daddy ai",
-        "cheating daddy ai assistant",
-        "cheating daddy ai assistant for interviews",
-        "cheating daddy ai assistant for interviews"
-    ],
-    "author": {
-        "name": "sohzm",
-        "email": "sohambharambe9@gmail.com"
-    },
-    "license": "GPL-3.0",
-    "dependencies": {
-        "@google/genai": "^1.2.0",
-        "electron-squirrel-startup": "^1.0.1"
-    },
-    "devDependencies": {
-        "@electron-forge/cli": "^7.8.1",
-        "@electron-forge/maker-deb": "^7.8.1",
-        "@electron-forge/maker-dmg": "^7.8.1",
-        "@electron-forge/maker-rpm": "^7.8.1",
-        "@electron-forge/maker-squirrel": "^7.8.1",
-        "@electron-forge/maker-zip": "^7.8.1",
-        "@electron-forge/plugin-auto-unpack-natives": "^7.8.1",
-        "@electron-forge/plugin-fuses": "^7.8.1",
-        "@electron/fuses": "^1.8.0",
-        "@reforged/maker-appimage": "^5.0.0",
-        "vitest": "^1.6.1",
-        "jsdom": "^23.2.0",
-        "electron": "^30.0.5"
-    }
+  "name": "cheating-daddy",
+  "productName": "CheatingDaddy",
+  "version": "1.1.0",
+  "description": "Cheating Daddy AI assistant with DeMoD Communications Framework (DCF) for low-latency P2P networking with smart glasses and devices. Complies with GPL-3.0 and U.S. export regulations (no encryption).",
+  "main": "src/main.js",
+  "keywords": [
+    "cheating daddy",
+    "cheating daddy ai",
+    "cheating daddy ai assistant",
+    "cheating daddy ai assistant for interviews",
+    "dcf",
+    "p2p networking",
+    "smart glasses"
+  ],
+  "author": {
+    "name": "sohzm",
+    "email": "sohambharambe9@gmail.com"
+  },
+  "license": "GPL-3.0",
+  "scripts": {
+    "start": "electron-forge start",
+    "package": "electron-forge package",
+    "make": "electron-forge make",
+    "publish": "electron-forge publish",
+    "lint": "eslint src/",
+    "test": "jest",
+    "test:vitest": "vitest run",
+    "proto": "protoc --js_out=import_style=commonjs:. --grpc_out=. --plugin=protoc-gen-grpc=node_modules/.bin/grpc_tools_node_protoc_plugin messages.proto services.proto"
+  },
+  "dependencies": {
+    "@abandonware/noble": "^1.9.2-15",
+    "@google/genai": "^1.2.0",
+    "@grpc/grpc-js": "^1.11.0",
+    "@grpc/proto-loader": "^0.7.0",
+    "mdns": "^2.7.2",
+    "winston": "^3.8.2",
+    "yargs": "^17.7.2",
+    "electron-squirrel-startup": "^1.0.1"
+  },
+  "devDependencies": {
+    "@electron-forge/cli": "^7.8.1",
+    "@electron-forge/maker-deb": "^7.8.1",
+    "@electron-forge/maker-dmg": "^7.8.1",
+    "@electron-forge/maker-rpm": "^7.8.1",
+    "@electron-forge/maker-squirrel": "^7.8.1",
+    "@electron-forge/maker-zip": "^7.8.1",
+    "@electron-forge/plugin-auto-unpack-natives": "^7.8.1",
+    "@electron-forge/plugin-fuses": "^7.8.1",
+    "@electron/fuses": "^1.8.0",
+    "@reforged/maker-appimage": "^5.0.0",
+    "electron": "^30.0.5",
+    "jest": "^29.7.0",
+    "eslint": "^8.0.0",
+    "electron-builder": "^latest",
+    "vitest": "^1.6.1",
+    "jsdom": "^23.2.0"
+  }
 }
