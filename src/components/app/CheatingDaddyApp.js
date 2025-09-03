@@ -139,6 +139,8 @@ export class CheatingDaddyApp extends LitElement {
 
         // Apply layout mode to document root
         this.updateLayoutMode();
+        // Apply initial transparency state
+        this.updateTransparency();
     }
 
     connectedCallback() {
@@ -155,6 +157,7 @@ export class CheatingDaddyApp extends LitElement {
             });
             ipcRenderer.on('click-through-toggled', (_, isEnabled) => {
                 this._isClickThrough = isEnabled;
+                this.updateTransparency();
             });
         }
     }
@@ -496,6 +499,15 @@ export class CheatingDaddyApp extends LitElement {
             document.documentElement.classList.add('compact-layout');
         } else {
             document.documentElement.classList.remove('compact-layout');
+        }
+    }
+
+    updateTransparency() {
+        // Apply or remove transparency class when mouse events are toggled
+        if (this._isClickThrough) {
+            document.documentElement.classList.add('mouse-events-disabled');
+        } else {
+            document.documentElement.classList.remove('mouse-events-disabled');
         }
     }
 
