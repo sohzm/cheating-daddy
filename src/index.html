@@ -71,6 +71,27 @@
                 --content-border-radius: 4px;
             }
 
+            /* Transparency when mouse events are disabled */
+            :root.mouse-events-disabled {
+                --header-background: rgba(0, 0, 0, 0.3);
+                --main-content-background: rgba(0, 0, 0, 0.3);
+                --button-background: rgba(0, 0, 0, 0.2);
+                --input-background: rgba(0, 0, 0, 0.15);
+                --preview-video-background: rgba(0, 0, 0, 0.4);
+                --screen-option-background: rgba(0, 0, 0, 0.2);
+                --screen-option-hover-background: rgba(0, 0, 0, 0.3);
+            }
+
+            :root.mouse-events-disabled cheating-daddy-app {
+                opacity: 0.7;
+                transition: opacity 0.3s ease;
+            }
+
+            /* Add transition to the main elements as well */
+            cheating-daddy-app {
+                transition: opacity 0.3s ease;
+            }
+
             html,
             body {
                 margin: 0;
