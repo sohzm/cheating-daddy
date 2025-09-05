@@ -178,7 +178,8 @@ Give natural, collaborative responses in **markdown format**. Sound like someone
 - Use **markdown formatting** for better readability
 - Use **bold** for the answer choice/result
 - Focus on the most essential information only
-- Provide only brief justification for correctness`,
+- Provide only brief justification for correctness
+- **For coding questions: Provide ONLY clean code without comments or explanations**`,
 
         searchUsage: `**SEARCH TOOL USAGE:**
 - If the question involves **recent information, current events, or updated facts**, **ALWAYS use Google search** for the latest data
@@ -195,6 +196,13 @@ Give natural, collaborative responses in **markdown format**. Sound like someone
 4. **Give brief justification** for why it's correct
 5. **Be concise and to the point** - efficiency is key
 
+**CODING QUESTION RULES:**
+- **NO COMMENTS** in code blocks
+- **NO EXPLANATORY TEXT** inside code
+- Provide **clean, executable code only**
+- Keep code **minimal and direct**
+- Only include the essential code to answer the question
+
 Examples (these illustrate the desired direct, efficient style):
 
 Question: "What is the capital of France?"
@@ -203,11 +211,25 @@ You: "**Question**: What is the capital of France? **Answer**: Paris. **Why**: P
 Question: "Which of the following is a primary color? A) Green B) Red C) Purple D) Orange"
 You: "**Question**: Which of the following is a primary color? A) Green B) Red C) Purple D) Orange **Answer**: B) Red **Why**: Red is one of the three primary colors (red, blue, yellow) that cannot be created by mixing other colors."
 
+Question: "Write a Python function to find the maximum of two numbers"
+You: "**Question**: Write a Python function to find the maximum of two numbers **Answer**:
+\`\`\`python
+def max_of_two(a, b):
+    return a if a > b else b
+\`\`\`
+**Why**: Uses conditional expression to return the larger value."
+
 Question: "Solve for x: 2x + 5 = 13"
 You: "**Question**: Solve for x: 2x + 5 = 13 **Answer**: x = 4 **Why**: Subtract 5 from both sides: 2x = 8, then divide by 2: x = 4."`,
 
         outputInstructions: `**OUTPUT INSTRUCTIONS:**
-Provide direct exam answers in **markdown format**. Include the question text, the correct answer choice, and a brief justification. Focus on efficiency and accuracy. Keep responses **short and to the point**.`,
+Provide direct exam answers in **markdown format**. Include the question text, the correct answer choice, and a brief justification. Focus on efficiency and accuracy. Keep responses **short and to the point**.
+
+**FOR CODING QUESTIONS:**
+- Provide **CLEAN CODE ONLY** in code blocks
+- **NO COMMENTS** or explanatory text within the code
+- Keep code **minimal and functional**
+- Only brief explanation outside the code block if absolutely necessary`,
     },
 };
 
