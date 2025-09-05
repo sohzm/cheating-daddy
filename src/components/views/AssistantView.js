@@ -483,7 +483,7 @@ export class AssistantView extends LitElement {
             background: rgba(255, 255, 255, 0.1);
         }
 
-        .save-button.saved {
+        .save-button.copied {
             color: #4caf50;
         }
 
@@ -499,6 +499,7 @@ export class AssistantView extends LitElement {
         onSendText: { type: Function },
         shouldAnimateResponse: { type: Boolean },
         savedResponses: { type: Array },
+        copiedFeedback: { type: Boolean },
     };
 
     constructor() {
@@ -508,6 +509,7 @@ export class AssistantView extends LitElement {
         this.selectedProfile = 'interview';
         this.onSendText = () => {};
         this._lastAnimatedWordCount = 0;
+        this.copiedFeedback = false;
         // Load saved responses from localStorage
         try {
             this.savedResponses = JSON.parse(localStorage.getItem('savedResponses') || '[]');
@@ -770,27 +772,77 @@ export class AssistantView extends LitElement {
         }, 0);
     }
 
-    saveCurrentResponse() {
+    extractCodeBlocks(text) {
+        // Extract code blocks from markdown text
+        const codeBlockRegex = /```[\w]*\n?([\s\S]*?)```/g;
+        const inlineCodeRegex = /`([^`]+)`/g;
+        const codeBlocks = [];
+        
+        // Extract fenced code blocks (```code```)
+        let match;
+        while ((match = codeBlockRegex.exec(text)) !== null) {
+            codeBlocks.push(match[1].trim());
+        }
+        
+        // If no fenced code blocks found, try to extract inline code
+        if (codeBlocks.length === 0) {
+            while ((match = inlineCodeRegex.exec(text)) !== null) {
+                codeBlocks.push(match[1].trim());
+            }
+        }
+        
+        return codeBlocks;
+    }
+
+    copyCurrentResponse() {
         const currentResponse = this.getCurrentResponse();
-        if (currentResponse && !this.isResponseSaved()) {
-            this.savedResponses = [
-                ...this.savedResponses,
-                {
-                    response: currentResponse,
-                    timestamp: new Date().toISOString(),
-                    profile: this.selectedProfile,
-                },
-            ];
-            // Save to localStorage for persistence
-            localStorage.setItem('savedResponses', JSON.stringify(this.savedResponses));
-            this.requestUpdate();
+        if (currentResponse) {
+            // Extract code blocks from the response
+            const codeBlocks = this.extractCodeBlocks(currentResponse);
+            
+            // Determine what to copy
+            let textToCopy;
+            if (codeBlocks.length > 0) {
+                // Copy all code blocks, separated by newlines if multiple
+                textToCopy = codeBlocks.join('\n\n');
+            } else {
+                // Fallback to full response if no code blocks found
+                textToCopy = currentResponse;
+            }
+            
+            // Copy to clipboard
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                // Visual feedback - temporarily change button appearance
+                this.copiedFeedback = true;
+                this.requestUpdate();
+                setTimeout(() => {
+                    this.copiedFeedback = false;
+                    this.requestUpdate();
+                }, 1000);
+            }).catch(err => {
+                console.error('Failed to copy text: ', err);
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = textToCopy;
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    this.copiedFeedback = true;
+                    this.requestUpdate();
+                    setTimeout(() => {
+                        this.copiedFeedback = false;
+                        this.requestUpdate();
+                    }, 1000);
+                } catch (err) {
+                    console.error('Fallback: Unable to copy', err);
+                }
+                document.body.removeChild(textArea);
+            });
         }
     }
 
-    isResponseSaved() {
-        const currentResponse = this.getCurrentResponse();
-        return this.savedResponses.some(saved => saved.response === currentResponse);
-    }
 
     firstUpdated() {
         super.firstUpdated();
@@ -843,7 +895,6 @@ export class AssistantView extends LitElement {
     render() {
         const currentResponse = this.getCurrentResponse();
         const responseCounter = this.getResponseCounter();
-        const isSaved = this.isResponseSaved();
 
         return html`
             <div class="response-container" id="responseContainer"></div>
@@ -870,9 +921,9 @@ export class AssistantView extends LitElement {
                 ${this.responses.length > 0 ? html` <span class="response-counter">${responseCounter}</span> ` : ''}
 
                 <button
-                    class="save-button ${isSaved ? 'saved' : ''}"
-                    @click=${this.saveCurrentResponse}
-                    title="${isSaved ? 'Response saved' : 'Save this response'}"
+                    class="save-button ${this.copiedFeedback ? 'copied' : ''}"
+                    @click=${this.copyCurrentResponse}
+                    title="${this.copiedFeedback ? 'Response copied!' : 'Copy this response'}"
                 >
                     <?xml version="1.0" encoding="UTF-8"?><svg
                         width="24px"
@@ -883,14 +934,12 @@ export class AssistantView extends LitElement {
                         xmlns="http://www.w3.org/2000/svg"
                     >
                         <path
-                            d="M5 20V5C5 3.89543 5.89543 3 7 3H16.1716C16.702 3 17.2107 3.21071 17.5858 3.58579L19.4142 5.41421C19.7893 5.78929 20 6.29799 20 6.82843V20C20 21.1046 19.1046 22 18 22H7C5.89543 22 5 21 5 20Z"
+                            d="M8 4V2C8 1.44772 8.44772 1 9 1H19C19.5523 1 20 1.44772 20 2V12C20 12.5523 19.5523 13 19 13H17V20C17 21.1046 16.1046 22 15 22H5C3.89543 22 3 21.1046 3 20V10C3 8.89543 3.89543 8 5 8H8Z"
                             stroke="currentColor"
                             stroke-width="1.7"
                             stroke-linecap="round"
                             stroke-linejoin="round"
                         ></path>
-                        <path d="M15 22V13H9V22" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
-                        <path d="M9 3V8H15" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
                     </svg>
                 </button>
 
