@@ -153,6 +153,7 @@ function getDefaultKeybinds() {
         nextResponse: isMac ? 'Cmd+]' : 'Ctrl+]',
         scrollUp: isMac ? 'Cmd+Shift+Up' : 'Ctrl+Shift+Up',
         scrollDown: isMac ? 'Cmd+Shift+Down' : 'Ctrl+Shift+Down',
+        copyCodeBlocks: isMac ? 'Cmd+Shift+C' : 'Ctrl+Shift+C',
         emergencyErase: isMac ? 'Cmd+Shift+E' : 'Ctrl+Shift+E',
     };
 }
@@ -313,6 +314,19 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
             console.log(`Registered scrollDown: ${keybinds.scrollDown}`);
         } catch (error) {
             console.error(`Failed to register scrollDown (${keybinds.scrollDown}):`, error);
+        }
+    }
+
+    // Register copy code blocks shortcut
+    if (keybinds.copyCodeBlocks) {
+        try {
+            globalShortcut.register(keybinds.copyCodeBlocks, () => {
+                console.log('Copy code blocks shortcut triggered');
+                sendToRenderer('copy-code-blocks');
+            });
+            console.log(`Registered copyCodeBlocks: ${keybinds.copyCodeBlocks}`);
+        } catch (error) {
+            console.error(`Failed to register copyCodeBlocks (${keybinds.copyCodeBlocks}):`, error);
         }
     }
 

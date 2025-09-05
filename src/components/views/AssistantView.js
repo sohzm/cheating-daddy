@@ -719,10 +719,16 @@ export class AssistantView extends LitElement {
                 this.scrollResponseDown();
             };
 
+            this.handleCopyCodeBlocks = () => {
+                console.log('Received copy-code-blocks message');
+                this.copyCurrentResponse();
+            };
+
             ipcRenderer.on('navigate-previous-response', this.handlePreviousResponse);
             ipcRenderer.on('navigate-next-response', this.handleNextResponse);
             ipcRenderer.on('scroll-response-up', this.handleScrollUp);
             ipcRenderer.on('scroll-response-down', this.handleScrollDown);
+            ipcRenderer.on('copy-code-blocks', this.handleCopyCodeBlocks);
         }
     }
 
@@ -743,6 +749,9 @@ export class AssistantView extends LitElement {
             }
             if (this.handleScrollDown) {
                 ipcRenderer.removeListener('scroll-response-down', this.handleScrollDown);
+            }
+            if (this.handleCopyCodeBlocks) {
+                ipcRenderer.removeListener('copy-code-blocks', this.handleCopyCodeBlocks);
             }
         }
     }
@@ -900,7 +909,7 @@ export class AssistantView extends LitElement {
             <div class="response-container" id="responseContainer"></div>
 
                     <div class="shortcut-hint">
-            Press <strong>Ctrl+G</strong> to clear session and automatically restart
+            Press <strong>Ctrl+Shift+C</strong> to copy code blocks | <strong>Ctrl+G</strong> to clear session and restart
         </div>
 
             <div class="text-input-container">
