@@ -136,6 +136,9 @@ function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
 
     setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef);
 
+    // Ensure window is visible (needed when skipTaskbar is true)
+    mainWindow.show();
+    
     return mainWindow;
 }
 

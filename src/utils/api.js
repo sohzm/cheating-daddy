@@ -8,6 +8,9 @@ class BurnCloudAPI {
 
     async sendMessage(messages, model = 'claude-sonnet-4-20250514') {
         try {
+            // Use dynamic import for node-fetch in Node.js environment
+            const fetch = (await import('node-fetch')).default;
+            
             const response = await fetch(this.baseUrl, {
                 method: 'POST',
                 headers: {
@@ -22,7 +25,8 @@ class BurnCloudAPI {
             });
 
             if (!response.ok) {
-                throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+                const errorText = await response.text();
+                throw new Error(`API request failed: ${response.status} ${response.statusText} - ${errorText}`);
             }
 
             const data = await response.json();
@@ -35,6 +39,9 @@ class BurnCloudAPI {
 
     async sendStreamMessage(messages, model = 'claude-sonnet-4-20250514', onChunk) {
         try {
+            // Use dynamic import for node-fetch in Node.js environment
+            const fetch = (await import('node-fetch')).default;
+            
             const response = await fetch(this.baseUrl, {
                 method: 'POST',
                 headers: {

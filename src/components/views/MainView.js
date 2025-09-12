@@ -1,6 +1,5 @@
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
 import { resizeLayout } from '../../utils/windowResize.js';
-import { getProvider, getAllProviders, getDefaultProvider } from '../../utils/providers.js';
 
 export class MainView extends LitElement {
     static styles = css`
@@ -189,8 +188,24 @@ export class MainView extends LitElement {
         this.isInitializing = false;
         this.onLayoutModeChange = () => {};
         this.showApiKeyError = false;
-        this.selectedProvider = localStorage.getItem('selectedProvider') || getDefaultProvider();
+        this.selectedProvider = localStorage.getItem('selectedProvider') || 'gemini';
         this.boundKeydownHandler = this.handleKeydown.bind(this);
+        
+        // Provider configurations (hardcoded for browser environment)
+        this.providers = {
+            gemini: {
+                name: 'Google Gemini',
+                apiKeyPlaceholder: 'Enter your Gemini API Key',
+                helpText: 'dont have an api key?',
+                helpLink: 'get one here'
+            },
+            burncloud: {
+                name: 'BurnCloud',
+                apiKeyPlaceholder: 'Enter your BurnCloud API Key',
+                helpText: 'dont have an api key?',
+                helpLink: 'get one here'
+            }
+        };
     }
 
     connectedCallback() {
@@ -322,8 +337,7 @@ export class MainView extends LitElement {
     }
 
     render() {
-        const providers = getAllProviders();
-        const currentProvider = getProvider(this.selectedProvider);
+        const currentProvider = this.providers[this.selectedProvider] || this.providers.gemini;
         
         return html`
             <div class="welcome">Welcome</div>
@@ -331,9 +345,9 @@ export class MainView extends LitElement {
             <div class="provider-selection">
                 <label class="provider-label">AI Provider</label>
                 <select class="provider-select" .value=${this.selectedProvider} @change=${this.handleProviderChange}>
-                    ${Object.keys(providers).map(key => html`
+                    ${Object.keys(this.providers).map(key => html`
                         <option value="${key}" ?selected=${key === this.selectedProvider}>
-                            ${providers[key].name}
+                            ${this.providers[key].name}
                         </option>
                     `)}
                 </select>

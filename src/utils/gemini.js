@@ -232,13 +232,47 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
 
     // Handle non-Gemini providers
     if (!provider.useGoogleSDK) {
-        // For now, BurnCloud and other providers don't support live sessions like Gemini
-        // This would need a different implementation for real-time audio/video
-        console.log(`${provider.name} provider selected, but live sessions are only supported with Gemini`);
-        isInitializingSession = false;
-        sendToRenderer('session-initializing', false);
-        sendToRenderer('update-status', `${provider.name} selected - Live sessions require Gemini provider`);
-        return null;
+        // For BurnCloud and other providers, implement text-based sessions
+        console.log(`Initializing ${provider.name} text-based session...`);
+        
+        try {
+            // Create BurnCloud API instance
+            const apiInstance = createAPIInstance(providerKey, apiKey);
+            
+            // Test the API key with a simple request
+            const testResponse = await apiInstance.sendMessage([
+                { role: 'user', content: 'Hello, please respond with "API key is valid"' }
+            ]);
+            
+            console.log('BurnCloud API test successful:', testResponse);
+            
+            // Create a simple session object for BurnCloud
+            const burnCloudSession = {
+                provider: providerKey,
+                apiInstance: apiInstance,
+                systemPrompt: getSystemPrompt(profile, customPrompt, false), // No Google Search for BurnCloud
+                send: async (message) => {
+                    const messages = [
+                        { role: 'system', content: burnCloudSession.systemPrompt },
+                        { role: 'user', content: message }
+                    ];
+                    return await apiInstance.sendMessage(messages);
+                }
+            };
+            
+            isInitializingSession = false;
+            sendToRenderer('session-initializing', false);
+            sendToRenderer('update-status', `${provider.name} session connected (text-based)`);
+            
+            return burnCloudSession;
+            
+        } catch (error) {
+            console.error(`${provider.name} API error:`, error);
+            isInitializingSession = false;
+            sendToRenderer('session-initializing', false);
+            sendToRenderer('update-status', `${provider.name} API error: ${error.message}`);
+            return null;
+        }
     }
 
     const client = new GoogleGenAI({
@@ -607,16 +641,31 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
     });
 
     ipcMain.handle('send-text-message', async (event, text) => {
-        if (!geminiSessionRef.current) return { success: false, error: 'No active Gemini session' };
+        if (!geminiSessionRef.current) return { success: false, error: 'No active session' };
 
         try {
             if (!text || typeof text !== 'string' || text.trim().length === 0) {
                 return { success: false, error: 'Invalid text message' };
             }
 
-            console.log('Sending text message:', text);
-            await geminiSessionRef.current.sendRealtimeInput({ text: text.trim() });
-            return { success: true };
+            // Check if it's a BurnCloud session or Gemini session
+            if (geminiSessionRef.current.provider && geminiSessionRef.current.provider !== 'gemini') {
+                // Handle BurnCloud and other non-Gemini providers
+                console.log(`Sending text to ${geminiSessionRef.current.provider}:`, text);
+                
+                const response = await geminiSessionRef.current.send(text.trim());
+                
+                // Send response to renderer
+                sendToRenderer('update-response', response);
+                sendToRenderer('update-status', 'Response received');
+                
+                return { success: true, response: response };
+            } else {
+                // Handle Gemini live session
+                console.log('Sending text message to Gemini:', text);
+                await geminiSessionRef.current.sendRealtimeInput({ text: text.trim() });
+                return { success: true };
+            }
         } catch (error) {
             console.error('Error sending text:', error);
             return { success: false, error: error.message };
