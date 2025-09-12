@@ -3,6 +3,8 @@ const { BrowserWindow, ipcMain } = require('electron');
 const { spawn } = require('child_process');
 const { saveDebugAudio } = require('../audioUtils');
 const { getSystemPrompt } = require('./prompts');
+const { getProvider } = require('./providers');
+const { createAPIInstance } = require('./api');
 
 // Conversation tracking variables
 let currentSessionId = null;
@@ -177,6 +179,7 @@ async function attemptReconnection() {
             lastSessionParams.customPrompt,
             lastSessionParams.profile,
             lastSessionParams.language,
+            lastSessionParams.providerKey || 'gemini',
             true // isReconnection flag
         );
 
@@ -204,7 +207,7 @@ async function attemptReconnection() {
     }
 }
 
-async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'interview', language = 'en-US', isReconnection = false) {
+async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'interview', language = 'en-US', providerKey = 'gemini', isReconnection = false) {
     if (isInitializingSession) {
         console.log('Session initialization already in progress');
         return false;
@@ -213,6 +216,8 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
     isInitializingSession = true;
     sendToRenderer('session-initializing', true);
 
+    const provider = getProvider(providerKey);
+
     // Store session parameters for reconnection (only if not already reconnecting)
     if (!isReconnection) {
         lastSessionParams = {
@@ -220,8 +225,20 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
             customPrompt,
             profile,
             language,
+            providerKey,
         };
         reconnectionAttempts = 0; // Reset counter for new session
+    }
+
+    // Handle non-Gemini providers
+    if (!provider.useGoogleSDK) {
+        // For now, BurnCloud and other providers don't support live sessions like Gemini
+        // This would need a different implementation for real-time audio/video
+        console.log(`${provider.name} provider selected, but live sessions are only supported with Gemini`);
+        isInitializingSession = false;
+        sendToRenderer('session-initializing', false);
+        sendToRenderer('update-status', `${provider.name} selected - Live sessions require Gemini provider`);
+        return null;
     }
 
     const client = new GoogleGenAI({
@@ -523,8 +540,8 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
     // Store the geminiSessionRef globally for reconnection access
     global.geminiSessionRef = geminiSessionRef;
 
-    ipcMain.handle('initialize-gemini', async (event, apiKey, customPrompt, profile = 'interview', language = 'en-US') => {
-        const session = await initializeGeminiSession(apiKey, customPrompt, profile, language);
+    ipcMain.handle('initialize-gemini', async (event, apiKey, customPrompt, profile = 'interview', language = 'en-US', providerKey = 'gemini') => {
+        const session = await initializeGeminiSession(apiKey, customPrompt, profile, language, providerKey);
         if (session) {
             geminiSessionRef.current = session;
             return true;

@@ -1,5 +1,6 @@
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
 import { resizeLayout } from '../../utils/windowResize.js';
+import { getProvider, getAllProviders, getDefaultProvider } from '../../utils/providers.js';
 
 export class MainView extends LitElement {
     static styles = css`
@@ -19,7 +20,36 @@ export class MainView extends LitElement {
         .input-group {
             display: flex;
             gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .provider-selection {
             margin-bottom: 20px;
+        }
+
+        .provider-label {
+            color: var(--text-color);
+            font-size: 13px;
+            font-weight: 500;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .provider-select {
+            background: var(--input-background);
+            color: var(--text-color);
+            border: 1px solid var(--button-border);
+            padding: 8px 12px;
+            width: 100%;
+            border-radius: 6px;
+            font-size: 13px;
+            transition: border-color 0.2s ease;
+        }
+
+        .provider-select:focus {
+            outline: none;
+            border-color: var(--focus-border-color);
+            box-shadow: 0 0 0 3px var(--focus-box-shadow);
         }
 
         .input-group input {
@@ -149,6 +179,7 @@ export class MainView extends LitElement {
         isInitializing: { type: Boolean },
         onLayoutModeChange: { type: Function },
         showApiKeyError: { type: Boolean },
+        selectedProvider: { type: String },
     };
 
     constructor() {
@@ -158,6 +189,7 @@ export class MainView extends LitElement {
         this.isInitializing = false;
         this.onLayoutModeChange = () => {};
         this.showApiKeyError = false;
+        this.selectedProvider = localStorage.getItem('selectedProvider') || getDefaultProvider();
         this.boundKeydownHandler = this.handleKeydown.bind(this);
     }
 
@@ -199,6 +231,14 @@ export class MainView extends LitElement {
         if (this.showApiKeyError) {
             this.showApiKeyError = false;
         }
+    }
+
+    handleProviderChange(e) {
+        this.selectedProvider = e.target.value;
+        localStorage.setItem('selectedProvider', this.selectedProvider);
+        // Clear API key when switching providers
+        localStorage.removeItem('apiKey');
+        this.requestUpdate();
     }
 
     handleStartClick() {
@@ -282,13 +322,27 @@ export class MainView extends LitElement {
     }
 
     render() {
+        const providers = getAllProviders();
+        const currentProvider = getProvider(this.selectedProvider);
+        
         return html`
             <div class="welcome">Welcome</div>
+
+            <div class="provider-selection">
+                <label class="provider-label">AI Provider</label>
+                <select class="provider-select" .value=${this.selectedProvider} @change=${this.handleProviderChange}>
+                    ${Object.keys(providers).map(key => html`
+                        <option value="${key}" ?selected=${key === this.selectedProvider}>
+                            ${providers[key].name}
+                        </option>
+                    `)}
+                </select>
+            </div>
 
             <div class="input-group">
                 <input
                     type="password"
-                    placeholder="Enter your Gemini API Key"
+                    placeholder="${currentProvider.apiKeyPlaceholder}"
                     .value=${localStorage.getItem('apiKey') || ''}
                     @input=${this.handleInput}
                     class="${this.showApiKeyError ? 'api-key-error' : ''}"
@@ -298,8 +352,8 @@ export class MainView extends LitElement {
                 </button>
             </div>
             <p class="description">
-                dont have an api key?
-                <span @click=${this.handleAPIKeyHelpClick} class="link">get one here</span>
+                ${currentProvider.helpText}
+                <span @click=${this.handleAPIKeyHelpClick} class="link">${currentProvider.helpLink}</span>
             </p>
         `;
     }
