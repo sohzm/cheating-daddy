@@ -454,6 +454,7 @@ export class CustomizeView extends LitElement {
         this.loadVADSettings();
         this.loadBackgroundTransparency();
         this.loadFontSize();
+        this.initializeDefaultInstructions();
     }
 
     connectedCallback() {
@@ -546,8 +547,24 @@ export class CustomizeView extends LitElement {
     }
 
     handleProfileSelect(e) {
+        const previousProfile = this.selectedProfile;
         this.selectedProfile = e.target.value;
         localStorage.setItem('selectedProfile', this.selectedProfile);
+
+        // Check if current prompt is empty or contains default instructions from previous profile
+        const currentCustomPrompt = localStorage.getItem('customPrompt') || '';
+        const previousDefaultInstructions = this.getDefaultInstructions(previousProfile);
+        const newDefaultInstructions = this.getDefaultInstructions(this.selectedProfile);
+
+        // Update instructions if:
+        // 1. Current prompt is empty, OR
+        // 2. Current prompt matches the previous profile's default instructions
+        if (!currentCustomPrompt.trim() || currentCustomPrompt.trim() === previousDefaultInstructions.trim()) {
+            localStorage.setItem('customPrompt', newDefaultInstructions);
+            // Update the textarea value
+            this.requestUpdate();
+        }
+
         this.onProfileChange(this.selectedProfile);
     }
 
@@ -576,6 +593,18 @@ export class CustomizeView extends LitElement {
 
     handleCustomPromptInput(e) {
         localStorage.setItem('customPrompt', e.target.value);
+    }
+
+    getDefaultInstructions(profile) {
+        const defaultInstructions = {
+            exam: `Help me with MCQ, coding, and aptitude questions. Provide clear answers with brief explanations.`,
+            interview: `Help me with technical and HR interview questions. Give natural, professional responses.`,
+            sales: `Help me with sales calls and client conversations. Provide persuasive, relationship-building responses.`,
+            meeting: `Help me in business meetings and discussions. Give professional, collaborative input.`,
+            presentation: `Help me with presentations and public speaking. Provide engaging, confident responses.`,
+            negotiation: `Help me with business negotiations and deals. Give strategic, win-win focused advice.`
+        };
+        return defaultInstructions[profile] || '';
     }
 
     getDefaultKeybinds() {
@@ -883,6 +912,23 @@ export class CustomizeView extends LitElement {
     updateFontSize() {
         const root = document.documentElement;
         root.style.setProperty('--response-font-size', `${this.fontSize}px`);
+    }
+
+    initializeDefaultInstructions() {
+        // Load saved profile or use default
+        const savedProfile = localStorage.getItem('selectedProfile');
+        if (savedProfile) {
+            this.selectedProfile = savedProfile;
+        }
+
+        // Set default instructions if no custom prompt exists
+        const currentCustomPrompt = localStorage.getItem('customPrompt');
+        if (!currentCustomPrompt || !currentCustomPrompt.trim()) {
+            const defaultInstructions = this.getDefaultInstructions(this.selectedProfile);
+            if (defaultInstructions) {
+                localStorage.setItem('customPrompt', defaultInstructions);
+            }
+        }
     }
 
     render() {
