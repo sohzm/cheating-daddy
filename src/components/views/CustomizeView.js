@@ -547,22 +547,23 @@ export class CustomizeView extends LitElement {
     }
 
     handleProfileSelect(e) {
-        // Save current textarea content to the previous profile before switching
-        const currentTextareaValue = this.shadowRoot?.querySelector('textarea')?.value || localStorage.getItem('customPrompt') || '';
-        if (this.selectedProfile && currentTextareaValue !== undefined) {
-            this.setCustomPromptForProfile(this.selectedProfile, currentTextareaValue);
-        }
-
-        // Switch to new profile
+        const previousProfile = this.selectedProfile;
         this.selectedProfile = e.target.value;
         localStorage.setItem('selectedProfile', this.selectedProfile);
 
-        // Load instructions for the new profile
-        const newProfileInstructions = this.getCustomPromptForProfile(this.selectedProfile);
-        localStorage.setItem('customPrompt', newProfileInstructions);
+        // Check if current prompt is empty or contains default instructions from previous profile
+        const currentCustomPrompt = localStorage.getItem('customPrompt') || '';
+        const previousDefaultInstructions = this.getDefaultInstructions(previousProfile);
+        const newDefaultInstructions = this.getDefaultInstructions(this.selectedProfile);
 
-        // Update the textarea value
-        this.requestUpdate();
+        // Update instructions if:
+        // 1. Current prompt is empty, OR
+        // 2. Current prompt matches the previous profile's default instructions
+        if (!currentCustomPrompt.trim() || currentCustomPrompt.trim() === previousDefaultInstructions.trim()) {
+            localStorage.setItem('customPrompt', newDefaultInstructions);
+            // Update the textarea value
+            this.requestUpdate();
+        }
 
         this.onProfileChange(this.selectedProfile);
     }
@@ -591,30 +592,12 @@ export class CustomizeView extends LitElement {
     }
 
     handleCustomPromptInput(e) {
-        // Store custom prompt for the current profile
-        this.setCustomPromptForProfile(this.selectedProfile, e.target.value);
-    }
-
-    getCustomPromptForProfile(profile) {
-        const key = `customPrompt_${profile}`;
-        const saved = localStorage.getItem(key);
-        if (saved !== null) {
-            return saved;
-        }
-        // If no custom prompt exists for this profile, return default instructions
-        return this.getDefaultInstructions(profile);
-    }
-
-    setCustomPromptForProfile(profile, value) {
-        const key = `customPrompt_${profile}`;
-        localStorage.setItem(key, value);
-        // Also update the legacy customPrompt for compatibility
-        localStorage.setItem('customPrompt', value);
+        localStorage.setItem('customPrompt', e.target.value);
     }
 
     getDefaultInstructions(profile) {
         const defaultInstructions = {
-            exam: `Help me with MCQ, coding, and aptitude questions. Provide clear answers with brief explanations.`,
+            exam: `Help me with MCQ, coding and aptitude questions. Provide clear answers.`,
             interview: `Help me with technical and HR interview questions. Give natural, professional responses.`,
             sales: `Help me with sales calls and client conversations. Provide persuasive, relationship-building responses.`,
             meeting: `Help me in business meetings and discussions. Give professional, collaborative input.`,
@@ -938,9 +921,14 @@ export class CustomizeView extends LitElement {
             this.selectedProfile = savedProfile;
         }
 
-        // Load instructions for the current profile
-        const profileInstructions = this.getCustomPromptForProfile(this.selectedProfile);
-        localStorage.setItem('customPrompt', profileInstructions);
+        // Set default instructions if no custom prompt exists
+        const currentCustomPrompt = localStorage.getItem('customPrompt');
+        if (!currentCustomPrompt || !currentCustomPrompt.trim()) {
+            const defaultInstructions = this.getDefaultInstructions(this.selectedProfile);
+            if (defaultInstructions) {
+                localStorage.setItem('customPrompt', defaultInstructions);
+            }
+        }
     }
 
     render() {
