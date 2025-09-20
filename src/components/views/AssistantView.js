@@ -784,22 +784,29 @@ export class AssistantView extends LitElement {
     extractCodeBlocks(text) {
         // Extract code blocks from markdown text
         const codeBlockRegex = /```[\w]*\n?([\s\S]*?)```/g;
-        const inlineCodeRegex = /`([^`]+)`/g;
+        const multiLineInlineCodeRegex = /`([^`\n]*\n[^`]*)`/g; // Only multi-line inline code
         const codeBlocks = [];
-        
+
         // Extract fenced code blocks (```code```)
         let match;
         while ((match = codeBlockRegex.exec(text)) !== null) {
-            codeBlocks.push(match[1].trim());
-        }
-        
-        // If no fenced code blocks found, try to extract inline code
-        if (codeBlocks.length === 0) {
-            while ((match = inlineCodeRegex.exec(text)) !== null) {
-                codeBlocks.push(match[1].trim());
+            const codeContent = match[1].trim();
+            if (codeContent.length > 0) {
+                codeBlocks.push(codeContent);
             }
         }
-        
+
+        // If no fenced code blocks found, try to extract only multi-line inline code
+        // (This avoids copying single words like "jovezhong" but allows actual code snippets)
+        if (codeBlocks.length === 0) {
+            while ((match = multiLineInlineCodeRegex.exec(text)) !== null) {
+                const codeContent = match[1].trim();
+                if (codeContent.length > 10) { // Only extract if it's reasonably long
+                    codeBlocks.push(codeContent);
+                }
+            }
+        }
+
         return codeBlocks;
     }
 
