@@ -4,7 +4,7 @@ const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 module.exports = {
     packagerConfig: {
         asar: true,
-        extraResource: ['./src/assets/SystemAudioDump'],
+        extraResource: ['./src/web/assets/SystemAudioDump'],
         name: 'Cheating Daddy',
         icon: 'src/assets/logo',
         // use `security find-identity -v -p codesigning` to find your identity

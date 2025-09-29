@@ -1,0 +1,75 @@
+<!doctype html>
+<html>
+    <head>
+        <meta http-equiv="content-security-policy" content="script-src 'self' 'unsafe-inline'" />
+        <title>Cheating Daddy - Live Assistant</title>
+        <link rel="stylesheet" href="../assets/shared-styles.css" />
+        <link rel="stylesheet" href="../assets/highlight-vscode-dark.min.css" />
+        <style>
+            .page-container {
+                display: block;
+                width: 100%;
+                height: 100vh;
+                background-color: var(--background-transparent);
+                color: var(--text-color);
+            }
+        </style>
+    </head>
+    <body>
+        <div class="page-container">
+            <cheating-daddy-app current-view="assistant"></cheating-daddy-app>
+        </div>
+
+        <script src="../assets/marked-4.3.0.min.js"></script>
+        <script src="../assets/highlight-11.9.0.min.js"></script>
+        <script src="../assets/lit-all-2.7.4.min.js"></script>
+        <script src="../assets/shared.js"></script>
+        <script type="module" src="../components/app/CheatingDaddyApp.js"></script>
+        <script src="../utils/renderer.js"></script>
+        
+        <script>
+            // Auto-start live session when the page loads
+            document.addEventListener('DOMContentLoaded', async () => {
+                // Wait a moment for everything to initialize
+                setTimeout(async () => {
+                    try {
+                        // Check if API key is set
+                        const apiKey = localStorage.getItem('apiKey');
+                        if (!apiKey) {
+                            console.warn('No API key found. Please set up API key first.');
+                            // Could redirect back to home or show a message
+                            return;
+                        }
+
+                        // Get user preferences from localStorage
+                        const selectedProfile = localStorage.getItem('selectedProfile') || 'interview';
+                        const selectedLanguage = localStorage.getItem('selectedLanguage') || 'en-US';
+                        const screenshotInterval = parseInt(localStorage.getItem('screenshotInterval') || '5', 10);
+                        const imageQuality = localStorage.getItem('imageQuality') || 'medium';
+
+                        console.log('Starting live session with:', {
+                            profile: selectedProfile,
+                            language: selectedLanguage,
+                            screenshotInterval: screenshotInterval,
+                            imageQuality: imageQuality
+                        });
+
+                        // Initialize Gemini with user preferences
+                        await window.cheddar.initializeGemini(selectedProfile, selectedLanguage);
+                        
+                        // Start capture with user preferences
+                        try {
+                            await window.cheddar.startCapture(screenshotInterval, imageQuality);
+                        } catch (captureError) {
+                            console.error('Failed to start capture:', captureError);
+                        }
+                        
+                        console.log('Live session started successfully');
+                    } catch (error) {
+                        console.error('Failed to start live session:', error);
+                    }
+                }, 1000); // Wait 1 second for initialization
+            });
+        </script>
+    </body>
+</html>
