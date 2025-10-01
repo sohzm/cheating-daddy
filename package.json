@@ -2,7 +2,7 @@
     "name": "cheating-daddy",
     "productName": "cheating-daddy",
     "version": "0.4.0",
-    "description": "cheating daddy",
+    "description": "Clue2",
     "main": "src/index.js",
     "scripts": {
         "start": "electron-forge start",
@@ -13,11 +13,11 @@
         "test": "vitest run"
     },
     "keywords": [
-        "cheating daddy",
-        "cheating daddy ai",
-        "cheating daddy ai assistant",
-        "cheating daddy ai assistant for interviews",
-        "cheating daddy ai assistant for interviews"
+        "Clue2",
+        "Clue2 ai",
+        "Clue2 ai assistant",
+        "Clue2 ai assistant for interviews",
+        "Clue2 ai assistant for interviews"
     ],
     "author": {
         "name": "sohzm",

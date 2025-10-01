@@ -106,6 +106,7 @@ export class CheatingDaddyApp extends LitElement {
         selectedLanguage: { type: String },
         responses: { type: Array },
         currentResponseIndex: { type: Number },
+        messages: { type: Array },
         selectedScreenshotInterval: { type: String },
         selectedImageQuality: { type: String },
         layoutMode: { type: String },
@@ -131,6 +132,7 @@ export class CheatingDaddyApp extends LitElement {
         this.advancedMode = localStorage.getItem('advancedMode') === 'true';
         this.responses = [];
         this.currentResponseIndex = -1;
+        this.messages = [];
         this._viewInstances = new Map();
         this._isClickThrough = false;
         this._awaitingNewResponse = false;
@@ -180,33 +182,61 @@ export class CheatingDaddyApp extends LitElement {
     }
 
     setResponse(response) {
+        let responseText = typeof response === 'string' ? response : String(response ?? '');
+        
+        // Remove leading and trailing quotes if they wrap the entire response
+        responseText = responseText.replace(/^["'](.*)["']$/s, '$1');
+        
         // Check if this looks like a filler response (very short responses to hmm, ok, etc)
         const isFillerResponse =
-            response.length < 30 &&
-            (response.toLowerCase().includes('hmm') ||
-                response.toLowerCase().includes('okay') ||
-                response.toLowerCase().includes('next') ||
-                response.toLowerCase().includes('go on') ||
-                response.toLowerCase().includes('continue'));
+            responseText.length < 30 &&
+            (responseText.toLowerCase().includes('hmm') ||
+                responseText.toLowerCase().includes('okay') ||
+                responseText.toLowerCase().includes('next') ||
+                responseText.toLowerCase().includes('go on') ||
+                responseText.toLowerCase().includes('continue'));
 
         if (this._awaitingNewResponse || this.responses.length === 0) {
             // Always add as new response when explicitly waiting for one
-            this.responses = [...this.responses, response];
+            this.responses = [...this.responses, responseText];
             this.currentResponseIndex = this.responses.length - 1;
             this._awaitingNewResponse = false;
             this._currentResponseIsComplete = false;
-            console.log('[setResponse] Pushed new response:', response);
+            const assistantMessage = {
+                id: `assistant-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                role: 'assistant',
+                content: responseText,
+                timestamp: Date.now(),
+            };
+            this.messages = [...this.messages, assistantMessage];
+            console.log('[setResponse] Pushed new response:', responseText);
         } else if (!this._currentResponseIsComplete && !isFillerResponse && this.responses.length > 0) {
             // For substantial responses, update the last one (streaming behavior)
             // Only update if the current response is not marked as complete
-            this.responses = [...this.responses.slice(0, this.responses.length - 1), response];
-            console.log('[setResponse] Updated last response:', response);
+            this.responses = [...this.responses.slice(0, this.responses.length - 1), responseText];
+            const lastMessage = this.messages[this.messages.length - 1];
+            if (lastMessage && lastMessage.role === 'assistant') {
+                const updatedAssistant = {
+                    ...lastMessage,
+                    content: responseText,
+                    timestamp: Date.now(),
+                };
+                this.messages = [...this.messages.slice(0, this.messages.length - 1), updatedAssistant];
+            }
+            console.log('[setResponse] Updated last response:', responseText);
         } else {
             // For filler responses or when current response is complete, add as new
-            this.responses = [...this.responses, response];
+            this.responses = [...this.responses, responseText];
             this.currentResponseIndex = this.responses.length - 1;
             this._currentResponseIsComplete = false;
-            console.log('[setResponse] Added response as new:', response);
+            const assistantMessage = {
+                id: `assistant-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                role: 'assistant',
+                content: responseText,
+                timestamp: Date.now(),
+            };
+            this.messages = [...this.messages, assistantMessage];
+            console.log('[setResponse] Added response as new:', responseText);
         }
         this.shouldAnimateResponse = true;
         this.requestUpdate();
@@ -281,6 +311,7 @@ export class CheatingDaddyApp extends LitElement {
         cheddar.startCapture(this.selectedScreenshotInterval, this.selectedImageQuality);
         this.responses = [];
         this.currentResponseIndex = -1;
+        this.messages = [];
         this.startTime = Date.now();
         this.currentView = 'assistant';
     }
@@ -330,7 +361,20 @@ export class CheatingDaddyApp extends LitElement {
 
     // Assistant view event handlers
     async handleSendText(message) {
-        const result = await window.cheddar.sendTextMessage(message);
+        const trimmedMessage = message?.trim();
+        if (!trimmedMessage) {
+            return;
+        }
+
+        const userMessage = {
+            id: `user-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            role: 'user',
+            content: trimmedMessage,
+            timestamp: Date.now(),
+        };
+        this.messages = [...this.messages, userMessage];
+
+        const result = await window.cheddar.sendTextMessage(trimmedMessage);
 
         if (!result.success) {
             console.error('Failed to send message:', result.error);
@@ -443,6 +487,7 @@ export class CheatingDaddyApp extends LitElement {
                         .responses=${this.responses}
                         .currentResponseIndex=${this.currentResponseIndex}
                         .selectedProfile=${this.selectedProfile}
+                        .messages=${this.messages}
                         .onSendText=${message => this.handleSendText(message)}
                         .shouldAnimateResponse=${this.shouldAnimateResponse}
                         @response-index-changed=${this.handleResponseIndexChanged}
