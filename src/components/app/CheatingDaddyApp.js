@@ -152,6 +152,9 @@ export class CheatingDaddyApp extends LitElement {
             ipcRenderer.on('update-response', (_, response) => {
                 this.setResponse(response);
             });
+            ipcRenderer.on('update-response-streaming', (_, response) => {
+                this.setResponseStreaming(response);
+            });
             ipcRenderer.on('update-status', (_, status) => {
                 this.setStatus(status);
             });
@@ -166,6 +169,7 @@ export class CheatingDaddyApp extends LitElement {
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
             ipcRenderer.removeAllListeners('update-response');
+            ipcRenderer.removeAllListeners('update-response-streaming');
             ipcRenderer.removeAllListeners('update-status');
             ipcRenderer.removeAllListeners('click-through-toggled');
         }
@@ -196,8 +200,8 @@ export class CheatingDaddyApp extends LitElement {
                 responseText.toLowerCase().includes('go on') ||
                 responseText.toLowerCase().includes('continue'));
 
-        if (this._awaitingNewResponse || this.responses.length === 0) {
-            // Always add as new response when explicitly waiting for one
+        // If we're awaiting a new response, always create a new message
+        if (this._awaitingNewResponse) {
             this.responses = [...this.responses, responseText];
             this.currentResponseIndex = this.responses.length - 1;
             this._awaitingNewResponse = false;
@@ -209,9 +213,9 @@ export class CheatingDaddyApp extends LitElement {
                 timestamp: Date.now(),
             };
             this.messages = [...this.messages, assistantMessage];
-            console.log('[setResponse] Pushed new response:', responseText);
-        } else if (!this._currentResponseIsComplete && !isFillerResponse && this.responses.length > 0) {
-            // For substantial responses, update the last one (streaming behavior)
+            console.log('[setResponse] Created new response:', responseText);
+        } else if (this.responses.length > 0 && !this._currentResponseIsComplete) {
+            // Update the last response (streaming behavior)
             // Only update if the current response is not marked as complete
             this.responses = [...this.responses.slice(0, this.responses.length - 1), responseText];
             const lastMessage = this.messages[this.messages.length - 1];
@@ -223,9 +227,9 @@ export class CheatingDaddyApp extends LitElement {
                 };
                 this.messages = [...this.messages.slice(0, this.messages.length - 1), updatedAssistant];
             }
-            console.log('[setResponse] Updated last response:', responseText);
+            console.log('[setResponse] Updated streaming response:', responseText);
         } else {
-            // For filler responses or when current response is complete, add as new
+            // Only create a new response if the current one is complete or it's a filler response
             this.responses = [...this.responses, responseText];
             this.currentResponseIndex = this.responses.length - 1;
             this._currentResponseIsComplete = false;
@@ -236,7 +240,45 @@ export class CheatingDaddyApp extends LitElement {
                 timestamp: Date.now(),
             };
             this.messages = [...this.messages, assistantMessage];
-            console.log('[setResponse] Added response as new:', responseText);
+            console.log('[setResponse] Added new response (complete or filler):', responseText);
+        }
+        this.shouldAnimateResponse = true;
+        this.requestUpdate();
+    }
+
+    setResponseStreaming(response) {
+        let responseText = typeof response === 'string' ? response : String(response ?? '');
+        
+        // Remove leading and trailing quotes if they wrap the entire response
+        responseText = responseText.replace(/^["'](.*)["']$/s, '$1');
+        
+        // Only update the last response if we have one and it's not complete
+        if (this.responses.length > 0 && !this._currentResponseIsComplete) {
+            this.responses = [...this.responses.slice(0, this.responses.length - 1), responseText];
+            const lastMessage = this.messages[this.messages.length - 1];
+            if (lastMessage && lastMessage.role === 'assistant') {
+                const updatedAssistant = {
+                    ...lastMessage,
+                    content: responseText,
+                    timestamp: Date.now(),
+                };
+                this.messages = [...this.messages.slice(0, this.messages.length - 1), updatedAssistant];
+            }
+            console.log('[setResponseStreaming] Updated streaming response:', responseText);
+        } else if (this._awaitingNewResponse) {
+            // Create new response if we're waiting for one
+            this.responses = [...this.responses, responseText];
+            this.currentResponseIndex = this.responses.length - 1;
+            this._awaitingNewResponse = false;
+            this._currentResponseIsComplete = false;
+            const assistantMessage = {
+                id: `assistant-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                role: 'assistant',
+                content: responseText,
+                timestamp: Date.now(),
+            };
+            this.messages = [...this.messages, assistantMessage];
+            console.log('[setResponseStreaming] Created new streaming response:', responseText);
         }
         this.shouldAnimateResponse = true;
         this.requestUpdate();

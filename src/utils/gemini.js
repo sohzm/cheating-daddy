@@ -255,12 +255,12 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                     }
 
                     // Handle AI model response
+                    // Accumulate text chunks silently; only send once on generationComplete
                     if (message.serverContent?.modelTurn?.parts) {
                         for (const part of message.serverContent.modelTurn.parts) {
                             console.log(part);
                             if (part.text) {
                                 messageBuffer += part.text;
-                                sendToRenderer('update-response', messageBuffer);
                             }
                         }
                     }
