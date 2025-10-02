@@ -382,6 +382,10 @@ export class AssistantView extends LitElement {
         shouldAnimateResponse: { type: Boolean },
         messages: { type: Array },
         savedResponses: { type: Array },
+        isEmailSending: { type: Boolean },
+        emailStatus: { type: String },
+        isAudioStopping: { type: Boolean },
+        audioStatus: { type: String },
     };
 
     constructor() {
@@ -399,6 +403,10 @@ export class AssistantView extends LitElement {
         } catch (e) {
             this.savedResponses = [];
         }
+        this.isEmailSending = false;
+        this.emailStatus = '';
+        this.isAudioStopping = false;
+        this.audioStatus = '';
     }
 
     getProfileNames() {
@@ -462,7 +470,24 @@ export class AssistantView extends LitElement {
                 });
                 node.parentNode.replaceChild(frag, node);
             } else if (node.nodeType === Node.ELEMENT_NODE && !tagsToSkip.includes(node.tagName)) {
-                Array.from(node.childNodes).forEach(wrap);
+                // Preserve formatting tags like strong, b, em, i, etc.
+                if (['STRONG', 'B', 'EM', 'I', 'CODE', 'MARK'].includes(node.tagName)) {
+                    const words = node.textContent.split(/(\s+)/);
+                    const frag = document.createDocumentFragment();
+                    words.forEach(word => {
+                        if (word.trim()) {
+                            const span = document.createElement('span');
+                            span.setAttribute('data-word', '');
+                            span.innerHTML = `<${node.tagName.toLowerCase()}>${word}</${node.tagName.toLowerCase()}>`;
+                            frag.appendChild(span);
+                        } else {
+                            frag.appendChild(document.createTextNode(word));
+                        }
+                    });
+                    node.parentNode.replaceChild(frag, node);
+                } else {
+                    Array.from(node.childNodes).forEach(wrap);
+                }
             }
         }
         Array.from(doc.body.childNodes).forEach(wrap);
@@ -594,6 +619,14 @@ export class AssistantView extends LitElement {
 
         textInput.value = '';
         textInput.focus();
+
+        // Check if this is an email command and handle it automatically
+        const isEmailRequest = await this.shouldSendEmail(message);
+        if (isEmailRequest) {
+            await this.sendEmailFromCommand(message);
+            return;
+        }
+
         await this.onSendText(message);
     }
 
@@ -633,6 +666,189 @@ export class AssistantView extends LitElement {
     isResponseSaved() {
         const currentResponse = this.getCurrentResponse();
         return this.savedResponses.some(saved => saved.response === currentResponse);
+    }
+
+    getConversationSummary(maxMessages = 10) {
+        const msgs = (this.messages || []).slice(-maxMessages);
+        const parts = msgs.map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${String(m.content || '').trim()}`);
+        const joined = parts.join('\n');
+        // Trim overly long summaries
+        return joined.length > 4000 ? joined.slice(0, 4000) + '...' : joined;
+    }
+
+    async emailConversationSummary() {
+        if (this.isEmailSending) return;
+        this.isEmailSending = true;
+        this.emailStatus = 'Preparing summary...';
+        this.requestUpdate();
+
+        try {
+            const summary = this.getConversationSummary(12) || this.getCurrentResponse() || '';
+            const toEmail = localStorage.getItem('summaryEmail') || 'nikhilprabhu06@gmail.com';
+            const externalUserId = 'nikhilprabhu06@gmail.com';
+
+            const task = `Using connected Gmail, send an email to ${toEmail} with subject "Conversation Summary" and body:\n\n${summary}`;
+
+            const { ipcRenderer } = window.require ? window.require('electron') : { ipcRenderer: window.electron?.ipcRenderer };
+            if (!ipcRenderer) {
+                this.emailStatus = 'IPC unavailable to send email.';
+                this.isEmailSending = false;
+                this.requestUpdate();
+                return;
+            }
+
+            this.emailStatus = 'Sending email via Composio...';
+            this.requestUpdate();
+
+            const result = await ipcRenderer.invoke('execute-email-task', externalUserId, task, ["GMAIL_SEND_EMAIL"]);
+            if (result?.success) {
+                this.emailStatus = 'Email sent successfully!';
+            } else {
+                this.emailStatus = `Failed to send email: ${result?.error || 'Unknown error'}`;
+            }
+        } catch (err) {
+            this.emailStatus = `Error: ${err?.message || err}`;
+        } finally {
+            this.isEmailSending = false;
+            this.requestUpdate();
+        }
+    }
+
+    // Extract email address from text using regex
+    extractEmailFromText(text) {
+        const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g;
+        const matches = text.match(emailRegex);
+        return matches ? matches[0] : null;
+    }
+
+    // Check if text contains email sending commands
+    containsEmailCommand(text) {
+        const emailKeywords = [
+            'send an email', 'send email', 'email to', 'send to', 'email about',
+            'send him', 'send her', 'email him', 'email her', 'forward to',
+            'share with', 'send this to', 'email this to', 'send notes to',
+            'email notes to', 'send summary to', 'email summary to'
+        ];
+        
+        const lowerText = text.toLowerCase();
+        return emailKeywords.some(keyword => lowerText.includes(keyword));
+    }
+
+    // Let the LLM decide if this is an email command
+    async shouldSendEmail(userMessage) {
+        try {
+            const { ipcRenderer } = window.require ? window.require('electron') : { ipcRenderer: window.electron?.ipcRenderer };
+            if (!ipcRenderer) return false;
+
+            // Ask Gemini to analyze if this is an email request
+            const analysisPrompt = `Analyze this user message and determine if they want to send an email. Look for:
+1. Email addresses (like user@domain.com)
+2. Intent to send/share/forward information
+3. Requests to email someone
+
+User message: "${userMessage}"
+
+Respond with ONLY "YES" if this is clearly an email request, or "NO" if it's not.`;
+
+            const response = await ipcRenderer.invoke('analyze-email-intent', analysisPrompt);
+            
+            if (response?.success && response?.result?.toLowerCase().includes('yes')) {
+                return true;
+            }
+            return false;
+        } catch (err) {
+            console.error('Error analyzing email intent:', err);
+            // Fallback to regex if LLM analysis fails
+            return this.containsEmailCommand(userMessage) && this.extractEmailFromText(userMessage);
+        }
+    }
+
+    // Send email based on user's natural language command
+    async sendEmailFromCommand(userMessage) {
+        if (this.isEmailSending) return;
+
+        const emailAddress = this.extractEmailFromText(userMessage);
+        if (!emailAddress) {
+            this.emailStatus = 'No email address found in your message.';
+            this.requestUpdate();
+            return;
+        }
+
+        this.isEmailSending = true;
+        this.emailStatus = `Preparing email to ${emailAddress}...`;
+        this.requestUpdate();
+
+        try {
+            // Check Gmail connection first
+            const { ipcRenderer } = window.require ? window.require('electron') : { ipcRenderer: window.electron?.ipcRenderer };
+            if (!ipcRenderer) {
+                this.emailStatus = 'IPC unavailable to send email.';
+                this.isEmailSending = false;
+                this.requestUpdate();
+                return;
+            }
+
+            // Check Gmail connection status
+            const externalUserId = 'nikhilprabhu06@gmail.com';
+            const connectionStatus = await ipcRenderer.invoke('get-gmail-connection-status', externalUserId);
+            if (!connectionStatus?.success) {
+                this.emailStatus = `Gmail not connected: ${connectionStatus?.error || 'Unknown error'}. Please connect Gmail first.`;
+                this.isEmailSending = false;
+                this.requestUpdate();
+                return;
+            }
+
+            // Get conversation context
+            const summary = this.getConversationSummary(15) || this.getCurrentResponse() || '';
+
+            // Create a more natural task based on user's request
+            const task = `Send an email using Gmail. Recipient: ${emailAddress}. Subject: "Conversation Summary". Body: The user requested: "${userMessage}". Include this conversation context:\n\n${summary}`;
+
+            this.emailStatus = `Sending email to ${emailAddress} via Composio...`;
+            this.requestUpdate();
+
+            const result = await ipcRenderer.invoke('execute-email-task', externalUserId, task, ["GMAIL_SEND_EMAIL"]);
+            if (result?.success) {
+                this.emailStatus = `Email sent successfully to ${emailAddress}!`;
+            } else {
+                this.emailStatus = `Failed to send email: ${result?.error || 'Unknown error'}`;
+            }
+        } catch (err) {
+            this.emailStatus = `Error: ${err?.message || err}`;
+        } finally {
+            this.isEmailSending = false;
+            this.requestUpdate();
+        }
+    }
+
+    async stopAudioRecording() {
+        if (this.isAudioStopping) return;
+        
+        this.isAudioStopping = true;
+        this.audioStatus = 'Stopping audio recording...';
+        this.requestUpdate();
+
+        try {
+            const { ipcRenderer } = window.require ? window.require('electron') : { ipcRenderer: window.electron?.ipcRenderer };
+            if (!ipcRenderer) {
+                this.audioStatus = 'IPC unavailable to stop audio.';
+                this.isAudioStopping = false;
+                this.requestUpdate();
+                return;
+            }
+
+            const result = await ipcRenderer.invoke('stop-macos-audio');
+            if (result?.success) {
+                this.audioStatus = 'Audio recording stopped successfully!';
+            } else {
+                this.audioStatus = `Failed to stop audio: ${result?.error || 'Unknown error'}`;
+            }
+        } catch (err) {
+            this.audioStatus = `Error: ${err?.message || err}`;
+        } finally {
+            this.isAudioStopping = false;
+            this.requestUpdate();
+        }
     }
 
     firstUpdated() {
@@ -768,7 +984,7 @@ export class AssistantView extends LitElement {
                 if (i === words.length - 1) {
                     this.dispatchEvent(new CustomEvent('response-animation-complete', { bubbles: true, composed: true }));
                 }
-            }, (i - this._lastAnimatedWordCount) * 90);
+            }, (i - this._lastAnimatedWordCount) * 30);
         }
 
         this._lastAnimatedWordCount = words.length;
@@ -859,6 +1075,44 @@ export class AssistantView extends LitElement {
                             <path d="M9 3V8H15" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
                         </svg>
                     </button>
+
+                    <button
+                        class="save-button"
+                        @click=${this.emailConversationSummary}
+                        title="Email conversation summary via Composio Gmail"
+                        ?disabled=${this.isEmailSending}
+                    >
+                        <svg
+                            width="24"
+                            height="24"
+                            stroke-width="1.7"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                        >
+                            <path d="M4 4H20V20H4V4Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
+                            <path d="M4 7L12 12L20 7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
+                        </svg>
+                    </button>
+
+                    <button
+                        class="save-button"
+                        @click=${this.stopAudioRecording}
+                        title="Stop computer audio recording"
+                        ?disabled=${this.isAudioStopping}
+                    >
+                        <svg
+                            width="24"
+                            height="24"
+                            stroke-width="1.7"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                        >
+                            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.7"></circle>
+                            <rect x="9" y="9" width="6" height="6" stroke="currentColor" stroke-width="1.7"></rect>
+                        </svg>
+                    </button>
                 </div>
 
                 <input type="text" id="textInput" placeholder="Type a message to the AI..." @keydown=${this.handleTextKeydown} />
@@ -881,6 +1135,9 @@ export class AssistantView extends LitElement {
                     </svg>
                 </button>
             </div>
+
+            ${this.emailStatus ? html`<div class="usage-note" style="margin-top:6px;text-align:center;opacity:0.85;">${this.emailStatus}</div>` : ''}
+            ${this.audioStatus ? html`<div class="usage-note" style="margin-top:6px;text-align:center;opacity:0.85;">${this.audioStatus}</div>` : ''}
         `;
     }
 }

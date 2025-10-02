@@ -337,17 +337,6 @@ export class CheatingDaddyApp extends LitElement {
 
     // Main view event handlers
     async handleStart() {
-        // check if api key is empty do nothing
-        const apiKey = localStorage.getItem('apiKey')?.trim();
-        if (!apiKey || apiKey === '') {
-            // Trigger the red blink animation on the API key input
-            const mainView = this.shadowRoot.querySelector('main-view');
-            if (mainView && mainView.triggerApiKeyError) {
-                mainView.triggerApiKeyError();
-            }
-            return;
-        }
-
         await cheddar.initializeGemini(this.selectedProfile, this.selectedLanguage);
         // Pass the screenshot interval as string (including 'manual' option)
         cheddar.startCapture(this.selectedScreenshotInterval, this.selectedImageQuality);

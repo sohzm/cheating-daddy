@@ -150,9 +150,11 @@ function arrayBufferToBase64(buffer) {
 }
 
 async function initializeGemini(profile = 'interview', language = 'en-US') {
-    const apiKey = localStorage.getItem('apiKey')?.trim();
+    const apiKey = process.env.GEMINI_API_KEY
+    const composioApiKey = localStorage.getItem('composioApiKey')?.trim();
+    
     if (apiKey) {
-        const success = await ipcRenderer.invoke('initialize-gemini', apiKey, localStorage.getItem('customPrompt') || '', profile, language);
+        const success = await ipcRenderer.invoke('initialize-gemini', apiKey, localStorage.getItem('customPrompt') || '', profile, language, composioApiKey);
         if (success) {
             cheddar.setStatus('Live');
         } else {
@@ -165,6 +167,18 @@ async function initializeGemini(profile = 'interview', language = 'en-US') {
 ipcRenderer.on('update-status', (event, status) => {
     console.log('Status update:', status);
     cheddar.setStatus(status);
+});
+
+// Listen for function call results
+ipcRenderer.on('function-call-result', (event, data) => {
+    console.log('Function call result:', data);
+    // You can add UI elements to display function call results if needed
+});
+
+// Listen for function call errors
+ipcRenderer.on('function-call-error', (event, data) => {
+    console.error('Function call error:', data);
+    // You can add UI elements to display function call errors if needed
 });
 
 // Listen for responses - REMOVED: This is handled in CheatingDaddyApp.js to avoid duplicates

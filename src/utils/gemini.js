@@ -3,6 +3,7 @@ const { BrowserWindow, ipcMain } = require('electron');
 const { spawn } = require('child_process');
 const { saveDebugAudio } = require('../audioUtils');
 const { getSystemPrompt } = require('./prompts');
+const { composioService } = require('./composio');
 
 // Conversation tracking variables
 let currentSessionId = null;
@@ -122,6 +123,63 @@ async function getEnabledTools() {
         console.log('Google Search tool disabled');
     }
 
+    // Add Composio tools if service is initialized
+    if (composioService.isServiceInitialized()) {
+        try {
+            const composioTools = await composioService.getToolsForGemini('default-user', [
+                'GMAIL_SEND_EMAIL',
+                'GMAIL_GET_EMAILS',
+                'GMAIL_SEARCH_EMAILS',
+                'GMAIL_REPLY_TO_EMAIL'
+            ]);
+            
+            if (composioTools && composioTools.length > 0) {
+                // Clean and convert Composio tools to Gemini format
+                const cleanedTools = composioTools.map(tool => {
+                    // Create a deep copy and clean unsupported properties
+                    const cleanedTool = JSON.parse(JSON.stringify(tool));
+                    
+                    // Clean up parameters to remove unsupported properties
+                    if (cleanedTool.parameters && cleanedTool.parameters.properties) {
+                        const cleanedProperties = {};
+                        for (const [key, value] of Object.entries(cleanedTool.parameters.properties)) {
+                            // Remove unsupported properties for Gemini
+                            const cleanedValue = { ...value };
+                            delete cleanedValue.file_uploadable;
+                            delete cleanedValue.format;
+                            delete cleanedValue.title; // Remove title as it's not needed
+                            delete cleanedValue.examples; // Remove examples as it's not supported by Gemini
+                            
+                            // Keep only essential properties
+                            const essentialProps = ['type', 'description', 'default', 'nullable', 'items'];
+                            const filteredValue = {};
+                            for (const prop of essentialProps) {
+                                if (cleanedValue[prop] !== undefined) {
+                                    filteredValue[prop] = cleanedValue[prop];
+                                }
+                            }
+                            
+                            cleanedProperties[key] = filteredValue;
+                        }
+                        cleanedTool.parameters.properties = cleanedProperties;
+                    }
+                    
+                    return cleanedTool;
+                });
+                
+                // Convert to Gemini format
+                const geminiTools = cleanedTools.map(tool => ({
+                    functionDeclarations: [tool]
+                }));
+                tools.push(...geminiTools);
+                console.log(`Added ${cleanedTools.length} Composio tools`);
+            }
+        } catch (error) {
+            console.error('Failed to load Composio tools:', error);
+            console.log('Continuing without Composio tools...');
+        }
+    }
+
     return tools;
 }
 
@@ -177,7 +235,8 @@ async function attemptReconnection() {
             lastSessionParams.customPrompt,
             lastSessionParams.profile,
             lastSessionParams.language,
-            true // isReconnection flag
+            true, // isReconnection flag
+            lastSessionParams.composioApiKey
         );
 
         if (session && global.geminiSessionRef) {
@@ -204,7 +263,7 @@ async function attemptReconnection() {
     }
 }
 
-async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'interview', language = 'en-US', isReconnection = false) {
+async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'interview', language = 'en-US', isReconnection = false, composioApiKey = null) {
     if (isInitializingSession) {
         console.log('Session initialization already in progress');
         return false;
@@ -213,24 +272,45 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
     isInitializingSession = true;
     sendToRenderer('session-initializing', true);
 
+    // Use environment variable if apiKey is not provided
+    const finalApiKey = apiKey || process.env.GEMINI_API_KEY;
+
     // Store session parameters for reconnection (only if not already reconnecting)
     if (!isReconnection) {
         lastSessionParams = {
-            apiKey,
+            apiKey: finalApiKey,
             customPrompt,
             profile,
             language,
+            composioApiKey,
         };
         reconnectionAttempts = 0; // Reset counter for new session
     }
 
     const client = new GoogleGenAI({
         vertexai: false,
-        apiKey: apiKey,
+        apiKey: finalApiKey,
     });
 
+    // Initialize Composio service if API key is provided
+    if (composioApiKey && !composioService.isServiceInitialized()) {
+        console.log('Initializing Composio service...');
+        await composioService.initialize(composioApiKey, finalApiKey);
+    }
+
     // Get enabled tools first to determine Google Search status
-    const enabledTools = await getEnabledTools();
+    let enabledTools;
+    try {
+        enabledTools = await getEnabledTools();
+    } catch (error) {
+        console.error('Error getting enabled tools:', error);
+        // Fallback to just Google Search if Composio tools fail
+        enabledTools = [];
+        const googleSearchEnabled = await getStoredSetting('googleSearchEnabled', 'true');
+        if (googleSearchEnabled === 'true') {
+            enabledTools.push({ googleSearch: {} });
+        }
+    }
     const googleSearchEnabled = enabledTools.some(tool => tool.googleSearch);
 
     const systemPrompt = getSystemPrompt(profile, customPrompt, googleSearchEnabled);
@@ -247,7 +327,7 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                 onopen: function () {
                     sendToRenderer('update-status', 'Live session connected');
                 },
-                onmessage: function (message) {
+                onmessage: async function (message) {
                     console.log('----------------', message);
 
                     if (message.serverContent?.inputTranscription?.results) {
@@ -261,6 +341,30 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                             console.log(part);
                             if (part.text) {
                                 messageBuffer += part.text;
+                            }
+                            
+                            // Handle function calls
+                            if (part.functionCall && composioService.isServiceInitialized()) {
+                                try {
+                                    console.log('🔧 Executing function call:', part.functionCall.name);
+                                    const result = await composioService.executeFunctionCall('default-user', {
+                                        name: part.functionCall.name,
+                                        args: part.functionCall.args || {}
+                                    });
+                                    console.log('✅ Function call result:', result);
+                                    
+                                    // Send function call result to renderer
+                                    sendToRenderer('function-call-result', {
+                                        name: part.functionCall.name,
+                                        result: result
+                                    });
+                                } catch (error) {
+                                    console.error('❌ Function call failed:', error);
+                                    sendToRenderer('function-call-error', {
+                                        name: part.functionCall.name,
+                                        error: error.message
+                                    });
+                                }
                             }
                         }
                     }
@@ -523,8 +627,10 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
     // Store the geminiSessionRef globally for reconnection access
     global.geminiSessionRef = geminiSessionRef;
 
-    ipcMain.handle('initialize-gemini', async (event, apiKey, customPrompt, profile = 'interview', language = 'en-US') => {
-        const session = await initializeGeminiSession(apiKey, customPrompt, profile, language);
+    ipcMain.handle('initialize-gemini', async (event, apiKey, customPrompt, profile = 'interview', language = 'en-US', composioApiKey = null) => {
+        // Use environment variable if apiKey is not provided
+        const finalApiKey = apiKey || process.env.GEMINI_API_KEY;
+        const session = await initializeGeminiSession(finalApiKey, customPrompt, profile, language, false, composioApiKey);
         if (session) {
             geminiSessionRef.current = session;
             return true;
@@ -681,6 +787,72 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
             return { success: true };
         } catch (error) {
             console.error('Error updating Google Search setting:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    // Composio-specific IPC handlers
+    ipcMain.handle('initialize-composio', async (event, composioApiKey, geminiApiKey = null) => {
+        try {
+            // Use environment variable if geminiApiKey is not provided
+            const finalGeminiApiKey = geminiApiKey || process.env.GEMINI_API_KEY;
+            const success = await composioService.initialize(composioApiKey, finalGeminiApiKey);
+            return { success };
+        } catch (error) {
+            console.error('Error initializing Composio:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('connect-gmail', async (event, externalUserId, authConfigId) => {
+        try {
+            const result = await composioService.connectGmail(externalUserId, authConfigId);
+            return result;
+        } catch (error) {
+            console.error('Error connecting Gmail:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('get-gmail-connection-status', async (event, externalUserId) => {
+        try {
+            const result = await composioService.getGmailConnectionStatus(externalUserId);
+            return result;
+        } catch (error) {
+            console.error('Error getting Gmail connection status:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('execute-email-task', async (event, externalUserId, task, tools) => {
+        try {
+            const result = await composioService.executeEmailTaskWithAgent(externalUserId, task, tools);
+            return result;
+        } catch (error) {
+            console.error('Error executing email task:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('analyze-email-intent', async (event, prompt) => {
+        try {
+            const { GoogleGenAI } = require('@google/genai');
+            const client = new GoogleGenAI({
+                vertexai: false,
+                apiKey: process.env.GEMINI_API_KEY,
+            });
+
+            const response = await client.models.generateContent({
+                model: 'gemini-2.0-flash-001',
+                contents: prompt,
+            });
+
+            return { 
+                success: true, 
+                result: response.text || 'NO' 
+            };
+        } catch (error) {
+            console.error('Error analyzing email intent:', error);
             return { success: false, error: error.message };
         }
     });

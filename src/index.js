@@ -2,6 +2,9 @@ if (require('electron-squirrel-startup')) {
     process.exit(0);
 }
 
+// Load environment variables
+require('dotenv').config();
+
 const { app, BrowserWindow, shell, ipcMain } = require('electron');
 const { createWindow, updateGlobalShortcuts } = require('./utils/window');
 const { setupGeminiIpcHandlers, stopMacOSAudioCapture, sendToRenderer } = require('./utils/gemini');
