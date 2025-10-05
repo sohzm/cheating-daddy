@@ -25,20 +25,25 @@ function ensureDataDirectories() {
     return { imageDir, audioDir };
 }
 
-function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
+function createWindow(sendToRenderer, geminiSessionRef, randomNames = null, appConfig = {}) {
     // Get layout preference (default to 'normal')
     let windowWidth = 1100;
     let windowHeight = 800;
+
+    const stealthLevel = (appConfig && typeof appConfig.stealthLevel === 'string') ? appConfig.stealthLevel : 'balanced';
+    const isVisibleMode = stealthLevel === 'visible';
+    const shouldApplyStealth = !isVisibleMode;
+    const defaultContentProtection = shouldApplyStealth;
 
     const mainWindow = new BrowserWindow({
         width: windowWidth,
         height: windowHeight,
         frame: false,
         transparent: true,
-        hasShadow: false,
+        hasShadow: isVisibleMode,
         alwaysOnTop: true,
-        skipTaskbar: true,
-        hiddenInMissionControl: true,
+        skipTaskbar: shouldApplyStealth,
+        hiddenInMissionControl: shouldApplyStealth,
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false, // TODO: change to true
@@ -61,8 +66,12 @@ function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
     );
 
     mainWindow.setResizable(false);
-    mainWindow.setContentProtection(true);
-    mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    mainWindow.setContentProtection(defaultContentProtection);
+    try {
+        mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    } catch (error) {
+        console.warn('Unable to pin window to all workspaces:', error.message);
+    }
 
     // Center window at the top of the screen
     const primaryDisplay = screen.getPrimaryDisplay();
@@ -75,6 +84,14 @@ function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
         mainWindow.setAlwaysOnTop(true, 'screen-saver', 1);
     }
 
+    if (!shouldApplyStealth) {
+        try {
+            mainWindow.setAlwaysOnTop(true);
+        } catch (error) {
+            console.warn('Failed to ensure overlay stays on top:', error.message);
+        }
+    }
+
     mainWindow.loadFile(path.join(__dirname, '../index.html'));
 
     // Set window title to random name if provided
@@ -84,13 +101,52 @@ function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
     }
 
     // Apply stealth measures
-    applyStealthMeasures(mainWindow);
+    if (shouldApplyStealth) {
+        applyStealthMeasures(mainWindow, {
+            enableContentProtection: defaultContentProtection,
+            hideFromTaskbar: true,
+            hideFromMissionControl: true,
+            randomizeAppName: stealthLevel === 'ultra' || stealthLevel === 'balanced',
+            randomizeUserAgent: stealthLevel === 'ultra' || stealthLevel === 'balanced',
+        });
 
-    // Start periodic title randomization for additional stealth
-    startTitleRandomization(mainWindow);
+        // Start periodic title randomization for additional stealth
+        startTitleRandomization(mainWindow);
+    } else {
+        try {
+            mainWindow.setSkipTaskbar(false);
+            if (process.platform === 'darwin') {
+                mainWindow.setHiddenInMissionControl(false);
+            }
+            mainWindow.setContentProtection(false);
+            mainWindow.setAlwaysOnTop(true);
+        } catch (error) {
+            console.warn('Failed to force visible window settings:', error.message);
+        }
+    }
 
     // After window is created, check for layout preference and resize if needed
     mainWindow.webContents.once('dom-ready', () => {
+        // Ensure default content protection preference aligns with visibility mode
+        mainWindow.webContents
+            .executeJavaScript(
+                `
+                (function ensureContentProtectionDefault(defaultValue) {
+                    try {
+                        const stored = localStorage.getItem('contentProtection');
+                        if (defaultValue === false) {
+                            localStorage.setItem('contentProtection', 'false');
+                        } else if (stored === null) {
+                            localStorage.setItem('contentProtection', 'true');
+                        }
+                    } catch (error) {
+                        console.warn('Unable to seed content protection default:', error);
+                    }
+                })(${defaultContentProtection});
+            `
+            )
+            .catch(err => console.warn('Failed to seed content protection default:', err));
+
         setTimeout(() => {
             const defaultKeybinds = getDefaultKeybinds();
             let keybinds = defaultKeybinds;
@@ -116,19 +172,21 @@ function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
 
                     // Apply content protection setting via IPC handler
                     try {
-                        const contentProtection = await mainWindow.webContents.executeJavaScript('cheddar.getContentProtection()');
+                        const contentProtection = shouldApplyStealth
+                            ? await mainWindow.webContents.executeJavaScript('cheddar.getContentProtection()')
+                            : false;
                         mainWindow.setContentProtection(contentProtection);
                         console.log('Content protection loaded from settings:', contentProtection);
                     } catch (error) {
                         console.error('Error loading content protection:', error);
-                        mainWindow.setContentProtection(true);
+                        mainWindow.setContentProtection(defaultContentProtection);
                     }
 
                     updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessionRef);
                 })
                 .catch(() => {
-                    // Default to content protection enabled
-                    mainWindow.setContentProtection(true);
+                    // Default to config-derived content protection
+                    mainWindow.setContentProtection(defaultContentProtection);
                     updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessionRef);
                 });
         }, 150);

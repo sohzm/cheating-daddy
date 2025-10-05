@@ -3,6 +3,7 @@
 require('dotenv').config();
 
 const Cerebras = require('@cerebras/cerebras_cloud_sdk');
+const { findWorkflowMatchFromText } = require('./composio');
 
 const DEFAULT_MODEL = 'llama3.1-8b';
 
@@ -74,6 +75,8 @@ class CerebrasService {
             history = [],
         } = options;
 
+        const workflowSuggestion = findWorkflowMatchFromText(trimmed);
+
         const messages = [];
 
         if (systemPrompt) {
@@ -118,7 +121,10 @@ class CerebrasService {
 
                 console.log(`[Cerebras] Response generated: "${response.substring(0, 100)}..."`);
 
-                return response;
+                return {
+                    text: response,
+                    workflow: workflowSuggestion,
+                };
             }
 
             if (Array.isArray(message.content)) {
@@ -130,7 +136,14 @@ class CerebrasService {
 
                     .trim();
 
-                return combined || null;
+                if (!combined) {
+                    return null;
+                }
+
+                return {
+                    text: combined,
+                    workflow: workflowSuggestion,
+                };
             }
 
             return null;

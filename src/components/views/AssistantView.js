@@ -2,6 +2,8 @@ import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
 
 export class AssistantView extends LitElement {
     static styles = css`
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
         :host {
             height: 100%;
             display: flex;
@@ -9,24 +11,29 @@ export class AssistantView extends LitElement {
         }
 
         * {
-            font-family: 'Inter', sans-serif;
+            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Courier New', monospace;
             cursor: default;
+            letter-spacing: -0.2px;
+            font-feature-settings: "tnum", "zero";
         }
 
-        .response-container {
+        .chat-wrapper {
             flex: 1;
             display: flex;
             flex-direction: column;
-            gap: 12px;
-            overflow-y: auto;
-            border-radius: 12px;
-            font-size: var(--response-font-size, 14px);
-            line-height: 1.6;
-            background: rgba(0, 0, 0, 0.3);
+            justify-content: flex-end;
             padding: 20px;
-            scroll-behavior: smooth;
-            user-select: text;
-            cursor: text;
+            background: rgba(255, 255, 255, 0.01);
+            backdrop-filter: blur(40px) saturate(100%);
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .chat-header {
+            display: none;
+        }
+
+        .response-container {
+            display: none;
         }
 
         .response-container * {
@@ -52,29 +59,41 @@ export class AssistantView extends LitElement {
         }
 
         .chat-bubble {
-            max-width: 75%;
-            padding: 12px 16px;
-            border-radius: 16px;
-            line-height: 1.6;
+            max-width: 85%;
+            padding: 10px 14px;
+            border-radius: 14px;
+            line-height: 1.5;
             position: relative;
             word-break: break-word;
             overflow-wrap: break-word;
             hyphens: auto;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+            backdrop-filter: blur(25px);
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            opacity: 0;
+            transform: translateY(6px);
+            animation: slideInUp 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+        }
+
+        @keyframes slideInUp {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         .chat-bubble.assistant {
-            background: #E6D7FF;
-            color: #000000;
+            background: rgba(255, 255, 255, 0.04);
+            color: rgba(255, 255, 255, 0.85);
             border-top-left-radius: 4px;
-            border: 1px solid #D4B0FF;
+            border: 0.5px solid rgba(255, 255, 255, 0.08);
         }
 
         .chat-bubble.user {
-            background: #ffffff;
-            color: #000000;
+            background: rgba(255, 255, 255, 0.03);
+            color: rgba(255, 255, 255, 0.8);
             border-top-right-radius: 4px;
-            border: 1px solid rgba(0, 0, 0, 0.1);
+            border: 0.5px solid rgba(255, 255, 255, 0.06);
         }
 
         .chat-bubble.assistant.active {
@@ -174,7 +193,7 @@ export class AssistantView extends LitElement {
         .response-container pre code {
             background: none;
             padding: 0;
-            border-radius: 0;
+
         }
 
         .response-container a {
@@ -241,73 +260,88 @@ export class AssistantView extends LitElement {
 
         .text-input-container {
             display: flex;
-            gap: 12px;
-            margin-top: 16px;
+            gap: 8px;
             align-items: center;
+            background: rgba(255, 255, 255, 0.02);
+            border: 0.5px solid rgba(255, 255, 255, 0.04);
+            border-radius: 16px;
+            padding: 12px 16px;
+            backdrop-filter: blur(30px);
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
         }
 
         .composer-actions {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
             flex-shrink: 0;
         }
 
         .text-input-container input {
             flex: 1;
-            background: rgba(200, 160, 255, 0.3);
-            color: var(--text-color);
-            border: 1px solid rgba(200, 160, 255, 0.5);
-            padding: 10px 14px;
-            border-radius: 8px;
-            font-size: 14px;
-            height: 42px;
+            background: transparent;
+            color: rgba(255, 255, 255, 0.9);
+            border: none;
+            padding: 8px 12px;
+            font-size: 13px;
+            height: 32px;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .text-input-container input:focus {
             outline: none;
-            border-color: rgba(200, 160, 255, 0.8);
-            box-shadow: 0 0 0 3px rgba(200, 160, 255, 0.2);
-            background: rgba(200, 160, 255, 0.4);
         }
 
         .text-input-container input::placeholder {
-            color: var(--placeholder-color);
+            color: rgba(255, 255, 255, 0.3);
         }
 
         .text-input-container button:not(.send-button) {
-            background: transparent;
-            border: none;
-            padding: 0;
-            border-radius: 100px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 0.5px solid rgba(255, 255, 255, 0.04);
+            padding: 6px;
+            border-radius: 8px;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(20px);
         }
 
         .text-input-container button:not(.send-button):hover {
-            background: var(--text-input-button-hover);
+            background: rgba(255, 255, 255, 0.04);
+            border-color: rgba(255, 255, 255, 0.08);
+            transform: translateY(-1px);
+        }
+
+        .text-input-container button:not(.send-button):active {
+            transform: translateY(0);
+            transition: all 0.1s ease;
         }
 
         .send-button {
-            background: #ffffff;
-            color: #000000;
-            border: 1px solid rgba(0, 0, 0, 0.1);
-            width: 44px;
-            height: 44px;
-            border-radius: 12px;
+            background: rgba(0, 122, 255, 0.4);
+            color: rgba(255, 255, 255, 0.9);
+            border: 0.5px solid rgba(0, 122, 255, 0.2);
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(20px);
         }
 
         .send-button:hover {
+            background: rgba(0, 122, 255, 0.5);
+            border-color: rgba(0, 122, 255, 0.3);
             transform: translateY(-1px);
-            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.25);
         }
 
         .send-button:active {
             transform: translateY(0);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            transition: all 0.1s ease;
         }
 
         .nav-button {
@@ -345,32 +379,41 @@ export class AssistantView extends LitElement {
         }
 
         .save-button {
-            background: transparent;
-            color: var(--start-button-background);
-            border: none;
-            padding: 4px;
-            border-radius: 50%;
+            background: rgba(42, 45, 64, 0.8);
+            color: #c5c8ff;
+            border: 1px solid rgba(173, 177, 255, 0.25);
+            padding: 8px;
+            border-radius: 12px;
             font-size: 12px;
             display: flex;
             align-items: center;
-            width: 36px;
-            height: 36px;
+            width: 40px;
+            height: 40px;
             justify-content: center;
             cursor: pointer;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
         }
 
         .save-button:hover {
-            background: rgba(255, 255, 255, 0.1);
+            transform: translateY(-1px);
+            box-shadow: 0 8px 18px rgba(0, 0, 0, 0.25);
         }
 
         .save-button.saved {
-            color: #4caf50;
+            color: #6ef7a8;
+            border-color: rgba(110, 247, 168, 0.45);
+            background: rgba(38, 66, 54, 0.75);
         }
 
-
-        
         .save-button svg {
             stroke: currentColor !important;
+        }
+
+        .status-banner {
+            font-size: 12px;
+            color: rgba(223, 226, 255, 0.72);
+            text-align: center;
+            padding: 6px 0 0 0;
         }
     `;
 
@@ -391,7 +434,7 @@ export class AssistantView extends LitElement {
     constructor() {
         super();
         this.responses = [];
-        this.selectedProfile = 'interview';
+        this.selectedProfile = 'meeting';
         this.onSendText = () => {};
         this._lastAnimatedWordCount = 0;
         this.messages = [];
@@ -437,7 +480,6 @@ export class AssistantView extends LitElement {
 
     getProfileNames() {
         return {
-            interview: 'Job Interview',
             sales: 'Sales Call',
             meeting: 'Business Meeting',
             presentation: 'Presentation',
@@ -677,9 +719,12 @@ export class AssistantView extends LitElement {
         setTimeout(() => {
             const container = this.shadowRoot.querySelector('#responseContainer');
             if (container) {
-                container.scrollTop = container.scrollHeight;
+                container.scrollTo({
+                    top: container.scrollHeight,
+                    behavior: 'smooth'
+                });
             }
-        }, 0);
+        }, 50);
     }
 
     saveCurrentResponse() {
@@ -730,7 +775,7 @@ export class AssistantView extends LitElement {
 
             const result = await ipcRenderer.invoke('stop-macos-audio');
             if (result?.success) {
-                this.audioStatus = 'Audio recording stopped successfully!';
+                // Audio recording stopped
             } else {
                 this.audioStatus = `Failed to stop audio: ${result?.error || 'Unknown error'}`;
             }
@@ -769,7 +814,25 @@ export class AssistantView extends LitElement {
             const profileName = profileNames[this.selectedProfile] || 'Assistant';
             const systemPrompt = `You are a helpful ${profileName.toLowerCase()} assistant. Provide concise, actionable responses based on the conversation context.
 
-IMPORTANT: If the user's question requires current information, real-time data, or web search, respond with exactly: "SEARCH_REQUIRED: [your initial response]". This will trigger a web search to get the most current information.`;
+Respond ONLY with a valid JSON object following this schema:
+{
+  "reply": "<message to the user>",
+  "should_search": true | false,
+  "search_query": "<google search query or empty string>",
+  "action": {
+    "type": "none" | "composio_workflow",
+    "target": "<one of: google_docs | google_sheets | google_slides | gmail | descriptive label>",
+    "task": "<succinct imperative description of the requested work>"
+  }
+}
+
+Guidelines:
+- Set "should_search" to true when the user explicitly asks you to search Google, requests the latest information, or when answering confidently requires real-time data.
+- When "should_search" is true, "search_query" must contain a short Googleable query describing what to look up. Otherwise set it to an empty string.
+- The "reply" field should be what you would tell the user immediately. If a search is required, acknowledge that you will look it up.
+- Set "action.type" to "composio_workflow" when the user wants you to perform a task through a connected integration (for example Google Docs, Google Sheets, Google Slides, or Gmail). Otherwise set it to "none".
+- When "action.type" is "composio_workflow", use a known workflow key such as "google_docs", "google_sheets", "google_slides", or "gmail" for "target" (fallback to a concise description if unsure). The "task" field must summarize the work to be done in an imperative voice.
+- Do not add any text outside of the JSON object.`;
 
             const result = await ipcRenderer.invoke('generate-cerebras-response', {
                 userMessage,
@@ -780,48 +843,69 @@ IMPORTANT: If the user's question requires current information, real-time data, 
             });
 
             if (result?.success && result?.response) {
-                // Check if Cerebras indicates search is required
-                if (result.response.startsWith('SEARCH_REQUIRED:')) {
-                    const initialResponse = result.response.replace('SEARCH_REQUIRED:', '').trim();
-                    
-                    // Add user message to conversation
-                    this.messages = [...this.messages, { role: 'user', content: userMessage }];
-                    console.log('Added user message (search), total messages:', this.messages.length);
-                    this.notifyMessagesUpdated();
-                    
-                    // Add initial response
+                const responsePayload = result.response;
+                const responseText = typeof responsePayload === 'object' && responsePayload !== null ? String(responsePayload.text ?? '') : String(responsePayload ?? '');
+                let raw = responseText.trim();
+
+                const workflowSuggestion = typeof responsePayload === 'object' && responsePayload !== null ? responsePayload.workflow || null : null;
+
+                const fencedMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
+                if (fencedMatch) {
+                    raw = fencedMatch[1].trim();
+                }
+
+                let structured = null;
+                try {
+                    structured = JSON.parse(raw);
+                } catch (parseError) {
+                    console.warn('Cerebras did not return JSON, falling back to plain text.', parseError);
+                }
+
+                const reply = typeof structured?.reply === 'string' ? structured.reply : responseText;
+                const shouldSearch = Boolean(structured?.should_search);
+                const searchQuery = typeof structured?.search_query === 'string' ? structured.search_query.trim() : '';
+                const structuredAction = structured && typeof structured.action === 'object' ? structured.action : null;
+                const workflowContext = {
+                    structuredAction,
+                    workflowSuggestion,
+                    userMessage,
+                    assistantReply: reply,
+                };
+
+                // Add user message to conversation
+                this.messages = [...this.messages, { role: 'user', content: userMessage }];
+                console.log('Added user message, total messages:', this.messages.length);
+                this.notifyMessagesUpdated();
+
+                if (shouldSearch) {
+                    const initialResponse = reply || 'Let me look that up for you.';
+
                     this.messages = [...this.messages, { role: 'assistant', content: initialResponse }];
                     console.log('Added initial response (search), total messages:', this.messages.length);
                     this.notifyMessagesUpdated();
-                    
-                    // Save conversation history
+
                     this.saveConversationHistory();
-                    
-                    // Trigger Gemini search
+
                     this.cerebrasStatus = 'Searching for current information...';
                     this.requestUpdate();
-                    
-                    await this.performGeminiSearch(userMessage, initialResponse);
+
+                    const query = searchQuery || userMessage;
+                    await this.performGeminiSearch(userMessage, initialResponse, query);
+                    await this.triggerWorkflowIfNeeded(workflowContext);
                 } else {
-                    // Add user message to conversation
-                    this.messages = [...this.messages, { role: 'user', content: userMessage }];
-                    console.log('Added user message, total messages:', this.messages.length);
-                    this.notifyMessagesUpdated();
-                    
-                    // Add AI response to conversation
-                    this.messages = [...this.messages, { role: 'assistant', content: result.response }];
+                    const finalReply = reply || 'I am not sure what to say yet.';
+
+                    this.messages = [...this.messages, { role: 'assistant', content: finalReply }];
                     console.log('Added assistant response, total messages:', this.messages.length);
                     this.notifyMessagesUpdated();
-                    
-                    // Update responses array for saving functionality
-                    this.responses = [...this.responses, result.response];
 
-                    // Save conversation history
+                    this.responses = [...this.responses, finalReply];
+
                     this.saveConversationHistory();
-                    
+
                     console.log('Final messages after Cerebras response:', this.messages.length, this.messages);
-                    this.cerebrasStatus = 'Response generated successfully!';
                     this.shouldAnimateResponse = true;
+                    await this.triggerWorkflowIfNeeded(workflowContext);
                 }
             } else {
                 this.cerebrasStatus = `Failed to generate response: ${result?.error || 'Unknown error'}`;
@@ -834,7 +918,58 @@ IMPORTANT: If the user's question requires current information, real-time data, 
         }
     }
 
-    async performGeminiSearch(userMessage, initialResponse) {
+    async triggerWorkflowIfNeeded(context) {
+        if (!context || typeof context !== 'object') return;
+
+        const { structuredAction, workflowSuggestion, userMessage, assistantReply } = context;
+        const actionType = typeof structuredAction?.type === 'string' ? structuredAction.type.toLowerCase() : 'none';
+        const hasSuggestion = workflowSuggestion && typeof workflowSuggestion === 'object';
+
+        if (actionType !== 'composio_workflow' && !hasSuggestion) {
+            return;
+        }
+
+        try {
+            const { ipcRenderer } = window.require ? window.require('electron') : { ipcRenderer: window.electron?.ipcRenderer };
+            if (!ipcRenderer) {
+                console.warn('IPC unavailable for Composio workflow routing.');
+                return;
+            }
+
+            const workflowKey = typeof structuredAction?.target === 'string' ? structuredAction.target : workflowSuggestion?.key || null;
+            const payload = await ipcRenderer.invoke('cerebras-trigger-workflow', {
+                workflowKey,
+                targetText: typeof structuredAction?.target === 'string' ? structuredAction.target : null,
+                taskSummary: typeof structuredAction?.task === 'string' ? structuredAction.task : assistantReply || userMessage,
+                userMessage,
+                fallbackWorkflow: hasSuggestion ? workflowSuggestion : null,
+            });
+
+            if (!payload) {
+                return;
+            }
+
+            if (payload.success) {
+                const label = payload.workflow?.label || 'Composio';
+                if (payload.redirectUrl) {
+                    await ipcRenderer.invoke('open-external', payload.redirectUrl);
+                    this.cerebrasStatus = `${label} workflow link opened in your browser. Complete the requested task there.`;
+                } else {
+                    this.cerebrasStatus = `${label} workflow is ready.`;
+                }
+            } else if (payload.error) {
+                console.warn('Workflow routing failed:', payload.error);
+                this.cerebrasStatus = `Workflow error: ${payload.error}`;
+            }
+        } catch (workflowError) {
+            console.error('Error triggering Composio workflow:', workflowError);
+            this.cerebrasStatus = `Workflow error: ${workflowError?.message || workflowError}`;
+        } finally {
+            this.requestUpdate();
+        }
+    }
+
+    async performGeminiSearch(userMessage, initialResponse, searchQuery) {
         try {
             const { ipcRenderer } = window.require ? window.require('electron') : { ipcRenderer: window.electron?.ipcRenderer };
             if (!ipcRenderer) {
@@ -846,7 +981,8 @@ IMPORTANT: If the user's question requires current information, real-time data, 
             const searchResult = await ipcRenderer.invoke('perform-gemini-search', {
                 userMessage,
                 initialResponse,
-                profile: this.selectedProfile
+                profile: this.selectedProfile,
+                searchQuery
             });
 
             if (searchResult?.success && searchResult?.response) {
@@ -866,7 +1002,6 @@ IMPORTANT: If the user's question requires current information, real-time data, 
                     this.responses = [searchResult.response];
                 }
 
-                this.cerebrasStatus = 'Search completed successfully!';
                 this.shouldAnimateResponse = true;
                 
                 // Save conversation history with enhanced response
@@ -1023,81 +1158,59 @@ IMPORTANT: If the user's question requires current information, real-time data, 
 
 
     render() {
-        const isSaved = this.isResponseSaved();
+        const statusMessages = [this.audioStatus, this.cerebrasStatus].filter(Boolean);
 
         return html`
-            <div class="response-container" id="responseContainer"></div>
+            <div class="chat-wrapper">
+                <div class="text-input-container">
+                    <div class="composer-actions">
+                        <button
+                            class="save-button"
+                            @click=${this.stopAudioRecording}
+                            title="Stop computer audio recording"
+                            ?disabled=${this.isAudioStopping}
+                        >
+                            <svg
+                                width="20"
+                                height="20"
+                                stroke-width="1.5"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                xmlns="http://www.w3.org/2000/svg"
+                            >
+                                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.5"></circle>
+                                <rect x="9" y="9" width="6" height="6" stroke="currentColor" stroke-width="1.5"></rect>
+                            </svg>
+                        </button>
+                    </div>
 
-            <div class="text-input-container">
-                <div class="composer-actions">
-                    <button
-                        class="save-button ${isSaved ? 'saved' : ''}"
-                        @click=${this.saveCurrentResponse}
-                        title="${isSaved ? 'Response saved' : 'Save this response'}"
-                    >
+                    <input type="text" id="textInput" placeholder="Ask anything or give instructions..." @keydown=${this.handleTextKeydown} />
+
+                    <button class="send-button" @click=${this.handleSendText} title="Send message">
                         <svg
-                            width="24"
-                            height="24"
-                            stroke-width="1.7"
+                            width="18"
+                            height="18"
                             viewBox="0 0 24 24"
                             fill="none"
                             xmlns="http://www.w3.org/2000/svg"
                         >
                             <path
-                                d="M5 20V5C5 3.89543 5.89543 3 7 3H16.1716C16.702 3 17.2107 3.21071 17.5858 3.58579L19.4142 5.41421C19.7893 5.78929 20 6.29799 20 6.82843V20C20 21.1046 19.1046 22 18 22H7C5.89543 22 5 21 5 20Z"
+                                d="M3 11.5L21 3L13.5 21L11 13L3 11.5Z"
                                 stroke="currentColor"
-                                stroke-width="1.7"
+                                stroke-width="1.5"
                                 stroke-linecap="round"
                                 stroke-linejoin="round"
                             ></path>
-                            <path d="M15 22V13H9V22" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
-                            <path d="M9 3V8H15" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
-                        </svg>
-                    </button>
-
-                    <button
-                        class="save-button"
-                        @click=${this.stopAudioRecording}
-                        title="Stop computer audio recording"
-                        ?disabled=${this.isAudioStopping}
-                    >
-                        <svg
-                            width="24"
-                            height="24"
-                            stroke-width="1.7"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            xmlns="http://www.w3.org/2000/svg"
-                        >
-                            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.7"></circle>
-                            <rect x="9" y="9" width="6" height="6" stroke="currentColor" stroke-width="1.7"></rect>
                         </svg>
                     </button>
                 </div>
 
-                <input type="text" id="textInput" placeholder="Type a message to the AI..." @keydown=${this.handleTextKeydown} />
-
-                <button class="send-button" @click=${this.handleSendText} title="Send message">
-                    <svg
-                        width="22"
-                        height="22"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                    >
-                        <path
-                            d="M3 11.5L21 3L13.5 21L11 13L3 11.5Z"
-                            stroke="currentColor"
-                            stroke-width="1.7"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                        ></path>
-                    </svg>
-                </button>
+                ${statusMessages.length > 0
+                    ? html`${statusMessages.map(
+                          status => html`<div class="status-banner">${status}</div>`
+                      )}`
+                    : ''}
             </div>
-
-            ${this.audioStatus ? html`<div class="usage-note" style="margin-top:6px;text-align:center;opacity:0.85;">${this.audioStatus}</div>` : ''}
-            ${this.cerebrasStatus ? html`<div class="usage-note" style="margin-top:6px;text-align:center;opacity:0.85;">${this.cerebrasStatus}</div>` : ''}
         `;
     }
 }

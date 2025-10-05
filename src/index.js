@@ -9,6 +9,7 @@ const { app, BrowserWindow, shell, ipcMain } = require('electron');
 const { createWindow, updateGlobalShortcuts } = require('./utils/window');
 const { setupGeminiIpcHandlers, stopMacOSAudioCapture, sendToRenderer } = require('./utils/gemini');
 const { cerebrasService } = require('./utils/cerebras');
+const { composioService, findWorkflowMatchFromText, getWorkflowMetadata } = require('./utils/composio');
 const { initializeRandomProcessNames } = require('./utils/processRandomizer');
 const { applyAntiAnalysisMeasures } = require('./utils/stealthFeatures');
 const { getLocalConfig, writeConfig } = require('./config');
@@ -20,7 +21,8 @@ let mainWindow = null;
 const randomNames = initializeRandomProcessNames();
 
 function createMainWindow() {
-    mainWindow = createWindow(sendToRenderer, geminiSessionRef, randomNames);
+    const config = getLocalConfig();
+    mainWindow = createWindow(sendToRenderer, geminiSessionRef, randomNames, config);
     return mainWindow;
 }
 
@@ -135,28 +137,41 @@ function setupGeneralIpcHandlers() {
         }
     });
 
-    ipcMain.handle('update-content-protection', async (event, contentProtection) => {
+    ipcMain.handle('update-content-protection', async (event, contentProtectionValue) => {
         try {
-            if (mainWindow) {
-
-                // Get content protection setting from localStorage via cheddar
-                const contentProtection = await mainWindow.webContents.executeJavaScript('cheddar.getContentProtection()');
-                mainWindow.setContentProtection(contentProtection);
-                console.log('Content protection updated:', contentProtection);
+            if (!mainWindow) {
+                return { success: false, error: 'No active window' };
             }
-            return { success: true };
+
+            let enabled;
+            if (typeof contentProtectionValue === 'boolean') {
+                enabled = contentProtectionValue;
+            } else {
+                try {
+                    enabled = await mainWindow.webContents.executeJavaScript(
+                        'window?.cheddar?.getContentProtection?.() ?? true'
+                    );
+                } catch (lookupError) {
+                    console.warn('Falling back to default content protection value:', lookupError);
+                    enabled = true;
+                }
+            }
+
+            mainWindow.setContentProtection(Boolean(enabled));
+            console.log('Content protection updated:', Boolean(enabled));
+            return { success: true, contentProtection: Boolean(enabled) };
         } catch (error) {
             console.error('Error updating content protection:', error);
             return { success: false, error: error.message };
         }
     });
 
-    ipcMain.handle('get-random-display-name', async event => {
+    ipcMain.handle('get-composio-api-key', async (event) => {
         try {
-            return randomNames ? randomNames.displayName : 'System Monitor';
+            return { success: true, apiKey: process.env.COMPOSIO_API_KEY || null };
         } catch (error) {
-            console.error('Error getting random display name:', error);
-            return 'System Monitor';
+            console.error('Error getting Composio API key:', error);
+            return { success: false, error: error.message };
         }
     });
 
@@ -176,7 +191,7 @@ function setupGeneralIpcHandlers() {
                 maxTokens
             });
 
-            if (response) {
+            if (response && typeof response.text === 'string' && response.text.trim().length > 0) {
                 return { success: true, response };
             } else {
                 return { success: false, error: 'Failed to generate response from Cerebras' };
@@ -187,14 +202,83 @@ function setupGeneralIpcHandlers() {
         }
     });
 
+    ipcMain.handle('cerebras-trigger-workflow', async (event, payload = {}) => {
+        try {
+            const {
+                workflowKey,
+                targetText,
+                taskSummary,
+                userMessage,
+                fallbackWorkflow,
+                externalUserId = 'default-user',
+            } = payload;
+
+            let workflow = null;
+
+            if (typeof workflowKey === 'string' && workflowKey.trim()) {
+                const normalizedKey = workflowKey.trim().toLowerCase().replace(/[\s-]+/g, '_');
+                workflow = getWorkflowMetadata(normalizedKey) || findWorkflowMatchFromText(normalizedKey);
+            }
+
+            if (!workflow && typeof targetText === 'string' && targetText.trim()) {
+                workflow = findWorkflowMatchFromText(targetText);
+            }
+
+            if (!workflow && fallbackWorkflow && typeof fallbackWorkflow === 'object') {
+                if (typeof fallbackWorkflow.key === 'string') {
+                    workflow = getWorkflowMetadata(fallbackWorkflow.key) || fallbackWorkflow;
+                }
+            }
+
+            if (!workflow && typeof taskSummary === 'string' && taskSummary.trim()) {
+                workflow = findWorkflowMatchFromText(taskSummary);
+            }
+
+            if (!workflow && typeof userMessage === 'string' && userMessage.trim()) {
+                workflow = findWorkflowMatchFromText(userMessage);
+            }
+
+            if (!workflow) {
+                return { success: false, error: 'No matching Composio workflow found.' };
+            }
+
+            if (!composioService.isServiceInitialized()) {
+                const apiKey = process.env.COMPOSIO_API_KEY;
+                if (!apiKey) {
+                    return { success: false, error: 'Composio API key is not configured.' };
+                }
+                const initialized = await composioService.initialize(apiKey, process.env.GEMINI_API_KEY);
+                if (!initialized) {
+                    return { success: false, error: 'Failed to initialize Composio service.' };
+                }
+            }
+
+            const linkResult = await composioService.startWorkflowLink(externalUserId, workflow.key);
+            if (!linkResult || !linkResult.success) {
+                return { success: false, error: linkResult?.error || 'Failed to start Composio workflow.' };
+            }
+
+            return {
+                success: true,
+                workflow: linkResult.workflow || workflow,
+                redirectUrl: linkResult.redirectUrl || null,
+            };
+        } catch (error) {
+            console.error('Error triggering Composio workflow:', error);
+            return { success: false, error: error.message || 'Unknown error occurred' };
+        }
+    });
+
     // Gemini search integration (triggered by Cerebras)
     ipcMain.handle('perform-gemini-search', async (event, options) => {
         try {
-            const { userMessage, initialResponse, profile } = options;
+            const { userMessage, initialResponse, profile, searchQuery } = options;
             
             if (!userMessage || typeof userMessage !== 'string') {
                 throw new Error('Invalid user message provided');
             }
+
+            const resolvedQuery = typeof searchQuery === 'string' && searchQuery.trim().length > 0 ? searchQuery.trim() : userMessage;
 
             // Use Gemini for web search with Google Search enabled
             const { GoogleGenAI } = require('@google/genai');
@@ -203,11 +287,20 @@ function setupGeneralIpcHandlers() {
                 apiKey: process.env.GEMINI_API_KEY,
             });
 
-            const searchPrompt = `Based on the user's question: "${userMessage}" and the initial response: "${initialResponse}", please provide an enhanced response using current web search information. Include relevant, up-to-date details and cite sources when appropriate.`;
+            const searchPrompt = `You are enhancing an assistant's reply using real-time data.
+User question: "${userMessage}"
+Initial assistant reply: "${initialResponse}"
+Google search query to run: "${resolvedQuery}"
+
+Instructions:
+- Use the Google Search tool with the provided query (adapt if necessary).
+- Synthesize the latest information into a helpful answer.
+- Reference or cite sources when possible.
+- Maintain the tone of the ${profile || 'assistant'} assistant.`;
 
             const response = await client.models.generateContent({
                 model: 'gemini-2.0-flash-001',
-                contents: searchPrompt,
+                contents: [{ role: 'user', parts: [{ text: searchPrompt }] }],
                 tools: [{ googleSearch: {} }]
             });
 

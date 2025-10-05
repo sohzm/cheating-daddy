@@ -360,8 +360,8 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
             const intervalMilliseconds = parseInt(screenshotIntervalSeconds) * 1000;
             screenshotInterval = setInterval(() => captureScreenshot(imageQuality), intervalMilliseconds);
 
-            // Capture first screenshot immediately
-            setTimeout(() => captureScreenshot(imageQuality), 100);
+            // Don't capture screenshot immediately on start - wait for the first interval
+            console.log('Screenshot capture started - will begin after first interval');
         }
     } catch (err) {
         console.error('Error starting capture:', err);
@@ -792,6 +792,15 @@ const cheddar = {
     getContentProtection: () => {
         const contentProtection = localStorage.getItem('contentProtection');
         return contentProtection !== null ? contentProtection === 'true' : true;
+    },
+
+    setStealthAppearance: profile => {
+        if (typeof profile !== 'string') {
+            return;
+        }
+        if (cheatingDaddyApp?.setStealthAppearance) {
+            cheatingDaddyApp.setStealthAppearance(profile, { persistLocal: false });
+        }
     },
 
     // Platform detection

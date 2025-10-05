@@ -4,11 +4,7 @@ import { resizeLayout } from '../../utils/windowResize.js';
 export class CustomizeView extends LitElement {
     static styles = css`
         * {
-            font-family:
-                'Inter',
-                -apple-system,
-                BlinkMacSystemFont,
-                sans-serif;
+            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Courier New', monospace;
             cursor: default;
             user-select: none;
         }
@@ -415,11 +411,13 @@ export class CustomizeView extends LitElement {
         onLayoutModeChange: { type: Function },
         advancedMode: { type: Boolean },
         onAdvancedModeChange: { type: Function },
+        stealthProfile: { type: String },
+        stealthUpdateStatus: { type: String },
     };
 
     constructor() {
         super();
-        this.selectedProfile = 'interview';
+        this.selectedProfile = 'meeting';
         this.selectedLanguage = 'en-US';
         this.selectedScreenshotInterval = '5';
         this.selectedImageQuality = 'medium';
@@ -431,6 +429,9 @@ export class CustomizeView extends LitElement {
         this.onImageQualityChange = () => {};
         this.onLayoutModeChange = () => {};
         this.onAdvancedModeChange = () => {};
+
+        this.stealthProfile = localStorage.getItem('stealthProfile') || 'balanced';
+        this.stealthUpdateStatus = '';
 
         // Google Search default
         this.googleSearchEnabled = true;
@@ -461,11 +462,6 @@ export class CustomizeView extends LitElement {
 
     getProfiles() {
         return [
-            {
-                value: 'interview',
-                name: 'Job Interview',
-                description: 'Get help with answering interview questions',
-            },
             {
                 value: 'sales',
                 name: 'Sales Call',
@@ -531,7 +527,6 @@ export class CustomizeView extends LitElement {
 
     getProfileNames() {
         return {
-            interview: 'Job Interview',
             sales: 'Sales Call',
             meeting: 'Business Meeting',
             presentation: 'Presentation',
@@ -561,6 +556,42 @@ export class CustomizeView extends LitElement {
     handleImageQualitySelect(e) {
         this.selectedImageQuality = e.target.value;
         this.onImageQualityChange(e.target.value);
+    }
+
+    async handleStealthProfileChange(e) {
+        const value = e.target.value;
+        this.stealthProfile = value;
+        localStorage.setItem('stealthProfile', value);
+
+        if (value === 'visible') {
+            localStorage.setItem('contentProtection', 'false');
+        } else if (!localStorage.getItem('contentProtection')) {
+            localStorage.setItem('contentProtection', 'true');
+        }
+
+        if (window.cheddar?.setStealthAppearance) {
+            window.cheddar.setStealthAppearance(value);
+        }
+
+        if (window.require) {
+            try {
+                const { ipcRenderer } = window.require('electron');
+                const result = await ipcRenderer.invoke('set-stealth-level', value);
+                if (!result?.success) {
+                    console.error('Failed to persist stealth profile:', result?.error);
+                    this.stealthUpdateStatus = 'Failed to save stealth profile to system settings. Try restarting manually.';
+                } else {
+                    this.stealthUpdateStatus = 'Stealth profile saved. Restart the app to apply changes.';
+                }
+            } catch (error) {
+                console.error('Error updating stealth profile:', error);
+                this.stealthUpdateStatus = 'Error saving stealth profile. Restart may still be required.';
+            }
+        } else {
+            this.stealthUpdateStatus = 'Stealth profile saved locally. Restart the app to apply changes.';
+        }
+
+        this.requestUpdate();
     }
 
     handleLayoutModeSelect(e) {
@@ -937,18 +968,17 @@ export class CustomizeView extends LitElement {
                     <div class="form-grid">
                         <div class="form-group">
                             <label class="form-label">Profile</label>
-                            <select class="form-control" .value=${localStorage.getItem('stealthProfile') || 'balanced'} @change=${e => {
-                                localStorage.setItem('stealthProfile', e.target.value);
-                                // We need to notify the main process to restart for some settings to apply
-                                alert('Restart the application for stealth changes to take full effect.');
-                            }}>
+                            <select class="form-control" .value=${this.stealthProfile} @change=${this.handleStealthProfileChange}>
                                 <option value="visible">Visible</option>
                                 <option value="balanced">Balanced</option>
                                 <option value="ultra">Ultra-Stealth</option>
                             </select>
                             <div class="form-description">
-                                Adjusts visibility and detection resistance. A restart is required for changes to apply.
+                                Adjusts visibility and detection resistance. Restart the application after changing this option.
                             </div>
+                            ${this.stealthUpdateStatus
+                                ? html`<div class="form-description" style="color: var(--warning-color, #fbbf24);">${this.stealthUpdateStatus}</div>`
+                                : null}
                         </div>
                     </div>
                 </div>

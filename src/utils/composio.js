@@ -6,6 +6,8 @@
 // Load environment variables
 require('dotenv').config();
 
+const { getWorkflowMetadata, findWorkflowMatchFromText } = require('./composioRoutes');
+
 class ComposioService {
     constructor() {
         this.composio = null;
@@ -179,6 +181,44 @@ class ComposioService {
             accounts.push({ externalUserId, authConfigId, status: connection.status, connectedAccount: connection.connectedAccount });
         }
         return accounts;
+    }
+
+    /**
+     * Retrieve workflow metadata for a known Composio integration key
+     * @param {string} workflowKey
+     * @returns {{ key: string, label: string, description: string, authConfigId: string, provider: string, connectionType: string, defaultTools?: string[] }|null}
+     */
+    getWorkflowMetadata(workflowKey) {
+        return getWorkflowMetadata(workflowKey);
+    }
+
+    /**
+     * Match user text to a workflow definition using keyword heuristics
+     * @param {string} inputText
+     * @returns {{ key: string, label: string, description: string, authConfigId: string, provider: string, connectionType: string, defaultTools?: string[] }|null}
+     */
+    matchWorkflowFromText(inputText) {
+        return findWorkflowMatchFromText(inputText);
+    }
+
+    /**
+     * Start a linking flow for a workflow key (helper around connectIntegration)
+     * @param {string} externalUserId
+     * @param {string} workflowKey
+     * @returns {Promise<{success: boolean, redirectUrl?: string, error?: string, workflow?: object}>}
+     */
+    async startWorkflowLink(externalUserId, workflowKey) {
+        const workflow = getWorkflowMetadata(workflowKey);
+        if (!workflow) {
+            return { success: false, error: `Unknown Composio workflow: ${workflowKey}` };
+        }
+
+        const result = await this.connectIntegration(externalUserId, workflow.authConfigId, workflow.label);
+        if (result.success) {
+            return { ...result, workflow };
+        }
+
+        return result;
     }
 
     /**
@@ -367,5 +407,7 @@ const composioService = new ComposioService();
 
 module.exports = {
     ComposioService,
-    composioService
+    composioService,
+    getWorkflowMetadata,
+    findWorkflowMatchFromText,
 };

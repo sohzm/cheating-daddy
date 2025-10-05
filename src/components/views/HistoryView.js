@@ -4,7 +4,7 @@ import { resizeLayout } from '../../utils/windowResize.js';
 export class HistoryView extends LitElement {
     static styles = css`
         * {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Courier New', monospace;
             cursor: default;
             user-select: none;
         }
@@ -402,7 +402,6 @@ export class HistoryView extends LitElement {
 
     getProfileNames() {
         return {
-            interview: 'Job Interview',
             sales: 'Sales Call',
             meeting: 'Business Meeting',
             presentation: 'Presentation',

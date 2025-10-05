@@ -4,7 +4,7 @@ import { resizeLayout } from '../../utils/windowResize.js';
 export class MainView extends LitElement {
     static styles = css`
         * {
-            font-family: 'Inter', sans-serif;
+            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Courier New', monospace;
             cursor: default;
             user-select: none;
         }
@@ -231,9 +231,25 @@ export class MainView extends LitElement {
 
     async handleConnectGmail() {
         if (this.isConnectingGmail) return;
-        const composioApiKey = localStorage.getItem('composioApiKey');
+        
+        // Try to get API key from environment first, then localStorage
+        let composioApiKey = localStorage.getItem('composioApiKey');
         if (!composioApiKey) {
-            this.gmailStatus = 'Enter your Composio API key first.';
+            try {
+                const { ipcRenderer } = window.require ? window.require('electron') : { ipcRenderer: window.electron?.ipcRenderer };
+                if (ipcRenderer) {
+                    const result = await ipcRenderer.invoke('get-composio-api-key');
+                    if (result?.success && result.apiKey) {
+                        composioApiKey = result.apiKey;
+                    }
+                }
+            } catch (error) {
+                console.warn('Failed to load Composio API key from environment:', error);
+            }
+        }
+        
+        if (!composioApiKey) {
+            this.gmailStatus = 'No Composio API key found. Please set COMPOSIO_API_KEY in your .env file.';
             this.requestUpdate();
             return;
         }

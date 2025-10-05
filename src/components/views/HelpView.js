@@ -4,7 +4,7 @@ import { resizeLayout } from '../../utils/windowResize.js';
 export class HelpView extends LitElement {
     static styles = css`
         * {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Courier New', monospace;
             cursor: default;
             user-select: none;
         }
@@ -420,8 +420,8 @@ export class HelpView extends LitElement {
                     </div>
                     <div class="profiles-grid">
                         <div class="profile-item">
-                            <div class="profile-name">Job Interview</div>
-                            <div class="profile-description">Get help with interview questions and responses</div>
+                            <div class="profile-name">Business Meeting</div>
+                            <div class="profile-description">Support for professional meetings and discussions</div>
                         </div>
                         <div class="profile-item">
                             <div class="profile-name">Sales Call</div>

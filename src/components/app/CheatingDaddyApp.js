@@ -13,7 +13,7 @@ export class CheatingDaddyApp extends LitElement {
     static styles = css`
         * {
             box-sizing: border-box;
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family: 'Poppins', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             margin: 0px;
             padding: 0px;
             cursor: default;
@@ -116,6 +116,7 @@ export class CheatingDaddyApp extends LitElement {
         _isClickThrough: { state: true },
         _awaitingNewResponse: { state: true },
         shouldAnimateResponse: { type: Boolean },
+        stealthProfile: { type: String },
     };
 
     constructor() {
@@ -139,9 +140,19 @@ export class CheatingDaddyApp extends LitElement {
         this._awaitingNewResponse = false;
         this._currentResponseIsComplete = true;
         this.shouldAnimateResponse = false;
+        this.stealthProfile = localStorage.getItem('stealthProfile') || 'balanced';
+        this.stealthUpdateStatus = '';
 
         // Apply layout mode to document root
         this.updateLayoutMode();
+        this.applyStealthVisuals(this.stealthProfile);
+
+        this._handleStorageUpdate = event => {
+            if (event.key === 'stealthProfile') {
+                const profile = event.newValue || 'balanced';
+                this.setStealthAppearance(profile, { persistLocal: false });
+            }
+        };
     }
 
     handleAssistantMessagesUpdated(event) {
@@ -168,6 +179,8 @@ export class CheatingDaddyApp extends LitElement {
     connectedCallback() {
         super.connectedCallback();
 
+        window.addEventListener('storage', this._handleStorageUpdate);
+
         // Set up IPC listeners if needed
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
@@ -188,12 +201,35 @@ export class CheatingDaddyApp extends LitElement {
 
     disconnectedCallback() {
         super.disconnectedCallback();
+        window.removeEventListener('storage', this._handleStorageUpdate);
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
             ipcRenderer.removeAllListeners('update-response');
             ipcRenderer.removeAllListeners('update-response-streaming');
             ipcRenderer.removeAllListeners('update-status');
             ipcRenderer.removeAllListeners('click-through-toggled');
+        }
+    }
+
+    setStealthAppearance(profile, options = {}) {
+        const { persistLocal = true } = options;
+        this.stealthProfile = profile || 'balanced';
+        if (persistLocal) {
+            localStorage.setItem('stealthProfile', this.stealthProfile);
+        }
+        this.applyStealthVisuals(this.stealthProfile);
+    }
+
+    applyStealthVisuals(profile) {
+        const root = document.documentElement;
+        if (!root) {
+            return;
+        }
+
+        if (profile === 'visible') {
+            root.style.setProperty('--background-transparent', 'rgba(17, 19, 25, 0.4)');
+        } else {
+            root.style.setProperty('--background-transparent', 'transparent');
         }
     }
 

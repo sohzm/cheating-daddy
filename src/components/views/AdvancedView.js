@@ -5,6 +5,7 @@ export class AdvancedView extends LitElement {
     static styles = css`
         * {
             font-family:
+                'Poppins',
                 'Inter',
                 -apple-system,
                 BlinkMacSystemFont,

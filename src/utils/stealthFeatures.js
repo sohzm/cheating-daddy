@@ -6,11 +6,18 @@ const { getCurrentRandomDisplayName } = require('./processNames');
  * Apply additional stealth measures to the Electron application
  * @param {BrowserWindow} mainWindow - The main application window
  */
-function applyStealthMeasures(mainWindow) {
+function applyStealthMeasures(mainWindow, options = {}) {
+    const {
+        enableContentProtection = true,
+        hideFromTaskbar = true,
+        hideFromMissionControl = true,
+        randomizeAppName = true,
+        randomizeUserAgent = true,
+    } = options;
     console.log('Applying additional stealth measures...');
 
     // Hide from alt-tab on Windows
-    if (process.platform === 'win32') {
+    if (hideFromTaskbar && process.platform === 'win32') {
         try {
             mainWindow.setSkipTaskbar(true);
             console.log('Hidden from Windows taskbar');
@@ -20,7 +27,7 @@ function applyStealthMeasures(mainWindow) {
     }
 
     // Hide from Mission Control on macOS
-    if (process.platform === 'darwin') {
+    if (hideFromMissionControl && process.platform === 'darwin') {
         try {
             mainWindow.setHiddenInMissionControl(true);
             console.log('Hidden from macOS Mission Control');
@@ -30,7 +37,7 @@ function applyStealthMeasures(mainWindow) {
     }
 
     // Set random app name in menu bar (macOS)
-    if (process.platform === 'darwin') {
+    if (randomizeAppName && process.platform === 'darwin') {
         try {
             const { app } = require('electron');
             const randomName = getCurrentRandomDisplayName();
@@ -43,24 +50,26 @@ function applyStealthMeasures(mainWindow) {
 
     // Prevent screenshots if content protection is enabled
     try {
-        mainWindow.setContentProtection(true);
-        console.log('Content protection enabled');
+        mainWindow.setContentProtection(Boolean(enableContentProtection));
+        console.log(`Content protection ${enableContentProtection ? 'enabled' : 'disabled'} by stealth measures`);
     } catch (error) {
         console.warn('Could not enable content protection:', error.message);
     }
 
     // Randomize window user agent
-    try {
-        const userAgents = [
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36',
-        ];
-        const randomUA = userAgents[Math.floor(Math.random() * userAgents.length)];
-        mainWindow.webContents.setUserAgent(randomUA);
-        console.log('Set random user agent');
-    } catch (error) {
-        console.warn('Could not set user agent:', error.message);
+    if (randomizeUserAgent) {
+        try {
+            const userAgents = [
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+                'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36',
+            ];
+            const randomUA = userAgents[Math.floor(Math.random() * userAgents.length)];
+            mainWindow.webContents.setUserAgent(randomUA);
+            console.log('Set random user agent');
+        } catch (error) {
+            console.warn('Could not set user agent:', error.message);
+        }
     }
 }
 
