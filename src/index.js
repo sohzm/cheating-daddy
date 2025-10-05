@@ -333,10 +333,13 @@ Instructions:
 - Reference or cite sources when possible.
 - Maintain the tone of the ${profile || 'assistant'} assistant.`;
 
+            const groundingTool = { googleSearch: {} };
             const response = await client.models.generateContent({
-                model: 'gemini-2.0-flash-001',
+                model: 'gemini-2.5-flash',
                 contents: [{ role: 'user', parts: [{ text: searchPrompt }] }],
-                tools: [{ googleSearch: {} }]
+                config: {
+                    tools: [groundingTool],
+                },
             });
 
             if (response && response.text) {

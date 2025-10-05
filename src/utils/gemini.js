@@ -10,13 +10,161 @@ let currentSessionId = null;
 let currentTranscription = '';
 let conversationHistory = [];
 let isInitializingSession = false;
+let transcriptOnlyMode = false; // New mode for recording transcripts without AI responses
+let liveResponsesEnabled = false; // When false, stream transcripts but do not generate AI responses
+let storedTranscripts = []; // Store transcripts for later analysis
+
+/**
+ * Detect if transcribed text contains voice assistant patterns
+ * @param {string} text - The transcribed text to analyze
+ * @returns {boolean} - Whether the text appears to be from a voice assistant
+ */
+function isVoiceAssistantText(text) {
+    if (!text || typeof text !== 'string') {
+        return false;
+    }
+
+    const lowerText = text.toLowerCase().trim();
+    
+    // Voice assistant wake words and patterns
+    const wakeWords = [
+        'hey siri', 'ok google', 'alexa', 'hey cortana', 'hey assistant',
+        'computer', 'jarvis', 'hey google', 'okay google'
+    ];
+
+    // Voice assistant response patterns
+    const assistantPatterns = [
+        'i\'m sorry', 'im sorry', 'i don\'t understand', 'i dont understand',
+        'i can\'t help', 'i cant help', 'i\'m not sure', 'im not sure',
+        'here\'s what i found', 'heres what i found', 'i found this',
+        'according to', 'let me search', 'i\'ll help you', 'ill help you',
+        'i can help you', 'what can i help', 'how can i assist',
+        'i\'m here to help', 'im here to help', 'i\'m your assistant', 'im your assistant'
+    ];
+
+    // System/device response patterns
+    const systemPatterns = [
+        'system', 'device', 'connected', 'disconnected', 'battery',
+        'low battery', 'charging', 'volume', 'brightness', 'settings',
+        'notification', 'alert', 'warning', 'error', 'success',
+        'wifi', 'bluetooth', 'location', 'permission', 'access'
+    ];
+
+    // Check for wake words
+    const hasWakeWord = wakeWords.some(wakeWord => 
+        lowerText.includes(wakeWord)
+    );
+
+    // Check for assistant response patterns
+    const hasAssistantPattern = assistantPatterns.some(pattern => 
+        lowerText.includes(pattern)
+    );
+
+    // Check for system patterns
+    const hasSystemPattern = systemPatterns.some(pattern => 
+        lowerText.includes(pattern)
+    );
+
+    // Additional heuristics - only block very short responses that are likely system confirmations
+    const isShortResponse = lowerText.length < 10 && (
+        lowerText === 'yes' || lowerText === 'no' || 
+        lowerText === 'ok' || lowerText === 'okay' ||
+        lowerText === 'sure' || lowerText === 'right' ||
+        lowerText === 'done' || lowerText === 'ready'
+    );
+
+    const isCommandResponse = lowerText.includes('command') || 
+                             lowerText.includes('executed') ||
+                             lowerText.includes('completed');
+
+    const isVoiceAssistant = hasWakeWord || hasAssistantPattern || hasSystemPattern || 
+                            isShortResponse || isCommandResponse;
+
+    if (isVoiceAssistant) {
+        console.log(`[Voice Assistant Filter] Detected voice assistant text: "${text}"`);
+        console.log(`[Voice Assistant Filter] Reasons: wakeWord=${hasWakeWord}, assistantPattern=${hasAssistantPattern}, systemPattern=${hasSystemPattern}, shortResponse=${isShortResponse}, commandResponse=${isCommandResponse}`);
+    }
+
+    return isVoiceAssistant;
+}
+
+/**
+ * Determine if a transcription should be processed based on quality and content
+ * @param {string} transcription - The transcribed text to analyze
+ * @returns {boolean} - Whether the transcription should be processed
+ */
+function shouldProcessTranscription(transcription) {
+    if (!transcription || typeof transcription !== 'string') {
+        return false;
+    }
+
+    const text = transcription.trim();
+    
+    // Minimum length requirement (at least 3 words)
+    const words = text.split(/\s+/).filter(word => word.length > 0);
+    if (words.length < 3) {
+        return false;
+    }
+
+    // Skip very short utterances that are likely not meaningful
+    if (text.length < 15) {
+        return false;
+    }
+
+    // Skip common filler words and sounds
+    const fillerWords = [
+        'um', 'uh', 'ah', 'er', 'hmm', 'well', 'so', 'like', 'you know',
+        'i mean', 'actually', 'basically', 'literally', 'obviously'
+    ];
+    
+    const lowerText = text.toLowerCase();
+    const isMostlyFiller = fillerWords.some(filler => 
+        lowerText.includes(filler) && words.length < 5
+    );
+    
+    if (isMostlyFiller) {
+        return false;
+    }
+
+    // Skip repetitive or stuttering patterns
+    const wordsArray = lowerText.split(/\s+/);
+    const uniqueWords = new Set(wordsArray);
+    if (wordsArray.length > 3 && uniqueWords.size < wordsArray.length * 0.6) {
+        return false; // Too much repetition
+    }
+
+    // Skip incomplete sentences that end abruptly
+    if (text.endsWith('...') || text.endsWith('..') || text.endsWith('.')) {
+        // Check if it's a complete thought
+        const sentenceEndings = ['.', '!', '?'];
+        const lastChar = text[text.length - 1];
+        if (sentenceEndings.includes(lastChar) && words.length >= 4) {
+            return true; // Complete sentence
+        }
+    }
+
+    // Require at least one complete word (not just letters)
+    const hasCompleteWords = words.some(word => 
+        word.length >= 3 && /^[a-zA-Z]+$/.test(word)
+    );
+
+    return hasCompleteWords;
+}
 
 function formatSpeakerResults(results) {
     let text = '';
     for (const result of results) {
         if (result.transcript && result.speakerId) {
             const speakerLabel = result.speakerId === 1 ? 'Interviewer' : 'Candidate';
-            text += `[${speakerLabel}]: ${result.transcript}\n`;
+            const transcriptText = result.transcript;
+            
+            // Check if this transcript is from a voice assistant
+            if (isVoiceAssistantText(transcriptText)) {
+                console.log(`[Voice Assistant Filter] Blocking voice assistant transcript: "${transcriptText}"`);
+                continue; // Skip this transcript
+            }
+            
+            text += `[${speakerLabel}]: ${transcriptText}\n`;
         }
     }
     return text;
@@ -47,6 +195,101 @@ function initializeNewSession() {
     currentTranscription = '';
     conversationHistory = [];
     console.log('New conversation session started:', currentSessionId);
+}
+
+function saveTranscriptOnly(transcription) {
+    if (!currentSessionId) {
+        initializeNewSession();
+    }
+
+    const transcriptEntry = {
+        timestamp: Date.now(),
+        transcription: transcription.trim(),
+        sessionId: currentSessionId,
+    };
+
+    storedTranscripts.push(transcriptEntry);
+    console.log('Saved transcript (no AI response):', transcriptEntry);
+
+    // Send to renderer to save transcript without AI response
+    sendToRenderer('save-transcript-only', {
+        sessionId: currentSessionId,
+        transcript: transcriptEntry,
+        allTranscripts: storedTranscripts,
+    });
+}
+
+function analyzeStoredTranscripts(userQuery) {
+    if (storedTranscripts.length === 0) {
+        return {
+            success: false,
+            message: "No transcripts available to analyze."
+        };
+    }
+
+    // Combine all stored transcripts into a single text
+    const combinedTranscript = storedTranscripts
+        .map(entry => `[${new Date(entry.timestamp).toLocaleTimeString()}] ${entry.transcription}`)
+        .join('\n');
+
+    console.log('Analyzing stored transcripts:', storedTranscripts.length, 'entries');
+    
+    // Return the combined transcript for AI analysis
+    return {
+        success: true,
+        combinedTranscript,
+        transcriptCount: storedTranscripts.length,
+        userQuery
+    };
+}
+
+function clearStoredTranscripts() {
+    storedTranscripts = [];
+    console.log('Cleared stored transcripts');
+    sendToRenderer('transcripts-cleared', { sessionId: currentSessionId });
+}
+
+function setTranscriptOnlyMode(enabled) {
+    transcriptOnlyMode = enabled;
+    console.log('Transcript-only mode:', enabled ? 'ENABLED' : 'DISABLED');
+    // When transcript-only mode is enabled, also disable live responses
+    if (enabled) {
+        liveResponsesEnabled = false;
+    }
+    
+    // If we have an active session, we need to restart it with new configuration
+    if (global.geminiSessionRef?.current) {
+        console.log('Restarting session with new transcript-only mode configuration...');
+        // Close current session
+        global.geminiSessionRef.current.close();
+        global.geminiSessionRef.current = null;
+        
+        // Restart session with new configuration
+        setTimeout(async () => {
+            try {
+                const session = await initializeGeminiSession(
+                    lastSessionParams.apiKey,
+                    lastSessionParams.customPrompt,
+                    lastSessionParams.profile,
+                    lastSessionParams.language,
+                    true, // isReconnection flag
+                    lastSessionParams.composioApiKey
+                );
+                if (session) {
+                    global.geminiSessionRef.current = session;
+                    console.log('Session restarted with transcript-only mode:', enabled);
+                }
+            } catch (error) {
+                console.error('Failed to restart session:', error);
+            }
+        }, 1000);
+    }
+    
+    sendToRenderer('transcript-mode-changed', { 
+        transcriptOnlyMode: enabled,
+        liveResponsesEnabled,
+        sessionId: currentSessionId 
+    });
 }
 
 function saveConversationTurn(transcription, aiResponse) {
@@ -118,7 +361,6 @@ async function getEnabledTools() {
 
     if (googleSearchEnabled === 'true') {
         tools.push({ googleSearch: {} });
-        console.log('Added Google Search tool');
     } else {
         console.log('Google Search tool disabled');
     }
@@ -331,12 +573,44 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                     console.log('----------------', message);
 
                     if (message.serverContent?.inputTranscription?.results) {
-                        currentTranscription += formatSpeakerResults(message.serverContent.inputTranscription.results);
+                        const transcriptionText = formatSpeakerResults(message.serverContent.inputTranscription.results);
+                        
+                        // Check if the transcription contains voice assistant content
+                        if (transcriptionText && isVoiceAssistantText(transcriptionText)) {
+                            console.log(`[Voice Assistant Filter] Blocking voice assistant transcription from being processed`);
+                            return; // Skip processing this message entirely
+                        }
+                        
+                        // Stream transcripts to renderer regardless, but gate model response accumulation
+                        if (transcriptionText) {
+                            // Always notify renderer with streaming transcript text
+                            sendToRenderer('transcript-stream', { text: transcriptionText });
+
+                            // Additional filtering to reduce unnecessary responses
+                            if (shouldProcessTranscription(transcriptionText)) {
+                                if (transcriptOnlyMode) {
+                                    // In transcript-only mode, save transcript without triggering AI response
+                                    saveTranscriptOnly(transcriptionText);
+                                    return; // Don't accumulate for AI processing
+                                }
+
+                                // If live responses are disabled, keep storing as transcript and skip model reply accumulation
+                                if (!liveResponsesEnabled) {
+                                    saveTranscriptOnly(transcriptionText);
+                                    return;
+                                }
+
+                                // Else, accumulate to pair with a later AI response
+                                currentTranscription += transcriptionText;
+                            } else {
+                                console.log(`[Audio Filter] Skipping short or low-quality transcription: "${transcriptionText}"`);
+                            }
+                        }
                     }
 
-                    // Handle AI model response
-                    // Accumulate text chunks silently; only send once on generationComplete
-                    if (message.serverContent?.modelTurn?.parts) {
+                    // Handle AI model response - skip entirely in transcript-only mode or when live responses disabled
+                    if (!transcriptOnlyMode && liveResponsesEnabled && message.serverContent?.modelTurn?.parts) {
+                        // Accumulate text chunks silently; only send once on generationComplete
                         for (const part of message.serverContent.modelTurn.parts) {
                             console.log(part);
                             if (part.text) {
@@ -369,7 +643,7 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                         }
                     }
 
-                    if (message.serverContent?.generationComplete) {
+                    if (!transcriptOnlyMode && liveResponsesEnabled && message.serverContent?.generationComplete) {
                         sendToRenderer('update-response', messageBuffer);
 
                         // Save conversation turn when we have both transcription and AI response
@@ -435,8 +709,8 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                 },
             },
             config: {
-                responseModalities: ['TEXT'],
-                tools: enabledTools,
+                responseModalities: transcriptOnlyMode || !liveResponsesEnabled ? [] : ['TEXT'], // Disable responses when transcript-only or live responses disabled
+                tools: transcriptOnlyMode || !liveResponsesEnabled ? [] : enabledTools, // Disable tools as well when not responding
                 // Enable speaker diarization
                 inputAudioTranscription: {
                     enableSpeakerDiarization: true,
@@ -445,7 +719,9 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                 },
                 contextWindowCompression: { slidingWindow: {} },
                 speechConfig: { languageCode: language },
-                systemInstruction: {
+                systemInstruction: transcriptOnlyMode || !liveResponsesEnabled ? {
+                    parts: [{ text: "You are in transcript-only mode. Do not respond to any audio input. Only transcribe what you hear." }],
+                } : {
                     parts: [{ text: systemPrompt }],
                 },
             },
@@ -639,32 +915,14 @@ function setupGeminiIpcHandlers(geminiSessionRef, mainWindow) {
     });
 
     ipcMain.handle('send-audio-content', async (event, { data, mimeType }) => {
-        if (!geminiSessionRef.current) return { success: false, error: 'No active Gemini session' };
-        try {
-            process.stdout.write('.');
-            await geminiSessionRef.current.sendRealtimeInput({
-                audio: { data: data, mimeType: mimeType },
-            });
-            return { success: true };
-        } catch (error) {
-            console.error('Error sending system audio:', error);
-            return { success: false, error: error.message };
-        }
+        // Voice commands disabled - return success but don't process audio
+        return { success: true };
     });
 
     // Handle microphone audio on a separate channel
     ipcMain.handle('send-mic-audio-content', async (event, { data, mimeType }) => {
-        if (!geminiSessionRef.current) return { success: false, error: 'No active Gemini session' };
-        try {
-            process.stdout.write(',');
-            await geminiSessionRef.current.sendRealtimeInput({
-                audio: { data: data, mimeType: mimeType },
-            });
-            return { success: true };
-        } catch (error) {
-            console.error('Error sending mic audio:', error);
-            return { success: false, error: error.message };
-        }
+        // Voice commands disabled - return success but don't process microphone audio
+        return { success: true };
     });
 
     ipcMain.handle('send-image-content', async (event, { data, debug }) => {
@@ -679,7 +937,6 @@ function setupGeminiIpcHandlers(geminiSessionRef, mainWindow) {
             const buffer = Buffer.from(data, 'base64');
 
             if (buffer.length < 1000) {
-                console.error(`Image buffer too small: ${buffer.length} bytes`);
                 return { success: false, error: 'Image buffer too small' };
             }
 
@@ -908,25 +1165,97 @@ function setupGeminiIpcHandlers(geminiSessionRef, mainWindow) {
         }
     });
 
-    ipcMain.handle('analyze-email-intent', async (event, prompt) => {
+    // Transcript-only mode IPC handlers
+    ipcMain.handle('set-transcript-only-mode', async (event, enabled) => {
         try {
-            const { GoogleGenAI } = require('@google/genai');
-            const client = new GoogleGenAI({
-                vertexai: false,
-                apiKey: process.env.GEMINI_API_KEY,
-            });
+            setTranscriptOnlyMode(enabled);
+            return { success: true, transcriptOnlyMode: enabled };
+        } catch (error) {
+            console.error('Error setting transcript-only mode:', error);
+            return { success: false, error: error.message };
+        }
+    });
 
-            const response = await client.models.generateContent({
-                model: 'gemini-2.0-flash-001',
-                contents: prompt,
-            });
-
+    ipcMain.handle('get-stored-transcripts', async (event) => {
+        try {
             return { 
                 success: true, 
-                result: response.text || 'NO' 
+                transcripts: storedTranscripts,
+                count: storedTranscripts.length 
             };
         } catch (error) {
-            console.error('Error analyzing email intent:', error);
+            console.error('Error getting stored transcripts:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    // Toggle live responses (stream transcripts, optionally reply)
+    ipcMain.handle('set-live-responses-enabled', async (event, enabled) => {
+        try {
+            liveResponsesEnabled = Boolean(enabled);
+            console.log('Live responses:', liveResponsesEnabled ? 'ENABLED' : 'DISABLED');
+
+            // Restart session to apply config change
+            if (global.geminiSessionRef?.current && lastSessionParams) {
+                try {
+                    await global.geminiSessionRef.current.close();
+                } catch (e) {}
+                global.geminiSessionRef.current = null;
+
+                const session = await initializeGeminiSession(
+                    lastSessionParams.apiKey,
+                    lastSessionParams.customPrompt,
+                    lastSessionParams.profile,
+                    lastSessionParams.language,
+                    true, // isReconnection
+                    lastSessionParams.composioApiKey
+                );
+                if (session) {
+                    global.geminiSessionRef.current = session;
+                }
+            }
+
+            sendToRenderer('transcript-mode-changed', {
+                transcriptOnlyMode,
+                liveResponsesEnabled,
+                sessionId: currentSessionId,
+            });
+            return { success: true, liveResponsesEnabled };
+        } catch (error) {
+            console.error('Error setting live responses:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('analyze-stored-transcripts', async (event, userQuery) => {
+        try {
+            const result = analyzeStoredTranscripts(userQuery);
+            return result;
+        } catch (error) {
+            console.error('Error analyzing stored transcripts:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('clear-stored-transcripts', async (event) => {
+        try {
+            clearStoredTranscripts();
+            return { success: true };
+        } catch (error) {
+            console.error('Error clearing stored transcripts:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('get-transcript-mode-status', async (event) => {
+        try {
+            return { 
+                success: true, 
+                transcriptOnlyMode,
+                storedTranscriptCount: storedTranscripts.length 
+            };
+        } catch (error) {
+            console.error('Error getting transcript mode status:', error);
             return { success: false, error: error.message };
         }
     });

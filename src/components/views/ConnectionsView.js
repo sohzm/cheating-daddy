@@ -159,7 +159,7 @@ export class ConnectionsView extends LitElement {
             grid-row: 1 / span 2; 
         }
         .name { 
-            font-weight: 600; 
+            font-weight: 700; 
             font-size: 14px; 
             color: rgba(255, 255, 255, 0.9);
         }

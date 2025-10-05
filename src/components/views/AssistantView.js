@@ -79,7 +79,7 @@ export class AssistantView extends LitElement {
             overflow-wrap: break-word;
             hyphens: auto;
             font-size: 13px;
-            font-weight: 400;
+            font-weight: 600;
             transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
             opacity: 0;
             transform: translateY(6px);
@@ -98,7 +98,7 @@ export class AssistantView extends LitElement {
             color: rgba(255, 255, 255, 0.98);
             border-top-left-radius: 4px;
             border: 0.5px solid rgba(255, 255, 255, 0.15);
-            font-weight: 400;
+            font-weight: 600;
             letter-spacing: 0.1px;
         }
 
@@ -112,6 +112,73 @@ export class AssistantView extends LitElement {
         .chat-bubble.assistant.active {
             outline: 2px solid var(--focus-border-color);
             box-shadow: 0 0 0 4px var(--focus-box-shadow);
+        }
+
+        /* Searching message styles */
+        .searching-message {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            border-top-left-radius: 4px;
+            border: 0.5px solid rgba(255, 255, 255, 0.12);
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .search-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 20px;
+            height: 20px;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .search-text {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .search-label {
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: 500;
+        }
+
+        .search-dots {
+            display: flex;
+            gap: 4px;
+        }
+
+        .search-dots .dot {
+            width: 4px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.6);
+            border-radius: 50%;
+            animation: searchPulse 1.4s infinite ease-in-out;
+        }
+
+        .search-dots .dot:nth-child(1) {
+            animation-delay: -0.32s;
+        }
+
+        .search-dots .dot:nth-child(2) {
+            animation-delay: -0.16s;
+        }
+
+        @keyframes searchPulse {
+            0%, 80%, 100% {
+                transform: scale(0.8);
+                opacity: 0.5;
+            }
+            40% {
+                transform: scale(1);
+                opacity: 1;
+            }
         }
 
         /* Animated word-by-word reveal */
@@ -139,8 +206,9 @@ export class AssistantView extends LitElement {
         .response-container h5,
         .response-container h6 {
             margin: 1.2em 0 0.6em 0;
-            color: rgba(255, 255, 255, 0.95);
-            font-weight: 600;
+            color: rgba(255, 255, 255, 0.98);
+            font-weight: 700;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
         }
 
         .response-container h1 {
@@ -220,8 +288,8 @@ export class AssistantView extends LitElement {
 
         .response-container strong,
         .response-container b {
-            font-weight: 600;
-            color: #000000;
+            font-weight: 700;
+            color: rgba(255, 255, 255, 0.95);
         }
 
         .response-container em,
@@ -418,6 +486,12 @@ export class AssistantView extends LitElement {
             background: rgba(38, 66, 54, 0.75);
         }
 
+        .save-button.active {
+            color: #ffa500;
+            border-color: rgba(255, 165, 0, 0.45);
+            background: rgba(66, 54, 38, 0.75);
+        }
+
         .save-button svg {
             stroke: currentColor !important;
         }
@@ -443,6 +517,8 @@ export class AssistantView extends LitElement {
         cerebrasStatus: { type: String },
         isGeneratingResponse: { type: Boolean },
         lastComposioExecution: { type: Object },
+        transcriptOnlyMode: { type: Boolean },
+        storedTranscriptCount: { type: Number },
     };
 
     constructor() {
@@ -465,6 +541,8 @@ export class AssistantView extends LitElement {
         this.cerebrasStatus = '';
         this.isGeneratingResponse = false;
         this.lastComposioExecution = null;
+        this.transcriptOnlyMode = false;
+        this.storedTranscriptCount = 0;
         
         // Load conversation history from localStorage if available
         this.loadConversationHistory();
@@ -670,7 +748,7 @@ export class AssistantView extends LitElement {
         // Load and apply font size
         this.loadFontSize();
 
-        // Set up IPC listeners for keyboard shortcuts
+        // Set up IPC listeners for keyboard shortcuts and transcript mode
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
 
@@ -684,8 +762,29 @@ export class AssistantView extends LitElement {
                 this.scrollResponseDown();
             };
 
+            this.handleTranscriptModeChanged = (event, data) => {
+                console.log('Transcript mode changed:', data);
+                this.transcriptOnlyMode = data.transcriptOnlyMode;
+                this.requestUpdate();
+            };
+
+            this.handleTranscriptsCleared = (event, data) => {
+                console.log('Transcripts cleared:', data);
+                this.storedTranscriptCount = 0;
+                this.requestUpdate();
+            };
+
+            this.handleSaveTranscriptOnly = (event, data) => {
+                console.log('Transcript saved (no AI response):', data);
+                this.storedTranscriptCount = data.allTranscripts?.length || 0;
+                this.requestUpdate();
+            };
+
             ipcRenderer.on('scroll-response-up', this.handleScrollUp);
             ipcRenderer.on('scroll-response-down', this.handleScrollDown);
+            ipcRenderer.on('transcript-mode-changed', this.handleTranscriptModeChanged);
+            ipcRenderer.on('transcripts-cleared', this.handleTranscriptsCleared);
+            ipcRenderer.on('save-transcript-only', this.handleSaveTranscriptOnly);
         }
     }
 
@@ -700,6 +799,15 @@ export class AssistantView extends LitElement {
             }
             if (this.handleScrollDown) {
                 ipcRenderer.removeListener('scroll-response-down', this.handleScrollDown);
+            }
+            if (this.handleTranscriptModeChanged) {
+                ipcRenderer.removeListener('transcript-mode-changed', this.handleTranscriptModeChanged);
+            }
+            if (this.handleTranscriptsCleared) {
+                ipcRenderer.removeListener('transcripts-cleared', this.handleTranscriptsCleared);
+            }
+            if (this.handleSaveTranscriptOnly) {
+                ipcRenderer.removeListener('save-transcript-only', this.handleSaveTranscriptOnly);
             }
         }
     }
@@ -718,6 +826,12 @@ export class AssistantView extends LitElement {
 
         textInput.value = '';
         textInput.focus();
+
+        // Check if user is asking to analyze stored transcripts
+        if (this.isTranscriptAnalysisQuery(message)) {
+            await this.analyzeStoredTranscripts(message);
+            return;
+        }
 
         // Use Cerebras as the primary chat API
         await this.generateCerebrasResponse(message);
@@ -772,41 +886,364 @@ export class AssistantView extends LitElement {
         return joined.length > 4000 ? joined.slice(0, 4000) + '...' : joined;
     }
 
-    async stopAudioRecording() {
-        if (this.isAudioStopping) return;
-        
-        this.isAudioStopping = true;
-        this.audioStatus = 'Stopping audio recording...';
-        this.requestUpdate();
-
+    async takeScreenshot() {
         try {
             const { ipcRenderer } = window.require ? window.require('electron') : { ipcRenderer: window.electron?.ipcRenderer };
             if (!ipcRenderer) {
-                this.audioStatus = 'IPC unavailable to stop audio.';
-                this.isAudioStopping = false;
+                console.error('IPC unavailable for screenshot');
+                return;
+            }
+
+            console.log('Taking screenshot...');
+            const result = await ipcRenderer.invoke('capture-manual-screenshot');
+            if (result?.success) {
+                console.log('Screenshot captured successfully');
+            } else {
+                console.error('Failed to capture screenshot:', result?.error || 'Unknown error');
+            }
+        } catch (err) {
+            console.error('Error taking screenshot:', err?.message || err);
+        }
+    }
+
+    /**
+     * Check if the user query is asking to analyze stored transcripts
+     * @param {string} message - The user's message
+     * @returns {boolean} - Whether this is a transcript analysis query
+     */
+    isTranscriptAnalysisQuery(message) {
+        if (!message || typeof message !== 'string') {
+            return false;
+        }
+
+        const lowerMessage = message.toLowerCase().trim();
+        
+        // Keywords that indicate transcript analysis requests
+        const transcriptKeywords = [
+            'what can i pull from this transcript',
+            'analyze this transcript',
+            'what can you tell me about this transcript',
+            'summarize this transcript',
+            'what did i say in the transcript',
+            'transcript analysis',
+            'analyze the transcript',
+            'what\'s in the transcript',
+            'whats in the transcript',
+            'tell me about the transcript',
+            'what can you extract from the transcript',
+            'pull from transcript',
+            'extract from transcript'
+        ];
+
+        return transcriptKeywords.some(keyword => lowerMessage.includes(keyword));
+    }
+
+    /**
+     * Analyze stored transcripts and provide AI response
+     * @param {string} userQuery - The user's analysis request
+     */
+    async analyzeStoredTranscripts(userQuery) {
+        try {
+            const { ipcRenderer } = window.require ? window.require('electron') : { ipcRenderer: window.electron?.ipcRenderer };
+            if (!ipcRenderer) {
+                this.cerebrasStatus = 'IPC unavailable for transcript analysis.';
+                return;
+            }
+
+            this.isGeneratingResponse = true;
+            this.cerebrasStatus = 'Analyzing stored transcripts...';
+            this.requestUpdate();
+
+            // Get stored transcripts from main process
+            const transcriptResult = await ipcRenderer.invoke('analyze-stored-transcripts', userQuery);
+            
+            if (!transcriptResult?.success) {
+                this.cerebrasStatus = transcriptResult?.message || 'No transcripts available to analyze.';
+                this.isGeneratingResponse = false;
                 this.requestUpdate();
                 return;
             }
 
-            const result = await ipcRenderer.invoke('stop-macos-audio');
-            if (result?.success) {
-                // Audio recording stopped
+            // Add user message to conversation
+            this.messages = [...this.messages, { role: 'user', content: userQuery }];
+            this.notifyMessagesUpdated();
+
+            // Create analysis prompt with the combined transcript
+            const analysisPrompt = `Please analyze the following transcript and answer the user's question: "${userQuery}"
+
+TRANSCRIPT:
+${transcriptResult.combinedTranscript}
+
+Please provide a comprehensive analysis based on what was discussed in the transcript.`;
+
+            // Use Cerebras to analyze the transcript
+            const analysisResult = await ipcRenderer.invoke('generate-cerebras-response', {
+                userMessage: analysisPrompt,
+                systemPrompt: `You are a helpful assistant that analyzes transcripts and provides insights. Be thorough and specific in your analysis, referencing specific parts of the transcript when relevant.`,
+                history: this.messages.slice(-5).map(msg => ({
+                    role: msg.role,
+                    content: msg.content
+                })),
+                temperature: 0.7,
+                maxTokens: 1024
+            });
+
+            if (analysisResult?.success && analysisResult?.response) {
+                const responseText = typeof analysisResult.response === 'object' && analysisResult.response !== null 
+                    ? String(analysisResult.response.text ?? '') 
+                    : String(analysisResult.response ?? '');
+
+                const finalResponse = responseText.trim() || 'I analyzed the transcript but couldn\'t generate a response.';
+
+                this.messages = [...this.messages, { role: 'assistant', content: finalResponse }];
+                this.notifyMessagesUpdated();
+
+                this.responses = [...this.responses, finalResponse];
+                this.saveConversationHistory();
+
+                this.shouldAnimateResponse = true;
+                this.cerebrasStatus = `Analyzed ${transcriptResult.transcriptCount} transcript entries`;
             } else {
-                this.audioStatus = `Failed to stop audio: ${result?.error || 'Unknown error'}`;
+                this.cerebrasStatus = `Analysis failed: ${analysisResult?.error || 'Unknown error'}`;
             }
         } catch (err) {
-            this.audioStatus = `Error: ${err?.message || err}`;
+            this.cerebrasStatus = `Analysis error: ${err?.message || err}`;
         } finally {
-            this.isAudioStopping = false;
+            this.isGeneratingResponse = false;
             this.requestUpdate();
         }
+    }
+
+    /**
+     * Toggle transcript-only mode
+     */
+    async toggleTranscriptOnlyMode() {
+        try {
+            const { ipcRenderer } = window.require ? window.require('electron') : { ipcRenderer: window.electron?.ipcRenderer };
+            if (!ipcRenderer) {
+                console.error('IPC unavailable for transcript mode toggle');
+                return;
+            }
+
+            const newMode = !this.transcriptOnlyMode;
+            const result = await ipcRenderer.invoke('set-transcript-only-mode', newMode);
+            
+            if (result?.success) {
+                this.transcriptOnlyMode = newMode;
+                this.cerebrasStatus = newMode 
+                    ? 'Transcript-only mode enabled - recording without AI responses' 
+                    : 'Normal mode enabled - AI will respond to audio';
+                this.requestUpdate();
+            } else {
+                console.error('Failed to toggle transcript mode:', result?.error);
+            }
+        } catch (err) {
+            console.error('Error toggling transcript mode:', err?.message || err);
+        }
+    }
+
+    /**
+     * Clear stored transcripts
+     */
+    async clearStoredTranscripts() {
+        try {
+            const { ipcRenderer } = window.require ? window.require('electron') : { ipcRenderer: window.electron?.ipcRenderer };
+            if (!ipcRenderer) {
+                console.error('IPC unavailable for clearing transcripts');
+                return;
+            }
+
+            const result = await ipcRenderer.invoke('clear-stored-transcripts');
+            if (result?.success) {
+                this.storedTranscriptCount = 0;
+                this.cerebrasStatus = 'Stored transcripts cleared';
+                this.requestUpdate();
+            } else {
+                console.error('Failed to clear transcripts:', result?.error);
+            }
+        } catch (err) {
+            console.error('Error clearing transcripts:', err?.message || err);
+        }
+    }
+
+    /**
+     * Determine if a query requires Google Search based on content analysis
+     * @param {string} userMessage - The user's message/query
+     * @returns {boolean} - Whether Google Search should be used
+     */
+    shouldUseGoogleSearch(userMessage) {
+        if (!userMessage || typeof userMessage !== 'string') {
+            return false;
+        }
+
+        const message = userMessage.toLowerCase().trim();
+        
+        // Keywords that indicate need for current/recent information
+        const currentInfoKeywords = [
+            'latest', 'recent', 'current', 'today', 'yesterday', 'this week', 'this month',
+            'now', 'happening', 'breaking', 'news', 'update', 'score', 'result',
+            'winner', 'loser', 'game', 'match', 'election', 'weather', 'stock',
+            'price', 'rate', 'exchange', 'cryptocurrency', 'bitcoin', 'ethereum'
+        ];
+
+        // Time-sensitive indicators
+        const timeSensitiveKeywords = [
+            '2024', '2025', 'this year', 'last year', 'yesterday', 'today',
+            'recently', 'just happened', 'live', 'streaming', 'ongoing'
+        ];
+
+        // Question words that often need current data (more specific)
+        const questionWords = [
+            'who won', 'what happened', 'when did', 'how much', 'how many',
+            'what\'s the latest', 'whats the latest', 'what\'s the current', 'whats the current',
+            'what\'s happening', 'whats happening', 'what\'s new', 'whats new'
+        ];
+
+        // Check for current information needs
+        const needsCurrentInfo = currentInfoKeywords.some(keyword => 
+            message.includes(keyword)
+        );
+
+        // Check for time-sensitive content
+        const isTimeSensitive = timeSensitiveKeywords.some(keyword => 
+            message.includes(keyword)
+        );
+
+        // Check for question patterns that need current data
+        const isCurrentQuestion = questionWords.some(pattern => 
+            message.includes(pattern)
+        );
+
+        // Check for specific domains that need current information
+        const currentInfoDomains = [
+            'sports', 'football', 'basketball', 'soccer', 'baseball', 'tennis',
+            'politics', 'election', 'president', 'government', 'congress',
+            'finance', 'market', 'trading', 'crypto', 'bitcoin', 'stocks',
+            'technology', 'ai', 'artificial intelligence', 'tech news',
+            'entertainment', 'movie', 'celebrity', 'music', 'awards'
+        ];
+
+        const isCurrentDomain = currentInfoDomains.some(domain => 
+            message.includes(domain)
+        );
+
+        // Decision logic: Use Google Search if any of these conditions are met
+        const shouldSearch = needsCurrentInfo || isTimeSensitive || isCurrentQuestion || isCurrentDomain;
+
+        console.log(`[AssistantView] Google Search decision for "${userMessage.substring(0, 50)}...": ${shouldSearch ? 'YES' : 'NO'}`);
+        console.log(`[AssistantView] Reasons: currentInfo=${needsCurrentInfo}, timeSensitive=${isTimeSensitive}, currentQuestion=${isCurrentQuestion}, currentDomain=${isCurrentDomain}`);
+
+        return shouldSearch;
+    }
+
+    /**
+     * Detect if text contains voice assistant patterns
+     * @param {string} text - The text to analyze
+     * @returns {boolean} - Whether the text appears to be from a voice assistant
+     */
+    isVoiceAssistantText(text) {
+        if (!text || typeof text !== 'string') {
+            return false;
+        }
+
+        const lowerText = text.toLowerCase().trim();
+        
+        // Voice assistant wake words and patterns
+        const wakeWords = [
+            'hey siri', 'ok google', 'alexa', 'hey cortana', 'hey assistant',
+            'computer', 'jarvis', 'hey google', 'okay google'
+        ];
+
+        // Voice assistant response patterns
+        const assistantPatterns = [
+            'i\'m sorry', 'im sorry', 'i don\'t understand', 'i dont understand',
+            'i can\'t help', 'i cant help', 'i\'m not sure', 'im not sure',
+            'here\'s what i found', 'heres what i found', 'i found this',
+            'according to', 'let me search', 'i\'ll help you', 'ill help you',
+            'i can help you', 'what can i help', 'how can i assist',
+            'i\'m here to help', 'im here to help', 'i\'m your assistant', 'im your assistant'
+        ];
+
+        // System/device response patterns
+        const systemPatterns = [
+            'system', 'device', 'connected', 'disconnected', 'battery',
+            'low battery', 'charging', 'volume', 'brightness', 'settings',
+            'notification', 'alert', 'warning', 'error', 'success',
+            'wifi', 'bluetooth', 'location', 'permission', 'access'
+        ];
+
+        // Check for wake words
+        const hasWakeWord = wakeWords.some(wakeWord => 
+            lowerText.includes(wakeWord)
+        );
+
+        // Check for assistant response patterns
+        const hasAssistantPattern = assistantPatterns.some(pattern => 
+            lowerText.includes(pattern)
+        );
+
+        // Check for system patterns
+        const hasSystemPattern = systemPatterns.some(pattern => 
+            lowerText.includes(pattern)
+        );
+
+        // Additional heuristics - only block very short responses that are likely system confirmations
+        const isShortResponse = lowerText.length < 10 && (
+            lowerText === 'yes' || lowerText === 'no' || 
+            lowerText === 'ok' || lowerText === 'okay' ||
+            lowerText === 'sure' || lowerText === 'right' ||
+            lowerText === 'done' || lowerText === 'ready'
+        );
+
+        const isCommandResponse = lowerText.includes('command') || 
+                                 lowerText.includes('executed') ||
+                                 lowerText.includes('completed');
+
+        const isVoiceAssistant = hasWakeWord || hasAssistantPattern || hasSystemPattern || 
+                                isShortResponse || isCommandResponse;
+
+        if (isVoiceAssistant) {
+            console.log(`[AssistantView Voice Filter] Detected voice assistant text: "${text}"`);
+        }
+
+        return isVoiceAssistant;
+    }
+
+    /**
+     * Render the searching message with Google icon
+     * @returns {string} HTML string for the searching message
+     */
+    renderSearchingMessage() {
+        return `
+            <div class="searching-message">
+                <div class="search-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M21 21L16.514 16.506L21 21ZM19 10.5C19 15.194 15.194 19 10.5 19C5.806 19 2 15.194 2 10.5C2 5.806 5.806 2 10.5 2C15.194 2 19 5.806 19 10.5Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+                <div class="search-text">
+                    <span class="search-label">Searching Google</span>
+                    <div class="search-dots">
+                        <span class="dot"></span>
+                        <span class="dot"></span>
+                        <span class="dot"></span>
+                    </div>
+                </div>
+            </div>
+        `;
     }
 
     async generateCerebrasResponse(userMessage) {
         if (this.isGeneratingResponse) return;
         
+        // Check if this is voice assistant content and skip processing
+        if (this.isVoiceAssistantText(userMessage)) {
+            console.log(`[AssistantView Voice Filter] Blocking voice assistant message: "${userMessage}"`);
+            return;
+        }
+        
         this.isGeneratingResponse = true;
-        this.cerebrasStatus = 'Generating AI response...';
+        this.cerebrasStatus = '';
         this.requestUpdate();
 
         // Check if user is asking about screen content
@@ -838,6 +1275,7 @@ export class AssistantView extends LitElement {
             // Get system prompt based on selected profile
             const profileNames = this.getProfileNames();
             const profileName = profileNames[this.selectedProfile] || 'Assistant';
+            
             const systemPrompt = `You are a helpful ${profileName.toLowerCase()} assistant. Provide concise, actionable responses based on the conversation context.
 
 Respond ONLY with a valid JSON object following this schema:
@@ -853,12 +1291,13 @@ Respond ONLY with a valid JSON object following this schema:
 }
 
 Guidelines:
-- Set "should_search" to true when the user explicitly asks you to search Google, requests the latest information, or when answering confidently requires real-time data.
-- When "should_search" is true, "search_query" must contain a short Googleable query describing what to look up. Otherwise set it to an empty string.
-- The "reply" field should be what you would tell the user immediately. If a search is required, acknowledge that you will look it up.
+- Decide if "should_search" should be true only when answering requires fresh, real-time information or verification that you cannot provide confidently from memory. Otherwise set it to false.
+- When "should_search" is true, populate "search_query" with a short, precise Googleable phrase that captures what needs to be looked up. Leave it empty when no search is needed.
+- The "reply" field should contain the immediate response you would tell the user before any follow-up search occurs. Acknowledge when you plan to search.
 - Set "action.type" to "composio_workflow" when the user wants you to perform a task through a connected integration (for example Google Docs, Google Sheets, Google Slides, or Gmail). Otherwise set it to "none".
 - When "action.type" is "composio_workflow", use a known workflow key such as "google_docs", "google_sheets", "google_slides", or "gmail" for "target" (fallback to a concise description if unsure). The "task" field must summarize the work to be done in an imperative voice.
-- Do not add any text outside of the JSON object.`;
+- Do not add any text outside of the JSON object.
+- Remember that the host application performs Google Search only when "should_search" is true, so set that field carefully.`;
 
             const result = await ipcRenderer.invoke('generate-cerebras-response', {
                 userMessage,
@@ -888,7 +1327,33 @@ Guidelines:
                 }
 
                 const reply = typeof structured?.reply === 'string' ? structured.reply : responseText;
-                const shouldSearch = Boolean(structured?.should_search);
+                const coerceBoolean = value => {
+                    if (typeof value === 'boolean') {
+                        return value;
+                    }
+                    if (typeof value === 'string') {
+                        const normalized = value.trim().toLowerCase();
+                        if (['true', 'yes', '1'].includes(normalized)) {
+                            return true;
+                        }
+                        if (['false', 'no', '0'].includes(normalized)) {
+                            return false;
+                        }
+                    }
+                    return null;
+                };
+                const structuredDecision = coerceBoolean(structured?.should_search);
+                const serviceDecision = typeof responsePayload?.shouldUseGoogleSearch === 'boolean' ? responsePayload.shouldUseGoogleSearch : null;
+                const fallbackDecision = this.shouldUseGoogleSearch(userMessage);
+                const finalDecision = serviceDecision ?? structuredDecision ?? fallbackDecision;
+                const shouldSearch = Boolean(finalDecision);
+
+                console.log('[AssistantView] Search decision', {
+                    serviceDecision,
+                    structuredDecision,
+                    fallbackDecision,
+                    shouldSearch,
+                });
                 const searchQuery = typeof structured?.search_query === 'string' ? structured.search_query.trim() : '';
                 const structuredAction = structured && typeof structured.action === 'object' ? structured.action : null;
                 const workflowContext = {
@@ -904,19 +1369,22 @@ Guidelines:
                 this.notifyMessagesUpdated();
 
                 if (shouldSearch) {
-                    const initialResponse = reply || 'Let me look that up for you.';
-
-                    this.messages = [...this.messages, { role: 'assistant', content: initialResponse }];
-                    console.log('Added initial response (search), total messages:', this.messages.length);
+                    // Show Google search UI instead of immediate response
+                    this.messages = [...this.messages, { 
+                        role: 'assistant', 
+                        content: this.renderSearchingMessage(),
+                        isSearching: true 
+                    }];
+                    console.log('Added searching message, total messages:', this.messages.length);
                     this.notifyMessagesUpdated();
 
                     this.saveConversationHistory();
 
-                    this.cerebrasStatus = 'Searching for current information...';
+                    this.cerebrasStatus = 'Searching Google...';
                     this.requestUpdate();
 
                     const query = searchQuery || userMessage;
-                    await this.performGeminiSearch(userMessage, initialResponse, query);
+                    await this.performGeminiSearch(userMessage, '', query);
                     await this.triggerWorkflowIfNeeded(workflowContext);
                 } else {
                     const finalReply = reply || 'I am not sure what to say yet.';
@@ -1091,7 +1559,7 @@ Guidelines:
                 // Update the last assistant message with the enhanced response
                 this.messages = this.messages.map((msg, index) => {
                     if (index === this.messages.length - 1 && msg.role === 'assistant') {
-                        return { ...msg, content: searchResult.response };
+                        return { ...msg, content: searchResult.response, isSearching: false };
                     }
                     return msg;
                 });
@@ -1182,7 +1650,11 @@ Guidelines:
 
             if (message.role === 'assistant') {
                 bubble.setAttribute('data-role', 'assistant');
-                bubble.innerHTML = this.renderMarkdown(message.content || '');
+                if (message.isSearching) {
+                    bubble.innerHTML = message.content || '';
+                } else {
+                    bubble.innerHTML = this.renderMarkdown(message.content || '');
+                }
             } else {
                 bubble.setAttribute('data-role', 'user');
                 bubble.textContent = message.content || '';
@@ -1261,6 +1733,11 @@ Guidelines:
 
     render() {
         const statusMessages = [this.audioStatus, this.cerebrasStatus].filter(Boolean);
+        
+        // Add transcript mode status
+        if (this.transcriptOnlyMode) {
+            statusMessages.unshift(`📝 Transcript-only mode: ${this.storedTranscriptCount} stored`);
+        }
 
         return html`
             <div class="chat-wrapper">
@@ -1269,10 +1746,9 @@ Guidelines:
                 <div class="text-input-container">
                     <div class="composer-actions">
                         <button
-                            class="save-button"
-                            @click=${this.stopAudioRecording}
-                            title="Stop computer audio recording"
-                            ?disabled=${this.isAudioStopping}
+                            class="save-button ${this.transcriptOnlyMode ? 'active' : ''}"
+                            @click=${this.toggleTranscriptOnlyMode}
+                            title="${this.transcriptOnlyMode ? 'Disable transcript-only mode' : 'Enable transcript-only mode'}"
                         >
                             <svg
                                 width="20"
@@ -1282,8 +1758,50 @@ Guidelines:
                                 fill="none"
                                 xmlns="http://www.w3.org/2000/svg"
                             >
-                                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.5"></circle>
-                                <rect x="9" y="9" width="6" height="6" stroke="currentColor" stroke-width="1.5"></rect>
+                                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3Z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"></path>
+                                <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"></path>
+                                <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"></line>
+                                <line x1="8" y1="23" x2="16" y2="23" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"></line>
+                            </svg>
+                        </button>
+                        ${this.storedTranscriptCount > 0 ? html`
+                            <button
+                                class="save-button"
+                                @click=${this.clearStoredTranscripts}
+                                title="Clear stored transcripts (${this.storedTranscriptCount} stored)"
+                            >
+                                <svg
+                                    width="20"
+                                    height="20"
+                                    stroke-width="1.5"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                >
+                                    <path d="M3 6h18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"></path>
+                                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"></path>
+                                    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"></path>
+                                </svg>
+                            </button>
+                        ` : ''}
+                        <button
+                            class="save-button"
+                            @click=${this.takeScreenshot}
+                            title="Take screenshot of the screen"
+                        >
+                            <svg
+                                width="20"
+                                height="20"
+                                stroke-width="1.5"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                xmlns="http://www.w3.org/2000/svg"
+                            >
+                                <path d="M3 7V5a2 2 0 0 1 2-2h2" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"></path>
+                                <path d="M17 3h2a2 2 0 0 1 2 2v2" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"></path>
+                                <path d="M21 17v2a2 2 0 0 1-2 2h-2" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"></path>
+                                <path d="M7 21H5a2 2 0 0 1-2-2v-2" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"></path>
+                                <rect x="8" y="8" width="8" height="8" rx="1" stroke="currentColor" stroke-width="1.5"></rect>
                             </svg>
                         </button>
                     </div>
@@ -1308,12 +1826,12 @@ Guidelines:
                         </svg>
                     </button>
                 </div>
-
-                ${statusMessages.length > 0
-                    ? html`${statusMessages.map(
-                          status => html`<div class="status-banner">${status}</div>`
-                      )}`
-                    : ''}
+                
+                ${statusMessages.length > 0 ? html`
+                    <div class="status-banner">
+                        ${statusMessages.join(' • ')}
+                    </div>
+                ` : ''}
             </div>
         `;
     }

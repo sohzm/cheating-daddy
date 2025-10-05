@@ -169,6 +169,29 @@ ipcRenderer.on('update-status', (event, status) => {
     cheddar.setStatus(status);
 });
 
+// Live transcript streaming from main process
+ipcRenderer.on('transcript-stream', (event, payload) => {
+    try {
+        const text = typeof payload === 'string' ? payload : String(payload?.text || '');
+        if (!text) return;
+        // Forward transcript lines into AssistantView via messages list as user-role transcript entries
+        // We use the existing app interface to add text-only messages without triggering model responses
+        const app = document.querySelector('cheating-daddy-app');
+        if (app) {
+            const transcriptMessage = {
+                id: `transcript-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                role: 'user',
+                content: text,
+                timestamp: Date.now(),
+            };
+            app.messages = [...(app.messages || []), transcriptMessage];
+            app.requestUpdate();
+        }
+    } catch (e) {
+        console.warn('Failed to handle transcript-stream:', e);
+    }
+});
+
 // Listen for function call results
 ipcRenderer.on('function-call-result', (event, data) => {
     console.log('Function call result:', data);
