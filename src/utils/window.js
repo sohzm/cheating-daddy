@@ -2,12 +2,13 @@ const { BrowserWindow, globalShortcut, ipcMain, screen } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const os = require('os');
-const { applyStealthMeasures, startTitleRandomization } = require('./stealthFeatures');
+const { applyStealthMeasures, startTitleRandomization, startLinuxStealthMonitor } = require('./stealthFeatures');
 
 let mouseEventsIgnored = false;
 let windowResizing = false;
 let resizeAnimation = null;
 const RESIZE_ANIMATION_DURATION = 500; // milliseconds
+let linuxStealthMonitorDisposer = null; // Store the disposer to stop/restart monitor
 
 function ensureDataDirectories() {
     const homeDir = os.homedir();
@@ -125,6 +126,35 @@ function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
                     }
 
                     updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessionRef);
+
+                    // Optionally enable Linux stealth monitoring (Ubuntu, etc.)
+                    try {
+                        if (process.platform === 'linux') {
+                            const enableLinuxStealth = await mainWindow.webContents.executeJavaScript(`
+                                (function(){
+                                    try {
+                                        const v = localStorage.getItem('enableLinuxStealth');
+                                        return v === null ? true : v === 'true';
+                                    } catch (e) { return true; }
+                                })();
+                            `);
+
+                            if (enableLinuxStealth) {
+                                // Start monitor with 2-second checks for faster detection
+                                linuxStealthMonitorDisposer = startLinuxStealthMonitor(mainWindow, {
+                                    intervalMs: 2000,
+                                });
+                                console.log('✓ Linux stealth monitor enabled');
+                                console.log('  → Auto-hiding overlay when Zoom/recording apps detected');
+                                console.log('  → To disable: localStorage.setItem("enableLinuxStealth", "false")');
+                            } else {
+                                console.log('Linux stealth monitor disabled via localStorage setting');
+                                console.log('  → To enable: localStorage.setItem("enableLinuxStealth", "true")');
+                            }
+                        }
+                    } catch (error) {
+                        console.warn('Failed to initialize Linux stealth monitor:', error);
+                    }
                 })
                 .catch(() => {
                     // Default to content protection enabled
@@ -377,6 +407,46 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
             return { success: true };
         } catch (error) {
             console.error('Error toggling window visibility:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    // Handle Linux stealth mode toggle in real-time
+    ipcMain.handle('toggle-linux-stealth', async (event, enable) => {
+        try {
+            if (process.platform !== 'linux') {
+                return { success: false, error: 'Linux stealth mode only available on Linux' };
+            }
+
+            if (mainWindow.isDestroyed()) {
+                return { success: false, error: 'Window has been destroyed' };
+            }
+
+            // Stop existing monitor if running
+            if (linuxStealthMonitorDisposer) {
+                linuxStealthMonitorDisposer();
+                linuxStealthMonitorDisposer = null;
+                console.log('[Linux Stealth] Monitor stopped');
+            }
+
+            // Start new monitor if enabled
+            if (enable) {
+                linuxStealthMonitorDisposer = startLinuxStealthMonitor(mainWindow, {
+                    intervalMs: 2000,
+                });
+                console.log('[Linux Stealth] Monitor started via IPC');
+                return { success: true, message: 'Linux stealth mode enabled' };
+            } else {
+                // Make sure window is visible when disabling
+                if (!mainWindow.isVisible()) {
+                    mainWindow.showInactive();
+                }
+                mainWindow.setIgnoreMouseEvents(false);
+                console.log('[Linux Stealth] Monitor disabled via IPC');
+                return { success: true, message: 'Linux stealth mode disabled' };
+            }
+        } catch (error) {
+            console.error('[Linux Stealth] Error toggling:', error);
             return { success: false, error: error.message };
         }
     });

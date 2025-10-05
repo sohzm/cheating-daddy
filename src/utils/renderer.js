@@ -30,6 +30,7 @@ let hiddenVideo = null;
 let offscreenCanvas = null;
 let offscreenContext = null;
 let currentImageQuality = 'medium'; // Store current image quality for manual screenshots
+let isWaitingForResponse = false; // Track if we're waiting for AI response
 
 const isLinux = process.platform === 'linux';
 const isMacOS = process.platform === 'darwin';
@@ -149,12 +150,16 @@ function arrayBufferToBase64(buffer) {
     return btoa(binary);
 }
 
-async function initializeGemini(profile = 'interview', language = 'en-US') {
+async function initializeGemini(profile = 'interview', language = 'en-US', mode = 'interview', model = 'gemini-2.5-flash') {
     const apiKey = localStorage.getItem('apiKey')?.trim();
     if (apiKey) {
-        const success = await ipcRenderer.invoke('initialize-gemini', apiKey, localStorage.getItem('customPrompt') || '', profile, language);
+        // Get mode and model from localStorage if not provided
+        const selectedMode = mode || localStorage.getItem('selectedMode') || 'interview';
+        const selectedModel = model || localStorage.getItem('selectedModel') || 'gemini-2.5-flash';
+        
+        const success = await ipcRenderer.invoke('initialize-gemini', apiKey, localStorage.getItem('customPrompt') || '', profile, language, selectedMode, selectedModel);
         if (success) {
-            cheddar.setStatus('Live');
+            cheddar.setStatus(selectedMode === 'interview' ? 'Live' : 'Ready');
         } else {
             cheddar.setStatus('error');
         }
@@ -165,7 +170,33 @@ async function initializeGemini(profile = 'interview', language = 'en-US') {
 ipcRenderer.on('update-status', (event, status) => {
     console.log('Status update:', status);
     cheddar.setStatus(status);
+    
+    // Clear waiting flag when status changes to Ready
+    if (status === 'Ready') {
+        isWaitingForResponse = false;
+        if (responseTimeout) {
+            clearTimeout(responseTimeout);
+            responseTimeout = null;
+        }
+        console.log('✅ AI response received - resuming screenshot capture');
+    }
 });
+
+// Listen for responses to clear waiting flag
+ipcRenderer.on('update-response', (event, response) => {
+    // Clear waiting flag when we receive any response
+    if (isWaitingForResponse) {
+        isWaitingForResponse = false;
+        if (responseTimeout) {
+            clearTimeout(responseTimeout);
+            responseTimeout = null;
+        }
+        console.log('✅ AI response received - resuming screenshot capture');
+    }
+});
+
+// Store timeout reference for clearing
+let responseTimeout = null;
 
 // Listen for responses - REMOVED: This is handled in CheatingDaddyApp.js to avoid duplicates
 // ipcRenderer.on('update-response', (event, response) => {
@@ -182,17 +213,27 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
     tokenTracker.reset();
     console.log('🎯 Token tracker reset for new capture session');
 
-    const audioMode = localStorage.getItem('audioMode') || 'speaker_only';
+    // Check if we're in coding mode (disable audio)
+    const selectedMode = localStorage.getItem('selectedMode') || 'interview';
+    const isCodingMode = selectedMode === 'coding';
+    
+    if (isCodingMode) {
+        console.log('🎯 Coding mode detected - audio capture disabled');
+    }
+
+    const audioMode = isCodingMode ? 'none' : (localStorage.getItem('audioMode') || 'speaker_only');
 
     try {
         if (isMacOS) {
             // On macOS, use SystemAudioDump for audio and getDisplayMedia for screen
             console.log('Starting macOS capture with SystemAudioDump...');
 
-            // Start macOS audio capture
-            const audioResult = await ipcRenderer.invoke('start-macos-audio');
-            if (!audioResult.success) {
-                throw new Error('Failed to start macOS audio capture: ' + audioResult.error);
+            // Start macOS audio capture only if not in coding mode
+            if (!isCodingMode) {
+                const audioResult = await ipcRenderer.invoke('start-macos-audio');
+                if (!audioResult.success) {
+                    throw new Error('Failed to start macOS audio capture: ' + audioResult.error);
+                }
             }
 
             // Get screen capture for screenshots
@@ -227,32 +268,44 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
                 }
             }
         } else if (isLinux) {
-            // Linux - use display media for screen capture and try to get system audio
-            try {
-                // First try to get system audio via getDisplayMedia (works on newer browsers)
-                mediaStream = await navigator.mediaDevices.getDisplayMedia({
-                    video: {
-                        frameRate: 1,
-                        width: { ideal: 1920 },
-                        height: { ideal: 1080 },
-                    },
-                    audio: {
-                        sampleRate: SAMPLE_RATE,
-                        channelCount: 1,
-                        echoCancellation: false, // Don't cancel system audio
-                        noiseSuppression: false,
-                        autoGainControl: false,
-                    },
-                });
+            // Linux - use display media for screen capture and try to get system audio (only if not in coding mode)
+            if (!isCodingMode) {
+                try {
+                    // First try to get system audio via getDisplayMedia (works on newer browsers)
+                    mediaStream = await navigator.mediaDevices.getDisplayMedia({
+                        video: {
+                            frameRate: 1,
+                            width: { ideal: 1920 },
+                            height: { ideal: 1080 },
+                        },
+                        audio: {
+                            sampleRate: SAMPLE_RATE,
+                            channelCount: 1,
+                            echoCancellation: false, // Don't cancel system audio
+                            noiseSuppression: false,
+                            autoGainControl: false,
+                        },
+                    });
 
-                console.log('Linux system audio capture via getDisplayMedia succeeded');
+                    console.log('Linux system audio capture via getDisplayMedia succeeded');
 
-                // Setup audio processing for Linux system audio
-                setupLinuxSystemAudioProcessing();
-            } catch (systemAudioError) {
-                console.warn('System audio via getDisplayMedia failed, trying screen-only capture:', systemAudioError);
+                    // Setup audio processing for Linux system audio
+                    setupLinuxSystemAudioProcessing();
+                } catch (systemAudioError) {
+                    console.warn('System audio via getDisplayMedia failed, trying screen-only capture:', systemAudioError);
 
-                // Fallback to screen-only capture
+                    // Fallback to screen-only capture
+                    mediaStream = await navigator.mediaDevices.getDisplayMedia({
+                        video: {
+                            frameRate: 1,
+                            width: { ideal: 1920 },
+                            height: { ideal: 1080 },
+                        },
+                        audio: false,
+                    });
+                }
+            } else {
+                // In coding mode, only get screen capture
                 mediaStream = await navigator.mediaDevices.getDisplayMedia({
                     video: {
                         frameRate: 1,
@@ -261,10 +314,11 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
                     },
                     audio: false,
                 });
+                console.log('Linux screen capture started (coding mode - no audio)');
             }
 
-            // Additionally get microphone input for Linux based on audio mode
-            if (audioMode === 'mic_only' || audioMode === 'both') {
+            // Additionally get microphone input for Linux based on audio mode (only if not in coding mode)
+            if (!isCodingMode && (audioMode === 'mic_only' || audioMode === 'both')) {
                 let micStream = null;
                 try {
                     micStream = await navigator.mediaDevices.getUserMedia({
@@ -290,28 +344,41 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
 
             console.log('Linux capture started - system audio:', mediaStream.getAudioTracks().length > 0, 'microphone mode:', audioMode);
         } else {
-            // Windows - use display media with loopback for system audio
-            mediaStream = await navigator.mediaDevices.getDisplayMedia({
-                video: {
-                    frameRate: 1,
-                    width: { ideal: 1920 },
-                    height: { ideal: 1080 },
-                },
-                audio: {
-                    sampleRate: SAMPLE_RATE,
-                    channelCount: 1,
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true,
-                },
-            });
+            // Windows - use display media with loopback for system audio (only if not in coding mode)
+            if (!isCodingMode) {
+                mediaStream = await navigator.mediaDevices.getDisplayMedia({
+                    video: {
+                        frameRate: 1,
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 },
+                    },
+                    audio: {
+                        sampleRate: SAMPLE_RATE,
+                        channelCount: 1,
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true,
+                    },
+                });
 
-            console.log('Windows capture started with loopback audio');
+                console.log('Windows capture started with loopback audio');
 
-            // Setup audio processing for Windows loopback audio only
-            setupWindowsLoopbackProcessing();
+                // Setup audio processing for Windows loopback audio only
+                setupWindowsLoopbackProcessing();
+            } else {
+                // In coding mode, only get screen capture
+                mediaStream = await navigator.mediaDevices.getDisplayMedia({
+                    video: {
+                        frameRate: 1,
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 },
+                    },
+                    audio: false,
+                });
+                console.log('Windows screen capture started (coding mode - no audio)');
+            }
 
-            if (audioMode === 'mic_only' || audioMode === 'both') {
+            if (!isCodingMode && (audioMode === 'mic_only' || audioMode === 'both')) {
                 let micStream = null;
                 try {
                     micStream = await navigator.mediaDevices.getUserMedia({
@@ -452,6 +519,12 @@ async function captureScreenshot(imageQuality = 'medium', isManual = false) {
     console.log(`Capturing ${isManual ? 'manual' : 'automated'} screenshot...`);
     if (!mediaStream) return;
 
+    // Check if we're waiting for a response (skip automated screenshots)
+    if (!isManual && isWaitingForResponse) {
+        console.log('⚠️ Skipping automated screenshot - waiting for AI response');
+        return;
+    }
+
     // Check rate limiting for automated screenshots only
     if (!isManual && tokenTracker.shouldThrottle()) {
         console.log('⚠️ Automated screenshot skipped due to rate limiting');
@@ -529,6 +602,18 @@ async function captureScreenshot(imageQuality = 'medium', isManual = false) {
                     return;
                 }
 
+                // Set waiting flag when sending image
+                isWaitingForResponse = true;
+                console.log('🔄 Waiting for AI response...');
+
+                // Set a timeout to clear the waiting flag if no response is received
+                responseTimeout = setTimeout(() => {
+                    if (isWaitingForResponse) {
+                        console.log('⏰ Timeout waiting for AI response - resuming screenshot capture');
+                        isWaitingForResponse = false;
+                    }
+                }, 30000); // 30 second timeout
+
                 const result = await ipcRenderer.invoke('send-image-content', {
                     data: base64data,
                 });
@@ -540,6 +625,12 @@ async function captureScreenshot(imageQuality = 'medium', isManual = false) {
                     console.log(`📊 Image sent successfully - ${imageTokens} tokens used (${offscreenCanvas.width}x${offscreenCanvas.height})`);
                 } else {
                     console.error('Failed to send image:', result.error);
+                    // Clear waiting flag on error
+                    isWaitingForResponse = false;
+                    if (responseTimeout) {
+                        clearTimeout(responseTimeout);
+                        responseTimeout = null;
+                    }
                 }
             };
             reader.readAsDataURL(blob);

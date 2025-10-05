@@ -141,6 +141,48 @@ export class MainView extends LitElement {
             width: 100%;
             max-width: 500px;
         }
+
+        .cv-section {
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .cv-upload-button {
+            background: var(--button-background);
+            color: var(--text-color);
+            border: 1px solid var(--button-border);
+            padding: 10px 16px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .cv-upload-button:hover {
+            background: var(--hover-background);
+        }
+
+        .cv-status {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+            color: var(--description-color);
+        }
+
+        .cv-file-name {
+            font-weight: 500;
+            color: var(--text-color);
+        }
+
+        .cv-pages {
+            font-size: 10px;
+        }
     `;
 
     static properties = {
@@ -149,6 +191,8 @@ export class MainView extends LitElement {
         isInitializing: { type: Boolean },
         onLayoutModeChange: { type: Function },
         showApiKeyError: { type: Boolean },
+        cvStatus: { type: Object },
+        onCVUpload: { type: Function }
     };
 
     constructor() {
@@ -158,6 +202,8 @@ export class MainView extends LitElement {
         this.isInitializing = false;
         this.onLayoutModeChange = () => {};
         this.showApiKeyError = false;
+        this.cvStatus = {};
+        this.onCVUpload = () => {};
         this.boundKeydownHandler = this.handleKeydown.bind(this);
     }
 
@@ -210,6 +256,10 @@ export class MainView extends LitElement {
 
     handleAPIKeyHelpClick() {
         this.onAPIKeyHelp();
+    }
+
+    handleCVUploadClick() {
+        this.onCVUpload();
     }
 
     handleResetOnboarding() {
@@ -301,6 +351,18 @@ export class MainView extends LitElement {
                 dont have an api key?
                 <span @click=${this.handleAPIKeyHelpClick} class="link">get one here</span>
             </p>
+
+            <div class="cv-section">
+                <button @click=${this.handleCVUploadClick} class="cv-upload-button">
+                    📄 ${this.cvStatus.hasCV ? 'Manage CV' : 'Upload CV/Resume'}
+                </button>
+                ${this.cvStatus.hasCV ? html`
+                    <div class="cv-status">
+                        <span class="cv-file-name">${this.cvStatus.fileName}</span>
+                        <span class="cv-pages">${this.cvStatus.pages} pages</span>
+                    </div>
+                ` : ''}
+            </div>
         `;
     }
 }

@@ -1,8 +1,86 @@
 const { GoogleGenAI } = require('@google/genai');
-const { BrowserWindow, ipcMain } = require('electron');
+const { BrowserWindow, ipcMain, dialog } = require('electron');
 const { spawn } = require('child_process');
 const { saveDebugAudio } = require('../audioUtils');
 const { getSystemPrompt } = require('./prompts');
+const pdfProcessor = require('./pdfProcessor');
+
+// Enhanced prompt engineering for coding interview mode
+function getCodingOptimizedPrompt(basePrompt, model) {
+    // Get CV context if available
+    const cvContext = pdfProcessor.getCVContext();
+    
+    const codingEnhancements = `
+You are an expert coding interview assistant with the following capabilities:
+
+**CORE RESPONSIBILITIES:**
+- Analyze code screenshots and provide detailed, actionable feedback
+- Help debug code issues with step-by-step explanations
+- Suggest code improvements and best practices
+- Provide real-time coding assistance during interviews
+- Explain algorithms, data structures, and design patterns
+- Offer multiple solution approaches when applicable
+
+**RESPONSE GUIDELINES:**
+- Be concise but comprehensive in your explanations
+- Provide code examples with clear comments
+- Explain the time and space complexity of solutions
+- Suggest edge cases and test scenarios
+- Maintain a professional, helpful tone
+- Focus on learning and improvement
+
+**CODING BEST PRACTICES:**
+- Emphasize clean, readable code
+- Suggest proper error handling
+- Recommend appropriate data structures
+- Highlight security considerations
+- Encourage testing and validation
+
+**INTERVIEW CONTEXT:**
+- Act as a pair programming partner
+- Provide hints without giving away complete solutions
+- Encourage problem-solving thinking
+- Help with debugging and optimization
+- Support both technical and soft skills development
+
+**RESPONSE FORMAT:**
+- Use clear headings and bullet points
+- Include code blocks with syntax highlighting
+- Provide step-by-step breakdowns
+- End with key takeaways or next steps
+
+Remember: You're helping someone succeed in a coding interview. Be supportive, educational, and thorough in your assistance.
+
+${cvContext}
+`;
+
+    return basePrompt + codingEnhancements;
+}
+
+// Enhanced response quality for coding interviews
+function enhanceCodingResponse(response) {
+    // Ensure proper formatting and structure
+    let enhanced = response.trim();
+    
+    // Add coding-specific enhancements
+    if (enhanced.length > 0) {
+        // Ensure code blocks are properly formatted
+        enhanced = enhanced.replace(/```(\w+)?\n?/g, '```$1\n');
+        
+        // Add helpful context if response seems incomplete
+        if (enhanced.length < 100 && !enhanced.includes('```')) {
+            enhanced += '\n\n*Note: This appears to be a brief response. Feel free to ask for more detailed explanations or specific code examples.*';
+        }
+        
+        // Ensure proper markdown formatting
+        if (enhanced.includes('**') && !enhanced.includes('##')) {
+            // Add section headers for better organization
+            enhanced = enhanced.replace(/\*\*([^*]+)\*\*/g, '## $1');
+        }
+    }
+    
+    return enhanced;
+}
 
 // Conversation tracking variables
 let currentSessionId = null;
@@ -204,7 +282,7 @@ async function attemptReconnection() {
     }
 }
 
-async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'interview', language = 'en-US', isReconnection = false) {
+async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'interview', language = 'en-US', isReconnection = false, mode = 'interview', model = 'gemini-2.5-flash') {
     if (isInitializingSession) {
         console.log('Session initialization already in progress');
         return false;
@@ -220,6 +298,8 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
             customPrompt,
             profile,
             language,
+            mode,
+            model,
         };
         reconnectionAttempts = 0; // Reset counter for new session
     }
@@ -233,7 +313,19 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
     const enabledTools = await getEnabledTools();
     const googleSearchEnabled = enabledTools.some(tool => tool.googleSearch);
 
-    const systemPrompt = getSystemPrompt(profile, customPrompt, googleSearchEnabled);
+    // Get CV context if available and add to custom prompt
+    const cvContext = pdfProcessor.getCVContext();
+    const enhancedCustomPrompt = cvContext ? `${customPrompt}\n\n${cvContext}` : customPrompt;
+    
+    // Debug logging for CV context
+    if (cvContext) {
+        console.log('📄 CV context loaded and included in prompt');
+        console.log('CV context length:', cvContext.length);
+    } else {
+        console.log('📄 No CV context available');
+    }
+    
+    const systemPrompt = getSystemPrompt(profile, enhancedCustomPrompt, googleSearchEnabled);
 
     // Initialize new conversation session (only if not reconnecting)
     if (!isReconnection) {
@@ -241,111 +333,268 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
     }
 
     try {
-        const session = await client.live.connect({
-            model: 'gemini-live-2.5-flash-preview',
-            callbacks: {
-                onopen: function () {
-                    sendToRenderer('update-status', 'Live session connected');
-                },
-                onmessage: function (message) {
-                    console.log('----------------', message);
+        // Determine the model and connection type based on mode
+        let session;
+        
+        if (mode === 'interview' || model === 'gemini-live-2.0') {
+            // Use live connection for interview mode
+            session = await client.live.connect({
+                model: 'gemini-live-2.5-flash-preview',
+                callbacks: {
+                    onopen: function () {
+                        sendToRenderer('update-status', 'Live session connected');
+                    },
+                    onmessage: function (message) {
+                        console.log('----------------', message);
 
-                    if (message.serverContent?.inputTranscription?.results) {
-                        currentTranscription += formatSpeakerResults(message.serverContent.inputTranscription.results);
-                    }
+                        if (message.serverContent?.inputTranscription?.results) {
+                            currentTranscription += formatSpeakerResults(message.serverContent.inputTranscription.results);
+                        }
 
-                    // Handle AI model response
-                    if (message.serverContent?.modelTurn?.parts) {
-                        for (const part of message.serverContent.modelTurn.parts) {
-                            console.log(part);
-                            if (part.text) {
-                                messageBuffer += part.text;
-                                sendToRenderer('update-response', messageBuffer);
+                        // Handle AI model response
+                        if (message.serverContent?.modelTurn?.parts) {
+                            for (const part of message.serverContent.modelTurn.parts) {
+                                console.log(part);
+                                if (part.text) {
+                                    messageBuffer += part.text;
+                                    sendToRenderer('update-response', messageBuffer);
+                                }
                             }
                         }
-                    }
 
-                    if (message.serverContent?.generationComplete) {
-                        sendToRenderer('update-response', messageBuffer);
+                        if (message.serverContent?.generationComplete) {
+                            sendToRenderer('update-response', messageBuffer);
 
-                        // Save conversation turn when we have both transcription and AI response
-                        if (currentTranscription && messageBuffer) {
-                            saveConversationTurn(currentTranscription, messageBuffer);
-                            currentTranscription = ''; // Reset for next turn
+                            // Save conversation turn when we have both transcription and AI response
+                            if (currentTranscription && messageBuffer) {
+                                saveConversationTurn(currentTranscription, messageBuffer);
+                                currentTranscription = ''; // Reset for next turn
+                            }
+
+                            messageBuffer = '';
                         }
 
-                        messageBuffer = '';
-                    }
+                        if (message.serverContent?.turnComplete) {
+                            sendToRenderer('update-status', 'Listening...');
+                        }
+                    },
+                    onerror: function (e) {
+                        console.debug('Error:', e.message);
 
-                    if (message.serverContent?.turnComplete) {
-                        sendToRenderer('update-status', 'Listening...');
-                    }
+                        // Check if the error is related to invalid API key
+                        const isApiKeyError =
+                            e.message &&
+                            (e.message.includes('API key not valid') ||
+                                e.message.includes('invalid API key') ||
+                                e.message.includes('authentication failed') ||
+                                e.message.includes('unauthorized'));
+
+                        if (isApiKeyError) {
+                            console.log('Error due to invalid API key - stopping reconnection attempts');
+                            lastSessionParams = null; // Clear session params to prevent reconnection
+                            reconnectionAttempts = maxReconnectionAttempts; // Stop further attempts
+                            sendToRenderer('update-status', 'Error: Invalid API key');
+                            return;
+                        }
+
+                        sendToRenderer('update-status', 'Error: ' + e.message);
+                    },
+                    onclose: function (e) {
+                        console.debug('Session closed:', e.reason);
+
+                        // Check if the session closed due to invalid API key
+                        const isApiKeyError =
+                            e.reason &&
+                            (e.reason.includes('API key not valid') ||
+                                e.reason.includes('invalid API key') ||
+                                e.reason.includes('authentication failed') ||
+                                e.reason.includes('unauthorized'));
+
+                        if (isApiKeyError) {
+                            console.log('Session closed due to invalid API key - stopping reconnection attempts');
+                            lastSessionParams = null; // Clear session params to prevent reconnection
+                            reconnectionAttempts = maxReconnectionAttempts; // Stop further attempts
+                            sendToRenderer('update-status', 'Session closed: Invalid API key');
+                            return;
+                        }
+
+                        // Attempt automatic reconnection for server-side closures
+                        if (lastSessionParams && reconnectionAttempts < maxReconnectionAttempts) {
+                            console.log('Attempting automatic reconnection...');
+                            attemptReconnection();
+                        } else {
+                            sendToRenderer('update-status', 'Session closed');
+                        }
+                    },
                 },
-                onerror: function (e) {
-                    console.debug('Error:', e.message);
-
-                    // Check if the error is related to invalid API key
-                    const isApiKeyError =
-                        e.message &&
-                        (e.message.includes('API key not valid') ||
-                            e.message.includes('invalid API key') ||
-                            e.message.includes('authentication failed') ||
-                            e.message.includes('unauthorized'));
-
-                    if (isApiKeyError) {
-                        console.log('Error due to invalid API key - stopping reconnection attempts');
-                        lastSessionParams = null; // Clear session params to prevent reconnection
-                        reconnectionAttempts = maxReconnectionAttempts; // Stop further attempts
-                        sendToRenderer('update-status', 'Error: Invalid API key');
-                        return;
-                    }
-
-                    sendToRenderer('update-status', 'Error: ' + e.message);
+                config: {
+                    responseModalities: ['TEXT'],
+                    tools: enabledTools,
+                    // Enable speaker diarization
+                    inputAudioTranscription: {
+                        enableSpeakerDiarization: true,
+                        minSpeakerCount: 2,
+                        maxSpeakerCount: 2,
+                    },
+                    contextWindowCompression: { slidingWindow: {} },
+                    speechConfig: { languageCode: language },
+                    systemInstruction: {
+                        parts: [{ text: systemPrompt }],
+                    },
                 },
-                onclose: function (e) {
-                    console.debug('Session closed:', e.reason);
+            });
+        } else {
+            // For coding/OA mode, we'll use the existing live session infrastructure
+            // but with a different configuration optimized for image processing
+            let responseBuffer = ''; // Buffer to accumulate response text
+            let responseTimeout = null; // Timeout for partial responses
+            let performanceMetrics = {
+                startTime: Date.now(),
+                messageCount: 0,
+                responseTime: 0,
+                errorCount: 0
+            };
+            
+            session = await client.live.connect({
+                model: 'gemini-live-2.5-flash-preview',
+                callbacks: {
+                    onopen: function () {
+                        sendToRenderer('update-status', `${model} session connected (screenshot mode)`);
+                    },
+                    onmessage: function (message) {
+                        performanceMetrics.messageCount++;
+                        const messageStartTime = Date.now();
+                        
+                        console.log('Coding mode received message:', JSON.stringify(message, null, 2));
+                        
+                        // Handle AI model response
+                        if (message.serverContent?.modelTurn?.parts) {
+                            console.log('Processing model turn parts:', message.serverContent.modelTurn.parts.length);
+                            for (const part of message.serverContent.modelTurn.parts) {
+                                if (part.text) {
+                                    responseBuffer += part.text;
+                                    console.log('Accumulated response text:', responseBuffer);
+                                    
+                                    // Clear any existing timeout and set a new one for partial response
+                                    if (responseTimeout) {
+                                        clearTimeout(responseTimeout);
+                                    }
+                                    
+                                    // Set timeout to send partial response if no completion comes
+                                    responseTimeout = setTimeout(() => {
+                                        if (responseBuffer.trim()) {
+                                            console.log('Sending partial response due to timeout:', responseBuffer);
+                                            sendToRenderer('update-response', responseBuffer);
+                                            responseBuffer = '';
+                                        }
+                                    }, 5000); // 5 second timeout for partial responses
+                                }
+                            }
+                        }
 
-                    // Check if the session closed due to invalid API key
-                    const isApiKeyError =
-                        e.reason &&
-                        (e.reason.includes('API key not valid') ||
-                            e.reason.includes('invalid API key') ||
-                            e.reason.includes('authentication failed') ||
-                            e.reason.includes('unauthorized'));
-
-                    if (isApiKeyError) {
-                        console.log('Session closed due to invalid API key - stopping reconnection attempts');
-                        lastSessionParams = null; // Clear session params to prevent reconnection
-                        reconnectionAttempts = maxReconnectionAttempts; // Stop further attempts
-                        sendToRenderer('update-status', 'Session closed: Invalid API key');
-                        return;
-                    }
-
-                    // Attempt automatic reconnection for server-side closures
-                    if (lastSessionParams && reconnectionAttempts < maxReconnectionAttempts) {
-                        console.log('Attempting automatic reconnection...');
-                        attemptReconnection();
-                    } else {
-                        sendToRenderer('update-status', 'Session closed');
-                    }
+                        if (message.serverContent?.generationComplete) {
+                            console.log('Generation complete received');
+                            performanceMetrics.responseTime = Date.now() - messageStartTime;
+                            
+                            // Log performance metrics
+                            console.log('Performance metrics:', {
+                                totalMessages: performanceMetrics.messageCount,
+                                responseTime: performanceMetrics.responseTime + 'ms',
+                                sessionDuration: Date.now() - performanceMetrics.startTime + 'ms',
+                                errorCount: performanceMetrics.errorCount
+                            });
+                            
+                            // Clear timeout since we got completion
+                            if (responseTimeout) {
+                                clearTimeout(responseTimeout);
+                                responseTimeout = null;
+                            }
+                            
+                            // Send the complete accumulated response with quality enhancement
+                            if (responseBuffer.trim()) {
+                                console.log('Sending complete response:', responseBuffer);
+                                
+                                // Enhance response quality for coding interviews
+                                const enhancedResponse = enhanceCodingResponse(responseBuffer);
+                                sendToRenderer('update-response', enhancedResponse);
+                                responseBuffer = ''; // Reset buffer
+                            }
+                            sendToRenderer('update-status', 'Ready');
+                        }
+                        
+                        // Handle other message types
+                        if (message.serverContent?.serverTurn) {
+                            console.log('Server turn received:', message.serverContent.serverTurn);
+                        }
+                        
+                        if (message.serverContent?.modelTurn) {
+                            console.log('Model turn received:', message.serverContent.modelTurn);
+                        }
+                    },
+                    onerror: function (e) {
+                        performanceMetrics.errorCount++;
+                        console.error('Error in coding mode session:', e.message);
+                        console.error('Error metrics:', {
+                            errorCount: performanceMetrics.errorCount,
+                            totalMessages: performanceMetrics.messageCount,
+                            sessionDuration: Date.now() - performanceMetrics.startTime + 'ms'
+                        });
+                        
+                        sendToRenderer('update-status', 'Error: ' + e.message);
+                        
+                        // Enhanced error handling with exponential backoff
+                        const retryDelay = Math.min(1000 * Math.pow(2, (reconnectionAttempts || 0)), 30000);
+                        console.log(`Attempting to reconnect coding mode session in ${retryDelay}ms (attempt ${(reconnectionAttempts || 0) + 1})`);
+                        
+                        setTimeout(() => {
+                            console.log('Attempting to reconnect coding mode session...');
+                            initializeNewSession();
+                        }, retryDelay);
+                    },
+                    onclose: function (e) {
+                        console.log('Coding mode session closed', e ? `with code: ${e.code}` : '');
+                        
+                        // Clear any pending timeout
+                        if (responseTimeout) {
+                            clearTimeout(responseTimeout);
+                            responseTimeout = null;
+                        }
+                        
+                        // Send any remaining buffered response
+                        if (responseBuffer.trim()) {
+                            console.log('Sending final buffered response:', responseBuffer);
+                            sendToRenderer('update-response', responseBuffer);
+                            responseBuffer = '';
+                        }
+                        
+                        if (e && e.code !== 1000) {
+                            console.log('Session closed with error code, attempting to reconnect...');
+                            setTimeout(() => {
+                                console.log('Attempting to reconnect coding mode session...');
+                                initializeNewSession();
+                            }, 3000);
+                        }
+                    },
                 },
-            },
-            config: {
-                responseModalities: ['TEXT'],
-                tools: enabledTools,
-                // Enable speaker diarization
-                inputAudioTranscription: {
-                    enableSpeakerDiarization: true,
-                    minSpeakerCount: 2,
-                    maxSpeakerCount: 2,
+                config: {
+                    responseModalities: ['TEXT'],
+                    tools: enabledTools,
+                    contextWindowCompression: { slidingWindow: {} },
+                    systemInstruction: {
+                        parts: [{ text: getCodingOptimizedPrompt(systemPrompt, model) }],
+                    },
+                    // Enable image processing for coding mode
+                    inputModalities: ['TEXT', 'AUDIO', 'IMAGE'],
+                    // Enhanced configuration for coding interviews
+                    generationConfig: {
+                        temperature: 0.7,
+                        topK: 40,
+                        topP: 0.95,
+                        maxOutputTokens: 8192,
+                    },
                 },
-                contextWindowCompression: { slidingWindow: {} },
-                speechConfig: { languageCode: language },
-                systemInstruction: {
-                    parts: [{ text: systemPrompt }],
-                },
-            },
-        });
+            });
+        }
 
         isInitializingSession = false;
         sendToRenderer('session-initializing', false);
@@ -519,12 +768,13 @@ async function sendAudioToGemini(base64Data, geminiSessionRef) {
     }
 }
 
+
 function setupGeminiIpcHandlers(geminiSessionRef) {
     // Store the geminiSessionRef globally for reconnection access
     global.geminiSessionRef = geminiSessionRef;
 
-    ipcMain.handle('initialize-gemini', async (event, apiKey, customPrompt, profile = 'interview', language = 'en-US') => {
-        const session = await initializeGeminiSession(apiKey, customPrompt, profile, language);
+    ipcMain.handle('initialize-gemini', async (event, apiKey, customPrompt, profile = 'interview', language = 'en-US', mode = 'interview', model = 'gemini-2.5-flash') => {
+        const session = await initializeGeminiSession(apiKey, customPrompt, profile, language, false, mode, model);
         if (session) {
             geminiSessionRef.current = session;
             return true;
@@ -564,6 +814,10 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
     ipcMain.handle('send-image-content', async (event, { data, debug }) => {
         if (!geminiSessionRef.current) return { success: false, error: 'No active Gemini session' };
 
+        const startTime = Date.now();
+        let retryCount = 0;
+        const maxRetries = 3;
+
         try {
             if (!data || typeof data !== 'string') {
                 console.error('Invalid image data received');
@@ -577,15 +831,65 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
                 return { success: false, error: 'Image buffer too small' };
             }
 
-            process.stdout.write('!');
-            await geminiSessionRef.current.sendRealtimeInput({
-                media: { data: data, mimeType: 'image/jpeg' },
-            });
+            // Validate image data integrity
+            if (buffer.length > 10 * 1024 * 1024) { // 10MB limit
+                console.error(`Image too large: ${buffer.length} bytes`);
+                return { success: false, error: 'Image too large (max 10MB)' };
+            }
 
-            return { success: true };
+            console.log(`Sending image: ${buffer.length} bytes, base64 length: ${data.length}`);
+            process.stdout.write('!');
+            
+            // Progressive enhancement: adaptive delay based on image size
+            const adaptiveDelay = Math.min(100 + (buffer.length / 10000), 1000);
+            await new Promise(resolve => setTimeout(resolve, adaptiveDelay));
+            
+            // Retry mechanism with exponential backoff
+            while (retryCount < maxRetries) {
+                try {
+                    await geminiSessionRef.current.sendRealtimeInput({
+                        media: { 
+                            data: data, 
+                            mimeType: 'image/jpeg' 
+                        },
+                    });
+                    
+                    const processingTime = Date.now() - startTime;
+                    console.log(`Image sent successfully in ${processingTime}ms (attempt ${retryCount + 1})`);
+                    
+                    // Log performance metrics
+                    console.log('Image processing metrics:', {
+                        imageSize: buffer.length,
+                        processingTime: processingTime + 'ms',
+                        retryCount: retryCount,
+                        adaptiveDelay: adaptiveDelay + 'ms'
+                    });
+                    
+                    return { success: true, processingTime };
+                } catch (mediaError) {
+                    retryCount++;
+                    console.error(`Error sending media (attempt ${retryCount}/${maxRetries}):`, mediaError.message);
+                    
+                    if (retryCount < maxRetries) {
+                        // Exponential backoff
+                        const backoffDelay = Math.min(1000 * Math.pow(2, retryCount - 1), 5000);
+                        console.log(`Retrying in ${backoffDelay}ms...`);
+                        await new Promise(resolve => setTimeout(resolve, backoffDelay));
+                    } else {
+                        // Final fallback: send as text description
+                        console.error('All retries failed, using text fallback');
+                        const fallbackText = `[Image captured: ${buffer.length} bytes, ${Math.round(buffer.length/1024)}KB JPEG - Analysis requested]`;
+                        await geminiSessionRef.current.sendRealtimeInput({
+                            text: fallbackText
+                        });
+                        console.log('Image fallback sent as text');
+                        return { success: true, fallback: true, retryCount };
+                    }
+                }
+            }
         } catch (error) {
             console.error('Error sending image:', error);
-            return { success: false, error: error.message };
+            return { success: false, error: error.message, retryCount };
         }
     });
 
@@ -681,6 +985,73 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
             return { success: true };
         } catch (error) {
             console.error('Error updating Google Search setting:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    // PDF Upload and Management Handlers
+    ipcMain.handle('upload-cv-pdf', async (event) => {
+        try {
+            const result = await dialog.showOpenDialog({
+                title: 'Select your CV/Resume (PDF)',
+                filters: [
+                    { name: 'PDF Files', extensions: ['pdf'] },
+                    { name: 'All Files', extensions: ['*'] }
+                ],
+                properties: ['openFile']
+            });
+
+            if (result.canceled || result.filePaths.length === 0) {
+                return { success: false, error: 'No file selected' };
+            }
+
+            const filePath = result.filePaths[0];
+            const processResult = await pdfProcessor.processPDF(filePath);
+
+            if (processResult.success) {
+                console.log('CV uploaded and processed successfully:', processResult);
+                return {
+                    success: true,
+                    fileName: processResult.fileName,
+                    textLength: processResult.textLength,
+                    pages: processResult.pages
+                };
+            } else {
+                return { success: false, error: processResult.error };
+            }
+        } catch (error) {
+            console.error('Error uploading CV:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('get-cv-status', async (event) => {
+        try {
+            return pdfProcessor.getCVStatus();
+        } catch (error) {
+            console.error('Error getting CV status:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('clear-cv', async (event) => {
+        try {
+            pdfProcessor.clearCV();
+            return { success: true };
+        } catch (error) {
+            console.error('Error clearing CV:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('get-cv-context', async (event) => {
+        try {
+            return {
+                success: true,
+                context: pdfProcessor.getCVContext()
+            };
+        } catch (error) {
+            console.error('Error getting CV context:', error);
             return { success: false, error: error.message };
         }
     });

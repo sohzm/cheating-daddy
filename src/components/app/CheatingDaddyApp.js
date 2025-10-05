@@ -7,6 +7,7 @@ import { HistoryView } from '../views/HistoryView.js';
 import { AssistantView } from '../views/AssistantView.js';
 import { OnboardingView } from '../views/OnboardingView.js';
 import { AdvancedView } from '../views/AdvancedView.js';
+import { CVUploadView } from '../views/CVUploadView.js';
 
 export class CheatingDaddyApp extends LitElement {
     static styles = css`
@@ -114,6 +115,7 @@ export class CheatingDaddyApp extends LitElement {
         _isClickThrough: { state: true },
         _awaitingNewResponse: { state: true },
         shouldAnimateResponse: { type: Boolean },
+        cvStatus: { type: Object }
     };
 
     constructor() {
@@ -136,6 +138,7 @@ export class CheatingDaddyApp extends LitElement {
         this._awaitingNewResponse = false;
         this._currentResponseIsComplete = true;
         this.shouldAnimateResponse = false;
+        this.cvStatus = {};
 
         // Apply layout mode to document root
         this.updateLayoutMode();
@@ -157,6 +160,8 @@ export class CheatingDaddyApp extends LitElement {
                 this._isClickThrough = isEnabled;
             });
         }
+        
+        this.loadCVStatus();
     }
 
     disconnectedCallback() {
@@ -233,8 +238,25 @@ export class CheatingDaddyApp extends LitElement {
         this.requestUpdate();
     }
 
+    handleCVUploadClick() {
+        this.currentView = 'cv-upload';
+        this.requestUpdate();
+    }
+
+    async loadCVStatus() {
+        try {
+            if (window.require) {
+                const { ipcRenderer } = window.require('electron');
+                this.cvStatus = await ipcRenderer.invoke('get-cv-status');
+                this.requestUpdate();
+            }
+        } catch (error) {
+            console.error('Error loading CV status:', error);
+        }
+    }
+
     async handleClose() {
-        if (this.currentView === 'customize' || this.currentView === 'help' || this.currentView === 'history') {
+        if (this.currentView === 'customize' || this.currentView === 'help' || this.currentView === 'history' || this.currentView === 'cv-upload') {
             this.currentView = 'main';
         } else if (this.currentView === 'assistant') {
             cheddar.stopCapture();
@@ -276,7 +298,11 @@ export class CheatingDaddyApp extends LitElement {
             return;
         }
 
-        await cheddar.initializeGemini(this.selectedProfile, this.selectedLanguage);
+        // Get mode and model from localStorage
+        const selectedMode = localStorage.getItem('selectedMode') || 'interview';
+        const selectedModel = localStorage.getItem('selectedModel') || 'gemini-2.5-flash';
+        
+        await cheddar.initializeGemini(this.selectedProfile, this.selectedLanguage, selectedMode, selectedModel);
         // Pass the screenshot interval as string (including 'manual' option)
         cheddar.startCapture(this.selectedScreenshotInterval, this.selectedImageQuality);
         this.responses = [];
@@ -407,6 +433,8 @@ export class CheatingDaddyApp extends LitElement {
                         .onStart=${() => this.handleStart()}
                         .onAPIKeyHelp=${() => this.handleAPIKeyHelp()}
                         .onLayoutModeChange=${layoutMode => this.handleLayoutModeChange(layoutMode)}
+                        .onCVUpload=${() => this.handleCVUploadClick()}
+                        .cvStatus=${this.cvStatus}
                     ></main-view>
                 `;
 
@@ -436,6 +464,13 @@ export class CheatingDaddyApp extends LitElement {
 
             case 'advanced':
                 return html` <advanced-view></advanced-view> `;
+
+            case 'cv-upload':
+                return html`
+                    <cv-upload-view
+                        @navigate-back=${() => this.handleBackClick()}
+                    ></cv-upload-view>
+                `;
 
             case 'assistant':
                 return html`
