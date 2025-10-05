@@ -9,11 +9,57 @@ export class MainView extends LitElement {
             user-select: none;
         }
 
+        :host {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            width: 100%;
+            padding: 40px;
+            background: transparent;
+        }
+
+        .main-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+        }
+
         .welcome {
-            font-size: 24px;
+            font-size: 32px;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.9);
             margin-bottom: 8px;
-            font-weight: 600;
-            margin-top: auto;
+            letter-spacing: -0.5px;
+        }
+
+        .subtitle {
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.6);
+            margin-bottom: 40px;
+            font-weight: 400;
+            line-height: 1.5;
+        }
+
+        .shortcut-hint {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.4);
+            margin-top: 20px;
+            font-weight: 400;
+        }
+
+        .shortcut-key {
+            background: rgba(255, 255, 255, 0.1);
+            border: 0.5px solid rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            padding: 2px 6px;
+            font-size: 10px;
+            font-weight: 500;
         }
 
         .input-group {
@@ -92,31 +138,38 @@ export class MainView extends LitElement {
         }
 
         .start-button {
-            background: var(--start-button-background);
-            color: var(--start-button-color);
-            border: 1px solid var(--start-button-border);
-            padding: 8px 16px;
-            border-radius: 8px;
-            font-size: 13px;
+            background: rgba(0, 122, 255, 0.6);
+            color: rgba(255, 255, 255, 0.95);
+            border: 0.5px solid rgba(0, 122, 255, 0.3);
+            padding: 16px 32px;
+            border-radius: 12px;
+            font-size: 15px;
             font-weight: 500;
-            white-space: nowrap;
-            display: flex;
-            align-items: center;
-            gap: 6px;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(20px);
+            min-width: 200px;
+            letter-spacing: 0.2px;
         }
 
         .start-button:hover {
-            background: var(--start-button-hover-background);
-            border-color: var(--start-button-hover-border);
+            background: rgba(0, 122, 255, 0.7);
+            border-color: rgba(0, 122, 255, 0.4);
+            transform: translateY(-2px);
+        }
+
+        .start-button:active {
+            transform: translateY(0);
         }
 
         .start-button.initializing {
-            opacity: 0.5;
+            opacity: 0.7;
+            cursor: not-allowed;
         }
 
         .start-button.initializing:hover {
-            background: var(--start-button-background);
-            border-color: var(--start-button-border);
+            transform: none;
+            background: rgba(0, 122, 255, 0.6);
         }
 
         .shortcut-icons {
@@ -168,9 +221,6 @@ export class MainView extends LitElement {
         onAPIKeyHelp: { type: Function },
         isInitializing: { type: Boolean },
         onLayoutModeChange: { type: Function },
-        showApiKeyError: { type: Boolean },
-        isConnectingGmail: { type: Boolean },
-        gmailStatus: { type: String },
     };
 
     constructor() {
@@ -179,10 +229,7 @@ export class MainView extends LitElement {
         this.onAPIKeyHelp = () => {};
         this.isInitializing = false;
         this.onLayoutModeChange = () => {};
-        this.showApiKeyError = false;
         this.boundKeydownHandler = this.handleKeydown.bind(this);
-        this.isConnectingGmail = false;
-        this.gmailStatus = '';
     }
 
     connectedCallback() {
@@ -217,112 +264,7 @@ export class MainView extends LitElement {
         }
     }
 
-    handleInput(e) {
-        localStorage.setItem('apiKey', e.target.value);
-        // Clear error state when user starts typing
-        if (this.showApiKeyError) {
-            this.showApiKeyError = false;
-        }
-    }
 
-    handleComposioInput(e) {
-        localStorage.setItem('composioApiKey', e.target.value);
-    }
-
-    async handleConnectGmail() {
-        if (this.isConnectingGmail) return;
-        
-        // Try to get API key from environment first, then localStorage
-        let composioApiKey = localStorage.getItem('composioApiKey');
-        if (!composioApiKey) {
-            try {
-                const { ipcRenderer } = window.require ? window.require('electron') : { ipcRenderer: window.electron?.ipcRenderer };
-                if (ipcRenderer) {
-                    const result = await ipcRenderer.invoke('get-composio-api-key');
-                    if (result?.success && result.apiKey) {
-                        composioApiKey = result.apiKey;
-                    }
-                }
-            } catch (error) {
-                console.warn('Failed to load Composio API key from environment:', error);
-            }
-        }
-        
-        if (!composioApiKey) {
-            this.gmailStatus = 'No Composio API key found. Please set COMPOSIO_API_KEY in your .env file.';
-            this.requestUpdate();
-            return;
-        }
-
-        try {
-            this.isConnectingGmail = true;
-            this.gmailStatus = 'Initializing Composio...';
-            this.requestUpdate();
-
-            const { ipcRenderer } = window.require ? window.require('electron') : { ipcRenderer: window.electron?.ipcRenderer };
-            if (!ipcRenderer) {
-                this.gmailStatus = 'IPC unavailable in renderer.';
-                this.isConnectingGmail = false;
-                this.requestUpdate();
-                return;
-            }
-
-            const initResp = await ipcRenderer.invoke('initialize-composio', composioApiKey);
-            if (!initResp?.success) {
-                this.gmailStatus = `Failed to initialize Composio: ${initResp?.error || 'unknown error'}`;
-                this.isConnectingGmail = false;
-                this.requestUpdate();
-                return;
-            }
-
-            this.gmailStatus = 'Starting Gmail connection...';
-            this.requestUpdate();
-
-            const externalUserId = 'nikhilprabhu06@gmail.com';
-            const authConfigId = 'ac_AEOPhhO57Zsk';
-            const connectResp = await ipcRenderer.invoke('connect-gmail', externalUserId, authConfigId);
-            if (!connectResp?.success || !connectResp?.redirectUrl) {
-                this.gmailStatus = `Failed to start Gmail auth: ${connectResp?.error || 'no redirect URL'}`;
-                this.isConnectingGmail = false;
-                this.requestUpdate();
-                return;
-            }
-
-            // Open OAuth flow in system browser without blocking the window
-            await ipcRenderer.invoke('open-external', connectResp.redirectUrl);
-            this.gmailStatus = 'Waiting for Gmail authorization to complete...';
-            this.requestUpdate();
-
-            // Poll connection status non-blockingly
-            const pollStart = Date.now();
-            const timeoutMs = 5 * 60 * 1000;
-            const poll = async () => {
-                try {
-                    const statusResp = await ipcRenderer.invoke('get-gmail-connection-status', externalUserId);
-                    if (statusResp?.success && statusResp?.connectedAccount) {
-                        this.gmailStatus = `Connected! Account id: ${statusResp.connectedAccount.id}`;
-                        this.isConnectingGmail = false;
-                        this.requestUpdate();
-                        return;
-                    }
-                } catch (e) {
-                    // Ignore intermittent errors during polling
-                }
-                if (Date.now() - pollStart < timeoutMs && this.isConnectingGmail) {
-                    setTimeout(poll, 2000);
-                } else if (this.isConnectingGmail) {
-                    this.gmailStatus = 'Timed out waiting for Gmail authorization.';
-                    this.isConnectingGmail = false;
-                    this.requestUpdate();
-                }
-            };
-            setTimeout(poll, 2000);
-        } catch (err) {
-            this.gmailStatus = `Unexpected error: ${err?.message || err}`;
-            this.isConnectingGmail = false;
-            this.requestUpdate();
-        }
-    }
 
     handleStartClick() {
         if (this.isInitializing) {
@@ -406,45 +348,18 @@ export class MainView extends LitElement {
 
     render() {
         return html`
-            <div class="welcome">Welcome</div>
-
-            <div class="api-keys-container">
-                <div class="api-key-row">
-                    <div class="api-key-label">Gemini:</div>
-                    <input
-                        type="password"
-                        placeholder="Gemini API Key (loaded from .env file)"
-                        .value=${localStorage.getItem('apiKey') || ''}
-                        @input=${this.handleInput}
-                        class="${this.showApiKeyError ? 'api-key-error' : ''}"
-                        disabled
-                        title="Gemini API key is loaded from GEMINI_API_KEY environment variable"
-                    />
-                </div>
-                <div class="api-key-row">
-                    <div class="api-key-label">Composio:</div>
-                    <input
-                        type="password"
-                        placeholder="Enter your Composio API Key (optional)"
-                        .value=${localStorage.getItem('composioApiKey') || ''}
-                        @input=${this.handleComposioInput}
-                    />
-                    <button class="start-button" @click=${this.handleConnectGmail} .disabled=${this.isConnectingGmail}>
-                        ${this.isConnectingGmail ? 'Connecting…' : 'Connect Gmail'}
-                    </button>
-                </div>
-                ${this.gmailStatus ? html`<div class="description">${this.gmailStatus}</div>` : ''}
-            </div>
-
-            <div class="input-group">
+            <div class="main-container">
+                <div class="welcome">Welcome</div>
+                <div class="subtitle">Your intelligent assistant is ready to help</div>
+                
                 <button @click=${this.handleStartClick} class="start-button ${this.isInitializing ? 'initializing' : ''}">
                     ${this.getStartButtonText()}
                 </button>
+                
+                <div class="shortcut-hint">
+                    Press <span class="shortcut-key">Ctrl</span> + <span class="shortcut-key">Enter</span> to start
+                </div>
             </div>
-            <p class="description">
-                Gemini API key is loaded from .env file. 
-                <span @click=${this.handleAPIKeyHelpClick} class="link">Need help?</span>
-            </p>
         `;
     }
 }

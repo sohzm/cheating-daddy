@@ -21,10 +21,8 @@ export class AssistantView extends LitElement {
             flex: 1;
             display: flex;
             flex-direction: column;
-            justify-content: flex-end;
             padding: 20px;
-            background: rgba(255, 255, 255, 0.01);
-            backdrop-filter: blur(40px) saturate(100%);
+            background: transparent;
             transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
@@ -33,7 +31,20 @@ export class AssistantView extends LitElement {
         }
 
         .response-container {
-            display: none;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            overflow-y: auto;
+            font-size: 13px;
+            line-height: 1.6;
+            background: transparent;
+            padding: 20px 0;
+            scroll-behavior: smooth;
+            user-select: text;
+            cursor: text;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            margin-bottom: 16px;
         }
 
         .response-container * {
@@ -60,15 +71,15 @@ export class AssistantView extends LitElement {
 
         .chat-bubble {
             max-width: 85%;
-            padding: 10px 14px;
-            border-radius: 14px;
-            line-height: 1.5;
+            padding: 12px 16px;
+            border-radius: 16px;
+            line-height: 1.6;
             position: relative;
             word-break: break-word;
             overflow-wrap: break-word;
             hyphens: auto;
-            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
-            backdrop-filter: blur(25px);
+            font-size: 13px;
+            font-weight: 400;
             transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
             opacity: 0;
             transform: translateY(6px);
@@ -83,17 +94,19 @@ export class AssistantView extends LitElement {
         }
 
         .chat-bubble.assistant {
-            background: rgba(255, 255, 255, 0.04);
-            color: rgba(255, 255, 255, 0.85);
+            background: rgba(255, 255, 255, 0.12);
+            color: rgba(255, 255, 255, 0.98);
             border-top-left-radius: 4px;
-            border: 0.5px solid rgba(255, 255, 255, 0.08);
+            border: 0.5px solid rgba(255, 255, 255, 0.15);
+            font-weight: 400;
+            letter-spacing: 0.1px;
         }
 
         .chat-bubble.user {
-            background: rgba(255, 255, 255, 0.03);
-            color: rgba(255, 255, 255, 0.8);
+            background: rgba(0, 122, 255, 0.15);
+            color: rgba(255, 255, 255, 0.95);
             border-top-right-radius: 4px;
-            border: 0.5px solid rgba(255, 255, 255, 0.06);
+            border: 0.5px solid rgba(0, 122, 255, 0.2);
         }
 
         .chat-bubble.assistant.active {
@@ -126,7 +139,7 @@ export class AssistantView extends LitElement {
         .response-container h5,
         .response-container h6 {
             margin: 1.2em 0 0.6em 0;
-            color: #000000;
+            color: rgba(255, 255, 255, 0.95);
             font-weight: 600;
         }
 
@@ -151,14 +164,14 @@ export class AssistantView extends LitElement {
 
         .response-container p {
             margin: 0.8em 0;
-            color: #000000;
+            color: rgba(255, 255, 255, 0.95);
         }
 
         .response-container ul,
         .response-container ol {
             margin: 0.8em 0;
             padding-left: 2em;
-            color: #000000;
+            color: rgba(255, 255, 255, 0.95);
         }
 
         .response-container li {
@@ -262,11 +275,11 @@ export class AssistantView extends LitElement {
             display: flex;
             gap: 8px;
             align-items: center;
-            background: rgba(255, 255, 255, 0.02);
-            border: 0.5px solid rgba(255, 255, 255, 0.04);
+            background: rgba(255, 255, 255, 0.04);
+            border: 0.5px solid rgba(255, 255, 255, 0.08);
             border-radius: 16px;
             padding: 12px 16px;
-            backdrop-filter: blur(30px);
+            backdrop-filter: blur(20px);
             width: 100%;
             max-width: 600px;
             margin: 0 auto;
@@ -282,10 +295,10 @@ export class AssistantView extends LitElement {
         .text-input-container input {
             flex: 1;
             background: transparent;
-            color: rgba(255, 255, 255, 0.9);
+            color: rgba(255, 255, 255, 0.95);
             border: none;
             padding: 8px 12px;
-            font-size: 13px;
+            font-size: 14px;
             height: 32px;
             transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
@@ -295,7 +308,7 @@ export class AssistantView extends LitElement {
         }
 
         .text-input-container input::placeholder {
-            color: rgba(255, 255, 255, 0.3);
+            color: rgba(255, 255, 255, 0.5);
         }
 
         .text-input-container button:not(.send-button) {
@@ -1162,6 +1175,8 @@ Guidelines:
 
         return html`
             <div class="chat-wrapper">
+                <div class="response-container" id="responseContainer"></div>
+                
                 <div class="text-input-container">
                     <div class="composer-actions">
                         <button

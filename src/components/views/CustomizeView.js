@@ -395,7 +395,6 @@ export class CustomizeView extends LitElement {
     `;
 
     static properties = {
-        selectedProfile: { type: String },
         selectedLanguage: { type: String },
         selectedScreenshotInterval: { type: String },
         selectedImageQuality: { type: String },
@@ -417,7 +416,6 @@ export class CustomizeView extends LitElement {
 
     constructor() {
         super();
-        this.selectedProfile = 'meeting';
         this.selectedLanguage = 'en-US';
         this.selectedScreenshotInterval = '5';
         this.selectedImageQuality = 'medium';
@@ -460,35 +458,6 @@ export class CustomizeView extends LitElement {
         resizeLayout();
     }
 
-    getProfiles() {
-        return [
-            {
-                value: 'sales',
-                name: 'Sales Call',
-                description: 'Assist with sales conversations and objection handling',
-            },
-            {
-                value: 'meeting',
-                name: 'Business Meeting',
-                description: 'Support for professional meetings and discussions',
-            },
-            {
-                value: 'presentation',
-                name: 'Presentation',
-                description: 'Help with presentations and public speaking',
-            },
-            {
-                value: 'negotiation',
-                name: 'Negotiation',
-                description: 'Guidance for business negotiations and deals',
-            },
-            {
-                value: 'exam',
-                name: 'Exam Assistant',
-                description: 'Academic assistance for test-taking and exam questions',
-            },
-        ];
-    }
 
     getLanguages() {
         return [
@@ -525,21 +494,7 @@ export class CustomizeView extends LitElement {
         ];
     }
 
-    getProfileNames() {
-        return {
-            sales: 'Sales Call',
-            meeting: 'Business Meeting',
-            presentation: 'Presentation',
-            negotiation: 'Negotiation',
-            exam: 'Exam Assistant',
-        };
-    }
 
-    handleProfileSelect(e) {
-        this.selectedProfile = e.target.value;
-        localStorage.setItem('selectedProfile', this.selectedProfile);
-        this.onProfileChange(this.selectedProfile);
-    }
 
     handleLanguageSelect(e) {
         this.selectedLanguage = e.target.value;
@@ -888,10 +843,7 @@ export class CustomizeView extends LitElement {
     }
 
     render() {
-        const profiles = this.getProfiles();
         const languages = this.getLanguages();
-        const profileNames = this.getProfileNames();
-        const currentProfile = profiles.find(p => p.value === this.selectedProfile);
         const currentLanguage = languages.find(l => l.value === this.selectedLanguage);
 
         return html`
@@ -903,41 +855,20 @@ export class CustomizeView extends LitElement {
                     </div>
 
                     <div class="form-grid">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label class="form-label">
-                                    Profile Type
-                                    <span class="current-selection">${currentProfile?.name || 'Unknown'}</span>
-                                </label>
-                                <select class="form-control" .value=${this.selectedProfile} @change=${this.handleProfileSelect}>
-                                    ${profiles.map(
-                                        profile => html`
-                                            <option value=${profile.value} ?selected=${this.selectedProfile === profile.value}>
-                                                ${profile.name}
-                                            </option>
-                                        `
-                                    )}
-                                </select>
-                            </div>
-                        </div>
-
                         <div class="form-group full-width">
                             <label class="form-label">Custom AI Instructions</label>
                             <textarea
                                 class="form-control"
-                                placeholder="Add specific instructions for how you want the AI to behave during ${
-                                    profileNames[this.selectedProfile] || 'this interaction'
-                                }..."
+                                placeholder="Add specific instructions for how you want the AI to behave..."
                                 .value=${localStorage.getItem('customPrompt') || ''}
                                 rows="4"
                                 @input=${this.handleCustomPromptInput}
                             ></textarea>
                             <div class="form-description">
-                                Personalize the AI's behavior with specific instructions that will be added to the
-                                ${profileNames[this.selectedProfile] || 'selected profile'} base prompts
-                </div>
-                </div>
-            </div>
+                                Personalize the AI's behavior with specific instructions
+                            </div>
+                        </div>
+                    </div>
         </div>
 
                 <!-- Audio & Microphone Section -->

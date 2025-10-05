@@ -14,7 +14,6 @@ const INTEGRATIONS = [
     { logo: 'https://logos.composio.dev/api/googledrive', name: 'Google Drive', authConfigId: 'ac_0yXGuyFmAacK', authType: 'OAUTH2', lastUpdated: 'Oct 3, 2025', status: 'ENABLED', connections: 1 },
     { logo: 'https://logos.composio.dev/api/linkedin', name: 'LinkedIn', authConfigId: 'ac_9NVcBfIIjuMU', authType: 'OAUTH2', lastUpdated: 'Oct 3, 2025', status: 'ENABLED', connections: 1 },
     { logo: 'https://logos.composio.dev/api/slack', name: 'Slack', authConfigId: 'ac_ohDLI9rewHgG', authType: 'OAUTH2', lastUpdated: 'Oct 3, 2025', status: 'ENABLED', connections: 4 },
-    { logo: 'https://logos.composio.dev/api/gmail', name: 'Gmail', authConfigId: 'ac_AEOPhhO57Zsk', authType: 'OAUTH2', lastUpdated: 'Oct 1, 2025', status: 'ENABLED', connections: 7 },
 ];
 
 export class ConnectionsView extends LitElement {
