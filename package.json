@@ -25,9 +25,11 @@
     },
     "license": "GPL-3.0",
     "dependencies": {
+        "@cerebras/cerebras_cloud_sdk": "^1.50.0",
         "@composio/core": "^0.1.53",
         "@composio/google": "^0.1.53",
         "@google/genai": "^1.2.0",
+        "dotenv": "^17.2.3",
         "electron-squirrel-startup": "^1.0.1"
     },
     "devDependencies": {

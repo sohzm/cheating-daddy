@@ -10,3 +10,4 @@ export { HistoryView } from './views/HistoryView.js';
 export { AssistantView } from './views/AssistantView.js';
 export { OnboardingView } from './views/OnboardingView.js';
 export { AdvancedView } from './views/AdvancedView.js';
+export { ConnectionsView } from './views/ConnectionsView.js';

@@ -824,6 +824,56 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
         }
     });
 
+    // Generic integration connection handlers
+    ipcMain.handle('composio-start-connection', async (event, externalUserId, authConfigId, label) => {
+        try {
+            const result = await composioService.connectIntegration(externalUserId, authConfigId, label || 'Integration');
+            return result;
+        } catch (error) {
+            console.error('Error starting Composio connection:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('composio-wait-connection', async (event, externalUserId, authConfigId, timeoutMs) => {
+        try {
+            const result = await composioService.waitForIntegrationConnection(externalUserId, authConfigId, timeoutMs || 300000);
+            return result;
+        } catch (error) {
+            console.error('Error waiting for Composio connection:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('composio-get-connection-status', async (event, externalUserId, authConfigId) => {
+        try {
+            const result = await composioService.getIntegrationConnectionStatus(externalUserId, authConfigId);
+            return result;
+        } catch (error) {
+            console.error('Error getting Composio connection status:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('composio-disconnect', async (event, externalUserId, authConfigId) => {
+        try {
+            const result = await composioService.disconnectIntegration(externalUserId, authConfigId);
+            return result;
+        } catch (error) {
+            console.error('Error disconnecting Composio integration:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('composio-list-accounts', async (event) => {
+        try {
+            return { success: true, accounts: composioService.getConnectedAccounts() };
+        } catch (error) {
+            console.error('Error listing Composio accounts:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
     ipcMain.handle('execute-email-task', async (event, externalUserId, task, tools) => {
         try {
             const result = await composioService.executeEmailTaskWithAgent(externalUserId, task, tools);

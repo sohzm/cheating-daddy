@@ -101,6 +101,7 @@ export class AppHeader extends LitElement {
         isClickThrough: { type: Boolean, reflect: true },
         advancedMode: { type: Boolean },
         onAdvancedClick: { type: Function },
+        onConnectionsClick: { type: Function },
     };
 
     constructor() {
@@ -118,6 +119,7 @@ export class AppHeader extends LitElement {
         this.advancedMode = false;
         this.onAdvancedClick = () => {};
         this._timerInterval = null;
+        this.onConnectionsClick = () => {};
     }
 
     connectedCallback() {
@@ -177,6 +179,7 @@ export class AppHeader extends LitElement {
             onboarding: 'Welcome to Clue2',
             main: 'Clue2',
             customize: 'Customize',
+            connections: 'Connections',
             help: 'Help & Shortcuts',
             history: 'Conversation History',
             advanced: 'Advanced Tools',
@@ -194,7 +197,7 @@ export class AppHeader extends LitElement {
     }
 
     isNavigationView() {
-        const navigationViews = ['customize', 'help', 'history', 'advanced'];
+        const navigationViews = ['customize', 'connections', 'help', 'history', 'advanced'];
         return navigationViews.includes(this.currentView);
     }
 
@@ -322,6 +325,24 @@ export class AppHeader extends LitElement {
                                           stroke-linecap="round"
                                           stroke-linejoin="round"
                                       ></path>
+                                  </svg>
+                              </button>
+                              <button class="icon-button" @click=${this.onConnectionsClick} title="Connections">
+                                  <?xml version="1.0" encoding="UTF-8"?><svg
+                                      width="24px"
+                                      height="24px"
+                                      stroke-width="1.7"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      color="currentColor"
+                                  >
+                                      <path d="M7 12H17" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
+                                      <path d="M7 6H17" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
+                                      <path d="M7 18H17" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
+                                      <circle cx="4" cy="6" r="1.5" stroke="currentColor" stroke-width="1.7" fill="none"></circle>
+                                      <circle cx="4" cy="12" r="1.5" stroke="currentColor" stroke-width="1.7" fill="none"></circle>
+                                      <circle cx="4" cy="18" r="1.5" stroke="currentColor" stroke-width="1.7" fill="none"></circle>
                                   </svg>
                               </button>
                               <button class="icon-button" @click=${this.onHelpClick}>

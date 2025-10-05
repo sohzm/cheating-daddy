@@ -376,22 +376,21 @@ export class AssistantView extends LitElement {
 
     static properties = {
         responses: { type: Array },
-        currentResponseIndex: { type: Number },
         selectedProfile: { type: String },
         onSendText: { type: Function },
         shouldAnimateResponse: { type: Boolean },
         messages: { type: Array },
         savedResponses: { type: Array },
-        isEmailSending: { type: Boolean },
-        emailStatus: { type: String },
         isAudioStopping: { type: Boolean },
         audioStatus: { type: String },
+        useCerebras: { type: Boolean },
+        cerebrasStatus: { type: String },
+        isGeneratingResponse: { type: Boolean },
     };
 
     constructor() {
         super();
         this.responses = [];
-        this.currentResponseIndex = -1;
         this.selectedProfile = 'interview';
         this.onSendText = () => {};
         this._lastAnimatedWordCount = 0;
@@ -403,11 +402,38 @@ export class AssistantView extends LitElement {
         } catch (e) {
             this.savedResponses = [];
         }
-        this.isEmailSending = false;
-        this.emailStatus = '';
         this.isAudioStopping = false;
         this.audioStatus = '';
+        this.useCerebras = true; // Cerebras is now the primary API
+        this.cerebrasStatus = '';
+        this.isGeneratingResponse = false;
+        
+        // Load conversation history from localStorage if available
+        this.loadConversationHistory();
     }
+
+    loadConversationHistory() {
+        try {
+            const savedMessages = localStorage.getItem('conversationHistory');
+            if (savedMessages) {
+                this.messages = JSON.parse(savedMessages);
+                console.log('Loaded conversation history:', this.messages.length, 'messages');
+                this.notifyMessagesUpdated();
+            }
+        } catch (e) {
+            console.warn('Failed to load conversation history:', e);
+            this.messages = [];
+        }
+    }
+    
+    saveConversationHistory() {
+        try {
+            localStorage.setItem('conversationHistory', JSON.stringify(this.messages));
+        } catch (e) {
+            console.warn('Failed to save conversation history:', e);
+        }
+    }
+    
 
     getProfileNames() {
         return {
@@ -422,8 +448,8 @@ export class AssistantView extends LitElement {
 
     getCurrentResponse() {
         const profileNames = this.getProfileNames();
-        return this.responses.length > 0 && this.currentResponseIndex >= 0
-            ? this.responses[this.currentResponseIndex]
+        return this.responses.length > 0
+            ? this.responses[this.responses.length - 1]
             : `Hey, Im listening to your ${profileNames[this.selectedProfile] || 'session'}?`;
     }
 
@@ -470,22 +496,67 @@ export class AssistantView extends LitElement {
                 });
                 node.parentNode.replaceChild(frag, node);
             } else if (node.nodeType === Node.ELEMENT_NODE && !tagsToSkip.includes(node.tagName)) {
-                // Preserve formatting tags like strong, b, em, i, etc.
-                if (['STRONG', 'B', 'EM', 'I', 'CODE', 'MARK'].includes(node.tagName)) {
-                    const words = node.textContent.split(/(\s+)/);
+                if (['STRONG', 'B', 'EM', 'I', 'MARK'].includes(node.tagName)) {
+                    const textContent = node.textContent;
+                    const words = textContent.split(/(\s+)/);
                     const frag = document.createDocumentFragment();
+                    
+                    // Create a new element with the same tag name
+                    const newElement = document.createElement(node.tagName.toLowerCase());
+                    
                     words.forEach(word => {
                         if (word.trim()) {
                             const span = document.createElement('span');
                             span.setAttribute('data-word', '');
-                            span.innerHTML = `<${node.tagName.toLowerCase()}>${word}</${node.tagName.toLowerCase()}>`;
-                            frag.appendChild(span);
+                            span.textContent = word;
+                            newElement.appendChild(span);
                         } else {
-                            frag.appendChild(document.createTextNode(word));
+                            newElement.appendChild(document.createTextNode(word));
                         }
                     });
+                    
+                    // Copy any attributes from the original node
+                    Array.from(node.attributes).forEach(attr => {
+                        newElement.setAttribute(attr.name, attr.value);
+                    });
+                    
+                    frag.appendChild(newElement);
+                    node.parentNode.replaceChild(frag, node);
+                } else if (node.tagName === 'CODE') {
+                    // Handle code elements differently - wrap the entire code block
+                    const codeSpan = document.createElement('span');
+                    codeSpan.setAttribute('data-word', '');
+                    codeSpan.innerHTML = node.outerHTML;
+                    node.parentNode.replaceChild(codeSpan, node);
+                } else if (node.tagName === 'LI') {
+                    // Handle bullet points - extract text and wrap words, preserving the list structure
+                    const textContent = node.textContent;
+                    const words = textContent.split(/(\s+)/);
+                    const frag = document.createDocumentFragment();
+                    
+                    // Create new LI element
+                    const newLi = document.createElement('li');
+                    
+                    // Copy any attributes from the original node
+                    Array.from(node.attributes).forEach(attr => {
+                        newLi.setAttribute(attr.name, attr.value);
+                    });
+                    
+                    words.forEach(word => {
+                        if (word.trim()) {
+                            const span = document.createElement('span');
+                            span.setAttribute('data-word', '');
+                            span.textContent = word;
+                            newLi.appendChild(span);
+                        } else {
+                            newLi.appendChild(document.createTextNode(word));
+                        }
+                    });
+                    
+                    frag.appendChild(newLi);
                     node.parentNode.replaceChild(frag, node);
                 } else {
+                    // For other elements, recursively process child nodes
                     Array.from(node.childNodes).forEach(wrap);
                 }
             }
@@ -494,39 +565,28 @@ export class AssistantView extends LitElement {
         return doc.body.innerHTML;
     }
 
-    getResponseCounter() {
-        return this.responses.length > 0 ? `${this.currentResponseIndex + 1}/${this.responses.length}` : '';
-    }
 
-    navigateToPreviousResponse() {
-        if (this.currentResponseIndex > 0) {
-            this.currentResponseIndex--;
-            this.dispatchEvent(
-                new CustomEvent('response-index-changed', {
-                    detail: { index: this.currentResponseIndex },
-                })
-            );
-            this.requestUpdate();
-        }
-    }
-
-    navigateToNextResponse() {
-        if (this.currentResponseIndex < this.responses.length - 1) {
-            this.currentResponseIndex++;
-            this.dispatchEvent(
-                new CustomEvent('response-index-changed', {
-                    detail: { index: this.currentResponseIndex },
-                })
-            );
-            this.requestUpdate();
-        }
-    }
 
     scrollResponseUp() {
         const container = this.shadowRoot.querySelector('#responseContainer');
         if (container) {
             const scrollAmount = container.clientHeight * 0.3; // Scroll 30% of container height
             container.scrollTop = Math.max(0, container.scrollTop - scrollAmount);
+        }
+    }
+
+    notifyMessagesUpdated() {
+        try {
+            const clonedMessages = (this.messages || []).map(message => ({ ...message }));
+            this.dispatchEvent(
+                new CustomEvent('messages-updated', {
+                    detail: { messages: clonedMessages },
+                    bubbles: true,
+                    composed: true,
+                })
+            );
+        } catch (error) {
+            console.warn('Failed to notify messages update:', error);
         }
     }
 
@@ -557,16 +617,6 @@ export class AssistantView extends LitElement {
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
 
-            this.handlePreviousResponse = () => {
-                console.log('Received navigate-previous-response message');
-                this.navigateToPreviousResponse();
-            };
-
-            this.handleNextResponse = () => {
-                console.log('Received navigate-next-response message');
-                this.navigateToNextResponse();
-            };
-
             this.handleScrollUp = () => {
                 console.log('Received scroll-response-up message');
                 this.scrollResponseUp();
@@ -577,8 +627,6 @@ export class AssistantView extends LitElement {
                 this.scrollResponseDown();
             };
 
-            ipcRenderer.on('navigate-previous-response', this.handlePreviousResponse);
-            ipcRenderer.on('navigate-next-response', this.handleNextResponse);
             ipcRenderer.on('scroll-response-up', this.handleScrollUp);
             ipcRenderer.on('scroll-response-down', this.handleScrollDown);
         }
@@ -590,12 +638,6 @@ export class AssistantView extends LitElement {
         // Clean up IPC listeners
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
-            if (this.handlePreviousResponse) {
-                ipcRenderer.removeListener('navigate-previous-response', this.handlePreviousResponse);
-            }
-            if (this.handleNextResponse) {
-                ipcRenderer.removeListener('navigate-next-response', this.handleNextResponse);
-            }
             if (this.handleScrollUp) {
                 ipcRenderer.removeListener('scroll-response-up', this.handleScrollUp);
             }
@@ -620,14 +662,8 @@ export class AssistantView extends LitElement {
         textInput.value = '';
         textInput.focus();
 
-        // Check if this is an email command and handle it automatically
-        const isEmailRequest = await this.shouldSendEmail(message);
-        if (isEmailRequest) {
-            await this.sendEmailFromCommand(message);
-            return;
-        }
-
-        await this.onSendText(message);
+        // Use Cerebras as the primary chat API
+        await this.generateCerebrasResponse(message);
     }
 
     handleTextKeydown(e) {
@@ -676,151 +712,6 @@ export class AssistantView extends LitElement {
         return joined.length > 4000 ? joined.slice(0, 4000) + '...' : joined;
     }
 
-    async emailConversationSummary() {
-        if (this.isEmailSending) return;
-        this.isEmailSending = true;
-        this.emailStatus = 'Preparing summary...';
-        this.requestUpdate();
-
-        try {
-            const summary = this.getConversationSummary(12) || this.getCurrentResponse() || '';
-            const toEmail = localStorage.getItem('summaryEmail') || 'nikhilprabhu06@gmail.com';
-            const externalUserId = 'nikhilprabhu06@gmail.com';
-
-            const task = `Using connected Gmail, send an email to ${toEmail} with subject "Conversation Summary" and body:\n\n${summary}`;
-
-            const { ipcRenderer } = window.require ? window.require('electron') : { ipcRenderer: window.electron?.ipcRenderer };
-            if (!ipcRenderer) {
-                this.emailStatus = 'IPC unavailable to send email.';
-                this.isEmailSending = false;
-                this.requestUpdate();
-                return;
-            }
-
-            this.emailStatus = 'Sending email via Composio...';
-            this.requestUpdate();
-
-            const result = await ipcRenderer.invoke('execute-email-task', externalUserId, task, ["GMAIL_SEND_EMAIL"]);
-            if (result?.success) {
-                this.emailStatus = 'Email sent successfully!';
-            } else {
-                this.emailStatus = `Failed to send email: ${result?.error || 'Unknown error'}`;
-            }
-        } catch (err) {
-            this.emailStatus = `Error: ${err?.message || err}`;
-        } finally {
-            this.isEmailSending = false;
-            this.requestUpdate();
-        }
-    }
-
-    // Extract email address from text using regex
-    extractEmailFromText(text) {
-        const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g;
-        const matches = text.match(emailRegex);
-        return matches ? matches[0] : null;
-    }
-
-    // Check if text contains email sending commands
-    containsEmailCommand(text) {
-        const emailKeywords = [
-            'send an email', 'send email', 'email to', 'send to', 'email about',
-            'send him', 'send her', 'email him', 'email her', 'forward to',
-            'share with', 'send this to', 'email this to', 'send notes to',
-            'email notes to', 'send summary to', 'email summary to'
-        ];
-        
-        const lowerText = text.toLowerCase();
-        return emailKeywords.some(keyword => lowerText.includes(keyword));
-    }
-
-    // Let the LLM decide if this is an email command
-    async shouldSendEmail(userMessage) {
-        try {
-            const { ipcRenderer } = window.require ? window.require('electron') : { ipcRenderer: window.electron?.ipcRenderer };
-            if (!ipcRenderer) return false;
-
-            // Ask Gemini to analyze if this is an email request
-            const analysisPrompt = `Analyze this user message and determine if they want to send an email. Look for:
-1. Email addresses (like user@domain.com)
-2. Intent to send/share/forward information
-3. Requests to email someone
-
-User message: "${userMessage}"
-
-Respond with ONLY "YES" if this is clearly an email request, or "NO" if it's not.`;
-
-            const response = await ipcRenderer.invoke('analyze-email-intent', analysisPrompt);
-            
-            if (response?.success && response?.result?.toLowerCase().includes('yes')) {
-                return true;
-            }
-            return false;
-        } catch (err) {
-            console.error('Error analyzing email intent:', err);
-            // Fallback to regex if LLM analysis fails
-            return this.containsEmailCommand(userMessage) && this.extractEmailFromText(userMessage);
-        }
-    }
-
-    // Send email based on user's natural language command
-    async sendEmailFromCommand(userMessage) {
-        if (this.isEmailSending) return;
-
-        const emailAddress = this.extractEmailFromText(userMessage);
-        if (!emailAddress) {
-            this.emailStatus = 'No email address found in your message.';
-            this.requestUpdate();
-            return;
-        }
-
-        this.isEmailSending = true;
-        this.emailStatus = `Preparing email to ${emailAddress}...`;
-        this.requestUpdate();
-
-        try {
-            // Check Gmail connection first
-            const { ipcRenderer } = window.require ? window.require('electron') : { ipcRenderer: window.electron?.ipcRenderer };
-            if (!ipcRenderer) {
-                this.emailStatus = 'IPC unavailable to send email.';
-                this.isEmailSending = false;
-                this.requestUpdate();
-                return;
-            }
-
-            // Check Gmail connection status
-            const externalUserId = 'nikhilprabhu06@gmail.com';
-            const connectionStatus = await ipcRenderer.invoke('get-gmail-connection-status', externalUserId);
-            if (!connectionStatus?.success) {
-                this.emailStatus = `Gmail not connected: ${connectionStatus?.error || 'Unknown error'}. Please connect Gmail first.`;
-                this.isEmailSending = false;
-                this.requestUpdate();
-                return;
-            }
-
-            // Get conversation context
-            const summary = this.getConversationSummary(15) || this.getCurrentResponse() || '';
-
-            // Create a more natural task based on user's request
-            const task = `Send an email using Gmail. Recipient: ${emailAddress}. Subject: "Conversation Summary". Body: The user requested: "${userMessage}". Include this conversation context:\n\n${summary}`;
-
-            this.emailStatus = `Sending email to ${emailAddress} via Composio...`;
-            this.requestUpdate();
-
-            const result = await ipcRenderer.invoke('execute-email-task', externalUserId, task, ["GMAIL_SEND_EMAIL"]);
-            if (result?.success) {
-                this.emailStatus = `Email sent successfully to ${emailAddress}!`;
-            } else {
-                this.emailStatus = `Failed to send email: ${result?.error || 'Unknown error'}`;
-            }
-        } catch (err) {
-            this.emailStatus = `Error: ${err?.message || err}`;
-        } finally {
-            this.isEmailSending = false;
-            this.requestUpdate();
-        }
-    }
-
     async stopAudioRecording() {
         if (this.isAudioStopping) return;
         
@@ -851,6 +742,149 @@ Respond with ONLY "YES" if this is clearly an email request, or "NO" if it's not
         }
     }
 
+    async generateCerebrasResponse(userMessage) {
+        if (this.isGeneratingResponse) return;
+        
+        this.isGeneratingResponse = true;
+        this.cerebrasStatus = 'Generating AI response...';
+        this.requestUpdate();
+
+        try {
+            const { ipcRenderer } = window.require ? window.require('electron') : { ipcRenderer: window.electron?.ipcRenderer };
+            if (!ipcRenderer) {
+                this.cerebrasStatus = 'IPC unavailable for Cerebras.';
+                this.isGeneratingResponse = false;
+                this.requestUpdate();
+                return;
+            }
+
+            // Get conversation history for context
+            const history = this.messages.slice(-10).map(msg => ({
+                role: msg.role,
+                content: msg.content
+            }));
+
+            // Get system prompt based on selected profile
+            const profileNames = this.getProfileNames();
+            const profileName = profileNames[this.selectedProfile] || 'Assistant';
+            const systemPrompt = `You are a helpful ${profileName.toLowerCase()} assistant. Provide concise, actionable responses based on the conversation context.
+
+IMPORTANT: If the user's question requires current information, real-time data, or web search, respond with exactly: "SEARCH_REQUIRED: [your initial response]". This will trigger a web search to get the most current information.`;
+
+            const result = await ipcRenderer.invoke('generate-cerebras-response', {
+                userMessage,
+                systemPrompt,
+                history,
+                temperature: 0.7,
+                maxTokens: 512
+            });
+
+            if (result?.success && result?.response) {
+                // Check if Cerebras indicates search is required
+                if (result.response.startsWith('SEARCH_REQUIRED:')) {
+                    const initialResponse = result.response.replace('SEARCH_REQUIRED:', '').trim();
+                    
+                    // Add user message to conversation
+                    this.messages = [...this.messages, { role: 'user', content: userMessage }];
+                    console.log('Added user message (search), total messages:', this.messages.length);
+                    this.notifyMessagesUpdated();
+                    
+                    // Add initial response
+                    this.messages = [...this.messages, { role: 'assistant', content: initialResponse }];
+                    console.log('Added initial response (search), total messages:', this.messages.length);
+                    this.notifyMessagesUpdated();
+                    
+                    // Save conversation history
+                    this.saveConversationHistory();
+                    
+                    // Trigger Gemini search
+                    this.cerebrasStatus = 'Searching for current information...';
+                    this.requestUpdate();
+                    
+                    await this.performGeminiSearch(userMessage, initialResponse);
+                } else {
+                    // Add user message to conversation
+                    this.messages = [...this.messages, { role: 'user', content: userMessage }];
+                    console.log('Added user message, total messages:', this.messages.length);
+                    this.notifyMessagesUpdated();
+                    
+                    // Add AI response to conversation
+                    this.messages = [...this.messages, { role: 'assistant', content: result.response }];
+                    console.log('Added assistant response, total messages:', this.messages.length);
+                    this.notifyMessagesUpdated();
+                    
+                    // Update responses array for saving functionality
+                    this.responses = [...this.responses, result.response];
+
+                    // Save conversation history
+                    this.saveConversationHistory();
+                    
+                    console.log('Final messages after Cerebras response:', this.messages.length, this.messages);
+                    this.cerebrasStatus = 'Response generated successfully!';
+                    this.shouldAnimateResponse = true;
+                }
+            } else {
+                this.cerebrasStatus = `Failed to generate response: ${result?.error || 'Unknown error'}`;
+            }
+        } catch (err) {
+            this.cerebrasStatus = `Error: ${err?.message || err}`;
+        } finally {
+            this.isGeneratingResponse = false;
+            this.requestUpdate();
+        }
+    }
+
+    async performGeminiSearch(userMessage, initialResponse) {
+        try {
+            const { ipcRenderer } = window.require ? window.require('electron') : { ipcRenderer: window.electron?.ipcRenderer };
+            if (!ipcRenderer) {
+                this.cerebrasStatus = 'IPC unavailable for Gemini search.';
+                return;
+            }
+
+            // Use Gemini to perform web search and get enhanced response
+            const searchResult = await ipcRenderer.invoke('perform-gemini-search', {
+                userMessage,
+                initialResponse,
+                profile: this.selectedProfile
+            });
+
+            if (searchResult?.success && searchResult?.response) {
+                // Update the last assistant message with the enhanced response
+                this.messages = this.messages.map((msg, index) => {
+                    if (index === this.messages.length - 1 && msg.role === 'assistant') {
+                        return { ...msg, content: searchResult.response };
+                    }
+                    return msg;
+                });
+                this.notifyMessagesUpdated();
+
+                // Update responses array - replace the last response with the enhanced one
+                if (this.responses.length > 0) {
+                    this.responses = [...this.responses.slice(0, -1), searchResult.response];
+                } else {
+                    this.responses = [searchResult.response];
+                }
+
+                this.cerebrasStatus = 'Search completed successfully!';
+                this.shouldAnimateResponse = true;
+                
+                // Save conversation history with enhanced response
+                this.saveConversationHistory();
+                
+                console.log('Final messages after Gemini search:', this.messages.length, this.messages);
+                
+                // Force UI update to show the enhanced response
+                this.requestUpdate();
+            } else {
+                this.cerebrasStatus = `Search failed: ${searchResult?.error || 'Unknown error'}`;
+            }
+        } catch (err) {
+            this.cerebrasStatus = `Search error: ${err?.message || err}`;
+        }
+    }
+
+
     firstUpdated() {
         super.firstUpdated();
         this.updateChatContent();
@@ -872,7 +906,6 @@ Respond with ONLY "YES" if this is clearly an email request, or "NO" if it's not
         if (
             changedProperties.has('messages') ||
             changedProperties.has('responses') ||
-            changedProperties.has('currentResponseIndex') ||
             changedProperties.has('shouldAnimateResponse')
         ) {
             this.updateChatContent();
@@ -898,8 +931,9 @@ Respond with ONLY "YES" if this is clearly an email request, or "NO" if it's not
             return;
         }
 
+        console.log('updateChatContent called with', this.messages.length, 'messages');
+        
         container.innerHTML = '';
-        let assistantIndex = -1;
         const fragment = document.createDocumentFragment();
 
         this.messages.forEach(message => {
@@ -910,9 +944,7 @@ Respond with ONLY "YES" if this is clearly an email request, or "NO" if it's not
             bubble.classList.add('chat-bubble', message.role === 'assistant' ? 'assistant' : 'user');
 
             if (message.role === 'assistant') {
-                assistantIndex += 1;
                 bubble.setAttribute('data-role', 'assistant');
-                bubble.setAttribute('data-assistant-index', assistantIndex.toString());
                 bubble.innerHTML = this.renderMarkdown(message.content || '');
             } else {
                 bubble.setAttribute('data-role', 'user');
@@ -927,16 +959,12 @@ Respond with ONLY "YES" if this is clearly an email request, or "NO" if it's not
 
         this.applyWordAnimation(container);
 
-        const isViewingLatest = this.currentResponseIndex === this.responses.length - 1;
-        const shouldStickToBottom = this._pendingScrollToBottom || (isViewingLatest && this.shouldAnimateResponse);
-
-        if (shouldStickToBottom) {
+        // Always scroll to bottom for new messages
+        if (this._pendingScrollToBottom || this.shouldAnimateResponse) {
             this.scrollToBottom();
         }
 
         this._pendingScrollToBottom = false;
-
-        this.highlightActiveAssistant({ shouldScroll: !shouldStickToBottom });
     }
 
     applyWordAnimation(container) {
@@ -945,6 +973,7 @@ Respond with ONLY "YES" if this is clearly an email request, or "NO" if it's not
         if (assistantBubbles.length === 0) {
             if (this.shouldAnimateResponse) {
                 this.dispatchEvent(new CustomEvent('response-animation-complete', { bubbles: true, composed: true }));
+                this.shouldAnimateResponse = false; // Reset animation flag
             }
             this._lastAnimatedWordCount = 0;
             return;
@@ -968,6 +997,7 @@ Respond with ONLY "YES" if this is clearly an email request, or "NO" if it's not
 
         if (words.length === 0) {
             this.dispatchEvent(new CustomEvent('response-animation-complete', { bubbles: true, composed: true }));
+            this.shouldAnimateResponse = false; // Reset animation flag
             this._lastAnimatedWordCount = 0;
             return;
         }
@@ -983,6 +1013,7 @@ Respond with ONLY "YES" if this is clearly an email request, or "NO" if it's not
                 word.classList.add('visible');
                 if (i === words.length - 1) {
                     this.dispatchEvent(new CustomEvent('response-animation-complete', { bubbles: true, composed: true }));
+                    this.shouldAnimateResponse = false; // Reset animation flag when complete
                 }
             }, (i - this._lastAnimatedWordCount) * 30);
         }
@@ -990,32 +1021,8 @@ Respond with ONLY "YES" if this is clearly an email request, or "NO" if it's not
         this._lastAnimatedWordCount = words.length;
     }
 
-    highlightActiveAssistant({ shouldScroll = true } = {}) {
-        const container = this.shadowRoot?.querySelector('#responseContainer');
-        if (!container) {
-            return;
-        }
-
-        container.querySelectorAll('.chat-bubble.assistant').forEach(bubble => bubble.classList.remove('active'));
-
-        if (this.currentResponseIndex < 0) {
-            return;
-        }
-
-        const activeBubble = container.querySelector(
-            `.chat-bubble.assistant[data-assistant-index="${this.currentResponseIndex}"]`
-        );
-
-        if (activeBubble) {
-            activeBubble.classList.add('active');
-            if (shouldScroll) {
-                activeBubble.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            }
-        }
-    }
 
     render() {
-        const responseCounter = this.getResponseCounter();
         const isSaved = this.isResponseSaved();
 
         return html`
@@ -1023,34 +1030,6 @@ Respond with ONLY "YES" if this is clearly an email request, or "NO" if it's not
 
             <div class="text-input-container">
                 <div class="composer-actions">
-                    <button class="nav-button" @click=${this.navigateToPreviousResponse} ?disabled=${this.currentResponseIndex <= 0}>
-                        <svg
-                            width="24"
-                            height="24"
-                            stroke-width="1.7"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            xmlns="http://www.w3.org/2000/svg"
-                        >
-                            <path d="M15 6L9 12L15 18" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
-                        </svg>
-                    </button>
-
-                    <button class="nav-button" @click=${this.navigateToNextResponse} ?disabled=${this.currentResponseIndex >= this.responses.length - 1}>
-                        <svg
-                            width="24"
-                            height="24"
-                            stroke-width="1.7"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            xmlns="http://www.w3.org/2000/svg"
-                        >
-                            <path d="M9 6L15 12L9 18" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
-                        </svg>
-                    </button>
-
-                    ${this.responses.length > 0 ? html` <span class="response-counter">${responseCounter}</span> ` : ''}
-
                     <button
                         class="save-button ${isSaved ? 'saved' : ''}"
                         @click=${this.saveCurrentResponse}
@@ -1073,25 +1052,6 @@ Respond with ONLY "YES" if this is clearly an email request, or "NO" if it's not
                             ></path>
                             <path d="M15 22V13H9V22" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
                             <path d="M9 3V8H15" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
-                        </svg>
-                    </button>
-
-                    <button
-                        class="save-button"
-                        @click=${this.emailConversationSummary}
-                        title="Email conversation summary via Composio Gmail"
-                        ?disabled=${this.isEmailSending}
-                    >
-                        <svg
-                            width="24"
-                            height="24"
-                            stroke-width="1.7"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            xmlns="http://www.w3.org/2000/svg"
-                        >
-                            <path d="M4 4H20V20H4V4Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
-                            <path d="M4 7L12 12L20 7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
                         </svg>
                     </button>
 
@@ -1136,8 +1096,8 @@ Respond with ONLY "YES" if this is clearly an email request, or "NO" if it's not
                 </button>
             </div>
 
-            ${this.emailStatus ? html`<div class="usage-note" style="margin-top:6px;text-align:center;opacity:0.85;">${this.emailStatus}</div>` : ''}
             ${this.audioStatus ? html`<div class="usage-note" style="margin-top:6px;text-align:center;opacity:0.85;">${this.audioStatus}</div>` : ''}
+            ${this.cerebrasStatus ? html`<div class="usage-note" style="margin-top:6px;text-align:center;opacity:0.85;">${this.cerebrasStatus}</div>` : ''}
         `;
     }
 }

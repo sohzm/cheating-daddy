@@ -9,7 +9,8 @@ require('dotenv').config();
 class ComposioService {
     constructor() {
         this.composio = null;
-        this.connectedAccounts = new Map(); // Store connected accounts by externalUserId
+        // Keyed by `${externalUserId}:${authConfigId}` -> { request, status, connectedAccount }
+        this.connectedAccounts = new Map();
         this.isInitialized = false;
         this.geminiClient = null;
     }
@@ -54,31 +55,27 @@ class ComposioService {
      * @returns {Promise<{success: boolean, redirectUrl?: string, error?: string}>}
      */
     async connectGmail(externalUserId, authConfigId = 'ac_AEOPhhO57Zsk') {
+        return this.connectIntegration(externalUserId, authConfigId, 'Gmail');
+    }
+
+    /**
+     * Start a generic Composio auth flow for a given integration
+     * @param {string} externalUserId
+     * @param {string} authConfigId
+     * @param {string} label - optional label for logging
+     */
+    async connectIntegration(externalUserId, authConfigId, label = 'Integration') {
         if (!this.isInitialized) {
             return { success: false, error: 'Composio service not initialized' };
         }
-
         try {
-            console.log(`Starting Gmail connection for user: ${externalUserId}`);
-            
-            const connectionRequest = await this.composio.connectedAccounts.link(
-                externalUserId,
-                authConfigId
-            );
-
-            // Store the connection request for later polling
-            this.connectedAccounts.set(externalUserId, {
-                request: connectionRequest,
-                status: 'pending',
-                connectedAccount: null
-            });
-
-            return {
-                success: true,
-                redirectUrl: connectionRequest.redirectUrl
-            };
+            console.log(`Starting ${label} connection for user: ${externalUserId} (${authConfigId})`);
+            const connectionRequest = await this.composio.connectedAccounts.link(externalUserId, authConfigId);
+            const key = `${externalUserId}:${authConfigId}`;
+            this.connectedAccounts.set(key, { request: connectionRequest, status: 'pending', connectedAccount: null });
+            return { success: true, redirectUrl: connectionRequest.redirectUrl };
         } catch (error) {
-            console.error('Failed to start Gmail connection:', error);
+            console.error(`Failed to start ${label} connection:`, error);
             return { success: false, error: error.message };
         }
     }
@@ -90,34 +87,34 @@ class ComposioService {
      * @returns {Promise<{success: boolean, connectedAccount?: object, error?: string}>}
      */
     async waitForGmailConnection(externalUserId, timeoutMs = 300000) {
-        const userConnection = this.connectedAccounts.get(externalUserId);
-        if (!userConnection) {
-            return { success: false, error: 'No connection request found for user' };
-        }
+        // Backward compatibility not used directly; waiting is handled via status polling
+        return { success: false, error: 'Use waitForIntegrationConnection with authConfigId' };
+    }
 
+    /**
+     * Wait for integration connection to be established
+     */
+    async waitForIntegrationConnection(externalUserId, authConfigId, timeoutMs = 300000) {
+        const key = `${externalUserId}:${authConfigId}`;
+        const con = this.connectedAccounts.get(key);
+        if (!con) return { success: false, error: 'No connection request found' };
         try {
-            console.log(`Waiting for Gmail connection for user: ${externalUserId}`);
-            
-            const connectedAccount = await userConnection.request.waitForConnection();
-            
-            // Update stored connection info
-            userConnection.status = 'connected';
-            userConnection.connectedAccount = connectedAccount;
-
-            console.log(`Gmail connection established for user: ${externalUserId}, account ID: ${connectedAccount.id}`);
-            
+            console.log(`Waiting for connection ${authConfigId} for user: ${externalUserId}`);
+            const connectedAccount = await con.request.waitForConnection({ timeoutMs });
+            con.status = 'connected';
+            con.connectedAccount = connectedAccount;
             return {
                 success: true,
                 connectedAccount: {
                     id: connectedAccount.id,
-                    externalUserId: externalUserId,
+                    externalUserId,
                     status: 'connected',
-                    connectedAt: new Date().toISOString()
-                }
+                    connectedAt: new Date().toISOString(),
+                },
             };
         } catch (error) {
-            console.error('Failed to establish Gmail connection:', error);
-            userConnection.status = 'failed';
+            console.error('Failed to establish connection:', error);
+            con.status = 'failed';
             return { success: false, error: error.message };
         }
     }
@@ -128,31 +125,26 @@ class ComposioService {
      * @returns {Promise<{success: boolean, status?: string, connectedAccount?: object, error?: string}>}
      */
     async getGmailConnectionStatus(externalUserId) {
-        const userConnection = this.connectedAccounts.get(externalUserId);
-        if (!userConnection) {
-            // Check if we have a real connection through Composio
-            try {
-                const tools = await this.composio.tools.get(externalUserId, {
-                    tools: ["GMAIL_SEND_EMAIL"],
-                });
-                if (tools && tools.length > 0) {
-                    return { 
-                        success: true, 
-                        status: 'connected',
-                        connectedAccount: { id: 'real-composio-connection' }
-                    };
-                }
-            } catch (error) {
-                console.log('No real Gmail connection found:', error.message);
+        // Deprecated path used by MainView; attempt to infer via tools
+        try {
+            const tools = await this.composio.tools.get(externalUserId, { tools: ["GMAIL_SEND_EMAIL"] });
+            if (tools && tools.length > 0) {
+                return { success: true, status: 'connected', connectedAccount: { id: 'real-composio-connection' } };
             }
-            return { success: false, error: 'No Gmail connection found. Please connect Gmail in Composio dashboard.' };
+        } catch (error) {
+            console.log('No real Gmail connection found:', error.message);
         }
+        return { success: false, error: 'No Gmail connection found.' };
+    }
 
-        return {
-            success: true,
-            status: userConnection.status,
-            connectedAccount: userConnection.connectedAccount
-        };
+    /**
+     * Get connection status for a specific authConfigId
+     */
+    async getIntegrationConnectionStatus(externalUserId, authConfigId) {
+        const key = `${externalUserId}:${authConfigId}`;
+        const con = this.connectedAccounts.get(key);
+        if (!con) return { success: true, status: 'unknown' };
+        return { success: true, status: con.status, connectedAccount: con.connectedAccount };
     }
 
     /**
@@ -161,19 +153,17 @@ class ComposioService {
      * @returns {Promise<{success: boolean, error?: string}>}
      */
     async disconnectGmail(externalUserId) {
-        const userConnection = this.connectedAccounts.get(externalUserId);
-        if (!userConnection) {
-            return { success: false, error: 'No connection found for user' };
-        }
+        // Backward compatibility no-op
+        return { success: true };
+    }
 
+    async disconnectIntegration(externalUserId, authConfigId) {
+        const key = `${externalUserId}:${authConfigId}`;
+        if (!this.connectedAccounts.has(key)) return { success: true };
         try {
-            // Remove from local storage
-            this.connectedAccounts.delete(externalUserId);
-            console.log(`Gmail disconnected for user: ${externalUserId}`);
-            
+            this.connectedAccounts.delete(key);
             return { success: true };
         } catch (error) {
-            console.error('Failed to disconnect Gmail:', error);
             return { success: false, error: error.message };
         }
     }
@@ -184,12 +174,9 @@ class ComposioService {
      */
     getConnectedAccounts() {
         const accounts = [];
-        for (const [externalUserId, connection] of this.connectedAccounts.entries()) {
-            accounts.push({
-                externalUserId,
-                status: connection.status,
-                connectedAccount: connection.connectedAccount
-            });
+        for (const [key, connection] of this.connectedAccounts.entries()) {
+            const [externalUserId, authConfigId] = key.split(':');
+            accounts.push({ externalUserId, authConfigId, status: connection.status, connectedAccount: connection.connectedAccount });
         }
         return accounts;
     }

@@ -8,6 +8,7 @@ require('dotenv').config();
 const { app, BrowserWindow, shell, ipcMain } = require('electron');
 const { createWindow, updateGlobalShortcuts } = require('./utils/window');
 const { setupGeminiIpcHandlers, stopMacOSAudioCapture, sendToRenderer } = require('./utils/gemini');
+const { cerebrasService } = require('./utils/cerebras');
 const { initializeRandomProcessNames } = require('./utils/processRandomizer');
 const { applyAntiAnalysisMeasures } = require('./utils/stealthFeatures');
 const { getLocalConfig, writeConfig } = require('./config');
@@ -156,6 +157,68 @@ function setupGeneralIpcHandlers() {
         } catch (error) {
             console.error('Error getting random display name:', error);
             return 'System Monitor';
+        }
+    });
+
+    // Cerebras AI integration
+    ipcMain.handle('generate-cerebras-response', async (event, options) => {
+        try {
+            const { userMessage, systemPrompt, history, temperature, maxTokens } = options;
+            
+            if (!userMessage || typeof userMessage !== 'string') {
+                throw new Error('Invalid user message provided');
+            }
+
+            const response = await cerebrasService.generateReply(userMessage, {
+                systemPrompt,
+                history,
+                temperature,
+                maxTokens
+            });
+
+            if (response) {
+                return { success: true, response };
+            } else {
+                return { success: false, error: 'Failed to generate response from Cerebras' };
+            }
+        } catch (error) {
+            console.error('Error generating Cerebras response:', error);
+            return { success: false, error: error.message || 'Unknown error occurred' };
+        }
+    });
+
+    // Gemini search integration (triggered by Cerebras)
+    ipcMain.handle('perform-gemini-search', async (event, options) => {
+        try {
+            const { userMessage, initialResponse, profile } = options;
+            
+            if (!userMessage || typeof userMessage !== 'string') {
+                throw new Error('Invalid user message provided');
+            }
+
+            // Use Gemini for web search with Google Search enabled
+            const { GoogleGenAI } = require('@google/genai');
+            const client = new GoogleGenAI({
+                vertexai: false,
+                apiKey: process.env.GEMINI_API_KEY,
+            });
+
+            const searchPrompt = `Based on the user's question: "${userMessage}" and the initial response: "${initialResponse}", please provide an enhanced response using current web search information. Include relevant, up-to-date details and cite sources when appropriate.`;
+
+            const response = await client.models.generateContent({
+                model: 'gemini-2.0-flash-001',
+                contents: searchPrompt,
+                tools: [{ googleSearch: {} }]
+            });
+
+            if (response && response.text) {
+                return { success: true, response: response.text };
+            } else {
+                return { success: false, error: 'Failed to generate search-enhanced response from Gemini' };
+            }
+        } catch (error) {
+            console.error('Error performing Gemini search:', error);
+            return { success: false, error: error.message || 'Unknown error occurred' };
         }
     });
 }

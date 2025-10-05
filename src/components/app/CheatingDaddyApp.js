@@ -2,6 +2,7 @@ import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
 import { AppHeader } from './AppHeader.js';
 import { MainView } from '../views/MainView.js';
 import { CustomizeView } from '../views/CustomizeView.js';
+import { ConnectionsView } from '../views/ConnectionsView.js';
 import { HelpView } from '../views/HelpView.js';
 import { HistoryView } from '../views/HistoryView.js';
 import { AssistantView } from '../views/AssistantView.js';
@@ -141,6 +142,27 @@ export class CheatingDaddyApp extends LitElement {
 
         // Apply layout mode to document root
         this.updateLayoutMode();
+    }
+
+    handleAssistantMessagesUpdated(event) {
+        const incoming = event.detail?.messages;
+        if (!Array.isArray(incoming)) {
+            return;
+        }
+
+        const clonedMessages = incoming.map(message => ({ ...message }));
+        this.messages = clonedMessages;
+
+        const previousAssistantCount = this.responses.length;
+        const assistantResponses = clonedMessages.filter(msg => msg.role === 'assistant').map(msg => msg.content || '');
+        this.responses = assistantResponses;
+        this.currentResponseIndex = assistantResponses.length - 1;
+
+        if (assistantResponses.length > previousAssistantCount) {
+            this.shouldAnimateResponse = true;
+            this._currentResponseIsComplete = false;
+        }
+        this.requestUpdate();
     }
 
     connectedCallback() {
@@ -302,6 +324,11 @@ export class CheatingDaddyApp extends LitElement {
 
     handleAdvancedClick() {
         this.currentView = 'advanced';
+        this.requestUpdate();
+    }
+
+    handleConnectionsClick() {
+        this.currentView = 'connections';
         this.requestUpdate();
     }
 
@@ -503,6 +530,11 @@ export class CheatingDaddyApp extends LitElement {
                     ></customize-view>
                 `;
 
+            case 'connections':
+                return html`
+                    <connections-view @navigate-home=${() => { this.currentView = 'main'; this.requestUpdate(); }}></connections-view>
+                `;
+
             case 'help':
                 return html` <help-view .onExternalLinkClick=${url => this.handleExternalLinkClick(url)}></help-view> `;
 
@@ -521,6 +553,7 @@ export class CheatingDaddyApp extends LitElement {
                         .messages=${this.messages}
                         .onSendText=${message => this.handleSendText(message)}
                         .shouldAnimateResponse=${this.shouldAnimateResponse}
+                        @messages-updated=${event => this.handleAssistantMessagesUpdated(event)}
                         @response-index-changed=${this.handleResponseIndexChanged}
                         @response-animation-complete=${() => {
                             this.shouldAnimateResponse = false;
@@ -550,6 +583,7 @@ export class CheatingDaddyApp extends LitElement {
                         .startTime=${this.startTime}
                         .advancedMode=${this.advancedMode}
                         .onCustomizeClick=${() => this.handleCustomizeClick()}
+                        .onConnectionsClick=${() => this.handleConnectionsClick()}
                         .onHelpClick=${() => this.handleHelpClick()}
                         .onHistoryClick=${() => this.handleHistoryClick()}
                         .onAdvancedClick=${() => this.handleAdvancedClick()}
