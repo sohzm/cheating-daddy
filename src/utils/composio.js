@@ -17,6 +17,12 @@ class ComposioService {
         this.geminiClient = null;
     }
 
+    _ensureInitialized() {
+        if (!this.isInitialized || !this.composio || !this.geminiClient) {
+            throw new Error('Composio service not initialized');
+        }
+    }
+
     /**
      * Initialize Composio with API key using Google provider
      * @param {string} apiKey - Composio API key
@@ -43,10 +49,75 @@ class ComposioService {
             
             this.isInitialized = true;
             console.log('Composio service initialized successfully with Google provider');
+            
+            // Automatically activate connections when service initializes
+            await this.autoActivateConnections();
+            
             return true;
         } catch (error) {
             console.error('Failed to initialize Composio service:', error);
             return false;
+        }
+    }
+
+    /**
+     * Automatically activate connections when service initializes
+     */
+    async autoActivateConnections() {
+        const externalUserId = 'default-user';
+        
+        // Google integrations that should be auto-activated when Composio initializes
+        const googleIntegrations = [
+            'ac_SMDf4M_jKYE1', // Google Docs
+            'ac__DPVy8XWTDGX', // Google Sheets
+            'ac_b9UhoJR0WgT3', // Google Slides
+            'ac_0yXGuyFmAacK', // Google Drive
+            'ac_0neXn3m3-_Dm', // Google Calendar
+        ];
+        
+        // Auto-activate Google integrations since Composio uses Google provider
+        for (const authConfigId of googleIntegrations) {
+            const key = `${externalUserId}:${authConfigId}`;
+            const connectedAccount = { id: `google-provider-${authConfigId}`, externalUserId };
+            this.connectedAccounts.set(key, { 
+                request: null, 
+                status: 'connected', 
+                connectedAccount 
+            });
+        }
+        
+        // Check other integrations and auto-activate if tools are available
+        const otherIntegrations = [
+            'ac_2GM6bPzBIRbg', // Trello
+            'ac_J-3lYoXZlArF', // Notion
+            'ac_C5mpd5r37bH4', // Linear
+            'ac_pTUxOmkyKFHJ', // Twitter
+            'ac_b7RFgtr7s1Uf', // GitHub
+            'ac_9NVcBfIIjuMU', // LinkedIn
+            'ac_ohDLI9rewHgG', // Slack
+        ];
+        
+        for (const authConfigId of otherIntegrations) {
+            try {
+                const workflow = this.getWorkflowMetadataByAuthConfigId(authConfigId);
+                if (workflow && workflow.defaultTools) {
+                    const tools = await this.composio.tools.get(externalUserId, { 
+                        tools: workflow.defaultTools.slice(0, 1)
+                    });
+                    if (tools && tools.length > 0) {
+                        // Auto-activate this connection
+                        const key = `${externalUserId}:${authConfigId}`;
+                        const connectedAccount = { id: `auto-activated-${authConfigId}`, externalUserId };
+                        this.connectedAccounts.set(key, { 
+                            request: null, 
+                            status: 'connected', 
+                            connectedAccount 
+                        });
+                    }
+                }
+            } catch (error) {
+                // Integration not available, skip
+            }
         }
     }
 
@@ -140,13 +211,64 @@ class ComposioService {
     }
 
     /**
-     * Get connection status for a specific authConfigId
+     * Get connection status for a specific authConfigId with real verification
      */
     async getIntegrationConnectionStatus(externalUserId, authConfigId) {
         const key = `${externalUserId}:${authConfigId}`;
         const con = this.connectedAccounts.get(key);
-        if (!con) return { success: true, status: 'unknown' };
-        return { success: true, status: con.status, connectedAccount: con.connectedAccount };
+        
+        // If we have a local connection record, verify it's still valid
+        if (con && con.status === 'connected' && con.connectedAccount) {
+            try {
+                // Test the connection by trying to get tools for this integration
+                const workflow = this.getWorkflowMetadata(authConfigId) || this.matchWorkflowFromText(authConfigId);
+                if (workflow && workflow.defaultTools) {
+                    const tools = await this.composio.tools.get(externalUserId, { 
+                        tools: workflow.defaultTools.slice(0, 1) // Test with just one tool
+                    });
+                    if (tools && tools.length > 0) {
+                        return { success: true, status: 'connected', connectedAccount: con.connectedAccount };
+                    }
+                }
+            } catch (error) {
+                console.log(`Connection verification failed for ${authConfigId}:`, error.message);
+                // Connection is no longer valid, update local state
+                con.status = 'failed';
+                con.connectedAccount = null;
+            }
+        }
+        
+        // If Composio service is initialized and working, try to verify connection via tools
+        if (this.isInitialized && this.composio) {
+            try {
+                // Try to get any tools for this authConfigId to see if there's a real connection
+                const workflow = this.getWorkflowMetadataByAuthConfigId(authConfigId);
+                if (workflow && workflow.defaultTools) {
+                    const tools = await this.composio.tools.get(externalUserId, { 
+                        tools: workflow.defaultTools.slice(0, 1)
+                    });
+                    if (tools && tools.length > 0) {
+                        // Found working tools, mark as connected
+                        const connectedAccount = { id: `verified-${authConfigId}`, externalUserId };
+                        this.connectedAccounts.set(key, { 
+                            request: null, 
+                            status: 'connected', 
+                            connectedAccount 
+                        });
+                        return { success: true, status: 'connected', connectedAccount };
+                    }
+                }
+            } catch (error) {
+                // No active connection found
+            }
+        }
+        
+        // Return local state if no verification was possible
+        if (con) {
+            return { success: true, status: con.status, connectedAccount: con.connectedAccount };
+        }
+        
+        return { success: true, status: 'unknown' };
     }
 
     /**
@@ -184,12 +306,60 @@ class ComposioService {
     }
 
     /**
+     * Verify all connections and update their status
+     * @param {string} externalUserId - User identifier
+     * @returns {Promise<Object>} Status of all connections
+     */
+    async verifyAllConnections(externalUserId) {
+        const results = {};
+        
+        // Get all known integrations from the workflow metadata
+        const allIntegrations = [
+            'ac_2GM6bPzBIRbg', // Trello
+            'ac_0neXn3m3-_Dm', // Google Calendar
+            'ac_J-3lYoXZlArF', // Notion
+            'ac_C5mpd5r37bH4', // Linear
+            'ac_SMDf4M_jKYE1', // Google Docs
+            'ac_pTUxOmkyKFHJ', // Twitter
+            'ac__DPVy8XWTDGX', // Google Sheets
+            'ac_b9UhoJR0WgT3', // Google Slides
+            'ac_b7RFgtr7s1Uf', // GitHub
+            'ac_0yXGuyFmAacK', // Google Drive
+            'ac_9NVcBfIIjuMU', // LinkedIn
+            'ac_ohDLI9rewHgG', // Slack
+        ];
+        
+        // Check each integration
+        for (const authConfigId of allIntegrations) {
+            const status = await this.getIntegrationConnectionStatus(externalUserId, authConfigId);
+            results[authConfigId] = status;
+        }
+        
+        return results;
+    }
+
+    /**
      * Retrieve workflow metadata for a known Composio integration key
      * @param {string} workflowKey
      * @returns {{ key: string, label: string, description: string, authConfigId: string, provider: string, connectionType: string, defaultTools?: string[] }|null}
      */
     getWorkflowMetadata(workflowKey) {
         return getWorkflowMetadata(workflowKey);
+    }
+
+    /**
+     * Retrieve workflow metadata by authConfigId
+     * @param {string} authConfigId
+     * @returns {{ key: string, label: string, description: string, authConfigId: string, provider: string, connectionType: string, defaultTools?: string[] }|null}
+     */
+    getWorkflowMetadataByAuthConfigId(authConfigId) {
+        const { WORKFLOW_ROUTES } = require('./composioRoutes');
+        for (const [key, workflow] of Object.entries(WORKFLOW_ROUTES)) {
+            if (workflow.authConfigId === authConfigId) {
+                return { key, ...workflow };
+            }
+        }
+        return null;
     }
 
     /**
@@ -237,56 +407,8 @@ class ComposioService {
      * @returns {Promise<{success: boolean, result?: object, error?: string}>}
      */
     async executeEmailTaskWithAgent(externalUserId, task, tools = ["GMAIL_SEND_EMAIL", "GMAIL_GET_EMAILS"]) {
-        if (!this.isInitialized) {
-            return { success: false, error: 'Composio service not initialized' };
-        }
-
         try {
-            console.log(`🤖 Executing email task via Google provider for user: ${externalUserId}`);
-            console.log(`📝 Task: ${task}`);
-            
-            // Get tools for Gmail toolkit
-            const availableTools = await this.composio.tools.get(externalUserId, {
-                tools: tools,
-            });
-
-            console.log(`✅ Got tools:`, availableTools.length);
-
-            // Clean tools to match Gemini functionDeclarations schema
-            const cleanedTools = availableTools.map(this._cleanToolForGemini);
-            
-            // Use Gemini with function calling
-            const response = await this.geminiClient.models.generateContent({
-                model: 'gemini-2.0-flash-001',
-                contents: `You are a helpful assistant. ${task}. Use the Gmail function to send this email.`,
-                config: {
-                    tools: [{ functionDeclarations: cleanedTools }],
-                },
-            });
-
-            console.log('🤖 Gemini response:', JSON.stringify(response, null, 2));
-            
-            if (response.functionCalls && response.functionCalls.length > 0) {
-                console.log(`🔧 Calling tool ${response.functionCalls[0].name}`);
-                const functionCall = {
-                    name: response.functionCalls[0].name || '',
-                    args: response.functionCalls[0].args || {},
-                };
-                console.log('🔧 Function call details:', functionCall);
-                const result = await this.composio.provider.executeToolCall(externalUserId, functionCall);
-                console.log(`✅ Tool execution result:`, result);
-                return {
-                    success: true,
-                    result: result
-                };
-            } else {
-                console.log('📝 No function calls in the response');
-                console.log('📝 Response text:', response.text);
-                return {
-                    success: false,
-                    error: 'No function calls generated. Response: ' + (response.text || 'No response text')
-                };
-            }
+            return await this.executeWorkflowTask(externalUserId, 'gmail', task, { tools });
         } catch (error) {
             console.error('Failed to execute email task via Google provider:', error);
             return { success: false, error: error.message };
@@ -300,16 +422,14 @@ class ComposioService {
      * @returns {Promise<Array>} Formatted tools for Gemini
      */
     async getToolsForGemini(externalUserId, tools = ["GMAIL_SEND_EMAIL", "GMAIL_GET_EMAILS"]) {
-        if (!this.isInitialized) {
-            throw new Error('Composio service not initialized');
-        }
+        this._ensureInitialized();
 
         try {
             const availableTools = await this.composio.tools.get(externalUserId, {
                 tools: tools,
             });
             // Return cleaned tool declarations compatible with Gemini
-            return availableTools.map(this._cleanToolForGemini);
+            return availableTools.map(tool => this._cleanToolForGemini(tool));
         } catch (error) {
             console.error('Failed to get tools for Gemini:', error);
             throw error;
@@ -323,9 +443,7 @@ class ComposioService {
      * @returns {Promise<Object>} Function call result
      */
     async executeFunctionCall(externalUserId, functionCall) {
-        if (!this.isInitialized) {
-            throw new Error('Composio service not initialized');
-        }
+        this._ensureInitialized();
 
         try {
             const result = await this.composio.provider.executeToolCall(externalUserId, functionCall);
@@ -333,6 +451,160 @@ class ComposioService {
         } catch (error) {
             console.error('Failed to execute function call:', error);
             throw error;
+        }
+    }
+
+    /**
+     * Retrieve tools for a workflow and clean them for Gemini usage.
+     */
+    async getToolsForWorkflow(externalUserId, workflowKey, explicitTools = null) {
+        this._ensureInitialized();
+
+        const workflow = getWorkflowMetadata(workflowKey);
+        if (!workflow) {
+            throw new Error(`Unknown Composio workflow: ${workflowKey}`);
+        }
+
+        const requestedTools = Array.isArray(explicitTools) && explicitTools.length > 0 ? explicitTools : workflow.defaultTools;
+
+        if (!requestedTools || requestedTools.length === 0) {
+            throw new Error(`Workflow ${workflowKey} does not define default tools`);
+        }
+
+        try {
+            const tools = await this.composio.tools.get(externalUserId, { tools: requestedTools });
+            if (!tools || tools.length === 0) {
+                return { workflow, tools: [], cleanedTools: [] };
+            }
+
+            const cleanedTools = tools.map(tool => this._cleanToolForGemini(tool));
+            return { workflow, tools, cleanedTools };
+        } catch (error) {
+            if (error?.response?.status === 404 || error?.response?.status === 401) {
+                return { workflow, tools: [], cleanedTools: [], error: 'not_connected' };
+            }
+            throw error;
+        }
+    }
+
+    /**
+     * Execute a natural language task for a given workflow using Gemini function calls.
+     */
+    async executeWorkflowTask(externalUserId, workflowKey, taskDescription, options = {}) {
+        this._ensureInitialized();
+
+        if (!taskDescription || typeof taskDescription !== 'string') {
+            throw new Error('Task description is required');
+        }
+
+        const { tools: explicitTools = null, model = 'gemini-2.0-flash-001', maxFunctionCalls = 3 } = options;
+        const toolBundle = await this.getToolsForWorkflow(externalUserId, workflowKey, explicitTools);
+
+        if (!toolBundle.cleanedTools || toolBundle.cleanedTools.length === 0) {
+            return {
+                success: false,
+                requiresConnection: true,
+                workflow: toolBundle.workflow,
+                error: toolBundle.error === 'not_connected'
+                    ? 'This account is not linked yet.'
+                    : 'No authorized tools available for this workflow. Ask the user to link the integration.',
+                toolError: toolBundle.error || null,
+            };
+        }
+
+        const toolDeclarations = toolBundle.cleanedTools;
+
+        const prompt = this._buildWorkflowPrompt(toolBundle.workflow, taskDescription);
+
+        const executionLog = [];
+
+        try {
+            let remainingCalls = Math.max(1, Number(maxFunctionCalls) || 1);
+            let accumulatedText = '';
+
+            while (remainingCalls > 0) {
+                remainingCalls -= 1;
+
+                const response = await this.geminiClient.models.generateContent({
+                    model,
+                    contents: [
+                        {
+                            role: 'user',
+                            parts: [{ text: prompt }],
+                        },
+                    ],
+                    tools: [{ functionDeclarations: toolDeclarations }],
+                });
+
+                const { functionCalls, textOutput } = this._extractFunctionCalls(response);
+                if (textOutput) {
+                    accumulatedText += textOutput;
+                }
+
+                if (!functionCalls || functionCalls.length === 0) {
+                    return {
+                        success: false,
+                        workflow: toolBundle.workflow,
+                        lastModelOutput: accumulatedText.trim(),
+                        error: 'Model did not emit any function calls',
+                    };
+                }
+
+                const outcomes = [];
+                for (const call of functionCalls) {
+                    const safeCall = {
+                        name: call.name || call.functionName || call.function?.name || '',
+                        args: call.args || call.arguments || call.functionArguments || {},
+                    };
+
+                    if (!safeCall.name) {
+                        continue;
+                    }
+
+                    executionLog.push({ type: 'call', data: safeCall });
+
+                    const result = await this.composio.provider.executeToolCall(externalUserId, safeCall);
+                    outcomes.push({ call: safeCall, result });
+                    executionLog.push({ type: 'result', data: { call: safeCall, result } });
+                }
+
+                const summaryText = accumulatedText.trim() ||
+                    outcomes
+                        .map(({ call, result }) => {
+                            const resultSummary = typeof result === 'string'
+                                ? result
+                                : result?.status || result?.message || 'completed';
+                            return `${call.name} -> ${resultSummary}`;
+                        })
+                        .join('; ');
+
+                return {
+                    success: true,
+                    workflow: toolBundle.workflow,
+                    outcomes,
+                    modelOutput: accumulatedText.trim(),
+                    summary: summaryText,
+                    executionLog,
+                    toolError: toolBundle.error || null,
+                };
+            }
+
+            return {
+                success: false,
+                workflow: toolBundle.workflow,
+                executionLog,
+                error: 'Max function call attempts exhausted without execution',
+                toolError: toolBundle.error || null,
+            };
+        } catch (error) {
+            console.error('Failed to execute workflow task:', error);
+            return {
+                success: false,
+                workflow: toolBundle.workflow,
+                executionLog,
+                error: error.message,
+                toolError: toolBundle.error || null,
+            };
         }
     }
 
@@ -399,6 +671,52 @@ class ComposioService {
         }
 
         return clone;
+    }
+
+    _buildWorkflowPrompt(workflow, taskDescription) {
+        const label = workflow?.label || 'the selected integration';
+        const description = workflow?.description ? `${workflow.description}` : 'Complete the requested work using the available tools.';
+        return `You are an automation agent that can call Composio functions to work with ${label}.
+${description}
+
+Task: ${taskDescription}
+
+Use the provided function declarations to perform the task. If you need more information from the user, call a function that helps gather it.`;
+    }
+
+    _extractFunctionCalls(response) {
+        const functionCalls = [];
+        let textOutput = '';
+
+        if (!response) {
+            return { functionCalls, textOutput };
+        }
+
+        const candidates = Array.isArray(response?.candidates) ? response.candidates : [];
+        for (const candidate of candidates) {
+            const parts = candidate?.content?.parts || [];
+            for (const part of parts) {
+                if (part?.functionCall) {
+                    functionCalls.push({
+                        name: part.functionCall.name,
+                        args: part.functionCall.args,
+                    });
+                }
+                if (part?.text) {
+                    textOutput += `${part.text}\n`;
+                }
+            }
+        }
+
+        // Backwards compatibility for legacy SDK response shape
+        if (response.functionCalls && response.functionCalls.length > 0 && functionCalls.length === 0) {
+            functionCalls.push(...response.functionCalls);
+        }
+        if (!textOutput && typeof response.text === 'string') {
+            textOutput = response.text;
+        }
+
+        return { functionCalls, textOutput };
     }
 }
 

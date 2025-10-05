@@ -3,7 +3,7 @@ import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
 export class OnboardingView extends LitElement {
     static styles = css`
         * {
-            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Courier New', monospace;
+            font-family: 'Armata', sans-serif;
             cursor: default;
             user-select: none;
             margin: 0;

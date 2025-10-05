@@ -11,7 +11,7 @@ export class AssistantView extends LitElement {
         }
 
         * {
-            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Courier New', monospace;
+            font-family: 'Armata', sans-serif;
             cursor: default;
             letter-spacing: -0.2px;
             font-feature-settings: "tnum", "zero";
@@ -190,7 +190,7 @@ export class AssistantView extends LitElement {
             background: rgba(255, 255, 255, 0.1);
             padding: 0.2em 0.4em;
             border-radius: 3px;
-            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-family: 'Armata', sans-serif;
             font-size: 0.85em;
         }
 
@@ -442,6 +442,7 @@ export class AssistantView extends LitElement {
         useCerebras: { type: Boolean },
         cerebrasStatus: { type: String },
         isGeneratingResponse: { type: Boolean },
+        lastComposioExecution: { type: Object },
     };
 
     constructor() {
@@ -463,6 +464,7 @@ export class AssistantView extends LitElement {
         this.useCerebras = true; // Cerebras is now the primary API
         this.cerebrasStatus = '';
         this.isGeneratingResponse = false;
+        this.lastComposioExecution = null;
         
         // Load conversation history from localStorage if available
         this.loadConversationHistory();
@@ -807,6 +809,17 @@ export class AssistantView extends LitElement {
         this.cerebrasStatus = 'Generating AI response...';
         this.requestUpdate();
 
+        // Check if user is asking about screen content
+        const screenContentKeywords = ['screen', 'what\'s on', 'what is on', 'show me', 'see', 'display', 'current', 'this', 'here'];
+        const isScreenContentQuery = screenContentKeywords.some(keyword => 
+            userMessage.toLowerCase().includes(keyword)
+        );
+
+        if (isScreenContentQuery) {
+            await this.captureAndAnalyzeScreenContent(userMessage);
+            return;
+        }
+
         try {
             const { ipcRenderer } = window.require ? window.require('electron') : { ipcRenderer: window.electron?.ipcRenderer };
             if (!ipcRenderer) {
@@ -931,6 +944,67 @@ Guidelines:
         }
     }
 
+    async captureAndAnalyzeScreenContent(userMessage) {
+        try {
+            this.cerebrasStatus = 'Capturing screen content...';
+            this.requestUpdate();
+
+            // Add user message to conversation
+            this.messages = [...this.messages, { role: 'user', content: userMessage }];
+            this.notifyMessagesUpdated();
+
+            // Add initial response
+            const initialResponse = 'Let me take a screenshot and analyze what\'s on your screen.';
+            this.messages = [...this.messages, { role: 'assistant', content: initialResponse }];
+            this.notifyMessagesUpdated();
+
+            // Capture screenshot
+            const { ipcRenderer } = window.require ? window.require('electron') : { ipcRenderer: window.electron?.ipcRenderer };
+            if (!ipcRenderer) {
+                throw new Error('IPC unavailable for screen capture');
+            }
+
+            // Trigger manual screenshot capture
+            const captureResult = await ipcRenderer.invoke('capture-manual-screenshot');
+            if (!captureResult?.success) {
+                throw new Error(captureResult?.error || 'Failed to capture screenshot');
+            }
+
+            this.cerebrasStatus = 'Analyzing screen content...';
+            this.requestUpdate();
+
+            // Wait a moment for the screenshot to be processed by Gemini
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
+            // Send a follow-up message to get the analysis
+            const analysisPrompt = `Please analyze the screenshot I just sent and answer the user's question: "${userMessage}". Provide a detailed description of what you see on the screen and answer their specific question.`;
+            
+            const analysisResult = await ipcRenderer.invoke('send-text-message', analysisPrompt);
+            if (!analysisResult?.success) {
+                throw new Error(analysisResult?.error || 'Failed to send analysis request');
+            }
+
+            // Wait for Gemini to process and respond
+            await new Promise(resolve => setTimeout(resolve, 3000));
+
+            // Update status
+            this.cerebrasStatus = 'Screen analysis complete';
+            this.requestUpdate();
+
+        } catch (error) {
+            console.error('Error capturing and analyzing screen content:', error);
+            this.cerebrasStatus = `Error: ${error.message}`;
+            
+            // Add error message to conversation
+            const errorMessage = `Sorry, I couldn't capture or analyze your screen content: ${error.message}`;
+            this.messages = [...this.messages, { role: 'assistant', content: errorMessage }];
+            this.notifyMessagesUpdated();
+        } finally {
+            this.isGeneratingResponse = false;
+            this.requestUpdate();
+        }
+    }
+
     async triggerWorkflowIfNeeded(context) {
         if (!context || typeof context !== 'object') return;
 
@@ -964,9 +1038,24 @@ Guidelines:
 
             if (payload.success) {
                 const label = payload.workflow?.label || 'Composio';
-                if (payload.redirectUrl) {
-                    await ipcRenderer.invoke('open-external', payload.redirectUrl);
-                    this.cerebrasStatus = `${label} workflow link opened in your browser. Complete the requested task there.`;
+                if (payload.execution?.success) {
+                    let summary = String(payload.execution.modelOutput || payload.execution.summary || '').trim();
+                    if (summary.length > 240) {
+                        summary = `${summary.slice(0, 237)}...`;
+                    }
+                    this.cerebrasStatus = summary ? `${label} task executed: ${summary}` : `${label} task executed successfully via Composio.`;
+                    this.lastComposioExecution = payload.execution;
+                } else if (payload.redirectUrl) {
+                    if (payload.requiresConnection) {
+                        await ipcRenderer.invoke('open-external', payload.redirectUrl);
+                        const reason = payload.error ? ` (${payload.error})` : '';
+                        this.cerebrasStatus = `${label} account needs linking${reason}. Follow the browser flow to continue.`;
+                    } else {
+                        await ipcRenderer.invoke('open-external', payload.redirectUrl);
+                        this.cerebrasStatus = `${label} workflow link opened in your browser. Complete the requested task there.`;
+                    }
+                } else if (payload.requiresConnection) {
+                    this.cerebrasStatus = `${label} account needs to be linked before executing tasks.`;
                 } else {
                     this.cerebrasStatus = `${label} workflow is ready.`;
                 }

@@ -3,7 +3,7 @@ import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
 export class AppHeader extends LitElement {
     static styles = css`
         * {
-            font-family: 'Poppins', 'Inter', sans-serif;
+            font-family: 'Armata', sans-serif;
             cursor: default;
             user-select: none;
         }

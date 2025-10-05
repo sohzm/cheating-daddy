@@ -4,7 +4,7 @@ import { resizeLayout } from '../../utils/windowResize.js';
 export class MainView extends LitElement {
     static styles = css`
         * {
-            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Courier New', monospace;
+            font-family: 'Armata', sans-serif;
             cursor: default;
             user-select: none;
         }
@@ -12,12 +12,16 @@ export class MainView extends LitElement {
         :host {
             display: flex;
             flex-direction: column;
-            align-items: center;
+            align-items: flex-end;
             justify-content: center;
-            height: 100%;
-            width: 100%;
-            padding: 40px;
+            height: 100vh;
+            width: 100vw;
+            padding: 0;
             background: transparent;
+            position: fixed;
+            top: 0;
+            left: 0;
+            margin: 0;
         }
 
         .main-container {
@@ -28,22 +32,30 @@ export class MainView extends LitElement {
             max-width: 500px;
             width: 100%;
             text-align: center;
+            padding: 40px;
+            margin-left: auto;
+            margin-right: 220px;
+            transform: translateX(120px);
         }
 
         .welcome {
             font-size: 32px;
             font-weight: 500;
-            color: rgba(255, 255, 255, 0.9);
+            color: rgba(255, 255, 255, 0.95);
             margin-bottom: 8px;
             letter-spacing: -0.5px;
+            text-align: center;
+            width: 100%;
         }
 
         .subtitle {
             font-size: 14px;
-            color: rgba(255, 255, 255, 0.6);
+            color: rgba(255, 255, 255, 0.8);
             margin-bottom: 40px;
             font-weight: 400;
             line-height: 1.5;
+            text-align: center;
+            width: 100%;
         }
 
         .shortcut-hint {
@@ -138,9 +150,9 @@ export class MainView extends LitElement {
         }
 
         .start-button {
-            background: rgba(0, 122, 255, 0.6);
-            color: rgba(255, 255, 255, 0.95);
-            border: 0.5px solid rgba(0, 122, 255, 0.3);
+            background: rgba(0, 122, 255, 0.8);
+            color: rgba(255, 255, 255, 0.98);
+            border: 0.5px solid rgba(0, 122, 255, 0.5);
             padding: 16px 32px;
             border-radius: 12px;
             font-size: 15px;
@@ -148,13 +160,18 @@ export class MainView extends LitElement {
             cursor: pointer;
             transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
             backdrop-filter: blur(20px);
-            min-width: 200px;
+            min-width: 240px;
             letter-spacing: 0.2px;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
         }
 
         .start-button:hover {
-            background: rgba(0, 122, 255, 0.7);
-            border-color: rgba(0, 122, 255, 0.4);
+            background: rgba(0, 122, 255, 0.9);
+            border-color: rgba(0, 122, 255, 0.6);
             transform: translateY(-2px);
         }
 
@@ -350,15 +367,11 @@ export class MainView extends LitElement {
         return html`
             <div class="main-container">
                 <div class="welcome">Welcome</div>
-                <div class="subtitle">Your intelligent assistant is ready to help</div>
+                <div class="subtitle">Clue2 is ready to help!</div>
                 
                 <button @click=${this.handleStartClick} class="start-button ${this.isInitializing ? 'initializing' : ''}">
                     ${this.getStartButtonText()}
                 </button>
-                
-                <div class="shortcut-hint">
-                    Press <span class="shortcut-key">Ctrl</span> + <span class="shortcut-key">Enter</span> to start
-                </div>
             </div>
         `;
     }

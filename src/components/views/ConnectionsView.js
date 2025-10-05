@@ -19,7 +19,7 @@ const INTEGRATIONS = [
 export class ConnectionsView extends LitElement {
     static styles = css`
         * { 
-            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Courier New', monospace; 
+            font-family: 'Armata', sans-serif; 
             cursor: default; 
             user-select: none;
             letter-spacing: -0.2px;
@@ -247,6 +247,7 @@ export class ConnectionsView extends LitElement {
         super.connectedCallback();
         this.loadStatusesFromStorage();
         this.loadComposioApiKey();
+        this.verifyAllConnections();
     }
 
     loadStatusesFromStorage() {
@@ -311,6 +312,34 @@ export class ConnectionsView extends LitElement {
         }
     }
 
+    async verifyAllConnections() {
+        if (!(await this.ensureInitialized())) return;
+        
+        try {
+            const { ipcRenderer } = window.require ? window.require('electron') : { ipcRenderer: window.electron?.ipcRenderer };
+            const externalUserId = 'default-user';
+            const result = await ipcRenderer.invoke('composio-verify-all-connections', externalUserId);
+            
+            if (result?.success && result?.results) {
+                const newStatuses = { ...this.statuses };
+                for (const [authConfigId, statusResult] of Object.entries(result.results)) {
+                    if (statusResult?.success) {
+                        newStatuses[authConfigId] = {
+                            state: statusResult.status,
+                            accountId: statusResult.connectedAccount?.id,
+                            ts: Date.now()
+                        };
+                    }
+                }
+                this.statuses = newStatuses;
+                this.saveStatusesToStorage();
+                this.requestUpdate();
+            }
+        } catch (error) {
+            console.warn('Failed to verify connections:', error);
+        }
+    }
+
     async connectIntegration(intg) {
         if (this.connecting[intg.authConfigId]) return;
         if (!(await this.ensureInitialized())) return;
@@ -326,6 +355,8 @@ export class ConnectionsView extends LitElement {
                 this.statuses = { ...this.statuses, [authConfigId]: { state: 'failed' } };
                 this.saveStatusesToStorage();
                 this.connecting = { ...this.connecting, [authConfigId]: false };
+                // Auto-refresh after failed connection
+                await this.verifyAllConnections();
                 return;
             }
             await ipcRenderer.invoke('open-external', start.redirectUrl);
@@ -340,6 +371,8 @@ export class ConnectionsView extends LitElement {
                         this.saveStatusesToStorage();
                         this.connecting = { ...this.connecting, [authConfigId]: false };
                         this.requestUpdate();
+                        // Auto-refresh after successful connection
+                        await this.verifyAllConnections();
                         return;
                     }
                 } catch (_) {}
@@ -350,6 +383,8 @@ export class ConnectionsView extends LitElement {
                     this.saveStatusesToStorage();
                     this.connecting = { ...this.connecting, [authConfigId]: false };
                     this.requestUpdate();
+                    // Auto-refresh after timeout
+                    await this.verifyAllConnections();
                 }
             };
             setTimeout(poll, 2000);
@@ -357,6 +392,8 @@ export class ConnectionsView extends LitElement {
             this.statuses = { ...this.statuses, [authConfigId]: { state: 'failed' } };
             this.saveStatusesToStorage();
             this.connecting = { ...this.connecting, [authConfigId]: false };
+            // Auto-refresh after error
+            await this.verifyAllConnections();
         }
     }
 
@@ -372,6 +409,8 @@ export class ConnectionsView extends LitElement {
         this.statuses = s;
         this.saveStatusesToStorage();
         this.requestUpdate();
+        // Auto-refresh after disconnection
+        await this.verifyAllConnections();
     }
 
     renderRow(intg) {
@@ -386,7 +425,6 @@ export class ConnectionsView extends LitElement {
                 <div class="meta">
                     <span>${intg.authType}</span>
                     <span>${intg.status}</span>
-                    <span>${intg.lastUpdated}</span>
                 </div>
                 <div class="actions">
                     <span class="${pillClass}">${pillText}</span>
@@ -409,6 +447,7 @@ export class ConnectionsView extends LitElement {
                             : html`<div class="status-indicator warning">⚠ No API key found in environment variables</div>`
                         }
                     </div>
+                    <button @click=${() => this.verifyAllConnections()} title="Refresh connection status">Refresh</button>
                     <button class="home-btn" @click=${() => this.dispatchEvent(new CustomEvent('navigate-home', { bubbles: true, composed: true }))}>Home</button>
                 </div>
                 ${this.error ? html`<div class="hint">${this.error}</div>` : ''}

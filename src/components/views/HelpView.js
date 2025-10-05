@@ -4,7 +4,7 @@ import { resizeLayout } from '../../utils/windowResize.js';
 export class HelpView extends LitElement {
     static styles = css`
         * {
-            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Courier New', monospace;
+            font-family: 'Armata', sans-serif;
             cursor: default;
             user-select: none;
         }
@@ -86,7 +86,7 @@ export class HelpView extends LitElement {
             padding: 2px 6px;
             border-radius: 3px;
             font-size: 10px;
-            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace;
+            font-family: 'Armata', sans-serif;
             font-weight: 500;
             margin: 0 1px;
             white-space: nowrap;

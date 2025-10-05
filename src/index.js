@@ -31,7 +31,7 @@ app.whenReady().then(async () => {
     await applyAntiAnalysisMeasures();
 
     createMainWindow();
-    setupGeminiIpcHandlers(geminiSessionRef);
+    setupGeminiIpcHandlers(geminiSessionRef, mainWindow);
     setupGeneralIpcHandlers();
 });
 
@@ -253,15 +253,50 @@ function setupGeneralIpcHandlers() {
                 }
             }
 
-            const linkResult = await composioService.startWorkflowLink(externalUserId, workflow.key);
-            if (!linkResult || !linkResult.success) {
-                return { success: false, error: linkResult?.error || 'Failed to start Composio workflow.' };
+            const taskInstructions =
+                (typeof taskSummary === 'string' && taskSummary.trim())
+                    ? taskSummary.trim()
+                    : (typeof userMessage === 'string' && userMessage.trim())
+                        ? userMessage.trim()
+                        : `Complete a ${workflow.label} task`;
+
+            const execution = await composioService.executeWorkflowTask(externalUserId, workflow.key, taskInstructions, {
+                tools: workflow.defaultTools,
+            });
+
+            if (execution?.success) {
+                return {
+                    success: true,
+                    workflow,
+                    execution,
+                };
+            }
+
+            if (execution?.requiresConnection) {
+                const linkResult = await composioService.startWorkflowLink(externalUserId, workflow.key);
+                if (!linkResult || !linkResult.success) {
+                    return {
+                        success: false,
+                        requiresConnection: true,
+                        workflow,
+                        error: execution.error || linkResult?.error || 'Failed to start Composio workflow.',
+                    };
+                }
+
+                return {
+                    success: true,
+                    workflow: linkResult.workflow || workflow,
+                    redirectUrl: linkResult.redirectUrl || null,
+                    requiresConnection: true,
+                    error: execution.error,
+                };
             }
 
             return {
-                success: true,
-                workflow: linkResult.workflow || workflow,
-                redirectUrl: linkResult.redirectUrl || null,
+                success: false,
+                workflow,
+                error: execution?.error || 'Failed to execute workflow task.',
+                execution,
             };
         } catch (error) {
             console.error('Error triggering Composio workflow:', error);

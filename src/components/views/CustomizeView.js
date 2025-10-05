@@ -4,7 +4,7 @@ import { resizeLayout } from '../../utils/windowResize.js';
 export class CustomizeView extends LitElement {
     static styles = css`
         * {
-            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Courier New', monospace;
+            font-family: 'Armata', sans-serif;
             cursor: default;
             user-select: none;
         }
@@ -165,7 +165,7 @@ export class CustomizeView extends LitElement {
 
         .keybind-input {
             cursor: pointer;
-            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace;
+            font-family: 'Armata', sans-serif;
             text-align: center;
             letter-spacing: 0.5px;
             font-weight: 500;
@@ -340,7 +340,7 @@ export class CustomizeView extends LitElement {
             border-radius: 3px;
             font-weight: 500;
             border: 1px solid var(--success-border, rgba(52, 211, 153, 0.2));
-            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace;
+            font-family: 'Armata', sans-serif;
         }
 
         .slider-input {

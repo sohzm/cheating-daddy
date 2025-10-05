@@ -762,6 +762,14 @@ function handleShortcut(shortcutKey) {
 // Create reference to the main app element
 const cheatingDaddyApp = document.querySelector('cheating-daddy-app');
 
+// Listen for manual screenshot capture requests from main process
+if (window.electron?.ipcRenderer) {
+    window.electron.ipcRenderer.on('capture-manual-screenshot', () => {
+        console.log('Manual screenshot capture requested from main process');
+        captureManualScreenshot();
+    });
+}
+
 // Consolidated cheddar object - all functions in one place
 const cheddar = {
     // Element access

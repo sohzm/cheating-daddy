@@ -623,7 +623,7 @@ async function sendAudioToGemini(base64Data, geminiSessionRef) {
     }
 }
 
-function setupGeminiIpcHandlers(geminiSessionRef) {
+function setupGeminiIpcHandlers(geminiSessionRef, mainWindow) {
     // Store the geminiSessionRef globally for reconnection access
     global.geminiSessionRef = geminiSessionRef;
 
@@ -708,6 +708,20 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
             return { success: true };
         } catch (error) {
             console.error('Error sending text:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('capture-manual-screenshot', async (event) => {
+        try {
+            // Send message to renderer to trigger manual screenshot
+            if (mainWindow) {
+                mainWindow.webContents.send('capture-manual-screenshot');
+                return { success: true };
+            }
+            return { success: false, error: 'No active window' };
+        } catch (error) {
+            console.error('Error triggering manual screenshot:', error);
             return { success: false, error: error.message };
         }
     });
@@ -870,6 +884,16 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
             return { success: true, accounts: composioService.getConnectedAccounts() };
         } catch (error) {
             console.error('Error listing Composio accounts:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('composio-verify-all-connections', async (event, externalUserId) => {
+        try {
+            const results = await composioService.verifyAllConnections(externalUserId);
+            return { success: true, results };
+        } catch (error) {
+            console.error('Error verifying all Composio connections:', error);
             return { success: false, error: error.message };
         }
     });

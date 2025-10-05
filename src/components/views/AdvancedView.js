@@ -4,12 +4,7 @@ import { resizeLayout } from '../../utils/windowResize.js';
 export class AdvancedView extends LitElement {
     static styles = css`
         * {
-            font-family:
-                'Poppins',
-                'Inter',
-                -apple-system,
-                BlinkMacSystemFont,
-                sans-serif;
+            font-family: 'Armata', sans-serif;
             cursor: default;
             user-select: none;
         }
