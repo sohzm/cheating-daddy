@@ -1,153 +1,379 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { motion } from 'framer-motion';
+import {
+  FiHome,
+  FiBarChart2,
+  FiFolder,
+  FiCheckSquare,
+  FiSettings,
+  FiSend
+} from 'react-icons/fi';
 
-const AssistantIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M12 4C7.58172 4 4 7.58172 4 12C4 16.4183 7.58172 20 12 20C16.4183 20 20 16.4183 20 12C20 7.58172 16.4183 4 12 4Z" stroke="currentColor" strokeWidth="1.5" />
-    <path d="M12 8V12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    <path d="M16 12H12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    <circle cx="12" cy="12" r="1" fill="currentColor" />
-  </svg>
-);
+// Tabs
+const tabs = [
+  { key: 'dashboard', name: 'Dashboard', icon: FiHome },
+  { key: 'analytics', name: 'Analytics', icon: FiBarChart2 },
+  { key: 'projects', name: 'Projects', icon: FiFolder },
+  { key: 'tasks', name: 'Tasks', icon: FiCheckSquare },
+  { key: 'settings', name: 'Settings', icon: FiSettings }
+];
 
-const SendIcon = () => (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M3.49902 13.1201L3.55002 18.66C3.58502 20.91 5.51102 22.39 7.64902 21.61L11.53 20.1C11.8 20 12.2 20 12.47 20.1L16.35 21.61C18.488 22.39 20.414 20.91 20.449 18.66L20.499 13.12C20.521 11.45 19.581 10.04 18.013 9.42L13.102 7.55C12.422 7.29 11.577 7.29 10.897 7.55L5.98602 9.42C4.41802 10.04 3.47802 11.45 3.49902 13.12Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-        <path d="M12 7V2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-        <path d="M10.5 3.5L12 2L13.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
-);
-
-
-const NAV_ITEMS = ["Dashboard", "Analytics", "Projects", "Tasks", "Settings"];
-
-const MockContent = ({ title }) => (
-    <div className="p-8">
-        <h1 className="text-2xl font-bold text-gray-800">{title}</h1>
-        <p className="mt-4 text-gray-600">This is the mock content for the {title} section.</p>
+// Simple content per tab (sample cards)
+const TabContent = ({ active }) => {
+  const card = (title, body) => (
+    <div className="card">
+      <div className="card-title">{title}</div>
+      <div className="card-body">{body}</div>
     </div>
-);
+  );
 
-const AssistantPanel = ({ isVisible, onClose }) => {
-    const [messages, setMessages] = useState([]);
-    const [input, setInput] = useState('');
-    const messagesEndRef = useRef(null);
+  if (active === 'dashboard') {
+    return (
+      <div className="grid">
+        {card('Overview', 'KPIs, summaries, and quick links.')}
+        {card('Recent Activity', 'Latest updates and alerts.')}
+        {card('Shortcuts', 'Jump into frequent actions.')}
+      </div>
+    );
+  }
 
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    };
+  if (active === 'analytics') {
+    return (
+      <div className="grid">
+        {card('Trends', 'Performance and funnel metrics.')}
+        {card('Cohorts', 'Stickiness and retention insights.')}
+        {card('Benchmarks', 'Targets vs actuals.')}
+      </div>
+    );
+  }
 
-    useEffect(scrollToBottom, [messages]);
+  if (active === 'projects') {
+    return (
+      <div className="grid">
+        {card('Roadmap', 'Milestones and deliverables.')}
+        {card('Status', 'Risks, owners, and timelines.')}
+        {card('Files', 'Specs, docs, and assets.')}
+      </div>
+    );
+  }
 
-    const handleSend = () => {
-        if (input.trim()) {
-            setMessages([...messages, { text: input, sender: 'user' }]);
-            setInput('');
-            // Simulate AI response
-            setTimeout(() => {
-                setMessages(prev => [...prev, { text: `This is a simulated AI response to "${input}"`, sender: 'ai' }]);
-            }, 1000);
+  if (active === 'tasks') {
+    return (
+      <div className="grid">
+        {card('Backlog', 'Prioritized tasks ready to pick.')}
+        {card('In Progress', 'Active work items.')}
+        {card('Done', 'Recently completed items.')}
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid">
+      {card('Preferences', 'Theme, notifications, and profile.')}
+      {card('Integrations', 'APIs and tokens.')}
+      {card('Billing', 'Plan and usage.')}
+    </div>
+  );
+};
+
+// Unified AI router: switch internally by tab if needed, but always return plain text
+async function getAIResponse(activeTab, text) {
+  const hints = {
+    dashboard:
+      "Here’s a quick take focused on home metrics and highlights.",
+    analytics:
+      "Here’s a concise view on trends, cohorts, and performance.",
+    projects:
+      "Here’s a brief project‑centric response with milestones in mind.",
+    tasks:
+      "Here’s an action‑oriented reply focusing on next steps.",
+    settings:
+      "Here’s guidance around configuration and preferences."
+  };
+  const preface = hints[activeTab] ?? "Here’s a helpful answer.";
+  // Replace this with real API calls if needed; keep the response text free of per-tab labels
+  // Example:
+  // const res = await fetch(`/api/${activeTab}/chat`, { method: 'POST', body: JSON.stringify({ text }) });
+  // const { reply } = await res.json();
+  // return reply;
+  return `${preface} ${text ? `Regarding “${text},” here’s what stands out.` : ""}`.trim();
+}
+
+export default function Dashboard() {
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [messages, setMessages] = useState([
+    { role: 'ai', content: "Welcome. Ask anything — one AI handles every tab." }
+  ]);
+  const [draft, setDraft] = useState('');
+
+  // Assistant is completely hidden at first glance
+  const [isChatVisible, setIsChatVisible] = useState(false);
+
+  const listRef = useRef(null);
+
+  const activeTabName = useMemo(
+    () => tabs.find(t => t.key === activeTab)?.name ?? 'Dashboard',
+    [activeTab]
+  );
+
+  // Auto-scroll messages
+  useEffect(() => {
+    if (listRef.current) {
+      listRef.current.scrollTop = listRef.current.scrollHeight;
+    }
+  }, [messages]);
+
+  // Global shortcuts: Ctrl+Shift+X toggles chat; Ctrl+Shift+E hides chat
+  useEffect(() => {
+    const handler = (e) => {
+      if (!e.ctrlKey || !e.shiftKey) return;
+      const k = (e.code?.startsWith('Key') ? e.code.slice(3) : e.key)?.toLowerCase();
+      if (k === 'x') {
+        e.preventDefault();
+        setIsChatVisible(v => !v);
+      } else if (k === 'e') {
+        e.preventDefault();
+        setIsChatVisible(false);
+        setDraft('');
+        // Optionally blur active element for safety
+        if (document.activeElement && document.activeElement.blur) {
+          document.activeElement.blur();
         }
+      }
     };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
-    return (
-        <AnimatePresence>
-            {isVisible && (
-                <motion.div
-                    initial={{ x: '100%' }}
-                    animate={{ x: 0 }}
-                    exit={{ x: '100%' }}
-                    transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                    className="fixed top-0 right-0 h-full w-96 bg-white shadow-lg z-50 flex flex-col"
-                >
-                    <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-                        <h2 className="text-lg font-semibold">Assistant</h2>
-                        <button onClick={onClose} className="text-gray-500 hover:text-gray-800">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
-                    </div>
-                    <div className="flex-1 p-4 overflow-y-auto">
-                        {messages.map((msg, index) => (
-                            <div key={index} className={`mb-4 flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                <div className={`p-2 rounded-lg ${msg.sender === 'user' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-800'}`}>
-                                    {msg.text}
-                                </div>
-                            </div>
-                        ))}
-                        <div ref={messagesEndRef} />
-                    </div>
-                    <div className="p-4 border-t border-gray-200 flex">
-                        <input
-                            type="text"
-                            value={input}
-                            onChange={(e) => setInput(e.target.value)}
-                            onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-                            className="flex-1 p-2 border border-gray-300 rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="Type a message..."
-                        />
-                        <button onClick={handleSend} className="p-2 bg-blue-500 text-white rounded-r-md hover:bg-blue-600">
-                            <SendIcon />
-                        </button>
-                    </div>
-                </motion.div>
-            )}
-        </AnimatePresence>
-    );
-};
+  const send = async () => {
+    const text = draft.trim();
+    if (!text) return;
+    setMessages(prev => [...prev, { role: 'user', content: text }]);
+    setDraft('');
+    const reply = await getAIResponse(activeTab, text);
+    setMessages(prev => [...prev, { role: 'ai', content: reply }]);
+  };
 
-const Dashboard = () => {
-    const [activeView, setActiveView] = useState("Dashboard");
-    const [isAssistantVisible, setAssistantVisible] = useState(false);
+  const onComposerKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      send();
+    }
+  };
 
-    useEffect(() => {
-        const handleKeyDown = (event) => {
-            if (event.ctrlKey && event.shiftKey && event.key === 'X') {
-                setAssistantVisible(prev => !prev);
-            }
-        };
-
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, []);
-
-    return (
-        <div className="flex h-screen bg-gray-100 font-sans">
-            <aside className="w-64 bg-white shadow-md flex flex-col">
-                <div className="p-4 border-b border-gray-200">
-                    <h1 className="text-xl font-bold">Dashboard</h1>
-                </div>
-                <nav className="flex-1 p-4">
-                    <ul>
-                        {NAV_ITEMS.map(item => (
-                            <li key={item} className="mb-2">
-                                <button
-                                    onClick={() => setActiveView(item)}
-                                    className={`w-full text-left p-2 rounded-md ${activeView === item ? 'bg-blue-500 text-white' : 'hover:bg-gray-200'}`}
-                                >
-                                    {item}
-                                </button>
-                            </li>
-                        ))}
-                    </ul>
-                </nav>
-            </aside>
-
-            <main className="flex-1 flex flex-col">
-                <header className="p-4 bg-white border-b border-gray-200 flex justify-end">
-                    <button onClick={() => setAssistantVisible(true)} className="text-gray-500 hover:text-gray-800">
-                        <AssistantIcon />
-                    </button>
-                </header>
-                <div className="flex-1 overflow-y-auto">
-                    <MockContent title={activeView} />
-                </div>
-            </main>
-
-            <AssistantPanel isVisible={isAssistantVisible} onClose={() => setAssistantVisible(false)} />
+  return (
+    <div className="app">
+      <aside className="sidebar">
+        <div className="brand">
+          <div className="brand-top">Cheating Daddy</div>
+          <div className="brand-bottom">Analytics</div>
         </div>
-    );
-};
 
-export default Dashboard;
+        <nav className="nav">
+          {tabs.map(({ key, name, icon: Icon }) => {
+            const active = key === activeTab;
+            return (
+              <motion.button
+                key={key}
+                onClick={() => setActiveTab(key)}
+                className={`nav-btn ${active ? 'active' : ''}`}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <Icon className="nav-icon" />
+                <span className="nav-label">{name}</span>
+              </motion.button>
+            );
+          })}
+        </nav>
+      </aside>
+
+      <main className="main">
+        <header className="header">
+          <div>
+            <h1>{activeTabName}</h1>
+            <p>Real‑time metrics, insights, and a unified assistant.</p>
+          </div>
+        </header>
+
+        <TabContent active={activeTab} />
+
+        {isChatVisible && (
+          <section className="assistant">
+            <div className="assistant-title">Assistant</div>
+
+            <div className="messages" ref={listRef}>
+              {messages.map((m, i) => (
+                <div
+                  key={i}
+                  className={`bubble ${m.role === 'ai' ? 'ai' : 'user'}`}
+                >
+                  <div className="label">{m.role === 'ai' ? 'AI' : 'You'}</div>
+                  <div className="text">{m.content}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="composer">
+              <textarea
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={onComposerKeyDown}
+                placeholder="Type a message..."
+                rows={2}
+              />
+              <button className="send" onClick={send} title="Send (Enter)">
+                <FiSend />
+              </button>
+            </div>
+          </section>
+        )}
+
+        <style>{`
+          :root {
+            --bg-0: #0b1020;
+            --bg-1: rgba(255,255,255,0.04);
+            --bg-2: rgba(255,255,255,0.06);
+            --stroke: rgba(255,255,255,0.10);
+            --soft: rgba(255,255,255,0.06);
+            --text-1: #e2e8f0;
+            --text-2: #94a3b8;
+            --accent: #7c5cff;
+            --ai: #0ea5e9;
+            --user: #a78bfa;
+          }
+          * { box-sizing: border-box; }
+          .app {
+            min-height: 100vh;
+            display: grid;
+            grid-template-columns: 240px 1fr;
+            background: radial-gradient(1200px 600px at 20% -20%, rgba(124,92,255,0.12), transparent),
+                        radial-gradient(1000px 500px at 110% 10%, rgba(34,211,238,0.10), transparent),
+                        linear-gradient(180deg, #0b1020, #0d1327 40%, #0b1020);
+            color: var(--text-1);
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, Apple Color Emoji, Segoe UI Emoji;
+          }
+          .sidebar {
+            backdrop-filter: blur(8px);
+            border-right: 1px solid var(--stroke);
+            background: linear-gradient(180deg, var(--bg-1), transparent);
+            padding: 20px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+          }
+          .brand-top { font-weight: 700; letter-spacing: 0.3px; }
+          .brand-bottom { font-size: 28px; line-height: 28px; margin-top: -2px; }
+          .nav { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+          .nav-btn {
+            height: 40px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 0 12px;
+            border-radius: 10px;
+            color: var(--text-1);
+            background: transparent;
+            border: 1px solid transparent;
+            cursor: pointer;
+          }
+          .nav-btn:hover { background: var(--bg-1); border-color: var(--stroke); }
+          .nav-btn.active {
+            background: linear-gradient(180deg, rgba(124,92,255,0.18), rgba(124,92,255,0.10));
+            border: 1px solid rgba(124,92,255,0.35);
+            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);
+          }
+          .nav-icon { font-size: 16px; opacity: 0.9; }
+          .nav-label { font-size: 14px; }
+
+          .main { padding: 26px 32px; overflow: auto; }
+          .header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 16px; }
+          .header h1 { margin: 0; font-size: 22px; }
+          .header p { margin: 6px 0 0; color: var(--text-2); }
+
+          .grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 14px;
+            margin-bottom: 18px;
+          }
+          .card {
+            background: var(--soft);
+            border: 1px solid var(--stroke);
+            border-radius: 14px;
+            padding: 14px;
+          }
+          .card-title { font-weight: 600; margin-bottom: 4px; }
+          .card-body { color: var(--text-2); }
+
+          .assistant {
+            margin-top: 18px;
+            background: linear-gradient(180deg, var(--bg-2), var(--bg-1));
+            border: 1px solid var(--stroke);
+            border-radius: 14px;
+            overflow: hidden;
+          }
+          .assistant-title {
+            padding: 12px 14px;
+            border-bottom: 1px solid var(--stroke);
+            font-weight: 600;
+          }
+          .messages {
+            max-height: 280px;
+            overflow: auto;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+          }
+          .bubble {
+            display: grid;
+            grid-template-columns: 56px 1fr;
+            gap: 8px;
+            padding: 10px;
+            border-radius: 10px;
+            border: 1px solid var(--stroke);
+            background: rgba(255,255,255,0.03);
+          }
+          .bubble.ai .label { color: var(--ai); }
+          .bubble.user .label { color: var(--user); }
+          .label { font-weight: 700; }
+          .text { white-space: pre-wrap; color: var(--text-1); }
+
+          .composer {
+            display: grid;
+            grid-template-columns: 1fr 42px;
+            gap: 8px;
+            padding: 10px;
+            border-top: 1px solid var(--stroke);
+            background: rgba(255,255,255,0.02);
+          }
+          .composer textarea {
+            resize: none;
+            width: 100%;
+            background: rgba(255,255,255,0.03);
+            color: var(--text-1);
+            border: 1px solid var(--stroke);
+            border-radius: 10px;
+            padding: 10px 12px;
+            outline: none;
+          }
+          .composer textarea:focus {
+            border-color: rgba(124,92,255,0.45);
+            box-shadow: 0 0 0 3px rgba(124,92,255,0.15);
+          }
+          .send {
+            border-radius: 10px;
+            border: 1px solid rgba(124,92,255,0.35);
+            background: linear-gradient(180deg, rgba(124,92,255,0.35), rgba(124,92,255,0.18));
+            color: white;
+            display: grid;
+            place-items: center;
+            cursor: pointer;
+          }
+          .send:hover { filter: brightness(1.05); }
+        `}</style>
+      </main>
+    </div>
+  );
+}

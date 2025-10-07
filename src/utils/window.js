@@ -26,118 +26,47 @@ function ensureDataDirectories() {
 }
 
 function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
-    // Get layout preference (default to 'normal')
-    let windowWidth = 1100;
-    let windowHeight = 800;
+    const windowWidth = 1100;
+    const windowHeight = 800;
 
     const mainWindow = new BrowserWindow({
         width: windowWidth,
         height: windowHeight,
-        frame: false,
-        transparent: true,
-        hasShadow: false,
-        alwaysOnTop: true,
-        skipTaskbar: true,
-        hiddenInMissionControl: true,
+        frame: true,               // ✅ Adds native window controls
+        transparent: false,        // ✅ Removes weird transparency
+        resizable: true,           // ✅ Allows resizing
+        show: true,
         webPreferences: {
             nodeIntegration: true,
-            contextIsolation: false, // TODO: change to true
+            contextIsolation: false,
             backgroundThrottling: false,
             enableBlinkFeatures: 'GetDisplayMedia',
             webSecurity: true,
             allowRunningInsecureContent: false,
         },
-        backgroundColor: '#00000000',
+        backgroundColor: '#ffffff', // ✅ Clean white background
     });
 
-    const { session, desktopCapturer } = require('electron');
-    session.defaultSession.setDisplayMediaRequestHandler(
-        (request, callback) => {
-            desktopCapturer.getSources({ types: ['screen'] }).then(sources => {
-                callback({ video: sources[0], audio: 'loopback' });
-            });
-        },
-        { useSystemPicker: true }
-    );
-
-    mainWindow.setResizable(false);
-    mainWindow.setContentProtection(true);
-    mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-
-    // Center window at the top of the screen
-    const primaryDisplay = screen.getPrimaryDisplay();
-    const { width: screenWidth } = primaryDisplay.workAreaSize;
-    const x = Math.floor((screenWidth - windowWidth) / 2);
-    const y = 0;
-    mainWindow.setPosition(x, y);
-
-    if (process.platform === 'win32') {
-        mainWindow.setAlwaysOnTop(true, 'screen-saver', 1);
-    }
-
+    // Load the React dashboard
     mainWindow.loadFile(path.join(__dirname, '../dashboard.html'));
 
-    // Set window title to random name if provided
-    if (randomNames && randomNames.windowTitle) {
+    // Optional: Set a custom title
+    if (randomNames?.windowTitle) {
         mainWindow.setTitle(randomNames.windowTitle);
         console.log(`Set window title to: ${randomNames.windowTitle}`);
     }
 
-    // Apply stealth measures
-    applyStealthMeasures(mainWindow);
-
-    // Start periodic title randomization for additional stealth
-    startTitleRandomization(mainWindow);
-
-    // After window is created, check for layout preference and resize if needed
-    mainWindow.webContents.once('dom-ready', () => {
-        setTimeout(() => {
-            const defaultKeybinds = getDefaultKeybinds();
-            let keybinds = defaultKeybinds;
-
-            mainWindow.webContents
-                .executeJavaScript(
-                    `
-                try {
-                    const savedKeybinds = localStorage.getItem('customKeybinds');
-                    
-                    return {
-                        keybinds: savedKeybinds ? JSON.parse(savedKeybinds) : null
-                    };
-                } catch (e) {
-                    return { keybinds: null };
-                }
-            `
-                )
-                .then(async savedSettings => {
-                    if (savedSettings.keybinds) {
-                        keybinds = { ...defaultKeybinds, ...savedSettings.keybinds };
-                    }
-
-                    // Apply content protection setting via IPC handler
-                    try {
-                        const contentProtection = await mainWindow.webContents.executeJavaScript('cheddar.getContentProtection()');
-                        mainWindow.setContentProtection(contentProtection);
-                        console.log('Content protection loaded from settings:', contentProtection);
-                    } catch (error) {
-                        console.error('Error loading content protection:', error);
-                        mainWindow.setContentProtection(true);
-                    }
-
-                    updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessionRef);
-                })
-                .catch(() => {
-                    // Default to content protection enabled
-                    mainWindow.setContentProtection(true);
-                    updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessionRef);
-                });
-        }, 150);
-    });
-
+    // Apply IPC handlers and shortcuts
     setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef);
+
+    mainWindow.webContents.once('dom-ready', () => {
+        const keybinds = getDefaultKeybinds();
+        updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessionRef);
+    });
 
     return mainWindow;
 }
+
 
 function getDefaultKeybinds() {
     const isMac = process.platform === 'darwin';
