@@ -6,10 +6,11 @@
     "main": "src/index.js",
     "scripts": {
         "start": "electron-forge start",
-        "package": "electron-forge package",
-        "make": "electron-forge make",
-        "publish": "electron-forge publish",
-        "lint": "echo \"No linting configured\"",
+        "react:dev": "cd src/react-ui && vite",
+        "react:build": "cd src/react-ui && vite build",
+        "dev": "concurrently \"npm run react:dev\" \"wait-on http://localhost:5173 && electron-forge start\"",
+        "package": "npm run react:build && electron-forge package",
+        "make": "npm run react:build && electron-forge make",
         "test": "vitest run"
     },
     "keywords": [
@@ -26,7 +27,9 @@
     "license": "GPL-3.0",
     "dependencies": {
         "@google/genai": "^1.2.0",
-        "electron-squirrel-startup": "^1.0.1"
+        "electron-squirrel-startup": "^1.0.1",
+        "react": "^19.2.0",
+        "react-dom": "^19.2.0"
     },
     "devDependencies": {
         "@electron-forge/cli": "^7.8.1",
@@ -39,8 +42,12 @@
         "@electron-forge/plugin-fuses": "^7.8.1",
         "@electron/fuses": "^1.8.0",
         "@reforged/maker-appimage": "^5.0.0",
-        "vitest": "^1.6.1",
+        "@vitejs/plugin-react": "^5.0.4",
+        "concurrently": "^9.2.1",
+        "electron": "^30.0.5",
         "jsdom": "^23.2.0",
-        "electron": "^30.0.5"
+        "vite": "^7.1.9",
+        "vitest": "^1.6.1",
+        "wait-on": "^9.0.1"
     }
 }
