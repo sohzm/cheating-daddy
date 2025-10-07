@@ -9,11 +9,23 @@ const { getCurrentRandomDisplayName } = require('./processNames');
 function applyStealthMeasures(mainWindow) {
     console.log('Applying additional stealth measures...');
 
-    // Hide from alt-tab on Windows
+    // Hide from alt-tab and screen share picker on Windows
     if (process.platform === 'win32') {
         try {
             mainWindow.setSkipTaskbar(true);
             console.log('Hidden from Windows taskbar');
+
+            // Hide from screen share picker using native Windows API
+            const nativeWindowHandle = mainWindow.getNativeWindowHandle();
+            if (nativeWindowHandle) {
+                try {
+                    const { setWindowExStyle } = require('./windowsNative');
+                    setWindowExStyle(nativeWindowHandle);
+                    console.log('Hidden from Windows screen share picker');
+                } catch (error) {
+                    console.warn('Could not hide from screen share picker:', error.message);
+                }
+            }
         } catch (error) {
             console.warn('Could not hide from taskbar:', error.message);
         }

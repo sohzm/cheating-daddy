@@ -443,10 +443,10 @@ export class CustomizeView extends LitElement {
         this.vadEnabled = false;
 
         // Background transparency default
-        this.backgroundTransparency = 0.8;
+        this.backgroundTransparency = 0.51;
 
         // Font size default (in pixels)
-        this.fontSize = 20;
+        this.fontSize = 13;
 
         this.loadKeybinds();
         this.loadGoogleSearchSettings();

@@ -30,7 +30,7 @@ function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
     let windowWidth = 800;
     let windowHeight = 450;
 
-    const mainWindow = new BrowserWindow({
+    const windowOptions = {
         width: windowWidth,
         height: windowHeight,
         frame: false,
@@ -48,7 +48,15 @@ function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
             allowRunningInsecureContent: false,
         },
         backgroundColor: '#00000000',
-    });
+    };
+
+    // Add Windows-specific options to hide from screen capture picker
+    if (process.platform === 'win32') {
+        // type: 'toolbar' helps hide from various Windows UI elements
+        windowOptions.type = 'toolbar';
+    }
+
+    const mainWindow = new BrowserWindow(windowOptions);
 
     const { session, desktopCapturer } = require('electron');
     session.defaultSession.setDisplayMediaRequestHandler(
