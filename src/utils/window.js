@@ -9,6 +9,19 @@ let windowResizing = false;
 let resizeAnimation = null;
 const RESIZE_ANIMATION_DURATION = 500; // milliseconds
 
+// --- Add this new section for config IPC handlers ---
+let appConfig = { stealthLevel: "balanced" };
+
+ipcMain.handle("get-config", async () => {
+  return { success: true, config: appConfig };
+});
+
+ipcMain.handle("set-stealth-level", async (event, level) => {
+  appConfig.stealthLevel = level;
+  return { success: true, config: appConfig };
+});
+
+
 function ensureDataDirectories() {
     const homeDir = os.homedir();
     const cheddarDir = path.join(homeDir, 'cheddar');
@@ -75,7 +88,16 @@ function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
         mainWindow.setAlwaysOnTop(true, 'screen-saver', 1);
     }
 
+    // mainWindow.loadFile(path.join(__dirname, '../index.html'));
+
+    const isDev = process.env.NODE_ENV === "development";
+
+if (isDev) {
+  win.loadURL("http://localhost:5173");
+} else {
     mainWindow.loadFile(path.join(__dirname, '../index.html'));
+}
+
 
     // Set window title to random name if provided
     if (randomNames && randomNames.windowTitle) {
