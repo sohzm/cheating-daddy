@@ -1,0 +1,60 @@
+* {
+    box-sizing: border-box;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    margin: 0px;
+    padding: 0px;
+    cursor: default;
+    user-select: none;
+}
+
+.window-container {
+    height: 100vh;
+    border-radius: 7px;
+    overflow: hidden;
+    width: 100%;
+    background-color: var(--background-transparent);
+    color: var(--text-color);
+}
+
+.container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.main-content {
+    flex: 1;
+    padding: var(--main-content-padding);
+    overflow-y: auto;
+    margin-top: var(--main-content-margin-top);
+    border-radius: var(--content-border-radius);
+    transition: all 0.15s ease-out;
+    background: var(--main-content-background);
+}
+
+.main-content.with-border {
+    border: 1px solid var(--border-color);
+}
+
+.main-content.assistant-view {
+    padding: 10px;
+    border: none;
+}
+
+.main-content.onboarding-view {
+    padding: 0;
+    border: none;
+    background: transparent;
+}
+
+.view-container {
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 0.15s ease-out, transform 0.15s ease-out;
+    height: 100%;
+}
+
+.view-container.entering {
+    opacity: 0;
+    transform: translateY(10px);
+}

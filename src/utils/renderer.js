@@ -732,35 +732,50 @@ ipcRenderer.on('clear-sensitive-data', () => {
     // Consider clearing IndexedDB as well for full erasure
 });
 
+// React app state - will be set by React app on mount
+let reactAppState = {
+    currentView: 'main',
+    layoutMode: 'normal',
+    setStatus: null,
+    setResponse: null,
+    handleStart: null
+};
+
 // Handle shortcuts based on current view
 function handleShortcut(shortcutKey) {
-    const currentView = cheddar.getCurrentView();
+    const currentView = reactAppState.currentView;
 
     if (shortcutKey === 'ctrl+enter' || shortcutKey === 'cmd+enter') {
-        if (currentView === 'main') {
-            cheddar.element().handleStart();
+        if (currentView === 'main' && reactAppState.handleStart) {
+            reactAppState.handleStart();
         } else {
             captureManualScreenshot();
         }
     }
 }
 
-// Create reference to the main app element
-const cheatingDaddyApp = document.querySelector('cheating-daddy-app');
-
-// Consolidated cheddar object - all functions in one place
+// Consolidated cheddar object - updated for React
 const cheddar = {
-    // Element access
-    element: () => cheatingDaddyApp,
-    e: () => cheatingDaddyApp,
+    // React app state management
+    setReactAppState: (state) => {
+        reactAppState = { ...reactAppState, ...state };
+    },
 
-    // App state functions - access properties directly from the app element
-    getCurrentView: () => cheatingDaddyApp.currentView,
-    getLayoutMode: () => cheatingDaddyApp.layoutMode,
+    // App state functions - access from React state
+    getCurrentView: () => reactAppState.currentView,
+    getLayoutMode: () => reactAppState.layoutMode,
 
-    // Status and response functions
-    setStatus: text => cheatingDaddyApp.setStatus(text),
-    setResponse: response => cheatingDaddyApp.setResponse(response),
+    // Status and response functions - delegate to React
+    setStatus: text => {
+        if (reactAppState.setStatus) {
+            reactAppState.setStatus(text);
+        }
+    },
+    setResponse: response => {
+        if (reactAppState.setResponse) {
+            reactAppState.setResponse(response);
+        }
+    },
 
     // Core functionality
     initializeGemini,
