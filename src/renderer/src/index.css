@@ -1,0 +1,19 @@
+html, body, #root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: #fafafa;
+  color: #111;
+  font-family: Inter, Arial, sans-serif;
+}
+
+input {
+  padding: 6px 8px;
+  margin-left: 6px;
+}
+
+button {
+  padding: 8px 12px;
+}
