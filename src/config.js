@@ -6,7 +6,7 @@ const os = require('os');
 const DEFAULT_CONFIG = {
     onboarded: false,
     stealthLevel: "balanced",
-    layout: "normal"
+    layout: "compact"
 };
 
 // Get the config directory path based on OS

@@ -675,7 +675,7 @@ function stopCapture() {
     offscreenContext = null;
 }
 
-// Send text message to Gemini
+// Send text message to Gemini with automatic screenshot
 async function sendTextMessage(text) {
     if (!text || text.trim().length === 0) {
         console.warn('Cannot send empty text message');
@@ -683,15 +683,23 @@ async function sendTextMessage(text) {
     }
 
     try {
+        // First, capture a screenshot to provide visual context
+        console.log('Capturing screenshot for text message context...');
+        await captureScreenshot(currentImageQuality, false);
+
+        // Wait a moment for the screenshot to be processed
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Then send the text message
         const result = await ipcRenderer.invoke('send-text-message', text);
         if (result.success) {
-            console.log('Text message sent successfully');
+            console.log('Screenshot + text message sent successfully');
         } else {
             console.error('Failed to send text message:', result.error);
         }
         return result;
     } catch (error) {
-        console.error('Error sending text message:', error);
+        console.error('Error sending text message with screenshot:', error);
         return { success: false, error: error.message };
     }
 }
