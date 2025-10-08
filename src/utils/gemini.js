@@ -62,12 +62,7 @@ function saveConversationTurn(transcription, aiResponse) {
     conversationHistory.push(conversationTurn);
     console.log('Saved conversation turn:', conversationTurn);
 
-    // Send to renderer to save in IndexedDB
-    sendToRenderer('save-conversation-turn', {
-        sessionId: currentSessionId,
-        turn: conversationTurn,
-        fullHistory: conversationHistory,
-    });
+    // Note: Conversation history storage has been removed
 }
 
 function getCurrentSessionData() {

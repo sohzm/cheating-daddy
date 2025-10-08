@@ -3,7 +3,6 @@ import { AppHeader } from './AppHeader.js';
 import { MainView } from '../views/MainView.js';
 import { CustomizeView } from '../views/CustomizeView.js';
 import { HelpView } from '../views/HelpView.js';
-import { HistoryView } from '../views/HistoryView.js';
 import { AssistantView } from '../views/AssistantView.js';
 import { OnboardingView } from '../views/OnboardingView.js';
 import { AdvancedView } from '../views/AdvancedView.js';
@@ -232,10 +231,6 @@ export class CheatingDaddyApp extends LitElement {
         this.requestUpdate();
     }
 
-    handleHistoryClick() {
-        this.currentView = 'history';
-        this.requestUpdate();
-    }
 
     handleAdvancedClick() {
         this.currentView = 'advanced';
@@ -243,7 +238,7 @@ export class CheatingDaddyApp extends LitElement {
     }
 
     async handleClose() {
-        if (this.currentView === 'customize' || this.currentView === 'help' || this.currentView === 'history') {
+        if (this.currentView === 'customize' || this.currentView === 'help' || this.currentView === 'advanced') {
             this.currentView = 'main';
         } else if (this.currentView === 'assistant') {
             cheddar.stopCapture();
@@ -477,9 +472,6 @@ export class CheatingDaddyApp extends LitElement {
             case 'help':
                 return html` <help-view .onExternalLinkClick=${url => this.handleExternalLinkClick(url)}></help-view> `;
 
-            case 'history':
-                return html` <history-view></history-view> `;
-
             case 'advanced':
                 return html` <advanced-view></advanced-view> `;
 
@@ -521,7 +513,6 @@ export class CheatingDaddyApp extends LitElement {
                         .advancedMode=${this.advancedMode}
                         .onCustomizeClick=${() => this.handleCustomizeClick()}
                         .onHelpClick=${() => this.handleHelpClick()}
-                        .onHistoryClick=${() => this.handleHistoryClick()}
                         .onAdvancedClick=${() => this.handleAdvancedClick()}
                         .onCloseClick=${() => this.handleClose()}
                         .onBackClick=${() => this.handleBackClick()}

@@ -704,101 +704,6 @@ async function sendTextMessage(text) {
     }
 }
 
-// Conversation storage functions using IndexedDB
-let conversationDB = null;
-
-async function initConversationStorage() {
-    return new Promise((resolve, reject) => {
-        const request = indexedDB.open('ConversationHistory', 1);
-
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => {
-            conversationDB = request.result;
-            resolve(conversationDB);
-        };
-
-        request.onupgradeneeded = event => {
-            const db = event.target.result;
-
-            // Create sessions store
-            if (!db.objectStoreNames.contains('sessions')) {
-                const sessionStore = db.createObjectStore('sessions', { keyPath: 'sessionId' });
-                sessionStore.createIndex('timestamp', 'timestamp', { unique: false });
-            }
-        };
-    });
-}
-
-async function saveConversationSession(sessionId, conversationHistory) {
-    if (!conversationDB) {
-        await initConversationStorage();
-    }
-
-    const transaction = conversationDB.transaction(['sessions'], 'readwrite');
-    const store = transaction.objectStore('sessions');
-
-    const sessionData = {
-        sessionId: sessionId,
-        timestamp: parseInt(sessionId),
-        conversationHistory: conversationHistory,
-        lastUpdated: Date.now(),
-    };
-
-    return new Promise((resolve, reject) => {
-        const request = store.put(sessionData);
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => resolve(request.result);
-    });
-}
-
-async function getConversationSession(sessionId) {
-    if (!conversationDB) {
-        await initConversationStorage();
-    }
-
-    const transaction = conversationDB.transaction(['sessions'], 'readonly');
-    const store = transaction.objectStore('sessions');
-
-    return new Promise((resolve, reject) => {
-        const request = store.get(sessionId);
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => resolve(request.result);
-    });
-}
-
-async function getAllConversationSessions() {
-    if (!conversationDB) {
-        await initConversationStorage();
-    }
-
-    const transaction = conversationDB.transaction(['sessions'], 'readonly');
-    const store = transaction.objectStore('sessions');
-    const index = store.index('timestamp');
-
-    return new Promise((resolve, reject) => {
-        const request = index.getAll();
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => {
-            // Sort by timestamp descending (newest first)
-            const sessions = request.result.sort((a, b) => b.timestamp - a.timestamp);
-            resolve(sessions);
-        };
-    });
-}
-
-// Listen for conversation data from main process
-ipcRenderer.on('save-conversation-turn', async (event, data) => {
-    try {
-        await saveConversationSession(data.sessionId, data.fullHistory);
-        console.log('Conversation session saved:', data.sessionId);
-    } catch (error) {
-        console.error('Error saving conversation session:', error);
-    }
-});
-
-// Initialize conversation storage when renderer loads
-initConversationStorage().catch(console.error);
-
 // Listen for emergency erase command from main process
 ipcRenderer.on('clear-sensitive-data', () => {
     console.log('Clearing renderer-side sensitive data...');
@@ -843,11 +748,6 @@ const cheddar = {
     stopCapture,
     sendTextMessage,
     handleShortcut,
-
-    // Conversation history functions
-    getAllConversationSessions,
-    getConversationSession,
-    initConversationStorage,
 
     // Content protection function
     getContentProtection: () => {

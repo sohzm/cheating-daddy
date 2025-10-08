@@ -263,6 +263,7 @@ export class HelpView extends LitElement {
             nextResponse: isMac ? 'Cmd+]' : 'Ctrl+]',
             scrollUp: isMac ? 'Cmd+Shift+Up' : 'Ctrl+Shift+Up',
             scrollDown: isMac ? 'Cmd+Shift+Down' : 'Ctrl+Shift+Down',
+            copyCodeBlocks: isMac ? 'Cmd+Shift+C' : 'Ctrl+Shift+C',
         };
     }
 
@@ -371,6 +372,10 @@ export class HelpView extends LitElement {
                             <div class="shortcut-item">
                                 <span class="shortcut-description">Scroll response down</span>
                                 <div class="shortcut-keys">${this.formatKeybind(this.keybinds.scrollDown)}</div>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-description">Copy AI response</span>
+                                <div class="shortcut-keys">${this.formatKeybind(this.keybinds.copyCodeBlocks)}</div>
                             </div>
                         </div>
 
