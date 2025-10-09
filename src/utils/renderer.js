@@ -160,12 +160,16 @@ function arrayBufferToBase64(buffer) {
     return btoa(binary);
 }
 
-async function initializeGemini(profile = 'interview', language = 'en-US') {
+async function initializeGemini(profile = 'interview', language = 'en-US', mode = 'interview', model = 'gemini-2.5-flash') {
     const apiKey = localStorage.getItem('apiKey')?.trim();
     if (apiKey) {
-        const success = await ipcRenderer.invoke('initialize-gemini', apiKey, localStorage.getItem('customPrompt') || '', profile, language);
+        // Get mode and model from localStorage if not provided
+        const selectedMode = mode || localStorage.getItem('selectedMode') || 'interview';
+        const selectedModel = model || localStorage.getItem('selectedModel') || 'gemini-2.5-flash';
+
+        const success = await ipcRenderer.invoke('initialize-gemini', apiKey, localStorage.getItem('customPrompt') || '', profile, language, selectedMode, selectedModel);
         if (success) {
-            cheddar.setStatus('Live');
+            cheddar.setStatus(selectedMode === 'interview' ? 'Live' : 'Ready');
         } else {
             cheddar.setStatus('error');
         }

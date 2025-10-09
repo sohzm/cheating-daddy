@@ -280,9 +280,21 @@ export class CheatingDaddyApp extends LitElement {
             return;
         }
 
-        await cheddar.initializeGemini(this.selectedProfile, this.selectedLanguage);
-        // Pass the screenshot interval as string (including 'manual' option)
-        cheddar.startCapture(this.selectedScreenshotInterval, this.selectedImageQuality);
+        // Get mode and model from localStorage
+        const selectedMode = localStorage.getItem('selectedMode') || 'interview';
+        const selectedModel = localStorage.getItem('selectedModel') || 'gemini-2.5-flash';
+
+        await cheddar.initializeGemini(this.selectedProfile, this.selectedLanguage, selectedMode, selectedModel);
+
+        // For coding/OA mode, ALWAYS use manual mode to avoid rate limits
+        // For interview mode, use the user's selected interval
+        const screenshotMode = selectedMode === 'coding' ? 'manual' : this.selectedScreenshotInterval;
+
+        if (selectedMode === 'coding') {
+            console.log('💻 Coding/OA mode: Manual capture only - Press Ctrl+Enter to analyze screenshot');
+        }
+
+        cheddar.startCapture(screenshotMode, this.selectedImageQuality);
         this.responses = [];
         this.currentResponseIndex = -1;
         this.startTime = Date.now();

@@ -199,7 +199,7 @@ async function attemptReconnection() {
     }
 }
 
-async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'interview', language = 'en-US', isReconnection = false) {
+async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'interview', language = 'en-US', isReconnection = false, mode = 'interview', model = 'gemini-2.5-flash') {
     if (isInitializingSession) {
         console.log('Session initialization already in progress');
         return false;
@@ -215,6 +215,8 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
             customPrompt,
             profile,
             language,
+            mode,
+            model,
         };
         reconnectionAttempts = 0; // Reset counter for new session
     }
@@ -236,12 +238,16 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
     }
 
     try {
-        // Live API only supports specific models - using the working model for all profiles
-        // Enhanced prompting will differentiate behavior for exam mode
-        const model = 'gemini-live-2.5-flash-preview';
+        // Determine which model to use based on mode
+        let session;
 
-        const session = await client.live.connect({
-            model: model,
+        if (mode === 'interview') {
+            // Interview mode: Use Gemini 2.5 Flash Live API for real-time audio/video
+            const liveModel = 'gemini-live-2.5-flash-preview';
+            console.log(`🎤 Interview mode: Using ${liveModel}`);
+
+            session = await client.live.connect({
+                model: liveModel,
             callbacks: {
                 onopen: function () {
                     sendToRenderer('update-status', 'Live session connected');
@@ -329,22 +335,117 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                     }
                 },
             },
-            config: {
-                responseModalities: ['TEXT'],
+                config: {
+                    responseModalities: ['TEXT'],
+                    tools: enabledTools,
+                    // Enable speaker diarization
+                    inputAudioTranscription: {
+                        enableSpeakerDiarization: true,
+                        minSpeakerCount: 2,
+                        maxSpeakerCount: 2,
+                    },
+                    contextWindowCompression: { slidingWindow: {} },
+                    speechConfig: { languageCode: language },
+                    systemInstruction: {
+                        parts: [{ text: systemPrompt }],
+                    },
+                },
+            });
+        } else {
+            // Coding/OA mode: Use regular Gemini API (not Live API) for better code quality
+            const regularModel = model || 'gemini-2.5-flash';
+            console.log(`💻 Coding/OA mode: Using ${regularModel} (regular API, screenshot-based)`);
+
+            // For coding mode, we'll create a "session" object that mimics the live API
+            // but uses generateContent internally
+            session = {
+                model: regularModel,
+                client: client,
+                systemPrompt: systemPrompt,
                 tools: enabledTools,
-                // Enable speaker diarization
-                inputAudioTranscription: {
-                    enableSpeakerDiarization: true,
-                    minSpeakerCount: 2,
-                    maxSpeakerCount: 2,
+                isClosed: false,
+
+                async sendRealtimeInput(input) {
+                    if (this.isClosed) {
+                        console.log('Session is closed, ignoring input');
+                        return;
+                    }
+
+                    try {
+                        // Only process image and text inputs for coding mode
+                        if (input.media || input.text) {
+                            console.log(`📸 Sending to ${this.model}`);
+                            sendToRenderer('update-status', 'Analyzing...');
+
+                            // Build the parts array
+                            const parts = [];
+
+                            if (input.text) {
+                                parts.push({ text: input.text });
+                            }
+
+                            if (input.media) {
+                                parts.push({
+                                    inlineData: {
+                                        mimeType: input.media.mimeType,
+                                        data: input.media.data
+                                    }
+                                });
+                            }
+
+                            // Call generateContent directly on client.models
+                            const result = await this.client.models.generateContent({
+                                model: this.model,
+                                contents: [{ role: 'user', parts: parts }],
+                                systemInstruction: { parts: [{ text: this.systemPrompt }] },
+                                generationConfig: {
+                                    temperature: 0.7,
+                                    topK: 40,
+                                    topP: 0.95,
+                                    maxOutputTokens: 8192,
+                                },
+                                tools: this.tools.length > 0 ? this.tools : undefined,
+                            });
+
+                            // Extract text from response
+                            let responseText = '';
+
+                            // The SDK returns result.candidates directly (not result.response.candidates)
+                            if (result && result.candidates && result.candidates.length > 0) {
+                                const candidate = result.candidates[0];
+                                if (candidate.content && candidate.content.parts) {
+                                    for (const part of candidate.content.parts) {
+                                        if (part.text) {
+                                            responseText += part.text;
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (responseText && responseText.trim()) {
+                                console.log(`✅ Got response: ${responseText.length} chars`);
+                                sendToRenderer('update-response', responseText);
+                                sendToRenderer('update-status', 'Ready');
+                            } else {
+                                console.error('❌ No response text. Result structure:', Object.keys(result));
+                                sendToRenderer('update-status', 'No response generated');
+                            }
+                        }
+                    } catch (error) {
+                        console.error('❌ Error in coding mode:', error);
+                        sendToRenderer('update-status', 'Error: ' + error.message);
+                    }
                 },
-                contextWindowCompression: { slidingWindow: {} },
-                speechConfig: { languageCode: language },
-                systemInstruction: {
-                    parts: [{ text: systemPrompt }],
-                },
-            },
-        });
+
+                async close() {
+                    this.isClosed = true;
+                    console.log('Coding mode session closed');
+                    sendToRenderer('update-status', 'Session closed');
+                }
+            };
+
+            sendToRenderer('update-status', `${regularModel} ready (screenshot mode)`);
+        }
 
         isInitializingSession = false;
         sendToRenderer('session-initializing', false);
@@ -522,8 +623,8 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
     // Store the geminiSessionRef globally for reconnection access
     global.geminiSessionRef = geminiSessionRef;
 
-    ipcMain.handle('initialize-gemini', async (event, apiKey, customPrompt, profile = 'interview', language = 'en-US') => {
-        const session = await initializeGeminiSession(apiKey, customPrompt, profile, language);
+    ipcMain.handle('initialize-gemini', async (event, apiKey, customPrompt, profile = 'interview', language = 'en-US', mode = 'interview', model = 'gemini-2.5-flash') => {
+        const session = await initializeGeminiSession(apiKey, customPrompt, profile, language, false, mode, model);
         if (session) {
             geminiSessionRef.current = session;
             return true;
