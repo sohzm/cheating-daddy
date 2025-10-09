@@ -393,8 +393,8 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                                 });
                             }
 
-                            // Call generateContent directly on client.models
-                            const result = await this.client.models.generateContent({
+                            // Use streaming for faster display
+                            const streamResult = await this.client.models.generateContentStream({
                                 model: this.model,
                                 contents: [{ role: 'user', parts: parts }],
                                 systemInstruction: { parts: [{ text: this.systemPrompt }] },
@@ -407,28 +407,56 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                                 tools: this.tools.length > 0 ? this.tools : undefined,
                             });
 
-                            // Extract text from response
+                            // Stream the response as it arrives
                             let responseText = '';
 
-                            // The SDK returns result.candidates directly (not result.response.candidates)
-                            if (result && result.candidates && result.candidates.length > 0) {
-                                const candidate = result.candidates[0];
-                                if (candidate.content && candidate.content.parts) {
-                                    for (const part of candidate.content.parts) {
-                                        if (part.text) {
-                                            responseText += part.text;
+                            // Check if it's iterable stream or has stream property
+                            const streamToIterate = streamResult.stream || streamResult;
+
+                            try {
+                                for await (const chunk of streamToIterate) {
+                                    if (chunk && chunk.candidates && chunk.candidates.length > 0) {
+                                        const candidate = chunk.candidates[0];
+                                        if (candidate.content && candidate.content.parts) {
+                                            for (const part of candidate.content.parts) {
+                                                if (part.text) {
+                                                    responseText += part.text;
+                                                    // Send each chunk immediately for faster display
+                                                    sendToRenderer('update-response', responseText);
+                                                }
+                                            }
                                         }
                                     }
                                 }
-                            }
 
-                            if (responseText && responseText.trim()) {
-                                console.log(`✅ Got response: ${responseText.length} chars`);
-                                sendToRenderer('update-response', responseText);
-                                sendToRenderer('update-status', 'Ready');
-                            } else {
-                                console.error('❌ No response text. Result structure:', Object.keys(result));
-                                sendToRenderer('update-status', 'No response generated');
+                                if (responseText && responseText.trim()) {
+                                    console.log(`✅ Got response: ${responseText.length} chars`);
+                                    sendToRenderer('update-status', 'Ready');
+                                } else {
+                                    console.error('❌ No response text received');
+                                    sendToRenderer('update-status', 'No response generated');
+                                }
+                            } catch (streamError) {
+                                console.error('❌ Streaming error:', streamError);
+                                // Fallback: try to get the complete result
+                                const finalResult = await streamResult;
+                                if (finalResult && finalResult.candidates && finalResult.candidates.length > 0) {
+                                    const candidate = finalResult.candidates[0];
+                                    if (candidate.content && candidate.content.parts) {
+                                        for (const part of candidate.content.parts) {
+                                            if (part.text) {
+                                                responseText += part.text;
+                                            }
+                                        }
+                                    }
+                                }
+                                if (responseText && responseText.trim()) {
+                                    console.log(`✅ Got response (fallback): ${responseText.length} chars`);
+                                    sendToRenderer('update-response', responseText);
+                                    sendToRenderer('update-status', 'Ready');
+                                } else {
+                                    throw streamError;
+                                }
                             }
                         }
                     } catch (error) {
