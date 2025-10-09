@@ -356,12 +356,24 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
             const regularModel = model || 'gemini-2.5-flash';
             console.log(`💻 Coding/OA mode: Using ${regularModel} (regular API, screenshot-based)`);
 
+            // Enhanced prompt for coding mode - concise, direct answers
+            const codingPrompt = systemPrompt + `
+
+**CRITICAL INSTRUCTIONS FOR CODING QUESTIONS:**
+- Provide CONCISE, DIRECT answers only
+- Code should have MINIMAL or NO comments (only if absolutely critical)
+- NO lengthy explanations - just the solution
+- Format: Brief approach (2-3 lines max) → Clean code → Time/Space complexity in one line
+- Avoid markdown formatting, just give clean code
+- No unnecessary text before or after the code
+- Get straight to the point - this is a timed coding assessment`;
+
             // For coding mode, we'll create a "session" object that mimics the live API
             // but uses generateContent internally
             session = {
                 model: regularModel,
                 client: client,
-                systemPrompt: systemPrompt,
+                systemPrompt: codingPrompt,
                 tools: enabledTools,
                 isClosed: false,
 
@@ -461,7 +473,19 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                         }
                     } catch (error) {
                         console.error('❌ Error in coding mode:', error);
-                        sendToRenderer('update-status', 'Error: ' + error.message);
+
+                        // Show user-friendly short error message
+                        let shortMsg = 'Error';
+
+                        if (error.message && error.message.toLowerCase().includes('429')) {
+                            shortMsg = 'Rate limit exceeded';
+                        } else if (error.message && error.message.toLowerCase().includes('503')) {
+                            shortMsg = 'Server overloaded';
+                        } else if (error.message && error.message.toLowerCase().includes('401')) {
+                            shortMsg = 'Invalid API key';
+                        }
+
+                        sendToRenderer('update-status', shortMsg);
                     }
                 },
 

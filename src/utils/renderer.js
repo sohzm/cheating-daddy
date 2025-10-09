@@ -624,9 +624,18 @@ async function captureManualScreenshot(imageQuality = null) {
     console.log('Manual screenshot triggered');
     const quality = imageQuality || currentImageQuality;
 
-    // Just capture and send the screenshot - no extra text message
-    // The screenshot itself will be analyzed by the AI
-    await captureScreenshot(quality, true); // Pass true for isManual
+    // Check if we're in coding mode
+    const selectedMode = localStorage.getItem('selectedMode') || 'interview';
+
+    if (selectedMode === 'coding') {
+        // For coding mode, send screenshot with direct command - no fluff!
+        await captureScreenshot(quality, true);
+        await new Promise(resolve => setTimeout(resolve, 500));
+        await sendTextMessage('The screenshot shows a coding problem. Solve it NOW with: brief approach + complete working code. NO explanations.');
+    } else {
+        // For interview mode, just send screenshot
+        await captureScreenshot(quality, true);
+    }
 }
 
 // Expose functions to global scope for external access
