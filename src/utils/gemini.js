@@ -402,6 +402,7 @@ NOW ANALYZE THE SCREENSHOT AND SOLVE THE EXACT PROBLEM SHOWN.`;
                 systemPrompt: codingPrompt,
                 tools: enabledTools,
                 isClosed: false,
+                conversationHistory: [], // Track conversation history for context
 
                 async sendRealtimeInput(input) {
                     if (this.isClosed) {
@@ -415,7 +416,7 @@ NOW ANALYZE THE SCREENSHOT AND SOLVE THE EXACT PROBLEM SHOWN.`;
                             console.log(`📸 Sending to ${this.model}`);
                             sendToRenderer('update-status', 'Analyzing...');
 
-                            // Build the parts array
+                            // Build the parts array for current message
                             const parts = [];
 
                             if (input.text) {
@@ -431,10 +432,16 @@ NOW ANALYZE THE SCREENSHOT AND SOLVE THE EXACT PROBLEM SHOWN.`;
                                 });
                             }
 
+                            // Build full conversation with history
+                            const contents = [
+                                ...this.conversationHistory,
+                                { role: 'user', parts: parts }
+                            ];
+
                             // Use streaming for faster display
                             const streamResult = await this.client.models.generateContentStream({
                                 model: this.model,
-                                contents: [{ role: 'user', parts: parts }],
+                                contents: contents,
                                 systemInstruction: { parts: [{ text: this.systemPrompt }] },
                                 generationConfig: {
                                     temperature: 0.7,
@@ -469,6 +476,14 @@ NOW ANALYZE THE SCREENSHOT AND SOLVE THE EXACT PROBLEM SHOWN.`;
 
                                 if (responseText && responseText.trim()) {
                                     console.log(`✅ Got response: ${responseText.length} chars`);
+
+                                    // Save to conversation history
+                                    this.conversationHistory.push(
+                                        { role: 'user', parts: parts },
+                                        { role: 'model', parts: [{ text: responseText }] }
+                                    );
+
+                                    console.log(`💬 Conversation history: ${this.conversationHistory.length / 2} turns`);
                                     sendToRenderer('update-status', 'Ready');
                                 } else {
                                     console.error('❌ No response text received');
@@ -490,6 +505,13 @@ NOW ANALYZE THE SCREENSHOT AND SOLVE THE EXACT PROBLEM SHOWN.`;
                                 }
                                 if (responseText && responseText.trim()) {
                                     console.log(`✅ Got response (fallback): ${responseText.length} chars`);
+
+                                    // Save to conversation history
+                                    this.conversationHistory.push(
+                                        { role: 'user', parts: parts },
+                                        { role: 'model', parts: [{ text: responseText }] }
+                                    );
+
                                     sendToRenderer('update-response', responseText);
                                     sendToRenderer('update-status', 'Ready');
                                 } else {
