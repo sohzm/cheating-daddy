@@ -113,9 +113,11 @@ export class CheatingDaddyApp extends LitElement {
         advancedMode: { type: Boolean },
         _viewInstances: { type: Object, state: true },
         _isClickThrough: { state: true },
+        isGenerating: { type: Boolean },
         _awaitingNewResponse: { state: true },
         shouldAnimateResponse: { type: Boolean },
-        cvStatus: { type: Object }
+        cvStatus: { type: Object },
+        selectedProvider: { type: String }
     };
 
     constructor() {
@@ -138,7 +140,9 @@ export class CheatingDaddyApp extends LitElement {
         this._awaitingNewResponse = false;
         this._currentResponseIsComplete = true;
         this.shouldAnimateResponse = false;
+        this.isGenerating = false;
         this.cvStatus = {};
+        this.selectedProvider = localStorage.getItem('selectedProvider') || 'gemini';
 
         // Apply layout mode to document root
         this.updateLayoutMode();
@@ -177,6 +181,14 @@ export class CheatingDaddyApp extends LitElement {
     setStatus(text) {
         this.statusText = text;
         
+        // Update loading state based on status
+        if (text.includes('Processing') || text.includes('Generating') || text.includes('thinking')) {
+            this.isGenerating = true;
+        } else if (text.includes('Ready') || text.includes('Listening') || text.includes('Connected') || text.includes('Response complete')) {
+            this.isGenerating = false;
+            console.log('[CheatingDaddyApp] Loading indicator hidden due to status:', text);
+        }
+        
         // Mark response as complete when we get certain status messages
         if (text.includes('Ready') || text.includes('Listening') || text.includes('Error')) {
             this._currentResponseIsComplete = true;
@@ -193,6 +205,8 @@ export class CheatingDaddyApp extends LitElement {
                 response.toLowerCase().includes('next') ||
                 response.toLowerCase().includes('go on') ||
                 response.toLowerCase().includes('continue'));
+
+        // Don't hide loading indicator here - let it be controlled by response completion
 
         if (this._awaitingNewResponse || this.responses.length === 0) {
             // Always add as new response when explicitly waiting for one
@@ -287,8 +301,11 @@ export class CheatingDaddyApp extends LitElement {
 
     // Main view event handlers
     async handleStart() {
-        // check if api key is empty do nothing
-        const apiKey = localStorage.getItem('apiKey')?.trim();
+        // Get selected provider and corresponding API key
+        this.selectedProvider = localStorage.getItem('selectedProvider') || 'gemini';
+        const apiKeyField = this.selectedProvider === 'gemini' ? 'apiKey' : 'openrouterApiKey';
+        const apiKey = localStorage.getItem(apiKeyField)?.trim();
+        
         if (!apiKey || apiKey === '') {
             // Trigger the red blink animation on the API key input
             const mainView = this.shadowRoot.querySelector('main-view');
@@ -302,13 +319,52 @@ export class CheatingDaddyApp extends LitElement {
         const selectedMode = localStorage.getItem('selectedMode') || 'interview';
         const selectedModel = localStorage.getItem('selectedModel') || 'gemini-2.5-flash';
         
-        await cheddar.initializeGemini(this.selectedProfile, this.selectedLanguage, selectedMode, selectedModel);
+        if (this.selectedProvider === 'gemini') {
+            await cheddar.initializeGemini(this.selectedProfile, this.selectedLanguage, selectedMode, selectedModel);
+        } else {
+            // Initialize OpenRouter session
+            await this.initializeOpenRouter(selectedMode, selectedModel);
+        }
+        
         // Pass the screenshot interval as string (including 'manual' option)
         cheddar.startCapture(this.selectedScreenshotInterval, this.selectedImageQuality);
         this.responses = [];
         this.currentResponseIndex = -1;
         this.startTime = Date.now();
         this.currentView = 'assistant';
+    }
+
+    async initializeOpenRouter(selectedMode, selectedModel) {
+        try {
+            const { ipcRenderer } = window.require('electron');
+            const openrouterApiKey = localStorage.getItem('openrouterApiKey');
+            
+            // Map model names for OpenRouter
+            const modelMapping = {
+                'deepseek-r1': 'deepseek-r1', // Uses LLM chaining
+                'gpt-4o': 'openai/gpt-4o', // Direct vision
+                'claude-3.5-sonnet': 'anthropic/claude-3.5-sonnet', // Direct vision
+                'gemini-2.5-flash': 'openai/gpt-4o', // Maps to GPT-4o for vision
+                'gemini-2.5-pro': 'openai/gpt-4o'   // Maps to GPT-4o for vision
+            };
+            
+            const openrouterModel = modelMapping[selectedModel] || 'deepseek-r1';
+            
+            const result = await ipcRenderer.invoke('initialize-openrouter-session', {
+                apiKey: openrouterApiKey,
+                mode: selectedMode,
+                model: openrouterModel
+            });
+            
+            if (!result.success) {
+                throw new Error(result.error);
+            }
+            
+            console.log('OpenRouter session initialized successfully');
+        } catch (error) {
+            console.error('Failed to initialize OpenRouter session:', error);
+            throw error;
+        }
     }
 
     async handleAPIKeyHelp() {
@@ -480,11 +536,13 @@ export class CheatingDaddyApp extends LitElement {
                         .selectedProfile=${this.selectedProfile}
                         .onSendText=${message => this.handleSendText(message)}
                         .shouldAnimateResponse=${this.shouldAnimateResponse}
+                        .isGenerating=${this.isGenerating}
                         @response-index-changed=${this.handleResponseIndexChanged}
                         @response-animation-complete=${() => {
                             this.shouldAnimateResponse = false;
                             this._currentResponseIsComplete = true;
-                            console.log('[response-animation-complete] Marked current response as complete');
+                            this.isGenerating = false; // Hide loading indicator when animation completes
+                            console.log('[response-animation-complete] Marked current response as complete and hid loading indicator');
                             this.requestUpdate();
                         }}
                     ></assistant-view>
