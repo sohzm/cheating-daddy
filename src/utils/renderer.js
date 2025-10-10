@@ -628,10 +628,8 @@ async function captureManualScreenshot(imageQuality = null) {
     const selectedMode = localStorage.getItem('selectedMode') || 'interview';
 
     if (selectedMode === 'coding') {
-        // For coding mode, send screenshot with direct command - no fluff!
+        // For coding mode, ONLY send screenshot - system prompt will handle it
         await captureScreenshot(quality, true);
-        await new Promise(resolve => setTimeout(resolve, 500));
-        await sendTextMessage('The screenshot shows a coding problem. Solve it NOW with: brief approach + complete working code. NO explanations.');
     } else {
         // For interview mode, just send screenshot
         await captureScreenshot(quality, true);

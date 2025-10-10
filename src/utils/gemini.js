@@ -356,17 +356,43 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
             const regularModel = model || 'gemini-2.5-flash';
             console.log(`💻 Coding/OA mode: Using ${regularModel} (regular API, screenshot-based)`);
 
-            // Enhanced prompt for coding mode - concise, direct answers
+            // Enhanced prompt for coding mode - ULTRA AGGRESSIVE for direct answers
             const codingPrompt = systemPrompt + `
 
-**CRITICAL INSTRUCTIONS FOR CODING QUESTIONS:**
-- Provide CONCISE, DIRECT answers only
-- Code should have MINIMAL or NO comments (only if absolutely critical)
-- NO lengthy explanations - just the solution
-- Format: Brief approach (2-3 lines max) → Clean code → Time/Space complexity in one line
-- Avoid markdown formatting, just give clean code
-- No unnecessary text before or after the code
-- Get straight to the point - this is a timed coding assessment`;
+============ CRITICAL CODING MODE INSTRUCTIONS ============
+
+YOU ARE A CODING ASSISTANT IN A TIMED ASSESSMENT. FOLLOW THESE RULES EXACTLY:
+
+1. WHEN YOU SEE A SCREENSHOT:
+   - Analyze the VISIBLE coding problem on screen
+   - Identify the problem's requirements, constraints, and expected output
+   - Solve THAT EXACT problem - not a different one
+
+2. RESPONSE FORMAT (STRICTLY FOLLOW):
+   - Line 1-2: Brief approach in 1-2 sentences
+   - Line 3+: COMPLETE working code in the language shown on screen
+   - Last line: Time/Space complexity
+
+3. CODE REQUIREMENTS:
+   - NO comments in code (unless absolutely critical)
+   - NO explanations or tutorial text
+   - NO multiple language versions (only the language shown on screen)
+   - CLEAN, working code that passes all test cases
+
+4. WHAT NOT TO DO:
+   - DO NOT solve a different problem than what's shown
+   - DO NOT give long explanations
+   - DO NOT add excessive comments
+   - DO NOT provide multiple solutions
+
+EXAMPLE:
+"Approach: Use Dijkstra + TSP with bitmask DP.
+
+[complete working code here in Java]
+
+Time: O(n²2ⁿ), Space: O(n2ⁿ)"
+
+NOW ANALYZE THE SCREENSHOT AND SOLVE THE EXACT PROBLEM SHOWN.`;
 
             // For coding mode, we'll create a "session" object that mimics the live API
             // but uses generateContent internally
