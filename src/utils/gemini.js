@@ -357,11 +357,18 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
             console.log(`💻 Coding/OA mode: Using ${regularModel} (regular API, screenshot-based)`);
 
             // Enhanced prompt for coding mode - ULTRA AGGRESSIVE for direct answers
+            // Make Pro model even more aggressive about being concise
+            const isProModel = regularModel.includes('pro');
             const codingPrompt = systemPrompt + `
 
 ============ CRITICAL CODING MODE INSTRUCTIONS ============
 
 YOU ARE A CODING ASSISTANT IN A TIMED ASSESSMENT. FOLLOW THESE RULES EXACTLY:
+
+${isProModel ? `
+WARNING GEMINI PRO: YOU MUST BE EXTREMELY CONCISE. NO VERBOSE RESPONSES.
+MAXIMUM 10 LINES OF EXPLANATION TOTAL. FOCUS ON CODE ONLY.
+` : ''}
 
 1. WHEN YOU SEE A SCREENSHOT:
    - Analyze the VISIBLE coding problem on screen
@@ -369,30 +376,59 @@ YOU ARE A CODING ASSISTANT IN A TIMED ASSESSMENT. FOLLOW THESE RULES EXACTLY:
    - Solve THAT EXACT problem - not a different one
 
 2. RESPONSE FORMAT (STRICTLY FOLLOW):
-   - Line 1-2: Brief approach in 1-2 sentences
-   - Line 3+: COMPLETE working code in the language shown on screen
+   - Line 1: One sentence approach (MAX 15 words)
+   - Line 2+: COMPLETE working code ONLY (language shown on screen)
    - Last line: Time/Space complexity
 
 3. CODE REQUIREMENTS:
-   - NO comments in code (unless absolutely critical)
-   - NO explanations or tutorial text
-   - NO multiple language versions (only the language shown on screen)
-   - CLEAN, working code that passes all test cases
+   - ZERO comments in code
+   - ZERO explanations before or after code
+   - ZERO tutorial text
+   - ONLY the language shown on screen
+   - CLEAN, optimized code that passes all test cases
 
-4. WHAT NOT TO DO:
-   - DO NOT solve a different problem than what's shown
-   - DO NOT give long explanations
-   - DO NOT add excessive comments
-   - DO NOT provide multiple solutions
+4. ABSOLUTELY FORBIDDEN:
+   - NO long explanations or theory
+   - NO comments in code
+   - NO multiple language versions
+   - NO step-by-step walkthroughs
+   - NO example inputs/outputs
+   - NO alternative approaches discussion
 
-EXAMPLE:
-"Approach: Use Dijkstra + TSP with bitmask DP.
+5. RESPONSE LENGTH LIMIT:
+   - Approach: 1 line (max 15 words)
+   - Code: As needed
+   - Complexity: 1 line
+   - TOTAL NON-CODE TEXT: MAX 2 LINES
 
-[complete working code here in Java]
+EXAMPLE OF PERFECT RESPONSE:
+"HashMap to count frequencies, find max group size, return chars with that frequency.
 
-Time: O(n²2ⁿ), Space: O(n2ⁿ)"
+class Solution {
+    public String majorityFrequencyGroup(String s) {
+        Map<Character, Integer> freq = new HashMap<>();
+        for (char c : s.toCharArray()) freq.put(c, freq.getOrDefault(c, 0) + 1);
+        Map<Integer, List<Character>> groups = new HashMap<>();
+        for (Map.Entry<Character, Integer> e : freq.entrySet()) {
+            groups.computeIfAbsent(e.getValue(), k -> new ArrayList<>()).add(e.getKey());
+        }
+        int maxSize = 0, maxFreq = 0;
+        for (Map.Entry<Integer, List<Character>> e : groups.entrySet()) {
+            int size = e.getValue().size();
+            if (size > maxSize || (size == maxSize && e.getKey() > maxFreq)) {
+                maxSize = size;
+                maxFreq = e.getKey();
+            }
+        }
+        StringBuilder sb = new StringBuilder();
+        for (char c : groups.get(maxFreq)) sb.append(c);
+        return sb.toString();
+    }
+}
 
-NOW ANALYZE THE SCREENSHOT AND SOLVE THE EXACT PROBLEM SHOWN.`;
+Time: O(n), Space: O(n)"
+
+NOW ANALYZE THE SCREENSHOT AND GIVE ONLY: 1 LINE APPROACH + CODE + 1 LINE COMPLEXITY.`;
 
             // For coding mode, we'll create a "session" object that mimics the live API
             // but uses generateContent internally
