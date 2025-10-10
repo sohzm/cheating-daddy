@@ -396,6 +396,25 @@ export class CustomizeView extends LitElement {
             font-size: 10px;
             color: var(--description-color, rgba(255, 255, 255, 0.5));
         }
+
+        .warning-box {
+            background: var(--warning-background, rgba(251, 191, 36, 0.08));
+            border: 1px solid var(--warning-border, rgba(251, 191, 36, 0.2));
+            border-radius: 4px;
+            padding: 12px;
+            font-size: 11px;
+            color: var(--warning-color, #fbbf24);
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            line-height: 1.4;
+        }
+
+        .warning-icon {
+            flex-shrink: 0;
+            font-size: 12px;
+            margin-top: 1px;
+        }
     `;
 
     static properties = {
@@ -416,6 +435,8 @@ export class CustomizeView extends LitElement {
         onLayoutModeChange: { type: Function },
         advancedMode: { type: Boolean },
         onAdvancedModeChange: { type: Function },
+        selectedMode: { type: String },
+        selectedModel: { type: String },
     };
 
     constructor() {
@@ -448,12 +469,17 @@ export class CustomizeView extends LitElement {
         // Font size default (in pixels)
         this.fontSize = 13;
 
+        // Mode and model selection defaults
+        this.selectedMode = 'interview';
+        this.selectedModel = 'gemini-2.5-flash';
+
         this.loadKeybinds();
         this.loadGoogleSearchSettings();
         this.loadAdvancedModeSettings();
         this.loadVADSettings();
         this.loadBackgroundTransparency();
         this.loadFontSize();
+        this.loadModeSettings();
         this.initializeDefaultInstructions();
     }
 
@@ -560,6 +586,17 @@ export class CustomizeView extends LitElement {
         // Load instructions for the new profile
         const newProfileInstructions = this.getCustomPromptForProfile(this.selectedProfile);
         localStorage.setItem('customPrompt', newProfileInstructions);
+
+        // Auto-set mode based on profile
+        if (this.selectedProfile === 'exam') {
+            // Exam Assistant -> Coding/OA mode
+            this.selectedMode = 'coding';
+            localStorage.setItem('selectedMode', 'coding');
+        } else {
+            // All other profiles -> Interview mode
+            this.selectedMode = 'interview';
+            localStorage.setItem('selectedMode', 'interview');
+        }
 
         // Update the textarea value
         this.requestUpdate();
@@ -943,6 +980,44 @@ export class CustomizeView extends LitElement {
         localStorage.setItem('customPrompt', profileInstructions);
     }
 
+    // Mode and model selection methods
+    loadModeSettings() {
+        const selectedMode = localStorage.getItem('selectedMode');
+        const selectedModel = localStorage.getItem('selectedModel');
+
+        this.selectedMode = selectedMode || 'interview';
+        this.selectedModel = selectedModel || 'gemini-2.5-flash';
+    }
+
+    async handleModeChange(e) {
+        this.selectedMode = e.target.value;
+        localStorage.setItem('selectedMode', this.selectedMode);
+
+        // In interview mode, always use live API
+        // In coding mode, user can choose between flash and pro
+        if (this.selectedMode === 'interview') {
+            this.selectedModel = 'gemini-2.5-flash';
+        } else {
+            // Keep current model selection for coding mode
+            if (this.selectedModel === 'gemini-2.5-flash' || this.selectedModel === 'gemini-2.5-pro') {
+                // Keep the selection
+            } else {
+                // Default to flash for coding mode
+                this.selectedModel = 'gemini-2.5-flash';
+            }
+        }
+        localStorage.setItem('selectedModel', this.selectedModel);
+
+        this.requestUpdate();
+    }
+
+    async handleModelChange(e) {
+        this.selectedModel = e.target.value;
+        localStorage.setItem('selectedModel', this.selectedModel);
+
+        this.requestUpdate();
+    }
+
     render() {
         const profiles = this.getProfiles();
         const languages = this.getLanguages();
@@ -995,6 +1070,58 @@ export class CustomizeView extends LitElement {
                 </div>
             </div>
         </div>
+
+                <!-- Mode Selection Section (Coding vs Interview) -->
+                <div class="settings-section">
+                    <div class="section-title">
+                        <span>🎯 Application Mode</span>
+                    </div>
+
+                    <div class="form-grid">
+                        ${this.selectedProfile === 'exam' ? html`
+                            <!-- Exam Assistant mode: Only Coding/OA mode available -->
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="form-label">Mode (Fixed for Exam Assistant)</label>
+                                    <select class="form-control" .value=${'coding'} disabled>
+                                        <option value="coding">💻 Coding/OA Mode (Screenshot-based)</option>
+                                    </select>
+                                    <div class="form-description">
+                                        Exam Assistant profile uses Coding/OA mode for better problem-solving responses. Uses regular Gemini API (2.5 Flash or Pro) instead of Live API.
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="form-label">Model Selection</label>
+                                    <select class="form-control" .value=${this.selectedModel} @change=${this.handleModelChange}>
+                                        <option value="gemini-2.5-flash">⚡ Gemini 2.5 Flash (Faster, Balanced)</option>
+                                        <option value="gemini-2.5-pro">🚀 Gemini 2.5 Pro (Slower, More Accurate)</option>
+                                    </select>
+                                    <div class="form-description">
+                                        ${this.selectedModel === 'gemini-2.5-flash'
+                                            ? 'Gemini 2.5 Flash: Faster responses, good for time-sensitive coding assessments.'
+                                            : 'Gemini 2.5 Pro: More accurate and detailed responses, better for complex problems.'}
+                                    </div>
+                                </div>
+                            </div>
+                        ` : html`
+                            <!-- Other profiles: Only Interview mode available -->
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="form-label">Mode (Fixed for ${this.getProfileNames()[this.selectedProfile]})</label>
+                                    <select class="form-control" .value=${'interview'} disabled>
+                                        <option value="interview">🎤 Interview Mode (Real-time Audio/Video)</option>
+                                    </select>
+                                    <div class="form-description">
+                                        ${this.getProfileNames()[this.selectedProfile]} profile uses Interview mode with Gemini 2.5 Flash Live API for real-time audio processing and live interactions.
+                                    </div>
+                                </div>
+                            </div>
+                        `}
+                    </div>
+                </div>
 
                 <!-- Audio & Microphone Section -->
                 <div class="settings-section">
@@ -1174,6 +1301,13 @@ export class CustomizeView extends LitElement {
                         <span>Screen Capture Settings</span>
                     </div>
 
+                    ${this.selectedProfile === 'exam' ? html`
+                        <div class="warning-box" style="margin-bottom: 12px;">
+                            <span class="warning-icon">⚠️</span>
+                            <span><strong>Note for Exam Assistant:</strong> Automatic screenshot capture is disabled in Exam Assistant mode to prevent API rate limits. Use Ctrl+Enter (or Cmd+Enter on Mac) to manually capture and analyze screenshots.</span>
+                        </div>
+                    ` : ''}
+
                     <div class="form-grid">
                         <div class="form-row">
                             <div class="form-group">
@@ -1196,6 +1330,7 @@ export class CustomizeView extends LitElement {
                                             ? 'Screenshots will only be taken when you use the "Ask Next Step" shortcut'
                                             : 'Automatic screenshots will be taken at the specified interval'
                                     }
+                                    ${this.selectedProfile === 'exam' ? ' (Note: Forced to manual mode for Exam Assistant)' : ''}
                                 </div>
                             </div>
 

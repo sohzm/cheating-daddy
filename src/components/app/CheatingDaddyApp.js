@@ -280,18 +280,29 @@ export class CheatingDaddyApp extends LitElement {
             return;
         }
 
-        // Get mode and model from localStorage
-        const selectedMode = localStorage.getItem('selectedMode') || 'interview';
+        // Auto-set mode based on profile
+        let selectedMode;
+        if (this.selectedProfile === 'exam') {
+            // Exam Assistant -> Coding/OA mode (forced)
+            selectedMode = 'coding';
+            localStorage.setItem('selectedMode', 'coding');
+        } else {
+            // All other profiles -> Interview mode (forced)
+            selectedMode = 'interview';
+            localStorage.setItem('selectedMode', 'interview');
+        }
+
+        // Get model from localStorage (only matters for coding mode)
         const selectedModel = localStorage.getItem('selectedModel') || 'gemini-2.5-flash';
 
         await cheddar.initializeGemini(this.selectedProfile, this.selectedLanguage, selectedMode, selectedModel);
 
-        // For coding/OA mode, ALWAYS use manual mode to avoid rate limits
+        // For coding/OA mode (exam-assistant), ALWAYS use manual mode to avoid rate limits
         // For interview mode, use the user's selected interval
         const screenshotMode = selectedMode === 'coding' ? 'manual' : this.selectedScreenshotInterval;
 
         if (selectedMode === 'coding') {
-            console.log('💻 Coding/OA mode: Manual capture only - Press Ctrl+Enter to analyze screenshot');
+            console.log('💻 Coding/OA mode (Exam Assistant): Manual capture only - Press Ctrl+Enter to analyze screenshot');
         }
 
         cheddar.startCapture(screenshotMode, this.selectedImageQuality);

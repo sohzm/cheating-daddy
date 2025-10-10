@@ -327,8 +327,6 @@ export class AdvancedView extends LitElement {
         maxTokensPerMin: { type: Number },
         throttleAtPercent: { type: Number },
         contentProtection: { type: Boolean },
-        selectedMode: { type: String },
-        selectedModel: { type: String },
     };
 
     constructor() {
@@ -345,13 +343,8 @@ export class AdvancedView extends LitElement {
         // Content protection default
         this.contentProtection = true;
 
-        // Mode and model selection defaults
-        this.selectedMode = 'interview';
-        this.selectedModel = 'gemini-2.5-flash';
-
         this.loadRateLimitSettings();
         this.loadContentProtectionSetting();
-        this.loadModeSettings();
     }
 
     connectedCallback() {
@@ -496,46 +489,6 @@ export class AdvancedView extends LitElement {
         this.requestUpdate();
     }
 
-    // Mode and model selection methods
-    loadModeSettings() {
-        const selectedMode = localStorage.getItem('selectedMode');
-        const selectedModel = localStorage.getItem('selectedModel');
-
-        this.selectedMode = selectedMode || 'interview';
-        this.selectedModel = selectedModel || 'gemini-2.5-flash';
-    }
-
-    async handleModeChange(e) {
-        this.selectedMode = e.target.value;
-        localStorage.setItem('selectedMode', this.selectedMode);
-
-        // In interview mode, always use live API
-        // In coding mode, user can choose between flash and pro
-        if (this.selectedMode === 'interview') {
-            this.selectedModel = 'gemini-2.5-flash';
-        } else {
-            // Keep current model selection for coding mode
-            if (this.selectedModel === 'gemini-2.5-flash' || this.selectedModel === 'gemini-2.5-pro') {
-                // Keep the selection
-            } else {
-                // Default to flash for coding mode
-                this.selectedModel = 'gemini-2.5-flash';
-            }
-        }
-        localStorage.setItem('selectedModel', this.selectedModel);
-
-        this.requestUpdate();
-    }
-
-    async handleModelChange(e) {
-        this.selectedModel = e.target.value;
-        localStorage.setItem('selectedModel', this.selectedModel);
-
-        this.requestUpdate();
-    }
-
-
-
     render() {
         return html`
             <div class="advanced-container">
@@ -567,51 +520,6 @@ export class AdvancedView extends LitElement {
                                 ? 'The application is currently invisible to screen sharing and recording software.' 
                                 : 'The application is currently visible to screen sharing and recording software.'}
                         </div>
-                    </div>
-                </div>
-
-                <!-- Mode Selection Section -->
-                <div class="advanced-section">
-                    <div class="section-title">
-                        <span>🎯 Mode Selection</span>
-                    </div>
-                    <div class="advanced-description">
-                        Choose between Interview Mode (real-time audio/video) and Coding/OA Mode (screenshot-based) for different use cases.
-                        Interview mode uses Gemini 2.5 Flash Live API with audio processing. Coding mode uses regular Gemini API (2.5 Flash or Pro) for better coding problem responses.
-                    </div>
-
-                    <div class="form-grid">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label class="form-label">Application Mode</label>
-                                <select class="form-control" .value=${this.selectedMode} @change=${this.handleModeChange}>
-                                    <option value="interview">🎤 Interview Mode (Real-time Audio/Video)</option>
-                                    <option value="coding">💻 Coding/OA Mode (Screenshot-based)</option>
-                                </select>
-                                <div class="form-description">
-                                    ${this.selectedMode === 'interview'
-                                        ? 'Uses Gemini 2.5 Flash Live API for real-time audio processing and live interactions.'
-                                        : 'Uses regular Gemini API for screenshot analysis (better for coding problems, optimized responses).'}
-                                </div>
-                            </div>
-                        </div>
-
-                        ${this.selectedMode === 'coding' ? html`
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label class="form-label">Model Selection (Coding/OA Mode)</label>
-                                    <select class="form-control" .value=${this.selectedModel} @change=${this.handleModelChange}>
-                                        <option value="gemini-2.5-flash">⚡ Gemini 2.5 Flash (Faster, Balanced)</option>
-                                        <option value="gemini-2.5-pro">🚀 Gemini 2.5 Pro (Slower, More Accurate)</option>
-                                    </select>
-                                    <div class="form-description">
-                                        ${this.selectedModel === 'gemini-2.5-flash'
-                                            ? 'Gemini 2.5 Flash: Faster responses, good for time-sensitive coding assessments.'
-                                            : 'Gemini 2.5 Pro: More accurate and detailed responses, better for complex problems.'}
-                                    </div>
-                                </div>
-                            </div>
-                        ` : ''}
                     </div>
                 </div>
 
