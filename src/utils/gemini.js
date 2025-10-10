@@ -4,6 +4,8 @@ const { spawn } = require('child_process');
 const { saveDebugAudio } = require('../audioUtils');
 const { getSystemPrompt } = require('./prompts');
 const pdfProcessor = require('./pdfProcessor');
+const { initializeOpenRouterSession, sendToOpenRouter } = require('./openrouter');
+const { sendToRenderer } = require('./ipcUtils');
 
 // Enhanced prompt engineering for coding interview mode
 function getCodingOptimizedPrompt(basePrompt, model) {
@@ -111,12 +113,22 @@ let maxReconnectionAttempts = 3;
 let reconnectionDelay = 2000; // 2 seconds between attempts
 let lastSessionParams = null;
 
-function sendToRenderer(channel, data) {
-    const windows = BrowserWindow.getAllWindows();
-    if (windows.length > 0) {
-        windows[0].webContents.send(channel, data);
+// OpenRouter session management
+let openrouterSession = null;
+
+// Initialize OpenRouter session
+async function initializeOpenRouterSessionWrapper(apiKey, mode = 'coding', model = 'deepseek-r1') {
+    try {
+        console.log('Initializing OpenRouter session...');
+        const session = await initializeOpenRouterSession(apiKey, mode, model);
+        console.log('OpenRouter session initialized successfully');
+        return session;
+    } catch (error) {
+        console.error('Failed to initialize OpenRouter session:', error);
+        throw error;
     }
 }
+
 
 // Conversation management functions
 function initializeNewSession() {
@@ -364,6 +376,7 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
 
                         if (message.serverContent?.generationComplete) {
                             sendToRenderer('update-response', messageBuffer);
+                            sendToRenderer('update-status', 'Response complete');
 
                             // Save conversation turn when we have both transcription and AI response
                             if (currentTranscription && messageBuffer) {
@@ -1055,13 +1068,678 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
             return { success: false, error: error.message };
         }
     });
+
+    // OpenRouter IPC handlers
+    ipcMain.handle('initialize-openrouter-session', async (event, { apiKey, mode, model }) => {
+        try {
+            // Store the session globally, don't return it
+            openrouterSession = await initializeOpenRouterSessionWrapper(apiKey, mode, model);
+            console.log('OpenRouter session stored globally');
+            return { success: true, model: openrouterSession.model, mode: openrouterSession.mode };
+        } catch (error) {
+            console.error('Error initializing OpenRouter session:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('send-to-openrouter', async (event, { message, screenshotData, selectedModel }) => {
+        try {
+            if (!openrouterSession) {
+                throw new Error('OpenRouter session not initialized');
+            }
+
+            let responseBuffer = '';
+            
+            // Check if this is DeepSeekR1 and we have screenshot data
+            const model = selectedModel || 'deepseek-r1';
+            
+            if (model === 'deepseek-r1' && screenshotData) {
+                console.log('🔄 DeepSeekR1 with screenshot: Using LLM chaining with user message');
+                
+                // Step 1: Extract text from screenshot using Gemini
+                const geminiApiKey = await getStoredSetting('apiKey') || process.env.GEMINI_API_KEY;
+                
+                if (!geminiApiKey || typeof geminiApiKey !== 'string') {
+                    throw new Error('Gemini API key not found or invalid. Please ensure you have entered a valid Gemini API key for LLM chaining.');
+                }
+                
+                sendToRenderer('update-status', 'Extracting text from screenshot...');
+                const extractedText = await extractTextFromImageWithGemini(screenshotData, geminiApiKey);
+                
+                if (!extractedText || extractedText.trim().length === 0) {
+                    throw new Error('Failed to extract text from screenshot');
+                }
+                
+                console.log(`Extracted text length: ${extractedText.length} characters`);
+                
+                // Step 2: Combine extracted text with user message
+                const combinedPrompt = `Screenshot Context:
+${extractedText}
+
+User Question/Request:
+${message}
+
+Please analyze the screenshot content above and respond to the user's question/request. Provide detailed assistance based on what you can see in the screenshot.`;
+                
+                sendToRenderer('update-status', 'Processing with DeepSeekR1...');
+                
+                await sendToOpenRouter(openrouterSession, combinedPrompt, (chunk) => {
+                    responseBuffer += chunk;
+                    sendToRenderer('update-response', responseBuffer);
+                });
+                
+            } else {
+                // Regular text-only request
+                await sendToOpenRouter(openrouterSession, message, (chunk) => {
+                    responseBuffer += chunk;
+                    sendToRenderer('update-response', responseBuffer);
+                });
+            }
+
+            sendToRenderer('update-status', 'Response complete');
+            return { success: true };
+        } catch (error) {
+            console.error('Error sending to OpenRouter:', error);
+            sendToRenderer('update-status', `OpenRouter error: ${error.message}`);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('close-openrouter-session', async () => {
+        try {
+            openrouterSession = null;
+            sendToRenderer('update-status', 'OpenRouter session closed');
+            return { success: true };
+        } catch (error) {
+            console.error('Error closing OpenRouter session:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    // OpenRouter image/screenshot handler with LLM chaining
+    ipcMain.handle('send-image-to-openrouter', async (event, { data, debug }) => {
+        if (!openrouterSession) {
+            return { success: false, error: 'No active OpenRouter session' };
+        }
+
+        const startTime = Date.now();
+        let retryCount = 0;
+        const maxRetries = 3;
+
+        try {
+            if (!data || typeof data !== 'string') {
+                console.error('Invalid image data received for OpenRouter');
+                return { success: false, error: 'Invalid image data' };
+            }
+
+            const buffer = Buffer.from(data, 'base64');
+
+            if (buffer.length < 1000) {
+                console.error(`Image buffer too small for OpenRouter: ${buffer.length} bytes`);
+                return { success: false, error: 'Image buffer too small' };
+            }
+
+            // Validate image data integrity
+            if (buffer.length > 10 * 1024 * 1024) { // 10MB limit
+                console.error(`Image too large for OpenRouter: ${buffer.length} bytes`);
+                return { success: false, error: 'Image too large (max 10MB)' };
+            }
+
+            console.log(`Processing image with LLM chaining: ${buffer.length} bytes`);
+            process.stdout.write('!');
+            
+            // Progressive enhancement: adaptive delay based on image size
+            const adaptiveDelay = Math.min(100 + (buffer.length / 10000), 1000);
+            await new Promise(resolve => setTimeout(resolve, adaptiveDelay));
+            
+            // Retry mechanism with exponential backoff
+            while (retryCount < maxRetries) {
+                try {
+                    // Step 1: Use Gemini Live to extract text from image
+                    sendToRenderer('update-status', 'Extracting text from image...');
+                    
+                    const geminiApiKey = await getStoredSetting('apiKey') || process.env.GEMINI_API_KEY;
+                    console.log('getStoredSetting result:', await getStoredSetting('apiKey'));
+                    console.log('process.env.GEMINI_API_KEY:', process.env.GEMINI_API_KEY);
+                    console.log('Final geminiApiKey type:', typeof geminiApiKey);
+                    console.log('Final geminiApiKey value:', geminiApiKey);
+                    console.log('Retrieved Gemini API key for LLM chaining:', geminiApiKey ? `${String(geminiApiKey).substring(0, 10)}...` : 'null');
+                    
+                    if (!geminiApiKey || typeof geminiApiKey !== 'string') {
+                        throw new Error('Gemini API key not found or invalid. Please ensure you have entered a valid Gemini API key for LLM chaining.');
+                    }
+                    
+                    const extractedText = await extractTextFromImageWithGemini(data, geminiApiKey);
+                    
+                    if (!extractedText || extractedText.trim().length === 0) {
+                        throw new Error('Failed to extract text from image');
+                    }
+                    
+                    console.log(`Extracted text length: ${extractedText.length} characters`);
+                    
+                    // Step 2: Send extracted text to DeepSeekR1
+                    sendToRenderer('update-status', 'Processing with DeepSeekR1...');
+                    
+                    const analysisPrompt = `Please analyze the following content extracted from a screenshot and provide detailed assistance:
+
+${extractedText}
+
+If this is code, help debug, explain, or provide solutions. If this is a problem or question, provide a complete answer with step-by-step explanation. If it's a multiple choice question, give the answer with reasoning.`;
+
+                    let responseBuffer = '';
+                    
+                    await sendToOpenRouter(openrouterSession, analysisPrompt, (chunk) => {
+                        responseBuffer += chunk;
+                        sendToRenderer('update-response', responseBuffer);
+                    });
+
+                    const processingTime = Date.now() - startTime;
+                    console.log(`LLM chaining completed successfully in ${processingTime}ms (attempt ${retryCount + 1})`);
+                    
+                    // Log performance metrics
+                    console.log('LLM chaining metrics:', {
+                        imageSize: buffer.length,
+                        extractedTextLength: extractedText.length,
+                        processingTime: processingTime + 'ms',
+                        retryCount: retryCount,
+                        model: openrouterSession.model
+                    });
+                    
+                    sendToRenderer('update-status', 'Response complete');
+                    return { success: true };
+                    
+                } catch (error) {
+                    retryCount++;
+                    console.warn(`LLM chaining attempt ${retryCount} failed:`, error.message);
+                    
+                    if (retryCount < maxRetries) {
+                        const backoffDelay = Math.min(1000 * Math.pow(2, retryCount - 1), 5000);
+                        console.log(`Retrying in ${backoffDelay}ms...`);
+                        await new Promise(resolve => setTimeout(resolve, backoffDelay));
+                    } else {
+                        throw error;
+                    }
+                }
+            }
+            
+        } catch (error) {
+            console.error('Error in LLM chaining:', error);
+            sendToRenderer('update-status', `LLM chaining error: ${error.message}`);
+            return { success: false, error: error.message };
+        }
+    });
+
+    // OpenRouter direct vision handler (for non-DeepSeekR1 models)
+    ipcMain.handle('send-image-to-openrouter-vision', async (event, { data, debug }) => {
+        if (!openrouterSession) {
+            return { success: false, error: 'No active OpenRouter session' };
+        }
+
+        const startTime = Date.now();
+        let retryCount = 0;
+        const maxRetries = 3;
+
+        try {
+            if (!data || typeof data !== 'string') {
+                console.error('Invalid image data received for OpenRouter vision');
+                return { success: false, error: 'Invalid image data' };
+            }
+
+            const buffer = Buffer.from(data, 'base64');
+
+            if (buffer.length < 1000) {
+                console.error(`Image buffer too small for OpenRouter vision: ${buffer.length} bytes`);
+                return { success: false, error: 'Image buffer too small' };
+            }
+
+            // Validate image data integrity
+            if (buffer.length > 10 * 1024 * 1024) { // 10MB limit
+                console.error(`Image too large for OpenRouter vision: ${buffer.length} bytes`);
+                return { success: false, error: 'Image too large (max 10MB)' };
+            }
+
+            console.log(`Sending image to OpenRouter vision model: ${buffer.length} bytes`);
+            process.stdout.write('!');
+            
+            // Progressive enhancement: adaptive delay based on image size
+            const adaptiveDelay = Math.min(100 + (buffer.length / 10000), 1000);
+            await new Promise(resolve => setTimeout(resolve, adaptiveDelay));
+            
+            // Retry mechanism with exponential backoff
+            while (retryCount < maxRetries) {
+                try {
+                    // Convert base64 to data URL for OpenRouter
+                    const dataUrl = `data:image/jpeg;base64,${data}`;
+                    
+                    // Create a message with the image for OpenRouter
+                    const messages = [
+                        {
+                            role: 'user',
+                            content: [
+                                {
+                                    type: 'text',
+                                    text: 'Please analyze this screenshot and provide detailed assistance. If this is code, help debug, explain, or provide solutions. If this is a problem or question, provide a complete answer with step-by-step explanation.'
+                                },
+                                {
+                                    type: 'image_url',
+                                    image_url: {
+                                        url: dataUrl
+                                    }
+                                }
+                            ]
+                        }
+                    ];
+
+                    let responseBuffer = '';
+                    
+                    await sendToOpenRouter(openrouterSession, messages, (chunk) => {
+                        responseBuffer += chunk;
+                        sendToRenderer('update-response', responseBuffer);
+                    });
+
+                    const processingTime = Date.now() - startTime;
+                    console.log(`Image sent to OpenRouter vision successfully in ${processingTime}ms (attempt ${retryCount + 1})`);
+                    
+                    // Log performance metrics
+                    console.log('OpenRouter vision processing metrics:', {
+                        imageSize: buffer.length,
+                        processingTime: processingTime + 'ms',
+                        retryCount: retryCount,
+                        model: openrouterSession.model
+                    });
+                    
+                    sendToRenderer('update-status', 'Response complete');
+                    return { success: true };
+                    
+                } catch (error) {
+                    retryCount++;
+                    console.warn(`OpenRouter vision send attempt ${retryCount} failed:`, error.message);
+                    
+                    if (retryCount < maxRetries) {
+                        const backoffDelay = Math.min(1000 * Math.pow(2, retryCount - 1), 5000);
+                        console.log(`Retrying in ${backoffDelay}ms...`);
+                        await new Promise(resolve => setTimeout(resolve, backoffDelay));
+                    } else {
+                        throw error;
+                    }
+                }
+            }
+            
+        } catch (error) {
+            console.error('Error sending image to OpenRouter vision:', error);
+            sendToRenderer('update-status', `OpenRouter vision error: ${error.message}`);
+            return { success: false, error: error.message };
+        }
+    });
 }
+
+// Context-aware OCR system that detects screen regions and content types
+async function extractTextFromImageWithGemini(imageData, apiKey) {
+    try {
+        console.log('🔍 Starting context-aware OCR analysis...');
+        
+        // Create a temporary Gemini session for text extraction
+        const { GoogleGenAI } = require('@google/genai');
+        
+        if (!apiKey) {
+            throw new Error('Gemini API key not provided for text extraction');
+        }
+        
+        console.log('Using Gemini API key for text extraction:', apiKey ? `${apiKey.substring(0, 10)}...` : 'null');
+        
+        const genAI = new GoogleGenAI({
+            vertexai: false,
+            apiKey: apiKey,
+        });
+
+        // Step 1: Analyze screen regions and content types
+        const contextAnalysis = await analyzeScreenContext(imageData, genAI);
+        console.log('📊 Screen context analysis:', contextAnalysis);
+        
+        // Step 2: Extract text based on detected context
+        const extractedText = await performContextAwareExtraction(imageData, genAI, contextAnalysis);
+        
+        return extractedText;
+    } catch (error) {
+        console.error('Error in context-aware OCR:', error);
+        
+        // Fallback to basic extraction if context analysis fails
+        console.log('🔄 Falling back to basic text extraction...');
+        return await performBasicTextExtraction(imageData, apiKey);
+    }
+}
+
+// Analyze screen to detect regions and content types
+async function analyzeScreenContext(imageData, genAI) {
+    const analysisPrompt = `Analyze this screenshot and identify different regions and content types. Look for:
+
+1. **Terminal/Console regions**: Dark backgrounds with monospaced text, command prompts, code output
+2. **Video/Media regions**: Video players, streaming content, media controls
+3. **Code editor regions**: Syntax-highlighted code, line numbers, file tabs
+4. **Web browser regions**: Web pages, forms, navigation elements
+5. **IDE/Application regions**: Development environments, toolbars, panels
+6. **Question/Problem regions**: Text-based questions, multiple choice, problem statements
+
+Respond with ONLY a valid JSON object (no markdown, no code blocks, no extra text). The JSON should contain:
+{
+  "regions": [
+    {
+      "type": "terminal|video|code_editor|web_browser|ide|question|other",
+      "location": "left|right|top|bottom|center|full",
+      "confidence": 0.0-1.0,
+      "description": "Brief description of what's in this region"
+    }
+  ],
+  "primary_content": "terminal|video|code|web|question|mixed",
+  "context_hints": ["coding_interview", "video_tutorial", "web_browsing", "problem_solving"]
+}
+
+IMPORTANT: Return only the JSON object, no markdown formatting or code blocks.`;
+
+    try {
+        const result = await genAI.models.generateContent({
+            model: 'gemini-2.0-flash-exp',
+            contents: [
+                {
+                    role: 'user',
+                    parts: [
+                        { text: analysisPrompt },
+                        {
+                            inlineData: {
+                                data: imageData,
+                                mimeType: 'image/jpeg'
+                            }
+                        }
+                    ]
+                }
+            ],
+            generationConfig: {
+                temperature: 0.1,
+                maxOutputTokens: 1000,
+            }
+        });
+        
+        const analysisText = result.candidates[0].content.parts[0].text;
+        console.log(`📊 Raw context analysis: ${analysisText.substring(0, 200)}...`);
+        
+        // Try to parse JSON, handling markdown code blocks
+        try {
+            // Extract JSON from markdown code blocks if present
+            let jsonText = analysisText.trim();
+            
+            // Remove markdown code block markers
+            if (jsonText.startsWith('```json')) {
+                jsonText = jsonText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+            } else if (jsonText.startsWith('```')) {
+                jsonText = jsonText.replace(/^```\s*/, '').replace(/\s*```$/, '');
+            }
+            
+            // Clean up any remaining whitespace
+            jsonText = jsonText.trim();
+            
+            console.log(`🧹 Cleaned JSON text: ${jsonText.substring(0, 200)}...`);
+            
+            const analysis = JSON.parse(jsonText);
+            console.log(`✅ Successfully parsed context analysis:`, analysis);
+            return JSON.stringify(analysis);
+        } catch (parseError) {
+            console.warn('Failed to parse context analysis as JSON:', parseError.message);
+            console.log('Raw text that failed to parse:', analysisText);
+            return JSON.stringify({
+                primary_content: 'mixed',
+                regions: [],
+                context_hints: ['general']
+            });
+        }
+        
+    } catch (error) {
+        console.error('Error in screen context analysis:', error);
+        // Return fallback analysis
+        return JSON.stringify({
+            primary_content: 'mixed',
+            regions: [],
+            context_hints: ['general']
+        });
+    }
+}
+
+// Perform context-aware text extraction based on detected regions
+async function performContextAwareExtraction(imageData, genAI, contextAnalysis) {
+    try {
+        let analysis;
+        try {
+            analysis = JSON.parse(contextAnalysis);
+        } catch (parseError) {
+            console.warn('Failed to parse context analysis JSON, using fallback');
+            analysis = { primary_content: 'mixed', regions: [] };
+        }
+
+        console.log(`🎯 Detected primary content: ${analysis.primary_content}`);
+        
+        // Create region-specific extraction prompts
+        const regionPrompts = analysis.regions.map(region => {
+            return `**${region.type.toUpperCase()} REGION (${region.location})**: ${region.description}`;
+        }).join('\n');
+
+        // Build context-aware extraction prompt
+        const extractionPrompt = `Extract ALL text content from this screenshot. Return ONLY plain text, NO JSON format.
+
+**DETECTED CONTEXT:**
+- Primary Content: ${analysis.primary_content}
+- Context Hints: ${analysis.context_hints?.join(', ') || 'general'}
+
+**REGIONS DETECTED:**
+${regionPrompts || 'No specific regions detected'}
+
+**EXTRACTION INSTRUCTIONS:**
+
+${getContextSpecificInstructions(analysis.primary_content)}
+
+**IMPORTANT: Return ONLY plain text content, structured as follows:**
+
+=== SCREEN CONTEXT ===
+[Brief description of what's on screen]
+
+=== TERMINAL/CONSOLE CONTENT ===
+[Any terminal output, commands, or console text]
+
+=== CODE CONTENT ===
+[Any code snippets, with proper formatting and indentation]
+
+=== QUESTION/PROBLEM TEXT ===
+[Any questions, problems, or prompts visible]
+
+=== UI ELEMENTS ===
+[Buttons, labels, navigation elements]
+
+=== OTHER TEXT ===
+[Any other readable text not covered above]
+
+DO NOT return JSON. Return only the structured text content above. Focus on accuracy and preserve formatting, especially for code and terminal output.`;
+
+        const result = await genAI.models.generateContent({
+            model: 'gemini-2.0-flash-exp',
+            contents: [
+                {
+                    role: 'user',
+                    parts: [
+                        { text: extractionPrompt },
+                        {
+                            inlineData: {
+                                data: imageData,
+                                mimeType: 'image/jpeg'
+                            }
+                        }
+                    ]
+                }
+            ],
+            generationConfig: {
+                temperature: 0.1,
+                maxOutputTokens: 4000,
+            }
+        });
+        
+        let extractedText = result.candidates[0].content.parts[0].text;
+        
+        // Post-process to remove any JSON formatting that might have been returned
+        extractedText = cleanExtractedText(extractedText);
+        
+        console.log(`✅ Context-aware extraction completed: ${extractedText.length} characters`);
+        console.log(`📝 First 200 chars: ${extractedText.substring(0, 200)}...`);
+        return extractedText;
+        
+    } catch (error) {
+        console.error('Error in context-aware extraction:', error);
+        throw error;
+    }
+}
+
+// Clean extracted text to remove JSON formatting
+function cleanExtractedText(text) {
+    try {
+        // Remove any markdown code blocks
+        let cleaned = text.trim();
+        
+        // Remove markdown code blocks
+        if (cleaned.startsWith('```')) {
+            cleaned = cleaned.replace(/^```[a-z]*\s*/, '').replace(/\s*```$/, '');
+        }
+        
+        // Remove JSON object markers if present
+        cleaned = cleaned.replace(/^\{[\s\S]*\}$/m, '').trim();
+        
+        // Remove any remaining JSON-like structures
+        cleaned = cleaned.replace(/^\s*[\{\[].*[\}\]]\s*$/m, '').trim();
+        
+        // If the text is empty after cleaning, return original
+        if (cleaned.length === 0) {
+            console.warn('⚠️ Text became empty after cleaning, returning original');
+            return text;
+        }
+        
+        console.log(`🧹 Cleaned text from ${text.length} to ${cleaned.length} characters`);
+        return cleaned;
+        
+    } catch (error) {
+        console.warn('Error cleaning extracted text:', error);
+        return text; // Return original if cleaning fails
+    }
+}
+
+// Get context-specific extraction instructions
+function getContextSpecificInstructions(primaryContent) {
+    const instructions = {
+        'terminal': `Focus on:
+- Command prompts and their output
+- Error messages and warnings
+- File paths and directory structures
+- Code execution results
+- System information`,
+        
+        'video': `Focus on:
+- Video titles and descriptions
+- Subtitles or captions
+- Control buttons and timestamps
+- Any overlaid text or annotations
+- Video metadata if visible`,
+        
+        'code': `Focus on:
+- Complete code blocks with proper indentation
+- Syntax highlighting preservation
+- Line numbers if present
+- File names and paths
+- Error messages or warnings
+- Comments and documentation`,
+        
+        'web': `Focus on:
+- Page titles and headings
+- Form fields and labels
+- Navigation elements
+- Article or content text
+- URLs and links
+- User interface elements`,
+        
+        'question': `Focus on:
+- Complete question text
+- Multiple choice options
+- Problem statements
+- Instructions or requirements
+- Answer fields or input areas
+- Any diagrams or visual aids`,
+        
+        'mixed': `Focus on:
+- All visible text content
+- Maintain spatial relationships
+- Preserve formatting and structure
+- Include all UI elements
+- Capture both code and text content`
+    };
+    
+    return instructions[primaryContent] || instructions['mixed'];
+}
+
+// Fallback basic text extraction
+async function performBasicTextExtraction(imageData, apiKey) {
+    const { GoogleGenAI } = require('@google/genai');
+    
+    const genAI = new GoogleGenAI({
+        vertexai: false,
+        apiKey: apiKey,
+    });
+    
+    const extractionPrompt = `Please extract ALL text content from this image. Include:
+1. Any visible text, code, or numbers
+2. UI elements, buttons, labels
+3. Error messages or notifications
+4. Code snippets or programming content
+5. Questions, problems, or prompts
+6. Any other readable text
+
+Format the output as plain text, preserving the structure and context. If there's code, maintain proper indentation and formatting.`;
+
+    const result = await genAI.models.generateContent({
+        model: 'gemini-2.0-flash-exp',
+        contents: [
+            {
+                role: 'user',
+                parts: [
+                    { text: extractionPrompt },
+                    {
+                        inlineData: {
+                            data: imageData,
+                            mimeType: 'image/jpeg'
+                        }
+                    }
+                ]
+            }
+        ],
+        generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 4000,
+        }
+    });
+    
+    const extractedText = result.candidates[0].content.parts[0].text;
+    console.log(`✅ Basic extraction completed: ${extractedText.length} characters`);
+    return extractedText;
+}
+
+// IPC handler for getting OpenRouter rate limit status
+ipcMain.handle('get-openrouter-rate-limit', async (event, model) => {
+    try {
+        const { getRateLimitStatus } = require('./openrouter.js');
+        const status = getRateLimitStatus(model);
+        return { success: true, status };
+    } catch (error) {
+        console.error('Error getting rate limit status:', error);
+        return { success: false, error: error.message };
+    }
+});
 
 module.exports = {
     initializeGeminiSession,
     getEnabledTools,
     getStoredSetting,
-    sendToRenderer,
     initializeNewSession,
     saveConversationTurn,
     getCurrentSessionData,

@@ -405,10 +405,16 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
             videoTrack: mediaStream.getVideoTracks()[0]?.getSettings(),
         });
 
-        // Start capturing screenshots - check if manual mode
+        // Start capturing screenshots - check if manual mode or OpenRouter provider
+        const selectedProvider = localStorage.getItem('selectedProvider') || 'gemini';
+        
         if (screenshotIntervalSeconds === 'manual' || screenshotIntervalSeconds === 'Manual') {
             console.log('Manual mode enabled - screenshots will be captured on demand only');
             // Don't start automatic capture in manual mode
+        } else if (selectedProvider === 'openrouter') {
+            console.log('OpenRouter provider selected - automatic screenshots disabled to save API calls');
+            console.log('Screenshots will only be captured when user sends messages through UI');
+            // Don't start automatic capture for OpenRouter to save on API calls
         } else {
             const intervalMilliseconds = parseInt(screenshotIntervalSeconds) * 1000;
             screenshotInterval = setInterval(() => captureScreenshot(imageQuality), intervalMilliseconds);
@@ -614,9 +620,29 @@ async function captureScreenshot(imageQuality = 'medium', isManual = false) {
                     }
                 }, 30000); // 30 second timeout
 
-                const result = await ipcRenderer.invoke('send-image-content', {
-                    data: base64data,
-                });
+                // Check which provider is selected and if we need LLM chaining
+                const selectedProvider = localStorage.getItem('selectedProvider') || 'gemini';
+                const selectedModel = localStorage.getItem('selectedModel') || 'gemini-2.5-flash';
+                
+                let result;
+                if (selectedProvider === 'gemini') {
+                    result = await ipcRenderer.invoke('send-image-content', {
+                        data: base64data,
+                    });
+                } else {
+                    // Check if we need LLM chaining (only for DeepSeekR1)
+                    if (selectedModel === 'deepseek-r1') {
+                        // Use LLM chaining for DeepSeekR1
+                        result = await ipcRenderer.invoke('send-image-to-openrouter', {
+                            data: base64data,
+                        });
+                    } else {
+                        // Use direct vision models for other OpenRouter models
+                        result = await ipcRenderer.invoke('send-image-to-openrouter-vision', {
+                            data: base64data,
+                        });
+                    }
+                }
 
                 if (result.success) {
                     // Track image tokens after successful send
@@ -643,13 +669,125 @@ async function captureScreenshot(imageQuality = 'medium', isManual = false) {
 async function captureManualScreenshot(imageQuality = null) {
     console.log('Manual screenshot triggered');
     const quality = imageQuality || currentImageQuality;
-    await captureScreenshot(quality, true); // Pass true for isManual
-    await new Promise(resolve => setTimeout(resolve, 2000)); // TODO shitty hack
-    await sendTextMessage(`Help me on this page, give me the answer no bs, complete answer.
-        So if its a code question, give me the approach in few bullet points, then the entire code. Also if theres anything else i need to know, tell me.
-        If its a question about the website, give me the answer no bs, complete answer.
-        If its a mcq question, give me the answer no bs, complete answer.
-        `);
+    
+    // Check which provider is selected
+    const selectedProvider = localStorage.getItem('selectedProvider') || 'gemini';
+    const selectedModel = localStorage.getItem('selectedModel') || 'gemini-2.5-flash';
+    
+    if (selectedProvider === 'gemini') {
+        // For Gemini, capture screenshot and send text message
+        await captureScreenshot(quality, true); // Pass true for isManual
+        await new Promise(resolve => setTimeout(resolve, 2000)); // TODO shitty hack
+        await sendTextMessage(`Help me on this page, give me the answer no bs, complete answer.
+            So if its a code question, give me the approach in few bullet points, then the entire code. Also if theres anything else i need to know, tell me.
+            If its a question about the website, give me the answer no bs, complete answer.
+            If its a mcq question, give me the answer no bs, complete answer.
+            `);
+    } else {
+        // For OpenRouter, capture screenshot and handle based on model
+        await captureScreenshot(quality, true); // Pass true for isManual
+        
+        if (selectedModel === 'deepseek-r1') {
+            // For DeepSeekR1, trigger LLM chaining sequence
+            console.log('Manual screenshot + DeepSeekR1: Triggering LLM chaining sequence');
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            await sendTextMessage(`Help me on this page, give me the answer no bs, complete answer.
+            So if its a code question, give me the approach in few bullet points, then the entire code. Also if theres anything else i need to know, tell me.
+            If its a question about the website, give me the answer no bs, complete answer.
+            If its a mcq question, give me the answer no bs, complete answer.
+            `);
+        } else {
+            // For other OpenRouter models (GPT-4o, Claude), send additional text message
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            await sendTextMessage(`Help me on this page, give me the answer no bs, complete answer.
+            So if its a code question, give me the approach in few bullet points, then the entire code. Also if theres anything else i need to know, tell me.
+            If its a question about the website, give me the answer no bs, complete answer.
+            If its a mcq question, give me the answer no bs, complete answer.
+            `);
+        }
+    }
+}
+
+// Capture screenshot and return base64 data for OpenRouter
+async function captureScreenshotForOpenRouter(imageQuality = 'medium') {
+    console.log('Capturing screenshot for OpenRouter...');
+    if (!mediaStream) {
+        throw new Error('No media stream available');
+    }
+
+    // Lazy init of video element
+    if (!hiddenVideo) {
+        hiddenVideo = document.createElement('video');
+        hiddenVideo.srcObject = mediaStream;
+        hiddenVideo.muted = true;
+        hiddenVideo.playsInline = true;
+        await hiddenVideo.play();
+
+        await new Promise(resolve => {
+            if (hiddenVideo.readyState >= 2) return resolve();
+            hiddenVideo.onloadedmetadata = () => resolve();
+        });
+
+        // Lazy init of canvas based on video dimensions
+        offscreenCanvas = document.createElement('canvas');
+        offscreenCanvas.width = hiddenVideo.videoWidth;
+        offscreenCanvas.height = hiddenVideo.videoHeight;
+        offscreenContext = offscreenCanvas.getContext('2d');
+    }
+
+    // Check if video is ready
+    if (hiddenVideo.readyState < 2) {
+        throw new Error('Video not ready yet');
+    }
+
+    offscreenContext.drawImage(hiddenVideo, 0, 0, offscreenCanvas.width, offscreenCanvas.height);
+
+    // Check if image was drawn properly
+    const imageData = offscreenContext.getImageData(0, 0, 1, 1);
+    const isBlank = imageData.data.every((value, index) => {
+        return index === 3 ? true : value === 0;
+    });
+
+    if (isBlank) {
+        console.warn('Screenshot appears to be blank/black');
+    }
+
+    let qualityValue;
+    switch (imageQuality) {
+        case 'high':
+            qualityValue = 0.9;
+            break;
+        case 'medium':
+            qualityValue = 0.7;
+            break;
+        case 'low':
+            qualityValue = 0.5;
+            break;
+        default:
+            qualityValue = 0.7;
+    }
+
+    return new Promise((resolve, reject) => {
+        offscreenCanvas.toBlob(
+            async blob => {
+                if (!blob) {
+                    reject(new Error('Failed to create blob from canvas'));
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    const base64data = reader.result.split(',')[1];
+                    console.log(`Screenshot captured for OpenRouter: ${base64data.length} characters`);
+                    resolve(base64data);
+                };
+                reader.onerror = () => reject(new Error('Failed to read blob'));
+                reader.readAsDataURL(blob);
+            },
+            'image/jpeg',
+            qualityValue
+        );
+    });
 }
 
 // Expose functions to global scope for external access
@@ -707,9 +845,33 @@ async function sendTextMessage(text) {
     }
 
     try {
-        const result = await ipcRenderer.invoke('send-text-message', text);
+        // Check which provider is selected
+        const selectedProvider = localStorage.getItem('selectedProvider') || 'gemini';
+        const selectedModel = localStorage.getItem('selectedModel') || 'gemini-2.5-flash';
+        
+        let result;
+        if (selectedProvider === 'gemini') {
+            result = await ipcRenderer.invoke('send-text-message', text);
+        } else {
+            // For OpenRouter, check if we need LLM chaining (DeepSeekR1)
+            if (selectedModel === 'deepseek-r1') {
+                console.log('OpenRouter + DeepSeekR1: Capturing screenshot and combining with user message');
+                // Capture screenshot and get the base64 data
+                const screenshotData = await captureScreenshotForOpenRouter('medium');
+                // Send both screenshot and message together
+                result = await ipcRenderer.invoke('send-to-openrouter', { 
+                    message: text, 
+                    screenshotData: screenshotData,
+                    selectedModel: selectedModel
+                });
+            } else {
+                // For other OpenRouter models (GPT-4o, Claude), just send the text
+                result = await ipcRenderer.invoke('send-to-openrouter', { message: text });
+            }
+        }
+        
         if (result.success) {
-            console.log('Text message sent successfully');
+            console.log('Text message sent successfully via', selectedProvider);
         } else {
             console.error('Failed to send text message:', result.error);
         }
