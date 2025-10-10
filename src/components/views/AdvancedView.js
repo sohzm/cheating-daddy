@@ -629,12 +629,15 @@ export class AdvancedView extends LitElement {
         this.requestUpdate();
     }
 
-    updateRateLimitInfo() {
-        const rateLimits = {
-            'gemini-live-2.0': { rpm: 15, tpm: 1000000, rpd: 1500 },
-            'gemini-2.5-flash': { rpm: 15, tpm: 1000000, rpd: 1500 },
-            'gemini-2.5-pro': { rpm: 2, tpm: 32000, rpd: 50 }
-        };
+        updateRateLimitInfo() {
+            const rateLimits = {
+                'gemini-live-2.0': { rpm: 15, tpm: 1000000, rpd: 1500 },
+                'gemini-2.5-flash': { rpm: 15, tpm: 1000000, rpd: 1500 },
+                'gemini-2.5-pro': { rpm: 2, tpm: 32000, rpd: 50 },
+                'deepseek-r1': { rpm: 60, tpm: 1000000, rpd: 10000 },
+                'gpt-4o': { rpm: 10, tpm: 200000, rpd: 500 },
+                'claude-3.5-sonnet': { rpm: 5, tpm: 100000, rpd: 200 }
+            };
 
         const limits = rateLimits[this.selectedModel] || rateLimits['gemini-2.5-flash'];
         this.rateLimitInfo = {
@@ -653,6 +656,32 @@ export class AdvancedView extends LitElement {
             this.updateRateLimitInfo();
             this.requestUpdate();
         }, 60000);
+        
+        // Update OpenRouter rate limits every 10 seconds if using OpenRouter
+        setInterval(async () => {
+            if (this.selectedProvider === 'openrouter' && this.selectedModel) {
+                await this.updateOpenRouterRateLimit();
+            }
+        }, 10000);
+    }
+
+    async updateOpenRouterRateLimit() {
+        try {
+            const result = await window.require('electron').ipcRenderer.invoke('get-openrouter-rate-limit', this.selectedModel);
+            if (result.success) {
+                const status = result.status;
+                this.rateLimitInfo = {
+                    ...this.rateLimitInfo,
+                    current: status.current,
+                    remaining: status.remaining,
+                    resetTime: new Date(status.resetTime).toLocaleTimeString(),
+                    lastUpdated: new Date().toLocaleTimeString()
+                };
+                this.requestUpdate();
+            }
+        } catch (error) {
+            console.error('Error updating OpenRouter rate limit:', error);
+        }
     }
 
     render() {
@@ -756,13 +785,24 @@ export class AdvancedView extends LitElement {
                                     <option value="gemini-live-2.0" ?disabled=${this.selectedMode !== 'interview'}>Gemini Live 2.0 (Real-time)</option>
                                     <option value="gemini-2.5-flash">Gemini 2.5 Flash (Fast, Free)</option>
                                     <option value="gemini-2.5-pro">Gemini 2.5 Pro (Advanced, Limited)</option>
+                                    <option value="deepseek-r1">DeepSeekR1 (Reasoning, Free)</option>
+                                    <option value="gpt-4o">GPT-4o (Direct Vision)</option>
+                                    <option value="claude-3.5-sonnet">Claude 3.5 Sonnet (Direct Vision)</option>
                                 </select>
                                 <div class="form-description">
                                     ${this.selectedModel === 'gemini-live-2.0' 
                                         ? 'Real-time audio/video processing with live streaming capabilities.' 
                                         : this.selectedModel === 'gemini-2.5-flash'
                                         ? 'Fast responses, generous free tier, best for coding tasks.'
-                                        : 'Advanced reasoning, limited free tier, best for complex problems.'}
+                                        : this.selectedModel === 'gemini-2.5-pro'
+                                        ? 'Advanced reasoning, limited free tier, best for complex problems.'
+                                        : this.selectedModel === 'deepseek-r1'
+                                        ? 'Advanced reasoning model with free tier. Uses LLM chaining: Gemini extracts text from images, then DeepSeekR1 processes it.'
+                                        : this.selectedModel === 'gpt-4o'
+                                        ? 'OpenAI\'s flagship model with direct vision capabilities via OpenRouter.'
+                                        : this.selectedModel === 'claude-3.5-sonnet'
+                                        ? 'Anthropic\'s advanced model with direct vision capabilities via OpenRouter.'
+                                        : 'Advanced reasoning model with free tier, excellent for problem-solving.'}
                                 </div>
                             </div>
                         </div>
@@ -787,7 +827,7 @@ export class AdvancedView extends LitElement {
                                 </div>
                                 <div class="rate-limit-stat">
                                     <span class="stat-label">Requests/Min:</span>
-                                    <span class="stat-value">${this.rateLimitInfo.requestsPerMinute || 0} / ${this.rateLimitInfo.rpm || 0}</span>
+                                    <span class="stat-value">${this.rateLimitInfo.current || this.rateLimitInfo.requestsPerMinute || 0} / ${this.rateLimitInfo.rpm || 0}</span>
                                 </div>
                                 <div class="rate-limit-stat">
                                     <span class="stat-label">Tokens/Min:</span>
@@ -799,7 +839,8 @@ export class AdvancedView extends LitElement {
                                 </div>
                             </div>
                             <div class="rate-limit-reset-info">
-                                <small>Last updated: ${this.rateLimitInfo.lastReset || 'Never'}</small>
+                                <small>Last updated: ${this.rateLimitInfo.lastUpdated || this.rateLimitInfo.lastReset || 'Never'}</small>
+                                ${this.rateLimitInfo.remaining !== undefined ? html`<br><small>Remaining: ${this.rateLimitInfo.remaining} requests</small>` : ''}
                             </div>
                         </div>
                     </div>
