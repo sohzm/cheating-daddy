@@ -317,6 +317,48 @@ export class AdvancedView extends LitElement {
             font-size: 12px;
             margin-top: 1px;
         }
+
+        .rate-limit-display {
+            background: var(--card-background, rgba(255, 255, 255, 0.02));
+            border: 1px solid var(--card-border, rgba(255, 255, 255, 0.08));
+            border-radius: 4px;
+            padding: 12px;
+            margin-top: 8px;
+        }
+
+        .rate-limit-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+
+        .rate-limit-stat {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 8px;
+            background: var(--input-background, rgba(0, 0, 0, 0.2));
+            border-radius: 3px;
+            font-size: 11px;
+        }
+
+        .stat-label {
+            color: var(--description-color, rgba(255, 255, 255, 0.7));
+            font-weight: 500;
+        }
+
+        .stat-value {
+            color: var(--text-color);
+            font-weight: 600;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        }
+
+        .rate-limit-reset-info {
+            text-align: center;
+            color: var(--description-color, rgba(255, 255, 255, 0.5));
+            font-size: 10px;
+        }
     `;
 
     static properties = {
@@ -327,6 +369,10 @@ export class AdvancedView extends LitElement {
         maxTokensPerMin: { type: Number },
         throttleAtPercent: { type: Number },
         contentProtection: { type: Boolean },
+        enableLinuxStealth: { type: Boolean },
+        selectedMode: { type: String },
+        selectedModel: { type: String },
+        rateLimitInfo: { type: Object },
     };
 
     constructor() {
@@ -343,8 +389,25 @@ export class AdvancedView extends LitElement {
         // Content protection default
         this.contentProtection = true;
 
+        // Linux stealth mode default (enabled by default)
+        this.enableLinuxStealth = true;
+
+        // Mode and model selection defaults
+        this.selectedMode = 'interview';
+        this.selectedModel = 'gemini-2.5-flash';
+        this.rateLimitInfo = {
+            requestsPerMinute: 0,
+            tokensPerMinute: 0,
+            requestsPerDay: 0,
+            lastReset: null,
+            model: null
+        };
+
         this.loadRateLimitSettings();
         this.loadContentProtectionSetting();
+        this.loadLinuxStealthSetting();
+        this.loadModeSettings();
+        this.startRateLimitMonitoring();
     }
 
     connectedCallback() {
@@ -489,7 +552,137 @@ export class AdvancedView extends LitElement {
         this.requestUpdate();
     }
 
+    // Linux stealth mode methods
+    loadLinuxStealthSetting() {
+        const enableLinuxStealth = localStorage.getItem('enableLinuxStealth');
+        this.enableLinuxStealth = enableLinuxStealth !== null ? enableLinuxStealth === 'true' : true;
+    }
 
+    async handleLinuxStealthChange(e) {
+        this.enableLinuxStealth = e.target.checked;
+        localStorage.setItem('enableLinuxStealth', this.enableLinuxStealth.toString());
+        
+        // Enable/disable immediately via IPC (no restart needed)
+        if (window.require) {
+            const { ipcRenderer } = window.require('electron');
+            try {
+                const result = await ipcRenderer.invoke('toggle-linux-stealth', this.enableLinuxStealth);
+                if (result.success) {
+                    this.statusMessage = this.enableLinuxStealth 
+                        ? '✓ Linux stealth mode enabled - overlay will auto-hide during Zoom/recordings'
+                        : '✓ Linux stealth mode disabled - overlay will remain visible';
+                    this.statusType = 'success';
+                } else {
+                    this.statusMessage = `Error: ${result.error || 'Failed to toggle Linux stealth mode'}`;
+                    this.statusType = 'error';
+                }
+            } catch (error) {
+                console.error('Failed to toggle Linux stealth mode:', error);
+                this.statusMessage = 'Error: Failed to toggle Linux stealth mode. Try restarting the app.';
+                this.statusType = 'error';
+            }
+        } else {
+            // Fallback if IPC not available
+            this.statusMessage = 'Restart the application for changes to take effect.';
+            this.statusType = 'info';
+        }
+        
+        setTimeout(() => {
+            this.statusMessage = '';
+            this.statusType = '';
+            this.requestUpdate();
+        }, 5000);
+        
+        this.requestUpdate();
+    }
+
+    // Mode and model selection methods
+    loadModeSettings() {
+        const selectedMode = localStorage.getItem('selectedMode');
+        const selectedModel = localStorage.getItem('selectedModel');
+        
+        this.selectedMode = selectedMode || 'interview';
+        this.selectedModel = selectedModel || 'gemini-2.5-flash';
+    }
+
+    async handleModeChange(e) {
+        this.selectedMode = e.target.value;
+        localStorage.setItem('selectedMode', this.selectedMode);
+        
+        // Update model based on mode
+        if (this.selectedMode === 'interview') {
+            this.selectedModel = 'gemini-live-2.0';
+        } else {
+            this.selectedModel = 'gemini-2.5-flash';
+        }
+        localStorage.setItem('selectedModel', this.selectedModel);
+        
+        this.updateRateLimitInfo();
+        this.requestUpdate();
+    }
+
+    async handleModelChange(e) {
+        this.selectedModel = e.target.value;
+        localStorage.setItem('selectedModel', this.selectedModel);
+        
+        this.updateRateLimitInfo();
+        this.requestUpdate();
+    }
+
+        updateRateLimitInfo() {
+            const rateLimits = {
+                'gemini-live-2.0': { rpm: 15, tpm: 1000000, rpd: 1500 },
+                'gemini-2.5-flash': { rpm: 15, tpm: 1000000, rpd: 1500 },
+                'gemini-2.5-pro': { rpm: 2, tpm: 32000, rpd: 50 },
+                'deepseek-r1': { rpm: 60, tpm: 1000000, rpd: 10000 },
+                'gpt-4o': { rpm: 10, tpm: 200000, rpd: 500 },
+                'claude-3.5-sonnet': { rpm: 5, tpm: 100000, rpd: 200 }
+            };
+
+        const limits = rateLimits[this.selectedModel] || rateLimits['gemini-2.5-flash'];
+        this.rateLimitInfo = {
+            ...this.rateLimitInfo,
+            ...limits,
+            model: this.selectedModel,
+            lastReset: new Date().toLocaleTimeString()
+        };
+    }
+
+    startRateLimitMonitoring() {
+        this.updateRateLimitInfo();
+        
+        // Update rate limit info every minute
+        setInterval(() => {
+            this.updateRateLimitInfo();
+            this.requestUpdate();
+        }, 60000);
+        
+        // Update OpenRouter rate limits every 10 seconds if using OpenRouter
+        setInterval(async () => {
+            if (this.selectedProvider === 'openrouter' && this.selectedModel) {
+                await this.updateOpenRouterRateLimit();
+            }
+        }, 10000);
+    }
+
+    async updateOpenRouterRateLimit() {
+        try {
+            const result = await window.require('electron').ipcRenderer.invoke('get-openrouter-rate-limit', this.selectedModel);
+            if (result.success) {
+                const status = result.status;
+                this.rateLimitInfo = {
+                    ...this.rateLimitInfo,
+                    current: status.current,
+                    remaining: status.remaining,
+                    resetTime: new Date(status.resetTime).toLocaleTimeString(),
+                    lastUpdated: new Date().toLocaleTimeString()
+                };
+                this.requestUpdate();
+            }
+        } catch (error) {
+            console.error('Error updating OpenRouter rate limit:', error);
+        }
+    }
 
     render() {
         return html`
@@ -521,6 +714,134 @@ export class AdvancedView extends LitElement {
                             ${this.contentProtection 
                                 ? 'The application is currently invisible to screen sharing and recording software.' 
                                 : 'The application is currently visible to screen sharing and recording software.'}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Linux Stealth Mode Section -->
+                ${process.platform === 'linux' ? html`
+                    <div class="advanced-section">
+                        <div class="section-title">
+                            <span>🐧 Linux Stealth Mode</span>
+                        </div>
+                        <div class="advanced-description">
+                            Auto-hide the overlay when screen recording or video call apps are detected on Linux/Ubuntu. 
+                            The overlay will automatically hide when apps like Zoom, OBS, Teams, Discord, etc. are running, 
+                            and restore when they're closed. This compensates for Linux's limited content protection support.
+                        </div>
+
+                        <div class="form-grid">
+                            <div class="checkbox-group">
+                                <input
+                                    type="checkbox"
+                                    class="checkbox-input"
+                                    id="enable-linux-stealth"
+                                    .checked=${this.enableLinuxStealth}
+                                    @change=${this.handleLinuxStealthChange}
+                                />
+                                <label for="enable-linux-stealth" class="checkbox-label">
+                                    Enable Linux stealth mode (auto-hide during recordings/calls)
+                                </label>
+                            </div>
+                            <div class="form-description" style="margin-left: 22px;">
+                                ${this.enableLinuxStealth 
+                                    ? 'Overlay will automatically hide when Zoom, OBS, or other recording/call apps are detected.' 
+                                    : 'Overlay will remain visible even when recording/call apps are running.'}
+                                <br><br>
+                                <strong>Note:</strong> Takes effect immediately. Checks for 75+ apps including Zoom, Teams, OBS, Discord, etc. every 2 seconds.
+                            </div>
+                        </div>
+                    </div>
+                ` : ''}
+
+                <!-- Mode Selection Section -->
+                <div class="advanced-section">
+                    <div class="section-title">
+                        <span>🎯 Mode Selection</span>
+                    </div>
+                    <div class="advanced-description">
+                        Choose between Interview Mode (real-time audio/video) and Coding/OA Mode (screenshot-based) for different use cases.
+                        Each mode uses different Gemini models optimized for specific tasks.
+                    </div>
+
+                    <div class="form-grid">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">Application Mode</label>
+                                <select class="form-control" .value=${this.selectedMode} @change=${this.handleModeChange}>
+                                    <option value="interview">🎤 Interview Mode (Real-time Audio/Video)</option>
+                                    <option value="coding">💻 Coding/OA Mode (Screenshot-based)</option>
+                                </select>
+                                <div class="form-description">
+                                    ${this.selectedMode === 'interview' 
+                                        ? 'Uses Gemini Live 2.0 for real-time audio processing and live interactions.' 
+                                        : 'Uses Gemini 2.5 Flash/Pro for screenshot analysis and coding assistance.'}
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label">AI Model</label>
+                                <select class="form-control" .value=${this.selectedModel} @change=${this.handleModelChange} ?disabled=${this.selectedMode === 'interview'}>
+                                    <option value="gemini-live-2.0" ?disabled=${this.selectedMode !== 'interview'}>Gemini Live 2.0 (Real-time)</option>
+                                    <option value="gemini-2.5-flash">Gemini 2.5 Flash (Fast, Free)</option>
+                                    <option value="gemini-2.5-pro">Gemini 2.5 Pro (Advanced, Limited)</option>
+                                    <option value="deepseek-r1">DeepSeekR1 (Reasoning, Free)</option>
+                                    <option value="gpt-4o">GPT-4o (Direct Vision)</option>
+                                    <option value="claude-3.5-sonnet">Claude 3.5 Sonnet (Direct Vision)</option>
+                                </select>
+                                <div class="form-description">
+                                    ${this.selectedModel === 'gemini-live-2.0' 
+                                        ? 'Real-time audio/video processing with live streaming capabilities.' 
+                                        : this.selectedModel === 'gemini-2.5-flash'
+                                        ? 'Fast responses, generous free tier, best for coding tasks.'
+                                        : this.selectedModel === 'gemini-2.5-pro'
+                                        ? 'Advanced reasoning, limited free tier, best for complex problems.'
+                                        : this.selectedModel === 'deepseek-r1'
+                                        ? 'Advanced reasoning model with free tier. Uses LLM chaining: Gemini extracts text from images, then DeepSeekR1 processes it.'
+                                        : this.selectedModel === 'gpt-4o'
+                                        ? 'OpenAI\'s flagship model with direct vision capabilities via OpenRouter.'
+                                        : this.selectedModel === 'claude-3.5-sonnet'
+                                        ? 'Anthropic\'s advanced model with direct vision capabilities via OpenRouter.'
+                                        : 'Advanced reasoning model with free tier, excellent for problem-solving.'}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Rate Limit Monitoring Section -->
+                <div class="advanced-section">
+                    <div class="section-title">
+                        <span>📊 Rate Limit Monitoring</span>
+                    </div>
+                    <div class="advanced-description">
+                        Monitor your API usage and rate limits for the selected model. This helps you stay within free tier limits and avoid unexpected charges.
+                    </div>
+
+                    <div class="form-grid">
+                        <div class="rate-limit-display">
+                            <div class="rate-limit-stats">
+                                <div class="rate-limit-stat">
+                                    <span class="stat-label">Model:</span>
+                                    <span class="stat-value">${this.rateLimitInfo.model || 'N/A'}</span>
+                                </div>
+                                <div class="rate-limit-stat">
+                                    <span class="stat-label">Requests/Min:</span>
+                                    <span class="stat-value">${this.rateLimitInfo.current || this.rateLimitInfo.requestsPerMinute || 0} / ${this.rateLimitInfo.rpm || 0}</span>
+                                </div>
+                                <div class="rate-limit-stat">
+                                    <span class="stat-label">Tokens/Min:</span>
+                                    <span class="stat-value">${this.rateLimitInfo.tokensPerMinute || 0} / ${this.rateLimitInfo.tpm || 0}</span>
+                                </div>
+                                <div class="rate-limit-stat">
+                                    <span class="stat-label">Requests/Day:</span>
+                                    <span class="stat-value">${this.rateLimitInfo.requestsPerDay || 0} / ${this.rateLimitInfo.rpd || 0}</span>
+                                </div>
+                            </div>
+                            <div class="rate-limit-reset-info">
+                                <small>Last updated: ${this.rateLimitInfo.lastUpdated || this.rateLimitInfo.lastReset || 'Never'}</small>
+                                ${this.rateLimitInfo.remaining !== undefined ? html`<br><small>Remaining: ${this.rateLimitInfo.remaining} requests</small>` : ''}
+                            </div>
                         </div>
                     </div>
                 </div>

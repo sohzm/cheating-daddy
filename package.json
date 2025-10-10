@@ -10,7 +10,15 @@
         "make": "electron-forge make",
         "publish": "electron-forge publish",
         "lint": "echo \"No linting configured\"",
-        "test": "vitest run"
+        "test": "jest",
+        "test:watch": "jest --watch",
+        "test:coverage": "jest --coverage",
+        "test:smoke": "jest --testNamePattern=\"Smoke Tests\"",
+        "test:integration": "jest --testNamePattern=\"Integration Tests\"",
+        "test:unit": "jest --testNamePattern=\"Unit Tests\"",
+        "test:performance": "jest --testNamePattern=\"Performance Tests\"",
+        "test:e2e": "jest --testNamePattern=\"End-to-End Tests\"",
+        "test:ci": "jest --ci --coverage --watchAll=false"
     },
     "keywords": [
         "cheating daddy",
@@ -25,8 +33,10 @@
     },
     "license": "GPL-3.0",
     "dependencies": {
-        "@google/genai": "^1.2.0",
-        "electron-squirrel-startup": "^1.0.1"
+        "@google/genai": "^1.23.0",
+        "electron-squirrel-startup": "^1.0.1",
+        "multer": "^1.4.5-lts.1",
+        "pdf-parse": "^1.1.1"
     },
     "devDependencies": {
         "@electron-forge/cli": "^7.8.1",
@@ -38,9 +48,12 @@
         "@electron-forge/plugin-auto-unpack-natives": "^7.8.1",
         "@electron-forge/plugin-fuses": "^7.8.1",
         "@electron/fuses": "^1.8.0",
+        "@jest/globals": "^30.2.0",
         "@reforged/maker-appimage": "^5.0.0",
-        "vitest": "^1.6.1",
+        "@types/jest": "^30.0.0",
+        "electron": "^30.0.5",
+        "jest": "^30.2.0",
         "jsdom": "^23.2.0",
-        "electron": "^30.0.5"
+        "vitest": "^1.6.1"
     }
 }

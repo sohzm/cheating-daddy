@@ -26,6 +26,118 @@ export class MainView extends LitElement {
             flex: 1;
         }
 
+        .api-provider-section {
+            margin-bottom: 20px;
+        }
+
+        .api-provider-label {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: var(--text-color);
+        }
+
+        .provider-options {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .provider-option {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid var(--button-border);
+            border-radius: 8px;
+            background: var(--input-background);
+            color: var(--text-color);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: center;
+            font-weight: 500;
+        }
+
+        .provider-option:hover {
+            border-color: var(--accent-color);
+            background: var(--hover-background);
+        }
+
+        .provider-option.selected {
+            border-color: var(--accent-color);
+            background: var(--accent-color);
+            color: white;
+        }
+
+        .provider-description {
+            font-size: 12px;
+            color: var(--description-color);
+            margin-top: 4px;
+        }
+
+        .model-selection {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 16px;
+        }
+
+        .model-select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid var(--input-border);
+            border-radius: 8px;
+            background: var(--input-background);
+            color: var(--text-color);
+            font-size: 14px;
+            transition: all 0.15s ease;
+        }
+
+        .model-select:focus {
+            outline: none;
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
+        }
+
+        .dual-api-keys {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .api-key-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .api-key-label {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-color);
+        }
+
+        .api-key-group input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid var(--input-border);
+            border-radius: 8px;
+            background: var(--input-background);
+            color: var(--text-color);
+            font-size: 14px;
+            transition: all 0.15s ease;
+        }
+
+        .api-key-group input:focus {
+            outline: none;
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
+        }
+
+        .api-key-group input.api-key-error {
+            border-color: #ef4444;
+            box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.1);
+        }
+
         input {
             background: var(--input-background);
             color: var(--text-color);
@@ -141,6 +253,48 @@ export class MainView extends LitElement {
             width: 100%;
             max-width: 500px;
         }
+
+        .cv-section {
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .cv-upload-button {
+            background: var(--button-background);
+            color: var(--text-color);
+            border: 1px solid var(--button-border);
+            padding: 10px 16px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .cv-upload-button:hover {
+            background: var(--hover-background);
+        }
+
+        .cv-status {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+            color: var(--description-color);
+        }
+
+        .cv-file-name {
+            font-weight: 500;
+            color: var(--text-color);
+        }
+
+        .cv-pages {
+            font-size: 10px;
+        }
     `;
 
     static properties = {
@@ -149,6 +303,10 @@ export class MainView extends LitElement {
         isInitializing: { type: Boolean },
         onLayoutModeChange: { type: Function },
         showApiKeyError: { type: Boolean },
+        cvStatus: { type: Object },
+        onCVUpload: { type: Function },
+        selectedProvider: { type: String },
+        selectedModel: { type: String },
     };
 
     constructor() {
@@ -158,7 +316,12 @@ export class MainView extends LitElement {
         this.isInitializing = false;
         this.onLayoutModeChange = () => {};
         this.showApiKeyError = false;
+        this.cvStatus = {};
+        this.onCVUpload = () => {};
+        this.selectedProvider = 'gemini';
+        this.selectedModel = 'gemini-2.5-flash';
         this.boundKeydownHandler = this.handleKeydown.bind(this);
+        this.loadProviderSettings();
     }
 
     connectedCallback() {
@@ -194,11 +357,34 @@ export class MainView extends LitElement {
     }
 
     handleInput(e) {
-        localStorage.setItem('apiKey', e.target.value);
+        const key = this.selectedProvider === 'gemini' ? 'apiKey' : 'openrouterApiKey';
+        localStorage.setItem(key, e.target.value);
         // Clear error state when user starts typing
         if (this.showApiKeyError) {
             this.showApiKeyError = false;
         }
+    }
+
+    loadProviderSettings() {
+        this.selectedProvider = localStorage.getItem('selectedProvider') || 'gemini';
+        this.selectedModel = localStorage.getItem('selectedModel') || 'gemini-2.5-flash';
+    }
+
+    handleProviderChange(provider) {
+        this.selectedProvider = provider;
+        localStorage.setItem('selectedProvider', provider);
+        this.requestUpdate();
+    }
+
+    handleModelChange(model) {
+        this.selectedModel = model;
+        localStorage.setItem('selectedModel', model);
+        this.requestUpdate();
+    }
+
+    getCurrentApiKey() {
+        const key = this.selectedProvider === 'gemini' ? 'apiKey' : 'openrouterApiKey';
+        return localStorage.getItem(key) || '';
     }
 
     handleStartClick() {
@@ -210,6 +396,10 @@ export class MainView extends LitElement {
 
     handleAPIKeyHelpClick() {
         this.onAPIKeyHelp();
+    }
+
+    handleCVUploadClick() {
+        this.onCVUpload();
     }
 
     handleResetOnboarding() {
@@ -285,14 +475,73 @@ export class MainView extends LitElement {
         return html`
             <div class="welcome">Welcome</div>
 
+            <div class="api-provider-section">
+                <div class="api-provider-label">Choose AI Provider</div>
+                <div class="provider-options">
+                    <div 
+                        class="provider-option ${this.selectedProvider === 'gemini' ? 'selected' : ''}"
+                        @click=${() => this.handleProviderChange('gemini')}
+                    >
+                        <div>Google Gemini</div>
+                        <div class="provider-description">Real-time audio & coding</div>
+                    </div>
+                    <div 
+                        class="provider-option ${this.selectedProvider === 'openrouter' ? 'selected' : ''}"
+                        @click=${() => this.handleProviderChange('openrouter')}
+                    >
+                        <div>OpenRouter</div>
+                        <div class="provider-description">DeepSeekR1 & more models</div>
+                    </div>
+                </div>
+            </div>
+
+            ${this.selectedProvider === 'openrouter' ? html`
+                <div class="model-selection">
+                    <label class="api-key-label">Select Model</label>
+                    <select class="model-select" .value=${this.selectedModel} @change=${(e) => this.handleModelChange(e.target.value)}>
+                        <option value="deepseek-r1">DeepSeekR1 (LLM Chaining)</option>
+                        <option value="gpt-4o">GPT-4o (Direct Vision)</option>
+                        <option value="claude-3.5-sonnet">Claude 3.5 Sonnet (Direct Vision)</option>
+                    </select>
+                </div>
+                
+                <div class="dual-api-keys">
+                    <div class="api-key-group">
+                        <label class="api-key-label">OpenRouter API Key</label>
+                        <input
+                            type="password"
+                            placeholder="Enter your OpenRouter API Key"
+                            .value=${localStorage.getItem('openrouterApiKey') || ''}
+                            @input=${(e) => localStorage.setItem('openrouterApiKey', e.target.value)}
+                            class="${this.showApiKeyError ? 'api-key-error' : ''}"
+                        />
+                    </div>
+                    ${this.selectedModel === 'deepseek-r1' ? html`
+                        <div class="api-key-group">
+                            <label class="api-key-label">Gemini API Key (for LLM chaining)</label>
+                            <input
+                                type="password"
+                                placeholder="Enter your Gemini API Key"
+                                .value=${localStorage.getItem('apiKey') || ''}
+                                @input=${(e) => localStorage.setItem('apiKey', e.target.value)}
+                                class="${this.showApiKeyError ? 'api-key-error' : ''}"
+                            />
+                        </div>
+                    ` : ''}
+                </div>
+            ` : html`
+                <div class="input-group">
+                    <input
+                        type="password"
+                        placeholder="Enter your Gemini API Key"
+                        .value=${this.getCurrentApiKey()}
+                        @input=${this.handleInput}
+                        class="${this.showApiKeyError ? 'api-key-error' : ''}"
+                    />
+                </div>
+            `}
+            
             <div class="input-group">
-                <input
-                    type="password"
-                    placeholder="Enter your Gemini API Key"
-                    .value=${localStorage.getItem('apiKey') || ''}
-                    @input=${this.handleInput}
-                    class="${this.showApiKeyError ? 'api-key-error' : ''}"
-                />
                 <button @click=${this.handleStartClick} class="start-button ${this.isInitializing ? 'initializing' : ''}">
                     ${this.getStartButtonText()}
                 </button>
@@ -301,6 +550,18 @@ export class MainView extends LitElement {
                 dont have an api key?
                 <span @click=${this.handleAPIKeyHelpClick} class="link">get one here</span>
             </p>
+
+            <div class="cv-section">
+                <button @click=${this.handleCVUploadClick} class="cv-upload-button">
+                    📄 ${this.cvStatus.hasCV ? 'Manage CV' : 'Upload CV/Resume'}
+                </button>
+                ${this.cvStatus.hasCV ? html`
+                    <div class="cv-status">
+                        <span class="cv-file-name">${this.cvStatus.fileName}</span>
+                        <span class="cv-pages">${this.cvStatus.pages} pages</span>
+                    </div>
+                ` : ''}
+            </div>
         `;
     }
 }
