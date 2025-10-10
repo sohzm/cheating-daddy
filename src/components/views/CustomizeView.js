@@ -1087,7 +1087,7 @@ export class CustomizeView extends LitElement {
                                         <option value="coding">💻 Coding/OA Mode (Screenshot-based)</option>
                                     </select>
                                     <div class="form-description">
-                                        Exam Assistant profile uses Coding/OA mode for better problem-solving responses. Uses regular Gemini API (2.5 Flash or Pro) instead of Live API.
+                                        Exam Assistant profile uses Gemini API 2.5 Flash or 2.5 Pro for better problem-solving responses.
                                     </div>
                                 </div>
                             </div>
@@ -1115,7 +1115,7 @@ export class CustomizeView extends LitElement {
                                         <option value="interview">🎤 Interview Mode (Real-time Audio/Video)</option>
                                     </select>
                                     <div class="form-description">
-                                        ${this.getProfileNames()[this.selectedProfile]} profile uses Interview mode with Gemini 2.5 Flash Live API for real-time audio processing and live interactions.
+                                        ${this.getProfileNames()[this.selectedProfile]} profile uses Interview mode with Gemini 2.5 Flash for real-time audio processing and live interactions.
                                     </div>
                                 </div>
                             </div>
@@ -1301,38 +1301,32 @@ export class CustomizeView extends LitElement {
                         <span>Screen Capture Settings</span>
                     </div>
 
-                    ${this.selectedProfile === 'exam' ? html`
-                        <div class="warning-box" style="margin-bottom: 12px;">
-                            <span class="warning-icon">⚠️</span>
-                            <span><strong>Note for Exam Assistant:</strong> Automatic screenshot capture is disabled in Exam Assistant mode to prevent API rate limits. Use Ctrl+Enter (or Cmd+Enter on Mac) to manually capture and analyze screenshots.</span>
-                        </div>
-                    ` : ''}
-
                     <div class="form-grid">
                         <div class="form-row">
-                            <div class="form-group">
-                                <label class="form-label">
-                                    Capture Interval
-                                    <span class="current-selection"
-                                        >${this.selectedScreenshotInterval === 'manual' ? 'Manual' : this.selectedScreenshotInterval + 's'}</span
-                                    >
-                                </label>
-                                <select class="form-control" .value=${this.selectedScreenshotInterval} @change=${this.handleScreenshotIntervalSelect}>
-                                    <option value="manual" ?selected=${this.selectedScreenshotInterval === 'manual'}>Manual (On demand)</option>
-                                    <option value="1" ?selected=${this.selectedScreenshotInterval === '1'}>Every 1 second</option>
-                                    <option value="2" ?selected=${this.selectedScreenshotInterval === '2'}>Every 2 seconds</option>
-                                    <option value="5" ?selected=${this.selectedScreenshotInterval === '5'}>Every 5 seconds</option>
-                                    <option value="10" ?selected=${this.selectedScreenshotInterval === '10'}>Every 10 seconds</option>
-                                </select>
-                                <div class="form-description">
-                                    ${
-                                        this.selectedScreenshotInterval === 'manual'
-                                            ? 'Screenshots will only be taken when you use the "Ask Next Step" shortcut'
-                                            : 'Automatic screenshots will be taken at the specified interval'
-                                    }
-                                    ${this.selectedProfile === 'exam' ? ' (Note: Forced to manual mode for Exam Assistant)' : ''}
+                            ${this.selectedProfile !== 'exam' ? html`
+                                <div class="form-group">
+                                    <label class="form-label">
+                                        Capture Interval
+                                        <span class="current-selection"
+                                            >${this.selectedScreenshotInterval === 'manual' ? 'Manual' : this.selectedScreenshotInterval + 's'}</span
+                                        >
+                                    </label>
+                                    <select class="form-control" .value=${this.selectedScreenshotInterval} @change=${this.handleScreenshotIntervalSelect}>
+                                        <option value="manual" ?selected=${this.selectedScreenshotInterval === 'manual'}>Manual (On demand)</option>
+                                        <option value="1" ?selected=${this.selectedScreenshotInterval === '1'}>Every 1 second</option>
+                                        <option value="2" ?selected=${this.selectedScreenshotInterval === '2'}>Every 2 seconds</option>
+                                        <option value="5" ?selected=${this.selectedScreenshotInterval === '5'}>Every 5 seconds</option>
+                                        <option value="10" ?selected=${this.selectedScreenshotInterval === '10'}>Every 10 seconds</option>
+                                    </select>
+                                    <div class="form-description">
+                                        ${
+                                            this.selectedScreenshotInterval === 'manual'
+                                                ? 'Screenshots will only be taken when you use the "Ask Next Step" shortcut'
+                                                : 'Automatic screenshots will be taken at the specified interval'
+                                        }
+                                    </div>
                                 </div>
-                            </div>
+                            ` : ''}
 
                             <div class="form-group">
                                 <label class="form-label">
