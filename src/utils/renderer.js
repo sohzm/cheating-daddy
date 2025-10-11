@@ -742,6 +742,9 @@ const cheddar = {
     element: () => cheatingDaddyApp,
     e: () => cheatingDaddyApp,
 
+    // App reference for global shortcuts (to be set after DOMContentLoaded)
+    app: null,
+
     // App state functions - access properties directly from the app element
     getCurrentView: () => cheatingDaddyApp.currentView,
     getLayoutMode: () => cheatingDaddyApp.layoutMode,
@@ -770,3 +773,15 @@ const cheddar = {
 
 // Make it globally available
 window.cheddar = cheddar;
+
+// Set app reference after DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    // Wait a bit for the custom element to be fully initialized
+    setTimeout(() => {
+        const appElement = document.querySelector('cheating-daddy-app');
+        if (appElement) {
+            cheddar.app = appElement;
+            console.log('App reference set for global shortcuts');
+        }
+    }, 100);
+});

@@ -344,9 +344,11 @@ export class CheatingDaddyApp extends LitElement {
     }
 
     handleGlobalKeydown(e) {
-        // Handle Ctrl+G (or Cmd+G on Mac) for clearing session
+        // Handle Ctrl+Alt+R (or Cmd+Option+R on Mac) for clearing and restarting session
         const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-        const isClearShortcut = isMac ? e.metaKey && e.key === 'g' : e.ctrlKey && e.key === 'g';
+        const isClearShortcut = isMac
+            ? e.metaKey && e.altKey && e.key === 'r'
+            : e.ctrlKey && e.altKey && e.key === 'r';
 
         if (isClearShortcut) {
             e.preventDefault();

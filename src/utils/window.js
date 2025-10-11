@@ -364,6 +364,26 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
             console.error(`Failed to register emergencyErase (${keybinds.emergencyErase}):`, error);
         }
     }
+
+    // Register restart session shortcut (Ctrl+Alt+R / Cmd+Option+R)
+    const isMac = process.platform === 'darwin';
+    const restartShortcut = isMac ? 'Cmd+Alt+R' : 'Ctrl+Alt+R';
+    try {
+        globalShortcut.register(restartShortcut, () => {
+            console.log('Restart session shortcut triggered');
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                // Trigger the clear and restart function in the renderer
+                mainWindow.webContents.executeJavaScript(`
+                    if (window.cheddar && window.cheddar.app) {
+                        window.cheddar.app.handleClearAndRestart();
+                    }
+                `);
+            }
+        });
+        console.log(`Registered restart session: ${restartShortcut}`);
+    } catch (error) {
+        console.error(`Failed to register restart session (${restartShortcut}):`, error);
+    }
 }
 
 function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {

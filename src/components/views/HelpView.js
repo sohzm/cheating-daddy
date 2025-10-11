@@ -353,6 +353,10 @@ export class HelpView extends LitElement {
                                 <span class="shortcut-description">Take screenshot and ask for next step</span>
                                 <div class="shortcut-keys">${this.formatKeybind(this.keybinds.nextStep)}</div>
                             </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-description">Clear session and restart</span>
+                                <div class="shortcut-keys">${this.formatKeybind(isMacOS ? 'Cmd+Alt+R' : 'Ctrl+Alt+R')}</div>
+                            </div>
                         </div>
 
                         <div class="keyboard-group">

@@ -313,7 +313,7 @@ export class MainView extends LitElement {
                 <span @click=${this.handleAPIKeyHelpClick} class="link">get one here</span>
             </p>
                     <p class="shortcut-hint">
-            Press <strong>Ctrl+G</strong> to clear session and automatically restart
+            Press <strong>Ctrl+Alt+R</strong> to clear session and automatically restart
         </p>
         `;
     }

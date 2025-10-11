@@ -907,7 +907,7 @@ export class AssistantView extends LitElement {
             <div class="response-container" id="responseContainer"></div>
 
                     <div class="shortcut-hint">
-            Press <strong>Ctrl+Shift+C</strong> to copy code blocks | <strong>Ctrl+G</strong> to clear session and restart
+            Press <strong>Ctrl+Shift+C</strong> to copy code blocks | <strong>Ctrl+Alt+R</strong> to clear session and restart
         </div>
 
             <div class="text-input-container">
