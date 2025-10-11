@@ -880,29 +880,20 @@ export class AssistantView extends LitElement {
         const container = this.shadowRoot.querySelector('#responseContainer');
         if (container) {
             const currentResponse = this.getCurrentResponse();
-            console.log('Current response:', currentResponse);
+            console.log('Current response length:', currentResponse.length);
+
+            // Skip animation entirely - just render the final markdown
+            // This prevents markdown breaking and re-streaming issues
             const renderedResponse = this.renderMarkdown(currentResponse);
-            console.log('Rendered response:', renderedResponse);
             container.innerHTML = renderedResponse;
+
+            // Make all words visible immediately (no animation)
             const words = container.querySelectorAll('[data-word]');
-            if (this.shouldAnimateResponse) {
-                for (let i = 0; i < this._lastAnimatedWordCount && i < words.length; i++) {
-                    words[i].classList.add('visible');
-                }
-                for (let i = this._lastAnimatedWordCount; i < words.length; i++) {
-                    words[i].classList.remove('visible');
-                    setTimeout(() => {
-                        words[i].classList.add('visible');
-                        if (i === words.length - 1) {
-                            this.dispatchEvent(new CustomEvent('response-animation-complete', { bubbles: true, composed: true }));
-                        }
-                    }, (i - this._lastAnimatedWordCount) * 100);
-                }
-                this._lastAnimatedWordCount = words.length;
-            } else {
-                words.forEach(word => word.classList.add('visible'));
-                this._lastAnimatedWordCount = words.length;
-            }
+            words.forEach(word => word.classList.add('visible'));
+            this._lastAnimatedWordCount = words.length;
+
+            // Auto-scroll to bottom as new content arrives
+            this.scrollToBottom();
         } else {
             console.log('Response container not found');
         }

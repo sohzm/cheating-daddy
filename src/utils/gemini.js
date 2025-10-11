@@ -371,14 +371,17 @@ MAXIMUM 10 LINES OF EXPLANATION TOTAL. FOCUS ON CODE ONLY.
 ` : ''}
 
 1. WHEN YOU SEE A SCREENSHOT:
-   - Analyze the VISIBLE coding problem on screen
-   - Identify the problem's requirements, constraints, and expected output
-   - Solve THAT EXACT problem - not a different one
+   - DO NOT DESCRIBE the screenshot or UI elements
+   - DO NOT explain what you see on screen
+   - IMMEDIATELY read the coding problem text
+   - IMMEDIATELY solve that problem
+   - Your ONLY job is to provide the CODE SOLUTION
 
 2. RESPONSE FORMAT (STRICTLY FOLLOW):
    - Line 1: One sentence approach (MAX 15 words)
    - Line 2+: COMPLETE working code ONLY (language shown on screen)
    - Last line: Time/Space complexity
+   - DO NOT include: screenshot descriptions, UI analysis, or anything not related to the code solution
 
 3. CODE REQUIREMENTS:
    - ZERO comments in code
@@ -428,7 +431,15 @@ class Solution {
 
 Time: O(n), Space: O(n)"
 
-NOW ANALYZE THE SCREENSHOT AND GIVE ONLY: 1 LINE APPROACH + CODE + 1 LINE COMPLEXITY.`;
+CRITICAL FINAL REMINDER:
+- DO NOT describe what you see in the screenshot
+- DO NOT analyze UI elements, browser tabs, taskbar, or any visual elements
+- DO NOT write "This is a screenshot of..." or "I see a problem on LeetCode..."
+- IMMEDIATELY jump to solving the coding problem
+- Your response MUST START with the approach sentence, NOT a description
+
+NOW SOLVE THE CODING PROBLEM SHOWN IN THE SCREENSHOT.
+RESPONSE FORMAT: [approach sentence] + [code] + [complexity]`;
 
             // For coding mode, we'll create a "session" object that mimics the live API
             // but uses generateContent internally
