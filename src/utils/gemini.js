@@ -853,6 +853,34 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
         }
     });
 
+    // Combined handler: Send screenshot + text together in ONE request
+    ipcMain.handle('send-screenshot-with-text', async (event, { imageData, text }) => {
+        if (!geminiSessionRef.current) return { success: false, error: 'No active Gemini session' };
+
+        try {
+            if (!imageData || typeof imageData !== 'string') {
+                return { success: false, error: 'Invalid image data' };
+            }
+
+            if (!text || typeof text !== 'string' || text.trim().length === 0) {
+                return { success: false, error: 'Invalid text message' };
+            }
+
+            console.log('Sending screenshot + text in one request:', text);
+
+            // Send BOTH screenshot and text together in a single request
+            await geminiSessionRef.current.sendRealtimeInput({
+                media: { data: imageData, mimeType: 'image/jpeg' },
+                text: text.trim()
+            });
+
+            return { success: true };
+        } catch (error) {
+            console.error('Error sending screenshot with text:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
     ipcMain.handle('start-macos-audio', async event => {
         if (process.platform !== 'darwin') {
             return {

@@ -683,7 +683,7 @@ function stopCapture() {
     offscreenContext = null;
 }
 
-// Send text message to Gemini with automatic screenshot
+// Send text message to Gemini with automatic screenshot (combined in one request)
 async function sendTextMessage(text) {
     if (!text || text.trim().length === 0) {
         console.warn('Cannot send empty text message');
@@ -691,19 +691,87 @@ async function sendTextMessage(text) {
     }
 
     try {
-        // First, capture a screenshot to provide visual context
-        console.log('Capturing screenshot for text message context...');
-        await captureScreenshot(currentImageQuality, false);
+        // Capture screenshot and get base64 data
+        console.log('Capturing screenshot with text message...');
 
-        // Wait a moment for the screenshot to be processed
-        await new Promise(resolve => setTimeout(resolve, 500));
+        if (!mediaStream) {
+            console.error('No media stream available');
+            return { success: false, error: 'No media stream' };
+        }
 
-        // Then send the text message
-        const result = await ipcRenderer.invoke('send-text-message', text);
+        // Lazy init of video element if needed
+        if (!hiddenVideo) {
+            hiddenVideo = document.createElement('video');
+            hiddenVideo.srcObject = mediaStream;
+            hiddenVideo.muted = true;
+            hiddenVideo.playsInline = true;
+            await hiddenVideo.play();
+
+            await new Promise(resolve => {
+                if (hiddenVideo.readyState >= 2) return resolve();
+                hiddenVideo.onloadedmetadata = () => resolve();
+            });
+
+            offscreenCanvas = document.createElement('canvas');
+            offscreenCanvas.width = hiddenVideo.videoWidth;
+            offscreenCanvas.height = hiddenVideo.videoHeight;
+            offscreenContext = offscreenCanvas.getContext('2d');
+        }
+
+        // Check if video is ready
+        if (hiddenVideo.readyState < 2) {
+            console.warn('Video not ready');
+            return { success: false, error: 'Video not ready' };
+        }
+
+        offscreenContext.drawImage(hiddenVideo, 0, 0, offscreenCanvas.width, offscreenCanvas.height);
+
+        // Get quality setting
+        let qualityValue;
+        switch (currentImageQuality) {
+            case 'high':
+                qualityValue = 0.9;
+                break;
+            case 'medium':
+                qualityValue = 0.7;
+                break;
+            case 'low':
+                qualityValue = 0.5;
+                break;
+            default:
+                qualityValue = 0.7;
+        }
+
+        // Convert canvas to base64
+        const blob = await new Promise(resolve => {
+            offscreenCanvas.toBlob(resolve, 'image/jpeg', qualityValue);
+        });
+
+        if (!blob) {
+            console.error('Failed to create blob');
+            return { success: false, error: 'Failed to create blob' };
+        }
+
+        const reader = new FileReader();
+        const base64data = await new Promise((resolve, reject) => {
+            reader.onloadend = () => resolve(reader.result.split(',')[1]);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+
+        // Send both screenshot and text together in one request
+        const result = await ipcRenderer.invoke('send-screenshot-with-text', {
+            imageData: base64data,
+            text: text.trim()
+        });
+
         if (result.success) {
-            console.log('Screenshot + text message sent successfully');
+            // Track image tokens
+            const imageTokens = tokenTracker.calculateImageTokens(offscreenCanvas.width, offscreenCanvas.height);
+            tokenTracker.addTokens(imageTokens, 'image');
+            console.log('Screenshot + text sent successfully in one request');
         } else {
-            console.error('Failed to send text message:', result.error);
+            console.error('Failed to send screenshot with text:', result.error);
         }
         return result;
     } catch (error) {
