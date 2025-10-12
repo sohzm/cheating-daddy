@@ -118,9 +118,14 @@ export class AssistantView extends LitElement {
             border-radius: 8px;
             padding: 1.2em;
             overflow-x: auto;
+            overflow-wrap: break-word;
+            word-wrap: break-word;
+            word-break: break-word;
+            white-space: pre-wrap;
             margin: 1em 0;
             position: relative;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            max-width: 100%;
         }
 
         .response-container pre code {
@@ -131,6 +136,8 @@ export class AssistantView extends LitElement {
             font-size: 0.9em;
             line-height: 1.5;
             color: #d4d4d4;
+            white-space: pre-wrap;
+            word-break: break-word;
         }
 
         /* Enhanced code block styling with VS Code colors */
