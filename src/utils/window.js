@@ -6,8 +6,12 @@ const { applyStealthMeasures, startTitleRandomization } = require('./stealthFeat
 
 let mouseEventsIgnored = false;
 let windowResizing = false;
+let windowMoving = false; // Track if window is being moved manually
 let resizeAnimation = null;
+let lastMoveTime = 0; // Track last time window was moved
+let intendedWindowSize = { width: 800, height: 450 }; // Track intended size to prevent drift
 const RESIZE_ANIMATION_DURATION = 500; // milliseconds
+const MOVE_COOLDOWN = 300; // milliseconds to wait after movement before allowing resize
 
 function ensureDataDirectories() {
     const homeDir = os.homedir();
@@ -29,6 +33,9 @@ function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
     // Get layout preference (default to 'normal') - Optimal height, comfortable width
     let windowWidth = 800;
     let windowHeight = 450;
+
+    // Store initial intended size
+    intendedWindowSize = { width: windowWidth, height: windowHeight };
 
     const windowOptions = {
         width: windowWidth,
@@ -70,7 +77,24 @@ function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
 
     mainWindow.setResizable(false);
     mainWindow.setContentProtection(true);
+
+    // Enhanced always-on-top configuration to stay above all apps including UWP apps
     mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+
+    // Set always on top with the highest level
+    // Using 'pop-up-menu' level which is higher than most apps but below screen-saver
+    // This prevents hiding behind apps like WhatsApp, Unstop, etc.
+    if (process.platform === 'win32') {
+        // On Windows, use 'pop-up-menu' level with relative level 1
+        // This keeps window above normal apps and UWP apps
+        mainWindow.setAlwaysOnTop(true, 'pop-up-menu', 1);
+    } else if (process.platform === 'darwin') {
+        // On macOS, use 'screen-saver' for maximum visibility
+        mainWindow.setAlwaysOnTop(true, 'screen-saver', 1);
+    } else {
+        // Linux and other platforms
+        mainWindow.setAlwaysOnTop(true, 'pop-up-menu');
+    }
 
     // Center window at the top of the screen
     const primaryDisplay = screen.getPrimaryDisplay();
@@ -79,9 +103,37 @@ function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
     const y = 0;
     mainWindow.setPosition(x, y);
 
-    if (process.platform === 'win32') {
-        mainWindow.setAlwaysOnTop(true, 'screen-saver', 1);
-    }
+    // Additional focus management to ensure window stays on top
+    // Force focus periodically to maintain top position
+    const maintainTopPosition = () => {
+        if (!mainWindow.isDestroyed() && mainWindow.isVisible()) {
+            mainWindow.moveTop();
+            // Re-apply always on top to ensure it stays above everything
+            if (process.platform === 'win32') {
+                mainWindow.setAlwaysOnTop(true, 'pop-up-menu', 1);
+            }
+        }
+    };
+
+    // Check and maintain top position every 2 seconds
+    const topPositionInterval = setInterval(maintainTopPosition, 2000);
+
+    // Clean up interval when window is closed
+    mainWindow.on('closed', () => {
+        clearInterval(topPositionInterval);
+    });
+
+    // Handle focus-lost event to immediately restore top position
+    mainWindow.on('blur', () => {
+        if (!mainWindow.isDestroyed() && mainWindow.isVisible()) {
+            // Small delay to avoid conflicts with other apps
+            setTimeout(() => {
+                if (!mainWindow.isDestroyed() && mainWindow.isVisible()) {
+                    mainWindow.moveTop();
+                }
+            }, 100);
+        }
+    });
 
     mainWindow.loadFile(path.join(__dirname, '../index.html'));
 
@@ -180,23 +232,60 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
     const movementActions = {
         moveUp: () => {
             if (!mainWindow.isVisible()) return;
+            windowMoving = true;
+            lastMoveTime = Date.now();
             const [currentX, currentY] = mainWindow.getPosition();
-            mainWindow.setPosition(currentX, currentY - moveIncrement);
+            // CRITICAL: Always use intendedWindowSize, NOT getSize()
+            // This prevents cumulative size drift from repeated movements
+            mainWindow.setBounds({
+                x: currentX,
+                y: currentY - moveIncrement,
+                width: intendedWindowSize.width,
+                height: intendedWindowSize.height
+            }, false);
+            setTimeout(() => { windowMoving = false; }, 100);
         },
         moveDown: () => {
             if (!mainWindow.isVisible()) return;
+            windowMoving = true;
+            lastMoveTime = Date.now();
             const [currentX, currentY] = mainWindow.getPosition();
-            mainWindow.setPosition(currentX, currentY + moveIncrement);
+            // CRITICAL: Always use intendedWindowSize, NOT getSize()
+            mainWindow.setBounds({
+                x: currentX,
+                y: currentY + moveIncrement,
+                width: intendedWindowSize.width,
+                height: intendedWindowSize.height
+            }, false);
+            setTimeout(() => { windowMoving = false; }, 100);
         },
         moveLeft: () => {
             if (!mainWindow.isVisible()) return;
+            windowMoving = true;
+            lastMoveTime = Date.now();
             const [currentX, currentY] = mainWindow.getPosition();
-            mainWindow.setPosition(currentX - moveIncrement, currentY);
+            // CRITICAL: Always use intendedWindowSize, NOT getSize()
+            mainWindow.setBounds({
+                x: currentX - moveIncrement,
+                y: currentY,
+                width: intendedWindowSize.width,
+                height: intendedWindowSize.height
+            }, false);
+            setTimeout(() => { windowMoving = false; }, 100);
         },
         moveRight: () => {
             if (!mainWindow.isVisible()) return;
+            windowMoving = true;
+            lastMoveTime = Date.now();
             const [currentX, currentY] = mainWindow.getPosition();
-            mainWindow.setPosition(currentX + moveIncrement, currentY);
+            // CRITICAL: Always use intendedWindowSize, NOT getSize()
+            mainWindow.setBounds({
+                x: currentX + moveIncrement,
+                y: currentY,
+                width: intendedWindowSize.width,
+                height: intendedWindowSize.height
+            }, false);
+            setTimeout(() => { windowMoving = false; }, 100);
         },
     };
 
@@ -451,7 +540,10 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
             console.log(`Starting animated resize from ${startWidth}x${startHeight} to ${targetWidth}x${targetHeight}`);
 
             windowResizing = true;
-            mainWindow.setResizable(true);
+
+            // CRITICAL FIX: Do NOT use setResizable(true) on Windows!
+            // It causes DPI scaling and unpredictable size changes
+            // We can resize without making window resizable by using setBounds
 
             const frameRate = 60; // 60 FPS
             const totalFrames = Math.floor(RESIZE_ANIMATION_DURATION / (1000 / frameRate));
@@ -476,10 +568,15 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
                     windowResizing = false;
                     return;
                 }
-                mainWindow.setSize(currentWidth, currentHeight);
 
-                // Keep window at its original position during resize
-                mainWindow.setPosition(startX, startY);
+                // Use setBounds instead of setSize to have more control
+                // This prevents Windows from applying automatic scaling
+                mainWindow.setBounds({
+                    x: startX,
+                    y: startY,
+                    width: currentWidth,
+                    height: currentHeight
+                }, false); // false = don't animate (we're doing our own animation)
 
                 if (currentFrame >= totalFrames) {
                     clearInterval(resizeAnimation);
@@ -488,11 +585,16 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
 
                     // Check if window is still valid before final operations
                     if (!mainWindow.isDestroyed()) {
-                        mainWindow.setResizable(false);
+                        // Final size with exact dimensions
+                        mainWindow.setBounds({
+                            x: startX,
+                            y: startY,
+                            width: targetWidth,
+                            height: targetHeight
+                        }, false);
 
-                        // Ensure final size is exact and keep position
-                        mainWindow.setSize(targetWidth, targetHeight);
-                        mainWindow.setPosition(startX, startY);
+                        // Update intended size to match the new target
+                        intendedWindowSize = { width: targetWidth, height: targetHeight };
                     }
 
                     console.log(`Animation complete: ${targetWidth}x${targetHeight}`);
@@ -506,6 +608,25 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
         try {
             if (mainWindow.isDestroyed()) {
                 return { success: false, error: 'Window has been destroyed' };
+            }
+
+            // Skip resize if window is being moved manually
+            if (windowMoving) {
+                console.log('Skipping resize - window is being moved');
+                return { success: true };
+            }
+
+            // Skip resize if recently moved (cooldown period)
+            const timeSinceLastMove = Date.now() - lastMoveTime;
+            if (timeSinceLastMove < MOVE_COOLDOWN) {
+                console.log(`Skipping resize - moved ${timeSinceLastMove}ms ago (cooldown: ${MOVE_COOLDOWN}ms)`);
+                return { success: true };
+            }
+
+            // Skip resize if already resizing
+            if (windowResizing) {
+                console.log('Skipping resize - resize already in progress');
+                return { success: true };
             }
 
             // Get current view and layout mode from renderer
