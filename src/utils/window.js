@@ -107,10 +107,17 @@ function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
     // Force focus periodically to maintain top position
     const maintainTopPosition = () => {
         if (!mainWindow.isDestroyed() && mainWindow.isVisible()) {
-            mainWindow.moveTop();
-            // Re-apply always on top to ensure it stays above everything
-            if (process.platform === 'win32') {
-                mainWindow.setAlwaysOnTop(true, 'pop-up-menu', 1);
+            // IMPORTANT: Only maintain top position when window is NOT focused
+            // When focused, user is interacting (dropdowns, inputs, etc.)
+            // Calling moveTop() or setAlwaysOnTop() will close native dropdowns!
+            if (!mainWindow.isFocused()) {
+                mainWindow.moveTop();
+
+                // Re-apply always on top only when NOT focused
+                // setAlwaysOnTop() closes HTML select dropdowns on Windows
+                if (process.platform === 'win32') {
+                    mainWindow.setAlwaysOnTop(true, 'pop-up-menu', 1);
+                }
             }
         }
     };
