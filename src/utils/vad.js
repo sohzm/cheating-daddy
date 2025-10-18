@@ -14,11 +14,13 @@ const VADState = {
 const VAD_CONFIG = {
     sampleRate: 16000,
     frameSize: 512, // 32ms at 16kHz
-    silenceThreshold: 500, // ms of silence before committing (increased for stability)
-    maxRecordingTime: 15000, // 15 seconds max recording
-    minRecordingTime: 500, // Minimum 500ms recording before committing
-    preSpeechPadFrames: 2, // Frames to include before speech detection
-    postSpeechPadFrames: 2, // Frames to include after speech ends
+    silenceThreshold: 600, // ms of silence before committing (increased for better accuracy)
+    maxRecordingTime: 20000, // 20 seconds max recording (increased for longer questions)
+    minRecordingTime: 400, // Minimum 400ms recording (reduced to catch quick questions)
+    preSpeechPadFrames: 3, // Frames to include before speech detection (increased)
+    postSpeechPadFrames: 3, // Frames to include after speech ends (increased)
+    adaptiveThreshold: true, // Enable adaptive threshold adjustment
+    noiseGateThreshold: 0.02, // Minimum amplitude to consider as potential speech
 };
 
 class VADProcessor {
@@ -33,14 +35,20 @@ class VADProcessor {
         this.frameCount = 0;
         this.consecutiveSilenceFrames = 0;
         this.consecutiveSpeechFrames = 0;
-        
+        this.inputSampleRate = 24000; // User's audio sample rate
+
+        // Adaptive threshold tracking
+        this.noiseLevel = 0;
+        this.noiseLevelSamples = 0;
+        this.speechConfidenceHistory = [];
+
         // VAD configuration - these parameters may need tuning
         this.vadConfig = {
             sampleRate: VAD_CONFIG.sampleRate,
             frameSize: VAD_CONFIG.frameSize,
-            positiveSpeechThreshold: 0.6, // Threshold for detecting speech
-            negativeSpeechThreshold: 0.45, // Threshold for detecting non-speech
-            minSpeechFrames: 3, // Minimum consecutive speech frames to start recording
+            positiveSpeechThreshold: 0.55, // Slightly lowered for better detection
+            negativeSpeechThreshold: 0.40, // Threshold for detecting non-speech
+            minSpeechFrames: 2, // Reduced to 2 for faster response
             maxSpeechFrames: 10, // Not used in our implementation
             preSpeechPadFrames: VAD_CONFIG.preSpeechPadFrames,
         };
@@ -79,9 +87,24 @@ class VADProcessor {
         this.frameCount++;
 
         try {
+            // IMPROVEMENT 2: Apply noise gate - ignore very quiet audio (background noise)
+            if (VAD_CONFIG.noiseGateThreshold > 0 && !this.hasSignificantAudio(audioFrame)) {
+                // Still buffer for pre-speech padding, but don't process with VAD
+                this.bufferPreSpeechAudio(audioFrame);
+                return;
+            }
+
+            // IMPROVEMENT 1: Resample audio from 24kHz to 16kHz for VAD
+            const resampledFrame = this.resampleAudio(audioFrame);
+
             // Convert Float32Array to the format expected by VAD
-            const vadInput = this.prepareVADInput(audioFrame);
+            const vadInput = this.prepareVADInput(resampledFrame);
             const voice = await this.vad.process(vadInput);
+
+            // IMPROVEMENT 3: Track speech confidence for adaptive thresholds
+            if (VAD_CONFIG.adaptiveThreshold) {
+                this.updateAdaptiveThreshold(voice);
+            }
 
             switch (this.state) {
                 case VADState.LISTENING:
@@ -113,6 +136,78 @@ class VADProcessor {
             return int16Array;
         }
         return audioFrame;
+    }
+
+    // IMPROVEMENT 1: Audio Resampling (24kHz → 16kHz)
+    resampleAudio(audioFrame) {
+        // If sample rates match, no resampling needed
+        if (this.inputSampleRate === VAD_CONFIG.sampleRate) {
+            return audioFrame;
+        }
+
+        // Calculate resampling ratio
+        const ratio = VAD_CONFIG.sampleRate / this.inputSampleRate; // 16000/24000 = 0.6667
+        const outputLength = Math.floor(audioFrame.length * ratio);
+        const resampled = new Float32Array(outputLength);
+
+        // Linear interpolation for smooth resampling
+        for (let i = 0; i < outputLength; i++) {
+            const srcIndex = i / ratio;
+            const srcIndexFloor = Math.floor(srcIndex);
+            const srcIndexCeil = Math.min(srcIndexFloor + 1, audioFrame.length - 1);
+            const fraction = srcIndex - srcIndexFloor;
+
+            // Interpolate between two samples
+            resampled[i] = audioFrame[srcIndexFloor] * (1 - fraction) +
+                          audioFrame[srcIndexCeil] * fraction;
+        }
+
+        return resampled;
+    }
+
+    // IMPROVEMENT 2: Noise Gate (filters background noise)
+    hasSignificantAudio(audioFrame) {
+        // Calculate RMS (Root Mean Square) - measures audio volume/energy
+        let sum = 0;
+        for (let i = 0; i < audioFrame.length; i++) {
+            sum += audioFrame[i] * audioFrame[i];
+        }
+        const rms = Math.sqrt(sum / audioFrame.length);
+
+        // Update background noise level estimate (only when listening)
+        if (this.state === VADState.LISTENING) {
+            // Exponential moving average - slowly adapts to ambient noise
+            this.noiseLevel = this.noiseLevel * 0.95 + rms * 0.05;
+            this.noiseLevelSamples++;
+        }
+
+        // Return true if audio is above noise gate threshold
+        return rms > VAD_CONFIG.noiseGateThreshold;
+    }
+
+    // IMPROVEMENT 3: Adaptive Threshold Adjustment
+    updateAdaptiveThreshold(voiceDetected) {
+        // Track speech detection history (last 100 frames)
+        this.speechConfidenceHistory.push(voiceDetected ? 1 : 0);
+        if (this.speechConfidenceHistory.length > 100) {
+            this.speechConfidenceHistory.shift();
+        }
+
+        // Auto-adjust threshold based on detection rate (only when listening)
+        if (this.state === VADState.LISTENING && this.speechConfidenceHistory.length >= 50) {
+            const speechRate = this.speechConfidenceHistory.reduce((a, b) => a + b, 0) / this.speechConfidenceHistory.length;
+
+            // If detecting speech too often (>80%) = too sensitive, raise threshold
+            if (speechRate > 0.8 && this.vadConfig.positiveSpeechThreshold < 0.75) {
+                this.vadConfig.positiveSpeechThreshold += 0.01;
+                console.log(`VAD: Threshold increased to ${this.vadConfig.positiveSpeechThreshold.toFixed(2)} (too sensitive)`);
+            }
+            // If rarely detecting speech (<5%) = not sensitive enough, lower threshold
+            else if (speechRate < 0.05 && this.vadConfig.positiveSpeechThreshold > 0.45) {
+                this.vadConfig.positiveSpeechThreshold -= 0.01;
+                console.log(`VAD: Threshold decreased to ${this.vadConfig.positiveSpeechThreshold.toFixed(2)} (not sensitive enough)`);
+            }
+        }
     }
 
     handleListeningState(audioFrame, voice) {
@@ -300,15 +395,35 @@ class VADProcessor {
         console.log('VAD configuration updated:', VAD_CONFIG);
     }
 
+    // Public method to get VAD statistics (useful for debugging)
+    getStats() {
+        const speechRate = this.speechConfidenceHistory.length > 0
+            ? this.speechConfidenceHistory.reduce((a, b) => a + b, 0) / this.speechConfidenceHistory.length
+            : 0;
+
+        return {
+            state: this.state,
+            frameCount: this.frameCount,
+            noiseLevel: this.noiseLevel.toFixed(4),
+            currentThreshold: this.vadConfig.positiveSpeechThreshold.toFixed(2),
+            speechDetectionRate: (speechRate * 100).toFixed(1) + '%',
+            isAdaptive: VAD_CONFIG.adaptiveThreshold,
+            bufferSize: this.audioBuffer.length,
+            preSpeechBufferSize: this.preSpeechBuffer.length
+        };
+    }
+
     // Cleanup method
     destroy() {
         this.setState(VADState.IDLE);
         this.audioBuffer = [];
         this.preSpeechBuffer = [];
+        this.speechConfidenceHistory = [];
         if (this.vad) {
             // Clean up VAD resources if needed
             this.vad = null;
         }
+        console.log('VAD processor destroyed');
     }
 }
 
