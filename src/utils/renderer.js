@@ -371,10 +371,40 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
 }
 
 function setupLinuxMicProcessing(micStream) {
-    // Setup microphone audio processing for Linux
+    // Setup microphone audio processing for Linux/macOS/Windows
     const micAudioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
     const micSource = micAudioContext.createMediaStreamSource(micStream);
     const micProcessor = micAudioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
+
+    // Initialize VAD for microphone if enabled and available
+    let isVADEnabled = false;
+    let micVadProcessor = null;
+
+    if (VADProcessor) {
+        try {
+            const vadEnabled = localStorage.getItem('vadEnabled') === 'true';
+            if (vadEnabled) {
+                micVadProcessor = new VADProcessor(async (audioSegment) => {
+                    // Callback when VAD detects complete speech segment
+                    try {
+                        const pcmData16 = convertFloat32ToInt16(audioSegment);
+                        const base64Data = arrayBufferToBase64(pcmData16.buffer);
+                        await ipcRenderer.invoke('send-mic-audio-content', {
+                            data: base64Data,
+                            mimeType: 'audio/pcm;rate=24000',
+                        });
+                        console.log('VAD: Microphone speech segment sent');
+                    } catch (error) {
+                        console.error('Failed to send VAD microphone audio segment:', error);
+                    }
+                });
+                isVADEnabled = true;
+                console.log('VAD enabled for microphone audio processing');
+            }
+        } catch (error) {
+            console.error('Failed to initialize VAD for microphone:', error);
+        }
+    }
 
     let audioBuffer = [];
     const samplesPerChunk = SAMPLE_RATE * AUDIO_CHUNK_DURATION;
@@ -386,13 +416,21 @@ function setupLinuxMicProcessing(micStream) {
         // Process audio in chunks
         while (audioBuffer.length >= samplesPerChunk) {
             const chunk = audioBuffer.splice(0, samplesPerChunk);
-            const pcmData16 = convertFloat32ToInt16(chunk);
-            const base64Data = arrayBufferToBase64(pcmData16.buffer);
 
-            await ipcRenderer.invoke('send-mic-audio-content', {
-                data: base64Data,
-                mimeType: 'audio/pcm;rate=24000',
-            });
+            if (isVADEnabled && micVadProcessor) {
+                // Process with VAD - only sends audio when speech is detected
+                const chunkArray = new Float32Array(chunk);
+                await micVadProcessor.processAudio(chunkArray);
+            } else {
+                // Process without VAD - sends all audio continuously (old behavior)
+                const pcmData16 = convertFloat32ToInt16(chunk);
+                const base64Data = arrayBufferToBase64(pcmData16.buffer);
+
+                await ipcRenderer.invoke('send-mic-audio-content', {
+                    data: base64Data,
+                    mimeType: 'audio/pcm;rate=24000',
+                });
+            }
         }
     };
 

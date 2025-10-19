@@ -14,11 +14,11 @@ const VADState = {
 const VAD_CONFIG = {
     sampleRate: 16000,
     frameSize: 512, // 32ms at 16kHz
-    silenceThreshold: 600, // ms of silence before committing (increased for better accuracy)
+    silenceThreshold: 300, // ms of silence before committing (reduced for faster response)
     maxRecordingTime: 20000, // 20 seconds max recording (increased for longer questions)
-    minRecordingTime: 400, // Minimum 400ms recording (reduced to catch quick questions)
-    preSpeechPadFrames: 3, // Frames to include before speech detection (increased)
-    postSpeechPadFrames: 3, // Frames to include after speech ends (increased)
+    minRecordingTime: 300, // Minimum 300ms recording (reduced to catch quick questions)
+    preSpeechPadFrames: 2, // Frames to include before speech detection
+    postSpeechPadFrames: 2, // Frames to include after speech ends
     adaptiveThreshold: true, // Enable adaptive threshold adjustment
     noiseGateThreshold: 0.02, // Minimum amplitude to consider as potential speech
 };
