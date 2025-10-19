@@ -831,8 +831,8 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
 
             if (currentMode === 'interview' && isManual) {
                 // Interview mode (Live API) + Manual screenshot (Ctrl+Enter):
-                // Send screenshot + text prompt to trigger a response
-                // This is for when user wants AI to analyze something specific (question, code, etc.)
+                // Send screenshot + strong prompt to solve/answer the question
+                // This is for when user wants AI to solve questions (coding, aptitude, reasoning, etc.)
                 await geminiSessionRef.current.sendRealtimeInput({
                     media: { data: data, mimeType: 'image/jpeg' },
                 });
@@ -840,9 +840,9 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
                 // Small delay to ensure screenshot is processed
                 await new Promise(resolve => setTimeout(resolve, 100));
 
-                // Send a minimal prompt to trigger analysis without biasing the response
+                // Send strong prompt similar to exam mode but adapted for interview context
                 await geminiSessionRef.current.sendRealtimeInput({
-                    text: "."
+                    text: "Answer this question or solve this problem. For MCQ questions, provide the option (e.g., 'B) Red'). For coding questions, provide clean code without comments. For aptitude/reasoning questions, provide the direct answer. For technical questions, give a brief answer in 2-3 sentences as if responding in an interview."
                 });
             } else {
                 // Either exam mode OR automated screenshots in interview mode:
