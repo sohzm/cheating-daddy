@@ -9,6 +9,7 @@ let currentSessionId = null;
 let currentTranscription = '';
 let conversationHistory = [];
 let isInitializingSession = false;
+let isSessionReady = false; // Track if Live API setup is complete
 
 function formatSpeakerResults(results) {
     let text = '';
@@ -206,6 +207,7 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
     }
 
     isInitializingSession = true;
+    isSessionReady = false; // Reset ready state for new session
     sendToRenderer('session-initializing', true);
 
     // Store session parameters for reconnection (only if not already reconnecting)
@@ -254,6 +256,15 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                 },
                 onmessage: function (message) {
                     console.log('----------------', message);
+
+                    // Handle setup complete - session is now ready
+                    if (message.setupComplete) {
+                        isSessionReady = true;
+                        isInitializingSession = false;
+                        sendToRenderer('session-initializing', false);
+                        sendToRenderer('update-status', 'Ready - Listening...');
+                        console.log('✅ Live API setup complete - session ready');
+                    }
 
                     if (message.serverContent?.inputTranscription?.results) {
                         currentTranscription += formatSpeakerResults(message.serverContent.inputTranscription.results);
@@ -309,6 +320,7 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                 },
                 onclose: function (e) {
                     console.debug('Session closed:', e.reason);
+                    isSessionReady = false; // Reset ready state when session closes
 
                     // Check if the session closed due to invalid API key
                     const isApiKeyError =
@@ -592,6 +604,8 @@ RESPONSE FORMAT: [approach sentence] + [code] + [complexity]`;
             };
 
             sendToRenderer('update-status', `${regularModel} ready (screenshot mode)`);
+            // Coding mode is immediately ready (no Live API setup delay)
+            isSessionReady = true;
         }
 
         isInitializingSession = false;
@@ -812,12 +826,28 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
             // Check current mode to handle differently
             const currentMode = lastSessionParams?.mode || 'interview';
 
+            // For interview mode manual screenshots, wait for session to be ready
+            if (currentMode === 'interview' && isManual && !isSessionReady) {
+                console.log('⏳ Waiting for Live API setup to complete...');
+                // Wait up to 10 seconds for setupComplete
+                let waitTime = 0;
+                while (!isSessionReady && waitTime < 10000) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    waitTime += 100;
+                }
+                if (!isSessionReady) {
+                    console.warn('⚠️ Session not ready after 10s - screenshot may fail');
+                    return { success: false, error: 'Session not ready yet - please wait a few seconds and try again' };
+                }
+                console.log('✅ Session ready, proceeding with screenshot');
+            }
+
             process.stdout.write('!');
 
             if (currentMode === 'interview' && isManual) {
                 // Interview mode (Live API) + Manual screenshot (Ctrl+Enter):
-                // Send screenshot + strong prompt to solve/answer the question
-                // This is for when user wants AI to solve questions (coding, aptitude, reasoning, etc.)
+                // Send screenshot + smart prompt to analyze what's shown
+                // This helps when user wants to ask about what's on screen
                 await geminiSessionRef.current.sendRealtimeInput({
                     media: { data: data, mimeType: 'image/jpeg' },
                 });
@@ -825,9 +855,9 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
                 // Small delay to ensure screenshot is processed
                 await new Promise(resolve => setTimeout(resolve, 100));
 
-                // Send strong prompt similar to exam mode but adapted for interview context
+                // Send contextual prompt that analyzes the screenshot content
                 await geminiSessionRef.current.sendRealtimeInput({
-                    text: "Answer this question or solve this problem. For MCQ questions, provide the option (e.g., 'B) Red'). For coding questions, provide clean code without comments. For aptitude/reasoning questions, provide the direct answer. For technical questions, give a brief answer in 2-3 sentences as if responding in an interview."
+                    text: "Based on this screenshot: If there's a question visible, answer it briefly (2-3 sentences for interview context). If it's code, explain what it does. If it's a problem to solve, provide the solution. If it's just a screen with no clear question, briefly describe what you see and ask if I need help with anything specific."
                 });
             } else {
                 // Either exam mode OR automated screenshots in interview mode:
