@@ -808,7 +808,7 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
         }
     });
 
-    ipcMain.handle('send-image-content', async (event, { data, debug }) => {
+    ipcMain.handle('send-image-content', async (event, { data, debug, isManual }) => {
         if (!geminiSessionRef.current) return { success: false, error: 'No active Gemini session' };
 
         try {
@@ -824,10 +824,33 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
                 return { success: false, error: 'Image buffer too small' };
             }
 
+            // Check current mode to handle differently
+            const currentMode = lastSessionParams?.mode || 'interview';
+
             process.stdout.write('!');
-            await geminiSessionRef.current.sendRealtimeInput({
-                media: { data: data, mimeType: 'image/jpeg' },
-            });
+
+            if (currentMode === 'interview' && isManual) {
+                // Interview mode (Live API) + Manual screenshot (Ctrl+Enter):
+                // Send screenshot + text prompt to trigger a response
+                // This is for when user wants AI to analyze something specific (question, code, etc.)
+                await geminiSessionRef.current.sendRealtimeInput({
+                    media: { data: data, mimeType: 'image/jpeg' },
+                });
+
+                // Small delay to ensure screenshot is processed
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                // Send a minimal prompt to trigger analysis without biasing the response
+                await geminiSessionRef.current.sendRealtimeInput({
+                    text: "."
+                });
+            } else {
+                // Either exam mode OR automated screenshots in interview mode:
+                // Just send screenshot alone (no text prompt to trigger response)
+                await geminiSessionRef.current.sendRealtimeInput({
+                    media: { data: data, mimeType: 'image/jpeg' },
+                });
+            }
 
             return { success: true };
         } catch (error) {
@@ -853,7 +876,7 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
         }
     });
 
-    // Combined handler: Send screenshot + text together in ONE request
+    // Combined handler: Send screenshot + text
     ipcMain.handle('send-screenshot-with-text', async (event, { imageData, text }) => {
         if (!geminiSessionRef.current) return { success: false, error: 'No active Gemini session' };
 
@@ -866,13 +889,33 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
                 return { success: false, error: 'Invalid text message' };
             }
 
-            console.log('Sending screenshot + text in one request:', text);
+            // Check current mode to handle differently
+            const currentMode = lastSessionParams?.mode || 'interview';
 
-            // Send BOTH screenshot and text together in a single request
-            await geminiSessionRef.current.sendRealtimeInput({
-                media: { data: imageData, mimeType: 'image/jpeg' },
-                text: text.trim()
-            });
+            if (currentMode === 'interview') {
+                // Interview mode (Live API): Send screenshot and text SEPARATELY
+                // Live API doesn't support media + text in one request
+                console.log('Interview mode: Sending screenshot + text in TWO separate requests:', text);
+
+                // 1. Send screenshot first
+                process.stdout.write('!');
+                await geminiSessionRef.current.sendRealtimeInput({
+                    media: { data: imageData, mimeType: 'image/jpeg' }
+                });
+
+                // 2. Send text prompt second
+                await geminiSessionRef.current.sendRealtimeInput({
+                    text: text.trim()
+                });
+            } else {
+                // Exam Assistant mode (Regular API): Send screenshot + text together in ONE request
+                console.log('Exam mode: Sending screenshot + text in one request:', text);
+
+                await geminiSessionRef.current.sendRealtimeInput({
+                    media: { data: imageData, mimeType: 'image/jpeg' },
+                    text: text.trim()
+                });
+            }
 
             return { success: true };
         } catch (error) {

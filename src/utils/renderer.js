@@ -523,6 +523,9 @@ async function captureScreenshot(imageQuality = 'medium', isManual = false) {
     console.log(`Capturing ${isManual ? 'manual' : 'automated'} screenshot...`);
     if (!mediaStream) return;
 
+    // Store isManual flag for use in the blob callback
+    const captureIsManual = isManual;
+
     // Check rate limiting for automated screenshots only
     if (!isManual && tokenTracker.shouldThrottle()) {
         console.log('⚠️ Automated screenshot skipped due to rate limiting');
@@ -602,6 +605,7 @@ async function captureScreenshot(imageQuality = 'medium', isManual = false) {
 
                 const result = await ipcRenderer.invoke('send-image-content', {
                     data: base64data,
+                    isManual: captureIsManual,
                 });
 
                 if (result.success) {

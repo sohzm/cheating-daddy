@@ -23,6 +23,34 @@ export class AppHeader extends LitElement {
             font-size: var(--header-font-size);
             font-weight: 600;
             -webkit-app-region: drag;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .model-badge {
+            font-size: 10px;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 4px;
+            background: var(--accent-background, rgba(0, 122, 255, 0.15));
+            color: var(--accent-color, #007aff);
+            border: 1px solid var(--accent-border, rgba(0, 122, 255, 0.3));
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+
+        .model-badge.interview {
+            background: rgba(52, 211, 153, 0.15);
+            color: #34d399;
+            border-color: rgba(52, 211, 153, 0.3);
+        }
+
+        .model-badge.coding {
+            background: rgba(251, 146, 60, 0.15);
+            color: #fb923c;
+            border-color: rgba(251, 146, 60, 0.3);
         }
 
         .header-actions {
@@ -92,6 +120,8 @@ export class AppHeader extends LitElement {
         currentView: { type: String },
         statusText: { type: String },
         startTime: { type: Number },
+        currentMode: { type: String },
+        currentModel: { type: String },
         onCustomizeClick: { type: Function },
         onHelpClick: { type: Function },
         onCloseClick: { type: Function },
@@ -108,6 +138,8 @@ export class AppHeader extends LitElement {
         this.currentView = 'main';
         this.statusText = '';
         this.startTime = null;
+        this.currentMode = 'interview';
+        this.currentModel = '';
         this.onCustomizeClick = () => {};
         this.onHelpClick = () => {};
         this.onCloseClick = () => {};
@@ -193,6 +225,25 @@ export class AppHeader extends LitElement {
         return '';
     }
 
+    getModelDisplayName() {
+        if (!this.currentModel) return '';
+
+        // Format model names for display
+        const modelMap = {
+            'gemini-live-2.5-flash-preview': '2.5 Flash Live',
+            'gemini-2.5-flash-native-audio-preview-09-2025': '2.5 Flash Live',
+            'gemini-2.5-flash': '2.5 Flash',
+            'gemini-2.5-pro': '2.5 Pro',
+            'gemini-2.0-flash-exp': '2.0 Flash',
+        };
+
+        return modelMap[this.currentModel] || this.currentModel;
+    }
+
+    getModelBadgeClass() {
+        return this.currentMode === 'interview' ? 'interview' : 'coding';
+    }
+
     isNavigationView() {
         const navigationViews = ['customize', 'help', 'advanced'];
         return navigationViews.includes(this.currentView);
@@ -200,10 +251,16 @@ export class AppHeader extends LitElement {
 
     render() {
         const elapsedTime = this.getElapsedTime();
+        const modelName = this.getModelDisplayName();
 
         return html`
             <div class="header">
-                <div class="header-title">${this.getViewTitle()}</div>
+                <div class="header-title">
+                    ${this.getViewTitle()}
+                    ${modelName && this.currentView === 'assistant'
+                        ? html`<span class="model-badge ${this.getModelBadgeClass()}">${modelName}</span>`
+                        : ''}
+                </div>
                 <div class="header-actions">
                     ${this.currentView === 'assistant'
                         ? html`

@@ -109,6 +109,8 @@ export class CheatingDaddyApp extends LitElement {
         selectedImageQuality: { type: String },
         layoutMode: { type: String },
         advancedMode: { type: Boolean },
+        currentMode: { type: String },
+        currentModel: { type: String },
         _viewInstances: { type: Object, state: true },
         _isClickThrough: { state: true },
         _awaitingNewResponse: { state: true },
@@ -128,6 +130,8 @@ export class CheatingDaddyApp extends LitElement {
         this.selectedImageQuality = localStorage.getItem('selectedImageQuality') || 'medium';
         this.layoutMode = localStorage.getItem('layoutMode') || 'normal';
         this.advancedMode = localStorage.getItem('advancedMode') === 'true';
+        this.currentMode = localStorage.getItem('selectedMode') || 'interview';
+        this.currentModel = '';
         this.responses = [];
         this.currentResponseIndex = -1;
         this._viewInstances = new Map();
@@ -296,6 +300,14 @@ export class CheatingDaddyApp extends LitElement {
         const selectedModel = localStorage.getItem('selectedModel') || 'gemini-2.5-flash';
 
         await cheddar.initializeGemini(this.selectedProfile, this.selectedLanguage, selectedMode, selectedModel);
+
+        // Set current mode and model for header display
+        this.currentMode = selectedMode;
+        if (selectedMode === 'interview') {
+            this.currentModel = 'gemini-live-2.5-flash-preview';
+        } else {
+            this.currentModel = selectedModel;
+        }
 
         // For coding/OA mode (exam-assistant), ALWAYS use manual mode to avoid rate limits
         // For interview mode, use the user's selected interval
@@ -535,6 +547,8 @@ export class CheatingDaddyApp extends LitElement {
                         .currentView=${this.currentView}
                         .statusText=${this.statusText}
                         .startTime=${this.startTime}
+                        .currentMode=${this.currentMode}
+                        .currentModel=${this.currentModel}
                         .advancedMode=${this.advancedMode}
                         .onCustomizeClick=${() => this.handleCustomizeClick()}
                         .onHelpClick=${() => this.handleHelpClick()}
