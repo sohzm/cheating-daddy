@@ -30,7 +30,6 @@ let mediaStream = null;
 let screenshotInterval = null;
 let audioContext = null;
 let audioProcessor = null;
-let micAudioProcessor = null;
 let audioBuffer = [];
 let vadProcessor = null; // VAD processor instance
 const SAMPLE_RATE = 24000;
@@ -197,8 +196,6 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
     tokenTracker.reset();
     console.log('🎯 Token tracker reset for new capture session');
 
-    const audioMode = localStorage.getItem('audioMode') || 'speaker_only';
-
     try {
         if (isMacOS) {
             // On macOS, use SystemAudioDump for audio and getDisplayMedia for screen
@@ -221,26 +218,6 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
             });
 
             console.log('macOS screen capture started - audio handled by SystemAudioDump');
-
-            if (audioMode === 'mic_only' || audioMode === 'both') {
-                let micStream = null;
-                try {
-                    micStream = await navigator.mediaDevices.getUserMedia({
-                        audio: {
-                            sampleRate: SAMPLE_RATE,
-                            channelCount: 1,
-                            echoCancellation: true,
-                            noiseSuppression: true,
-                            autoGainControl: true,
-                        },
-                        video: false,
-                    });
-                    console.log('macOS microphone capture started');
-                    setupLinuxMicProcessing(micStream);
-                } catch (micError) {
-                    console.warn('Failed to get microphone access on macOS:', micError);
-                }
-            }
         } else if (isLinux) {
             // Linux - use display media for screen capture and try to get system audio
             try {
@@ -278,32 +255,7 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
                 });
             }
 
-            // Additionally get microphone input for Linux based on audio mode
-            if (audioMode === 'mic_only' || audioMode === 'both') {
-                let micStream = null;
-                try {
-                    micStream = await navigator.mediaDevices.getUserMedia({
-                        audio: {
-                            sampleRate: SAMPLE_RATE,
-                            channelCount: 1,
-                            echoCancellation: true,
-                            noiseSuppression: true,
-                            autoGainControl: true,
-                        },
-                        video: false,
-                    });
-
-                    console.log('Linux microphone capture started');
-
-                    // Setup audio processing for microphone on Linux
-                    setupLinuxMicProcessing(micStream);
-                } catch (micError) {
-                    console.warn('Failed to get microphone access on Linux:', micError);
-                    // Continue without microphone if permission denied
-                }
-            }
-
-            console.log('Linux capture started - system audio:', mediaStream.getAudioTracks().length > 0, 'microphone mode:', audioMode);
+            console.log('Linux capture started - system audio:', mediaStream.getAudioTracks().length > 0);
         } else {
             // Windows - use display media with loopback for system audio
             mediaStream = await navigator.mediaDevices.getDisplayMedia({
@@ -325,26 +277,6 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
 
             // Setup audio processing for Windows loopback audio only
             setupWindowsLoopbackProcessing();
-
-            if (audioMode === 'mic_only' || audioMode === 'both') {
-                let micStream = null;
-                try {
-                    micStream = await navigator.mediaDevices.getUserMedia({
-                        audio: {
-                            sampleRate: SAMPLE_RATE,
-                            channelCount: 1,
-                            echoCancellation: true,
-                            noiseSuppression: true,
-                            autoGainControl: true,
-                        },
-                        video: false,
-                    });
-                    console.log('Windows microphone capture started');
-                    setupLinuxMicProcessing(micStream);
-                } catch (micError) {
-                    console.warn('Failed to get microphone access on Windows:', micError);
-                }
-            }
         }
 
         console.log('MediaStream obtained:', {
@@ -368,77 +300,6 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
         console.error('Error starting capture:', err);
         cheddar.setStatus('error');
     }
-}
-
-function setupLinuxMicProcessing(micStream) {
-    // Setup microphone audio processing for Linux/macOS/Windows
-    const micAudioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
-    const micSource = micAudioContext.createMediaStreamSource(micStream);
-    const micProcessor = micAudioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
-
-    // Initialize VAD for microphone if enabled and available
-    let isVADEnabled = false;
-    let micVadProcessor = null;
-
-    if (VADProcessor) {
-        try {
-            const vadEnabled = localStorage.getItem('vadEnabled') === 'true';
-            if (vadEnabled) {
-                micVadProcessor = new VADProcessor(async (audioSegment) => {
-                    // Callback when VAD detects complete speech segment
-                    try {
-                        const pcmData16 = convertFloat32ToInt16(audioSegment);
-                        const base64Data = arrayBufferToBase64(pcmData16.buffer);
-                        await ipcRenderer.invoke('send-mic-audio-content', {
-                            data: base64Data,
-                            mimeType: 'audio/pcm;rate=24000',
-                        });
-                        console.log('VAD: Microphone speech segment sent');
-                    } catch (error) {
-                        console.error('Failed to send VAD microphone audio segment:', error);
-                    }
-                });
-                isVADEnabled = true;
-                console.log('VAD enabled for microphone audio processing');
-            }
-        } catch (error) {
-            console.error('Failed to initialize VAD for microphone:', error);
-        }
-    }
-
-    let audioBuffer = [];
-    const samplesPerChunk = SAMPLE_RATE * AUDIO_CHUNK_DURATION;
-
-    micProcessor.onaudioprocess = async e => {
-        const inputData = e.inputBuffer.getChannelData(0);
-        audioBuffer.push(...inputData);
-
-        // Process audio in chunks
-        while (audioBuffer.length >= samplesPerChunk) {
-            const chunk = audioBuffer.splice(0, samplesPerChunk);
-
-            if (isVADEnabled && micVadProcessor) {
-                // Process with VAD - only sends audio when speech is detected
-                const chunkArray = new Float32Array(chunk);
-                await micVadProcessor.processAudio(chunkArray);
-            } else {
-                // Process without VAD - sends all audio continuously (old behavior)
-                const pcmData16 = convertFloat32ToInt16(chunk);
-                const base64Data = arrayBufferToBase64(pcmData16.buffer);
-
-                await ipcRenderer.invoke('send-mic-audio-content', {
-                    data: base64Data,
-                    mimeType: 'audio/pcm;rate=24000',
-                });
-            }
-        }
-    };
-
-    micSource.connect(micProcessor);
-    micProcessor.connect(micAudioContext.destination);
-
-    // Store processor reference for cleanup
-    micAudioProcessor = micProcessor;
 }
 
 function setupLinuxSystemAudioProcessing() {
@@ -690,12 +551,6 @@ function stopCapture() {
     if (audioProcessor) {
         audioProcessor.disconnect();
         audioProcessor = null;
-    }
-
-    // Clean up microphone audio processor (Linux only)
-    if (micAudioProcessor) {
-        micAudioProcessor.disconnect();
-        micAudioProcessor = null;
     }
 
     if (audioContext) {

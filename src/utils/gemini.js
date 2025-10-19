@@ -793,21 +793,6 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
         }
     });
 
-    // Handle microphone audio on a separate channel
-    ipcMain.handle('send-mic-audio-content', async (event, { data, mimeType }) => {
-        if (!geminiSessionRef.current) return { success: false, error: 'No active Gemini session' };
-        try {
-            process.stdout.write(',');
-            await geminiSessionRef.current.sendRealtimeInput({
-                audio: { data: data, mimeType: mimeType },
-            });
-            return { success: true };
-        } catch (error) {
-            console.error('Error sending mic audio:', error);
-            return { success: false, error: error.message };
-        }
-    });
-
     ipcMain.handle('send-image-content', async (event, { data, debug, isManual }) => {
         if (!geminiSessionRef.current) return { success: false, error: 'No active Gemini session' };
 

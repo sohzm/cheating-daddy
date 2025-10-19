@@ -1123,23 +1123,12 @@ export class CustomizeView extends LitElement {
                     </div>
                 </div>
 
-                <!-- Audio & Microphone Section -->
+                <!-- Audio Section -->
                 <div class="settings-section">
                     <div class="section-title">
-                        <span>Audio & Microphone</span>
+                        <span>Audio</span>
                     </div>
                     <div class="form-grid">
-                        <div class="form-group">
-                            <label class="form-label">Audio Mode</label>
-                            <select class="form-control" .value=${localStorage.getItem('audioMode') || 'speaker_only'} @change=${e => localStorage.setItem('audioMode', e.target.value)}>
-                                <option value="speaker_only">Speaker Only (Interviewer)</option>
-                                <option value="mic_only">Microphone Only (Me)</option>
-                                <option value="both">Both Speaker & Microphone</option>
-                            </select>
-                            <div class="form-description">
-                                Choose which audio sources to capture for the AI.
-                            </div>
-                        </div>
 
                         <div class="form-group full-width">
                             <div class="checkbox-group">
