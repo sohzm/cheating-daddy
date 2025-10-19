@@ -5,9 +5,6 @@
 > [!NOTE]  
 > Use latest MacOS and Windows version, older versions have limited support
 
-> [!NOTE]  
-> During interview mode sometimes Live Api can't fetch Correct question from Audio Detection and can't able to give correct response, this is due to audio capture issues, we will working on this issue soon and update it in next release.
-
 A real-time AI assistant that provides contextual help during video calls, interviews, presentations, and meetings using screen capture and audio analysis.
 
 ## Features
@@ -26,7 +23,36 @@ A real-time AI assistant that provides contextual help during video calls, inter
 
 ## What's New
 
-### v0.5.3 (Latest)
+### v0.5.4 (Latest)
+
+#### Major Bug Fixes
+- **Fixed first Ctrl+Enter not working**: Session now properly waits for Live API `setupComplete` before allowing manual screenshots (affects all profiles: interview, sales, presentation, negotiation, meeting)
+- **Fixed window overhidden bug**: Resolved window getting hidden behind other Dekstop applications. 
+- **Fixed window size increasing bug**: Window no longer expands when displaying long responses or code blocks
+
+#### Features & Improvements
+- **Enhanced Interview Response Quality**:
+  - Adjusted prompts for more complete technical answers (2-4 sentences instead of strict 2-3)
+  - Added "ALWAYS provide complete answers" principle to prevent fragmented responses
+  - Responses now balance natural human tone with technical completeness
+- **VAD (Voice Activity Detection) Improvements**:
+  - Reduced silence threshold from 600ms to 300ms for faster response times
+  - Reduced minimum recording time from 400ms to 300ms to catch quick questions
+  - Better detection of speech vs silence
+- **Added Model Selection Header**: Now displays which Gemini model is being used in the UI
+- **Removed Microphone Mode**: Simplified to speaker-only mode (interviewer's audio) for better performance and token management
+  - Removed microphone-only mode (candidate's voice)
+  - Removed "both speaker & microphone" mode
+  - Cleaned up all microphone-related code from UI and backend
+
+#### Technical Changes
+- Implemented `setupComplete` tracking for Live API session readiness
+- Added session ready state checks before manual screenshot processing
+- Improved manual screenshot prompt to handle various screen contexts intelligently
+- Platform-specific window level configuration (Windows: `pop-up-menu`, macOS: `screen-saver`)
+- Periodic window position maintenance to stay above UWP apps
+
+### v0.5.3
 
 #### Features & Improvements
 - Added Dual Mode for OA or tests and Interview mode
@@ -111,4 +137,3 @@ All features are properly tested and working.
 - Electron-compatible OS (macOS, Windows, Linux)
 - Gemini API key
 - Screen recording permissions
-- Microphone/audio permissions
