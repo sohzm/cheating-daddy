@@ -75,6 +75,8 @@ A real-time AI assistant that provides contextual help during video calls, inter
 - Text prompts now send with screenshot context in single request
 
 ### v0.5.2
+
+#### Features & Improvements
 - Improved Default Interface & Stealth
 - Removed Export & Conversation History Feature
 - Fixed some Bugs and Issues.
