@@ -33,7 +33,6 @@ export class CustomizeView extends LitElement {
             border: 1px solid var(--card-border, rgba(255, 255, 255, 0.1));
             border-radius: 6px;
             padding: 12px;
-            backdrop-filter: blur(10px);
             position: relative;
             overflow: visible;
         }
