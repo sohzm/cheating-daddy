@@ -26,7 +26,6 @@ A real-time AI assistant that provides contextual help during video calls, inter
 ### v0.5.4 (Latest)
 
 #### Major Bug Fixes
-- **Fixed first Ctrl+Enter not working**: Session now properly waits for Live API `setupComplete` before allowing manual screenshots (affects all profiles: interview, sales, presentation, negotiation, meeting)
 - **Fixed window overhidden bug**: Resolved window getting hidden behind other Dekstop applications. 
 - **Fixed window size increasing bug**: Window no longer expands when displaying long responses or code blocks
 
@@ -74,6 +73,11 @@ A real-time AI assistant that provides contextual help during video calls, inter
 - Window no longer moves to center/top on session restart
 - Long code lines now wrap instead of expanding window
 - Text prompts now send with screenshot context in single request
+
+### v0.5.2
+- Improved Default Interface & Stealth
+- Removed Export & Conversation History Feature
+- Fixed some Bugs and Issues.
 
 ### v0.5.1
 
