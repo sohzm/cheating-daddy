@@ -10,6 +10,19 @@ let currentTranscription = '';
 let conversationHistory = [];
 let isInitializingSession = false;
 
+function formatSpeakerResults(results) {
+    let text = '';
+    for (const result of results) {
+        if (result.transcript && result.speakerId) {
+            const speakerLabel = result.speakerId === 1 ? 'Interviewer' : 'Candidate';
+            text += `[${speakerLabel}]: ${result.transcript}\n`;
+        }
+    }
+    return text;
+}
+
+module.exports.formatSpeakerResults = formatSpeakerResults;
+
 // Audio capture variables
 let systemAudioProc = null;
 let messageBuffer = '';
@@ -237,9 +250,8 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                 onmessage: function (message) {
                     console.log('----------------', message);
 
-                    // Handle transcription input
-                    if (message.serverContent?.inputTranscription?.text) {
-                        currentTranscription += message.serverContent.inputTranscription.text;
+                    if (message.serverContent?.inputTranscription?.results) {
+                        currentTranscription += formatSpeakerResults(message.serverContent.inputTranscription.results);
                     }
 
                     // Handle AI model response
@@ -321,7 +333,12 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
             config: {
                 responseModalities: ['TEXT'],
                 tools: enabledTools,
-                inputAudioTranscription: {},
+                // Enable speaker diarization
+                inputAudioTranscription: {
+                    enableSpeakerDiarization: true,
+                    minSpeakerCount: 2,
+                    maxSpeakerCount: 2,
+                },
                 contextWindowCompression: { slidingWindow: {} },
                 speechConfig: { languageCode: language },
                 systemInstruction: {
@@ -524,7 +541,22 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
             });
             return { success: true };
         } catch (error) {
-            console.error('Error sending audio:', error);
+            console.error('Error sending system audio:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    // Handle microphone audio on a separate channel
+    ipcMain.handle('send-mic-audio-content', async (event, { data, mimeType }) => {
+        if (!geminiSessionRef.current) return { success: false, error: 'No active Gemini session' };
+        try {
+            process.stdout.write(',');
+            await geminiSessionRef.current.sendRealtimeInput({
+                audio: { data: data, mimeType: mimeType },
+            });
+            return { success: true };
+        } catch (error) {
+            console.error('Error sending mic audio:', error);
             return { success: false, error: error.message };
         }
     });
@@ -670,4 +702,5 @@ module.exports = {
     sendAudioToGemini,
     setupGeminiIpcHandlers,
     attemptReconnection,
+    formatSpeakerResults,
 };

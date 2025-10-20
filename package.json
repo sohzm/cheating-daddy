@@ -13,7 +13,8 @@
         "make:rpm": "electron-forge make --platform=linux --targets=@electron-forge/maker-rpm",
         "make:appimage": "electron-forge make --platform=linux --targets=@reforged/maker-appimage",
         "publish": "electron-forge publish",
-        "lint": "echo \"No linting configured\""
+        "lint": "echo \"No linting configured\"",
+        "test": "vitest run"
     },
     "keywords": [
         "cheating daddy",
@@ -42,6 +43,8 @@
         "@electron-forge/plugin-fuses": "^7.8.1",
         "@electron/fuses": "^1.8.0",
         "@reforged/maker-appimage": "^5.0.0",
-        "electron": "30.0.0"
+        "vitest": "^1.6.1",
+        "jsdom": "^23.2.0",
+        "electron": "^30.0.5"
     }
 }
