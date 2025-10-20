@@ -1,5 +1,6 @@
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
 import { resizeLayout } from '../../utils/windowResize.js';
+import '../common/CustomDropdown.js';
 
 export class CustomizeView extends LitElement {
     static styles = css`
@@ -122,15 +123,7 @@ export class CustomizeView extends LitElement {
             background: var(--input-hover-background, rgba(0, 0, 0, 0.35));
         }
 
-        select.form-control {
-            cursor: pointer;
-            appearance: none;
-            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
-            background-position: right 8px center;
-            background-repeat: no-repeat;
-            background-size: 12px;
-            padding-right: 28px;
-        }
+        /* Custom dropdown styling removed - now using custom-dropdown component */
 
         textarea.form-control {
             resize: vertical;
@@ -1040,15 +1033,11 @@ export class CustomizeView extends LitElement {
                                     Profile Type
                                     <span class="current-selection">${currentProfile?.name || 'Unknown'}</span>
                                 </label>
-                                <select class="form-control" .value=${this.selectedProfile} @change=${this.handleProfileSelect}>
-                                    ${profiles.map(
-                                        profile => html`
-                                            <option value=${profile.value} ?selected=${this.selectedProfile === profile.value}>
-                                                ${profile.name}
-                                            </option>
-                                        `
-                                    )}
-                                </select>
+                                <custom-dropdown
+                                    .value=${this.selectedProfile}
+                                    .options=${profiles.map(p => ({ value: p.value, label: p.name }))}
+                                    @change=${e => this.handleProfileSelect({ target: { value: e.detail.value } })}
+                                ></custom-dropdown>
                             </div>
                         </div>
 
@@ -1083,9 +1072,11 @@ export class CustomizeView extends LitElement {
                             <div class="form-row">
                                 <div class="form-group">
                                     <label class="form-label">Mode (Fixed for Exam Assistant)</label>
-                                    <select class="form-control" .value=${'coding'} disabled>
-                                        <option value="coding">💻 Coding/OA Mode (Screenshot-based)</option>
-                                    </select>
+                                    <custom-dropdown
+                                        .value=${'coding'}
+                                        .options=${[{ value: 'coding', label: '💻 Coding/OA Mode (Screenshot-based)' }]}
+                                        .disabled=${true}
+                                    ></custom-dropdown>
                                     <div class="form-description">
                                         Exam Assistant profile uses Gemini API 2.5 Flash or 2.5 Pro for better problem-solving responses.
                                     </div>
@@ -1095,10 +1086,14 @@ export class CustomizeView extends LitElement {
                             <div class="form-row">
                                 <div class="form-group">
                                     <label class="form-label">Model Selection</label>
-                                    <select class="form-control" .value=${this.selectedModel} @change=${this.handleModelChange}>
-                                        <option value="gemini-2.5-flash">⚡ Gemini 2.5 Flash (Faster, Balanced)</option>
-                                        <option value="gemini-2.5-pro">🚀 Gemini 2.5 Pro (Slower, More Accurate)</option>
-                                    </select>
+                                    <custom-dropdown
+                                        .value=${this.selectedModel}
+                                        .options=${[
+                                            { value: 'gemini-2.5-flash', label: '⚡ Gemini 2.5 Flash (Faster, Balanced)' },
+                                            { value: 'gemini-2.5-pro', label: '🚀 Gemini 2.5 Pro (Slower, More Accurate)' }
+                                        ]}
+                                        @change=${e => this.handleModelChange({ target: { value: e.detail.value } })}
+                                    ></custom-dropdown>
                                     <div class="form-description">
                                         ${this.selectedModel === 'gemini-2.5-flash'
                                             ? 'Gemini 2.5 Flash: Faster responses, good for time-sensitive coding assessments.'
@@ -1111,9 +1106,11 @@ export class CustomizeView extends LitElement {
                             <div class="form-row">
                                 <div class="form-group">
                                     <label class="form-label">Mode (Fixed for ${this.getProfileNames()[this.selectedProfile]})</label>
-                                    <select class="form-control" .value=${'interview'} disabled>
-                                        <option value="interview">🎤 Interview Mode (Real-time Audio/Video)</option>
-                                    </select>
+                                    <custom-dropdown
+                                        .value=${'interview'}
+                                        .options=${[{ value: 'interview', label: '🎤 Interview Mode (Real-time Audio/Video)' }]}
+                                        .disabled=${true}
+                                    ></custom-dropdown>
                                     <div class="form-description">
                                         ${this.getProfileNames()[this.selectedProfile]} profile uses Interview mode with Gemini 2.5 Flash for real-time audio processing and live interactions.
                                     </div>
@@ -1158,15 +1155,20 @@ export class CustomizeView extends LitElement {
                     <div class="form-grid">
                         <div class="form-group">
                             <label class="form-label">Profile</label>
-                            <select class="form-control" .value=${localStorage.getItem('stealthProfile') || 'balanced'} @change=${e => {
-                                localStorage.setItem('stealthProfile', e.target.value);
-                                // We need to notify the main process to restart for some settings to apply
-                                alert('Restart the application for stealth changes to take full effect.');
-                            }}>
-                                <option value="visible">Visible</option>
-                                <option value="balanced">Balanced</option>
-                                <option value="ultra">Ultra-Stealth</option>
-                            </select>
+                            <custom-dropdown
+                                .value=${localStorage.getItem('stealthProfile') || 'balanced'}
+                                .options=${[
+                                    { value: 'visible', label: 'Visible' },
+                                    { value: 'balanced', label: 'Balanced' },
+                                    { value: 'ultra', label: 'Ultra-Stealth' }
+                                ]}
+                                @change=${e => {
+                                    localStorage.setItem('stealthProfile', e.detail.value);
+                                    // We need to notify the main process to restart for some settings to apply
+                                    alert('Restart the application for stealth changes to take full effect.');
+                                    this.requestUpdate();
+                                }}
+                            ></custom-dropdown>
                             <div class="form-description">
                                 Adjusts visibility and detection resistance. A restart is required for changes to apply.
                             </div>
@@ -1188,15 +1190,11 @@ export class CustomizeView extends LitElement {
                                     Speech Language
                                     <span class="current-selection">${currentLanguage?.name || 'Unknown'}</span>
                                 </label>
-                                <select class="form-control" .value=${this.selectedLanguage} @change=${this.handleLanguageSelect}>
-                                    ${languages.map(
-                                        language => html`
-                                            <option value=${language.value} ?selected=${this.selectedLanguage === language.value}>
-                                                ${language.name}
-                                            </option>
-                                        `
-                                    )}
-                                </select>
+                                <custom-dropdown
+                                    .value=${this.selectedLanguage}
+                                    .options=${languages.map(l => ({ value: l.value, label: l.name }))}
+                                    @change=${e => this.handleLanguageSelect({ target: { value: e.detail.value } })}
+                                ></custom-dropdown>
                                 <div class="form-description">Language for speech recognition and AI responses</div>
                             </div>
                         </div>
@@ -1216,10 +1214,14 @@ export class CustomizeView extends LitElement {
                                     Layout Mode
                                     <span class="current-selection">${this.layoutMode === 'compact' ? 'Compact' : 'Normal'}</span>
                                 </label>
-                                <select class="form-control" .value=${this.layoutMode} @change=${this.handleLayoutModeSelect}>
-                                    <option value="normal" ?selected=${this.layoutMode === 'normal'}>Normal</option>
-                                    <option value="compact" ?selected=${this.layoutMode === 'compact'}>Compact</option>
-                                </select>
+                                <custom-dropdown
+                                    .value=${this.layoutMode}
+                                    .options=${[
+                                        { value: 'normal', label: 'Normal' },
+                                        { value: 'compact', label: 'Compact' }
+                                    ]}
+                                    @change=${e => this.handleLayoutModeSelect({ target: { value: e.detail.value } })}
+                                ></custom-dropdown>
                                 <div class="form-description">
                                     ${
                                         this.layoutMode === 'compact'
@@ -1300,13 +1302,17 @@ export class CustomizeView extends LitElement {
                                             >${this.selectedScreenshotInterval === 'manual' ? 'Manual' : this.selectedScreenshotInterval + 's'}</span
                                         >
                                     </label>
-                                    <select class="form-control" .value=${this.selectedScreenshotInterval} @change=${this.handleScreenshotIntervalSelect}>
-                                        <option value="manual" ?selected=${this.selectedScreenshotInterval === 'manual'}>Manual (On demand)</option>
-                                        <option value="1" ?selected=${this.selectedScreenshotInterval === '1'}>Every 1 second</option>
-                                        <option value="2" ?selected=${this.selectedScreenshotInterval === '2'}>Every 2 seconds</option>
-                                        <option value="5" ?selected=${this.selectedScreenshotInterval === '5'}>Every 5 seconds</option>
-                                        <option value="10" ?selected=${this.selectedScreenshotInterval === '10'}>Every 10 seconds</option>
-                                    </select>
+                                    <custom-dropdown
+                                        .value=${this.selectedScreenshotInterval}
+                                        .options=${[
+                                            { value: 'manual', label: 'Manual (On demand)' },
+                                            { value: '1', label: 'Every 1 second' },
+                                            { value: '2', label: 'Every 2 seconds' },
+                                            { value: '5', label: 'Every 5 seconds' },
+                                            { value: '10', label: 'Every 10 seconds' }
+                                        ]}
+                                        @change=${e => this.handleScreenshotIntervalSelect({ target: { value: e.detail.value } })}
+                                    ></custom-dropdown>
                                     <div class="form-description">
                                         ${
                                             this.selectedScreenshotInterval === 'manual'
@@ -1324,11 +1330,15 @@ export class CustomizeView extends LitElement {
                                         >${this.selectedImageQuality.charAt(0).toUpperCase() + this.selectedImageQuality.slice(1)}</span
                                     >
                                 </label>
-                                <select class="form-control" .value=${this.selectedImageQuality} @change=${this.handleImageQualitySelect}>
-                                    <option value="high" ?selected=${this.selectedImageQuality === 'high'}>High Quality</option>
-                                    <option value="medium" ?selected=${this.selectedImageQuality === 'medium'}>Medium Quality</option>
-                                    <option value="low" ?selected=${this.selectedImageQuality === 'low'}>Low Quality</option>
-                                </select>
+                                <custom-dropdown
+                                    .value=${this.selectedImageQuality}
+                                    .options=${[
+                                        { value: 'high', label: 'High Quality' },
+                                        { value: 'medium', label: 'Medium Quality' },
+                                        { value: 'low', label: 'Low Quality' }
+                                    ]}
+                                    @change=${e => this.handleImageQualitySelect({ target: { value: e.detail.value } })}
+                                ></custom-dropdown>
                                 <div class="form-description">
                                     ${
                                         this.selectedImageQuality === 'high'
