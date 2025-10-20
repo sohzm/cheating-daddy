@@ -16,7 +16,7 @@ export class CustomDropdown extends LitElement {
 
         .dropdown-container {
             position: relative;
-            width: 100%;
+            width: 120%;
         }
 
         .dropdown-button {

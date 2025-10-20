@@ -1159,24 +1159,26 @@ export class CustomizeView extends LitElement {
                         <span>Stealth Profile</span>
                     </div>
                     <div class="form-grid">
-                        <div class="form-group">
-                            <label class="form-label">Profile</label>
-                            <custom-dropdown
-                                .value=${localStorage.getItem('stealthProfile') || 'balanced'}
-                                .options=${[
-                                    { value: 'visible', label: 'Visible' },
-                                    { value: 'balanced', label: 'Balanced' },
-                                    { value: 'ultra', label: 'Ultra-Stealth' }
-                                ]}
-                                @change=${e => {
-                                    localStorage.setItem('stealthProfile', e.detail.value);
-                                    // We need to notify the main process to restart for some settings to apply
-                                    alert('Restart the application for stealth changes to take full effect.');
-                                    this.requestUpdate();
-                                }}
-                            ></custom-dropdown>
-                            <div class="form-description">
-                                Adjusts visibility and detection resistance. A restart is required for changes to apply.
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">Profile</label>
+                                <custom-dropdown
+                                    .value=${localStorage.getItem('stealthProfile') || 'balanced'}
+                                    .options=${[
+                                        { value: 'visible', label: 'Visible' },
+                                        { value: 'balanced', label: 'Balanced' },
+                                        { value: 'ultra', label: 'Ultra-Stealth' }
+                                    ]}
+                                    @change=${e => {
+                                        localStorage.setItem('stealthProfile', e.detail.value);
+                                        // We need to notify the main process to restart for some settings to apply
+                                        alert('Restart the application for stealth changes to take full effect.');
+                                        this.requestUpdate();
+                                    }}
+                                ></custom-dropdown>
+                                <div class="form-description">
+                                    Adjusts visibility and detection resistance. A restart is required for changes to apply.
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1299,8 +1301,8 @@ export class CustomizeView extends LitElement {
                     </div>
 
                     <div class="form-grid">
-                        <div class="form-row">
-                            ${this.selectedProfile !== 'exam' ? html`
+                        ${this.selectedProfile !== 'exam' ? html`
+                            <div class="form-row">
                                 <div class="form-group">
                                     <label class="form-label">
                                         Capture Interval
@@ -1327,8 +1329,10 @@ export class CustomizeView extends LitElement {
                                         }
                                     </div>
                                 </div>
-                            ` : ''}
+                            </div>
+                        ` : ''}
 
+                        <div class="form-row">
                             <div class="form-group">
                                 <label class="form-label">
                                     Image Quality
