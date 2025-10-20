@@ -71,14 +71,14 @@ export class CustomDropdown extends LitElement {
             top: calc(100% + 4px);
             left: 0;
             right: 0;
-            background: var(--input-background, rgba(0, 0, 0, 0.3));
+            background: rgba(10, 10, 10, 0.98);
             border: 1px solid var(--input-border, rgba(255, 255, 255, 0.15));
             border-radius: 4px;
             max-height: 250px;
             overflow-y: auto;
             z-index: 9999;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(20px);
             opacity: 0;
             transform: translateY(-10px);
             pointer-events: none;
@@ -100,11 +100,11 @@ export class CustomDropdown extends LitElement {
         }
 
         .dropdown-option:hover {
-            background: var(--input-hover-background, rgba(0, 0, 0, 0.35));
+            background: rgba(255, 255, 255, 0.15);
         }
 
         .dropdown-option.selected {
-            background: var(--focus-box-shadow, rgba(0, 122, 255, 0.15));
+            background: rgba(0, 122, 255, 0.3);
             color: var(--focus-border-color, #007aff);
             font-weight: 500;
         }

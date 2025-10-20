@@ -19,6 +19,7 @@ export class CustomizeView extends LitElement {
             padding: 8px;
             margin: 0 auto;
             max-width: 750px;
+            overflow: visible;
         }
 
         .settings-container {
@@ -33,6 +34,8 @@ export class CustomizeView extends LitElement {
             border-radius: 6px;
             padding: 12px;
             backdrop-filter: blur(10px);
+            position: relative;
+            overflow: visible;
         }
 
         .section-title {
@@ -58,6 +61,7 @@ export class CustomizeView extends LitElement {
         .form-grid {
             display: grid;
             gap: 8px;
+            overflow: visible;
         }
 
         .form-row {
@@ -65,6 +69,7 @@ export class CustomizeView extends LitElement {
             grid-template-columns: 1fr 1fr;
             gap: 8px;
             align-items: start;
+            overflow: visible;
         }
 
         @media (max-width: 600px) {
@@ -77,6 +82,8 @@ export class CustomizeView extends LitElement {
             display: flex;
             flex-direction: column;
             gap: 4px;
+            overflow: visible;
+            position: relative;
         }
 
         .form-group.full-width {
