@@ -463,7 +463,7 @@ export class CustomizeView extends LitElement {
         this.vadEnabled = false;
 
         // Background transparency default
-        this.backgroundTransparency = 0.51;
+        this.backgroundTransparency = 0.61;
 
         // Font size default (in pixels)
         this.fontSize = 13;
