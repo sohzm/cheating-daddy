@@ -413,7 +413,8 @@ export class CheatingDaddyApp extends LitElement {
             console.error('Failed to send message:', result.error);
             this.setStatus('Error sending message: ' + result.error);
         } else {
-            this.setStatus('Message sent...');
+            // Don't set "Message sent..." here - status is already managed by sendRealtimeInput
+            // which sends: "Analyzing..." → "Ready" (success) or "Server overloaded" (error)
             this._awaitingNewResponse = true;
         }
     }
