@@ -172,11 +172,6 @@ export class MainView extends LitElement {
         // Add keyboard event listener for Ctrl+Enter (or Cmd+Enter on Mac)
         document.addEventListener('keydown', this.boundKeydownHandler);
 
-        // Set default API key if none exists
-        if (!localStorage.getItem('apiKey')) {
-            localStorage.setItem('apiKey', 'YOUR_API_KEY');
-        }
-
         // Load and apply layout mode on startup
         this.loadLayoutMode();
         // Resize window for this view
