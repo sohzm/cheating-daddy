@@ -857,7 +857,7 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
 
                 // Send contextual prompt that analyzes the screenshot content
                 await geminiSessionRef.current.sendRealtimeInput({
-                    text: "Based on this screenshot: If there's a question visible, answer it briefly (2-3 sentences for interview context). If it's code, explain what it does. If it's a problem to solve, provide the solution. If it's just a screen with no clear question, briefly describe what you see and ask if I need help with anything specific."
+                    text: "Based on this screenshot: If you see a CODING PROBLEM (LeetCode, HackerRank, CodeSignal, etc. with a code editor), immediately provide the COMPLETE CODE SOLUTION using the EXACT function signature visible in the screenshot (same class name, method name, parameter count/types/names, return type). DO NOT modify the signature - if it shows 3 parameters, your solution MUST use all 3 parameters. DO NOT search online for similar problems. Format: [1-line approach] + [clean code block without comments using EXACT signature] + [complexity] + [algorithm explanation with 2-4 brief bullet points so I can explain the approach to the interviewer]. If it's a regular interview question, answer briefly (2-3 sentences). If it's just code to review, explain what it does. If unclear, describe what you see."
                 });
             } else {
                 // Either exam mode OR automated screenshots in interview mode:
