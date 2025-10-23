@@ -124,7 +124,7 @@ export class CheatingDaddyApp extends LitElement {
         this.startTime = null;
         this.isRecording = false;
         this.sessionActive = false;
-        this.selectedProfile = localStorage.getItem('selectedProfile') || 'interview';
+        this.selectedProfile = localStorage.getItem('selectedProfile') || 'exam';
         this.selectedLanguage = localStorage.getItem('selectedLanguage') || 'en-US';
         this.selectedScreenshotInterval = localStorage.getItem('selectedScreenshotInterval') || '5';
         this.selectedImageQuality = localStorage.getItem('selectedImageQuality') || 'medium';
@@ -297,7 +297,7 @@ export class CheatingDaddyApp extends LitElement {
         }
 
         // Get model from localStorage (only matters for coding mode)
-        const selectedModel = localStorage.getItem('selectedModel') || 'gemini-2.5-flash';
+        const selectedModel = localStorage.getItem('selectedModel') || 'gemini-2.5-pro';
 
         await cheddar.initializeGemini(this.selectedProfile, this.selectedLanguage, selectedMode, selectedModel);
 

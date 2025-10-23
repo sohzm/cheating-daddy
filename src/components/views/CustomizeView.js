@@ -440,7 +440,7 @@ export class CustomizeView extends LitElement {
 
     constructor() {
         super();
-        this.selectedProfile = 'interview';
+        this.selectedProfile = 'exam';
         this.selectedLanguage = 'en-US';
         this.selectedScreenshotInterval = '5';
         this.selectedImageQuality = 'medium';
@@ -460,7 +460,7 @@ export class CustomizeView extends LitElement {
         this.advancedMode = false;
 
         // VAD (Voice Activity Detection) default
-        this.vadEnabled = false;
+        this.vadEnabled = true;
 
         // Background transparency default
         this.backgroundTransparency = 0.61;
@@ -470,7 +470,7 @@ export class CustomizeView extends LitElement {
 
         // Mode and model selection defaults
         this.selectedMode = 'interview';
-        this.selectedModel = 'gemini-2.5-flash';
+        this.selectedModel = 'gemini-2.5-pro';
 
         this.loadKeybinds();
         this.loadGoogleSearchSettings();
@@ -985,7 +985,7 @@ export class CustomizeView extends LitElement {
         const selectedModel = localStorage.getItem('selectedModel');
 
         this.selectedMode = selectedMode || 'interview';
-        this.selectedModel = selectedModel || 'gemini-2.5-flash';
+        this.selectedModel = selectedModel || 'gemini-2.5-pro';
     }
 
     async handleModeChange(e) {
@@ -1001,8 +1001,8 @@ export class CustomizeView extends LitElement {
             if (this.selectedModel === 'gemini-2.5-flash' || this.selectedModel === 'gemini-2.5-pro') {
                 // Keep the selection
             } else {
-                // Default to flash for coding mode
-                this.selectedModel = 'gemini-2.5-flash';
+                // Default to pro for coding mode
+                this.selectedModel = 'gemini-2.5-pro';
             }
         }
         localStorage.setItem('selectedModel', this.selectedModel);
