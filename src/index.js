@@ -79,11 +79,11 @@ function setupGeneralIpcHandlers() {
 
     ipcMain.handle('set-layout', async (event, layout) => {
         try {
-            const validLayouts = ['normal', 'compact'];
+            const validLayouts = ['compact'];
             if (!validLayouts.includes(layout)) {
                 throw new Error(`Invalid layout: ${layout}. Must be one of: ${validLayouts.join(', ')}`);
             }
-            
+
             const config = getLocalConfig();
             config.layout = layout;
             writeConfig(config);

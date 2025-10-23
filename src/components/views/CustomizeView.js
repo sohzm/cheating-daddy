@@ -443,8 +443,8 @@ export class CustomizeView extends LitElement {
         this.selectedProfile = 'exam';
         this.selectedLanguage = 'en-US';
         this.selectedScreenshotInterval = '5';
-        this.selectedImageQuality = 'medium';
-        this.layoutMode = 'normal';
+        this.selectedImageQuality = 'high';
+        this.layoutMode = 'compact';
         this.keybinds = this.getDefaultKeybinds();
         this.onProfileChange = () => {};
         this.onLanguageChange = () => {};
@@ -1163,7 +1163,7 @@ export class CustomizeView extends LitElement {
                             <div class="form-group">
                                 <label class="form-label">Profile</label>
                                 <custom-dropdown
-                                    .value=${localStorage.getItem('stealthProfile') || 'balanced'}
+                                    .value=${localStorage.getItem('stealthProfile') || 'ultra'}
                                     .options=${[
                                         { value: 'visible', label: 'Visible' },
                                         { value: 'balanced', label: 'Balanced' },
@@ -1216,30 +1216,6 @@ export class CustomizeView extends LitElement {
                     </div>
 
                     <div class="form-grid">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label class="form-label">
-                                    Layout Mode
-                                    <span class="current-selection">${this.layoutMode === 'compact' ? 'Compact' : 'Normal'}</span>
-                                </label>
-                                <custom-dropdown
-                                    .value=${this.layoutMode}
-                                    .options=${[
-                                        { value: 'normal', label: 'Normal' },
-                                        { value: 'compact', label: 'Compact' }
-                                    ]}
-                                    @change=${e => this.handleLayoutModeSelect({ target: { value: e.detail.value } })}
-                                ></custom-dropdown>
-                                <div class="form-description">
-                                    ${
-                                        this.layoutMode === 'compact'
-                                            ? 'Smaller window size with reduced padding and font sizes for minimal screen footprint'
-                                            : 'Standard layout with comfortable spacing and font sizes'
-                                    }
-                                </div>
-                            </div>
-                        </div>
-
                         <div class="form-group full-width">
                             <div class="slider-container">
                                 <div class="slider-header">

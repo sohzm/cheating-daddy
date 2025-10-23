@@ -127,8 +127,8 @@ export class CheatingDaddyApp extends LitElement {
         this.selectedProfile = localStorage.getItem('selectedProfile') || 'exam';
         this.selectedLanguage = localStorage.getItem('selectedLanguage') || 'en-US';
         this.selectedScreenshotInterval = localStorage.getItem('selectedScreenshotInterval') || '5';
-        this.selectedImageQuality = localStorage.getItem('selectedImageQuality') || 'medium';
-        this.layoutMode = localStorage.getItem('layoutMode') || 'normal';
+        this.selectedImageQuality = localStorage.getItem('selectedImageQuality') || 'high';
+        this.layoutMode = localStorage.getItem('layoutMode') || 'compact';
         this.advancedMode = localStorage.getItem('advancedMode') === 'true';
         this.currentMode = localStorage.getItem('selectedMode') || 'interview';
         this.currentModel = '';
