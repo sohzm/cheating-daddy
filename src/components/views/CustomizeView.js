@@ -396,6 +396,16 @@ export class CustomizeView extends LitElement {
             color: var(--description-color, rgba(255, 255, 255, 0.5));
         }
 
+        .mode-display-box {
+            background: var(--input-background, rgba(0, 0, 0, 0.3));
+            border: 1px solid var(--input-border, rgba(255, 255, 255, 0.15));
+            border-radius: 4px;
+            padding: 8px 12px;
+            font-size: 12px;
+            color: var(--text-color);
+            cursor: default;
+        }
+
         .warning-box {
             background: var(--warning-background, rgba(251, 191, 36, 0.08));
             border: 1px solid var(--warning-border, rgba(251, 191, 36, 0.2));
@@ -1078,11 +1088,9 @@ export class CustomizeView extends LitElement {
                             <div class="form-row">
                                 <div class="form-group">
                                     <label class="form-label">Mode (Fixed for Exam Assistant)</label>
-                                    <custom-dropdown
-                                        .value=${'coding'}
-                                        .options=${[{ value: 'coding', label: '💻 Coding/OA Mode (Screenshot-based)' }]}
-                                        .disabled=${true}
-                                    ></custom-dropdown>
+                                    <div class="mode-display-box">
+                                        💻 Coding/OA Mode (Screenshot-based)
+                                    </div>
                                     <div class="form-description">
                                         Exam Assistant profile uses Gemini API 2.5 Flash or 2.5 Pro for better problem-solving responses.
                                     </div>
@@ -1112,11 +1120,9 @@ export class CustomizeView extends LitElement {
                             <div class="form-row">
                                 <div class="form-group">
                                     <label class="form-label">Mode (Fixed for ${this.getProfileNames()[this.selectedProfile]})</label>
-                                    <custom-dropdown
-                                        .value=${'interview'}
-                                        .options=${[{ value: 'interview', label: '🎤 Interview Mode (Real-time Audio/Video)' }]}
-                                        .disabled=${true}
-                                    ></custom-dropdown>
+                                    <div class="mode-display-box">
+                                        🎤 Interview Mode (Real-time Audio/Video)
+                                    </div>
                                     <div class="form-description">
                                         ${this.getProfileNames()[this.selectedProfile]} profile uses Interview mode with Gemini 2.5 Flash for real-time audio processing and live interactions.
                                     </div>
