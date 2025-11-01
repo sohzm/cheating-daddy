@@ -125,7 +125,7 @@ export class MainView extends LitElement {
         .link {
             color: var(--link-color);
             text-decoration: underline;
-            cursor: pointer;
+            cursor: default;
         }
 
         .shortcut-hint {
