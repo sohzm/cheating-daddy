@@ -113,7 +113,7 @@ export class AssistantView extends LitElement {
         }
 
         .response-container pre {
-            background: #1e1e1e;
+            background: rgba(0, 0, 0, 0.2);
             border: 1px solid var(--button-border);
             border-radius: 8px;
             padding: 1.2em;
@@ -142,7 +142,7 @@ export class AssistantView extends LitElement {
 
         /* Enhanced code block styling with VS Code colors */
         .response-container pre.hljs {
-            background: #1e1e1e !important;
+            background: rgba(0, 0, 0, 0.2) !important;
             border: 1px solid #404040;
             color: #d4d4d4 !important;
         }
