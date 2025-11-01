@@ -53,7 +53,7 @@ export class HelpView extends LitElement {
             font-size: 12px;
             line-height: 1.4;
             user-select: text;
-            cursor: text;
+            cursor: default;
         }
 
         .description strong {
@@ -69,7 +69,7 @@ export class HelpView extends LitElement {
         .link {
             color: var(--link-color, #007aff);
             text-decoration: none;
-            cursor: pointer;
+            cursor: default;
             transition: color 0.15s ease;
             user-select: text;
         }
@@ -91,7 +91,7 @@ export class HelpView extends LitElement {
             margin: 0 1px;
             white-space: nowrap;
             user-select: text;
-            cursor: text;
+            cursor: default;
         }
 
         .keyboard-section {
@@ -127,7 +127,7 @@ export class HelpView extends LitElement {
         .shortcut-description {
             color: var(--description-color, rgba(255, 255, 255, 0.7));
             user-select: text;
-            cursor: text;
+            cursor: default;
         }
 
         .shortcut-keys {
@@ -155,7 +155,7 @@ export class HelpView extends LitElement {
             color: var(--text-color);
             margin-bottom: 3px;
             user-select: text;
-            cursor: text;
+            cursor: default;
         }
 
         .profile-description {
@@ -163,7 +163,7 @@ export class HelpView extends LitElement {
             color: var(--description-color, rgba(255, 255, 255, 0.6));
             line-height: 1.3;
             user-select: text;
-            cursor: text;
+            cursor: default;
         }
 
         .community-links {
@@ -185,7 +185,7 @@ export class HelpView extends LitElement {
             font-size: 11px;
             font-weight: 500;
             transition: all 0.15s ease;
-            cursor: pointer;
+            cursor: default;
         }
 
         .community-link:hover {
@@ -205,7 +205,7 @@ export class HelpView extends LitElement {
             font-size: 11px;
             line-height: 1.3;
             user-select: text;
-            cursor: text;
+            cursor: default;
         }
 
         .usage-step::before {
