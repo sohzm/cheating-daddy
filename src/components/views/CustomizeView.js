@@ -167,7 +167,7 @@ export class CustomizeView extends LitElement {
         }
 
         .keybind-input {
-            cursor: pointer;
+            cursor: default;
             font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace;
             text-align: center;
             letter-spacing: 0.5px;
@@ -175,7 +175,7 @@ export class CustomizeView extends LitElement {
         }
 
         .keybind-input:focus {
-            cursor: text;
+            cursor: default;
             background: var(--input-focus-background, rgba(0, 122, 255, 0.1));
         }
 
@@ -355,7 +355,7 @@ export class CustomizeView extends LitElement {
             background: var(--input-background, rgba(0, 0, 0, 0.3));
             outline: none;
             border: 1px solid var(--input-border, rgba(255, 255, 255, 0.15));
-            cursor: pointer;
+            cursor: default;
         }
 
         .slider-input::-webkit-slider-thumb {
@@ -365,7 +365,7 @@ export class CustomizeView extends LitElement {
             height: 16px;
             border-radius: 50%;
             background: var(--focus-border-color, #007aff);
-            cursor: pointer;
+            cursor: default;
             border: 2px solid var(--text-color, white);
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
         }
@@ -375,7 +375,7 @@ export class CustomizeView extends LitElement {
             height: 16px;
             border-radius: 50%;
             background: var(--focus-border-color, #007aff);
-            cursor: pointer;
+            cursor: default;
             border: 2px solid var(--text-color, white);
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
         }

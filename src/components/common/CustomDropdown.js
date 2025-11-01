@@ -33,7 +33,7 @@ export class CustomDropdown extends LitElement {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            cursor: pointer;
+            cursor: default;
             text-align: left;
         }
 
@@ -95,7 +95,7 @@ export class CustomDropdown extends LitElement {
             padding: 8px 10px;
             font-size: 12px;
             color: var(--text-color);
-            cursor: pointer;
+            cursor: default;
             transition: background 0.1s ease;
         }
 
