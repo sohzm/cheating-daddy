@@ -20,14 +20,31 @@ function createMainWindow() {
     return mainWindow;
 }
 
-app.whenReady().then(async () => {
-    // Apply anti-analysis measures with random delay
-    await applyAntiAnalysisMeasures();
+// Single instance lock - prevent multiple instances of the app
+const gotTheLock = app.requestSingleInstanceLock();
 
-    createMainWindow();
-    setupGeminiIpcHandlers(geminiSessionRef);
-    setupGeneralIpcHandlers();
-});
+if (!gotTheLock) {
+    // Another instance is already running, quit this one
+    app.quit();
+} else {
+    // Someone tried to run a second instance, focus our window instead
+    app.on('second-instance', () => {
+        if (mainWindow) {
+            if (mainWindow.isMinimized()) mainWindow.restore();
+            mainWindow.focus();
+            mainWindow.show();
+        }
+    });
+
+    app.whenReady().then(async () => {
+        // Apply anti-analysis measures with random delay
+        await applyAntiAnalysisMeasures();
+
+        createMainWindow();
+        setupGeminiIpcHandlers(geminiSessionRef);
+        setupGeneralIpcHandlers();
+    });
+}
 
 app.on('window-all-closed', () => {
     stopMacOSAudioCapture();
