@@ -1,5 +1,59 @@
-if (require('electron-squirrel-startup')) {
-    process.exit(0);
+// Handle Squirrel events manually to prevent desktop shortcuts
+if (require('electron').app) {
+    const squirrelCommand = process.argv[1];
+    if (handleSquirrelEvent(squirrelCommand)) {
+        return;
+    }
+}
+
+function handleSquirrelEvent(squirrelCommand) {
+    const app = require('electron').app;
+
+    if (process.platform !== 'win32') {
+        return false;
+    }
+
+    const path = require('path');
+    const childProcess = require('child_process');
+    const appFolder = path.resolve(process.execPath, '..');
+    const rootAtomFolder = path.resolve(appFolder, '..');
+    const updateDotExe = path.resolve(path.join(rootAtomFolder, 'Update.exe'));
+    const exeName = path.basename(process.execPath);
+
+    const spawn = function(command, args) {
+        let spawnedProcess;
+        try {
+            spawnedProcess = childProcess.spawn(command, args, { detached: true });
+        } catch (error) {
+            console.error('Spawn error:', error);
+        }
+        return spawnedProcess;
+    };
+
+    const spawnUpdate = function(args) {
+        return spawn(updateDotExe, args);
+    };
+
+    switch (squirrelCommand) {
+        case '--squirrel-install':
+        case '--squirrel-updated':
+            // Create Start Menu shortcut only (no desktop shortcut)
+            spawnUpdate(['--createShortcut', exeName, '-l', 'StartMenu']);
+            setTimeout(app.quit, 1000);
+            return true;
+
+        case '--squirrel-uninstall':
+            // Remove shortcuts
+            spawnUpdate(['--removeShortcut', exeName]);
+            setTimeout(app.quit, 1000);
+            return true;
+
+        case '--squirrel-obsolete':
+            app.quit();
+            return true;
+    }
+
+    return false;
 }
 
 const { app, BrowserWindow, shell, ipcMain } = require('electron');

@@ -33,7 +33,7 @@ module.exports = {
                 name: 'cheating-daddy',
                 productName: 'Cheating Daddy',
                 shortcutName: 'Cheating Daddy',
-                createDesktopShortcut: true,
+                createDesktopShortcut: false,
                 createStartMenuShortcut: true,
             },
         },
@@ -51,7 +51,8 @@ module.exports = {
                     genericName: 'AI Assistant',
                     description: 'AI assistant for interviews and learning',
                     categories: ['Development', 'Education'],
-                    icon: 'src/assets/logo.png'
+                    icon: 'src/assets/logo.png',
+                    desktopIntegration: false  // Prevent automatic desktop shortcut creation
                 }
             },
         },
