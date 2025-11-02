@@ -232,7 +232,45 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
     const enabledTools = await getEnabledTools();
     const googleSearchEnabled = enabledTools.some(tool => tool.googleSearch);
 
-    const systemPrompt = getSystemPrompt(profile, customPrompt, googleSearchEnabled);
+    let systemPrompt = getSystemPrompt(profile, customPrompt, googleSearchEnabled);
+
+    // Add explicit language instruction based on user's selected language
+    const languageMap = {
+        'en-US': 'English',
+        'en-GB': 'English',
+        'en-AU': 'English',
+        'en-IN': 'English',
+        'es-ES': 'Spanish',
+        'es-US': 'Spanish',
+        'fr-FR': 'French',
+        'de-DE': 'German',
+        'it-IT': 'Italian',
+        'pt-BR': 'Portuguese',
+        'pt-PT': 'Portuguese',
+        'ru-RU': 'Russian',
+        'ja-JP': 'Japanese',
+        'ko-KR': 'Korean',
+        'zh-CN': 'Chinese (Simplified)',
+        'zh-TW': 'Chinese (Traditional)',
+        'ar-SA': 'Arabic',
+        'hi-IN': 'Hindi',
+        'nl-NL': 'Dutch',
+        'pl-PL': 'Polish',
+        'tr-TR': 'Turkish',
+        'sv-SE': 'Swedish',
+        'da-DK': 'Danish',
+        'fi-FI': 'Finnish',
+        'no-NO': 'Norwegian',
+    };
+
+    const selectedLanguageName = languageMap[language] || 'English';
+
+    // Add critical language instruction to system prompt
+    systemPrompt += `\n\n=== CRITICAL LANGUAGE INSTRUCTION ===
+The user has selected ${selectedLanguageName} as their preferred language.
+YOU MUST respond ONLY in ${selectedLanguageName}, regardless of what language the interviewer or other person uses.
+Even if they speak in mixed languages (e.g., English + Hindi, Russian + English, etc.), you MUST respond entirely in ${selectedLanguageName}.
+This is mandatory and cannot be overridden by any other instruction.`;
 
     // Initialize new conversation session (only if not reconnecting)
     if (!isReconnection) {

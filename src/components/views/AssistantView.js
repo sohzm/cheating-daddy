@@ -493,6 +493,7 @@ export class AssistantView extends LitElement {
         responses: { type: Array },
         currentResponseIndex: { type: Number },
         selectedProfile: { type: String },
+        selectedLanguage: { type: String },
         onSendText: { type: Function },
         shouldAnimateResponse: { type: Boolean },
         savedResponses: { type: Array },
@@ -504,6 +505,7 @@ export class AssistantView extends LitElement {
         this.responses = [];
         this.currentResponseIndex = -1;
         this.selectedProfile = 'interview';
+        this.selectedLanguage = 'en-US';
         this.onSendText = () => {};
         this._lastAnimatedWordCount = 0;
         this.copiedFeedback = false;
@@ -526,11 +528,46 @@ export class AssistantView extends LitElement {
         };
     }
 
-    getCurrentResponse() {
+    getLocalizedGreeting() {
         const profileNames = this.getProfileNames();
+        const profileName = profileNames[this.selectedProfile] || 'session';
+
+        // Localized greetings for all supported languages
+        const greetings = {
+            'en-US': `Hey, I'm listening to your ${profileName}`,
+            'en-GB': `Hey, I'm listening to your ${profileName}`,
+            'en-AU': `Hey, I'm listening to your ${profileName}`,
+            'en-IN': `Hey, I'm listening to your ${profileName}`,
+            'es-ES': `Hola, estoy escuchando tu ${profileName === 'Job Interview' ? 'Entrevista de Trabajo' : profileName === 'Sales Call' ? 'Llamada de Ventas' : profileName === 'Business Meeting' ? 'Reunión de Negocios' : profileName === 'Presentation' ? 'Presentación' : profileName === 'Negotiation' ? 'Negociación' : 'Asistente de Examen'}`,
+            'es-US': `Hola, estoy escuchando tu ${profileName === 'Job Interview' ? 'Entrevista de Trabajo' : profileName === 'Sales Call' ? 'Llamada de Ventas' : profileName === 'Business Meeting' ? 'Reunión de Negocios' : profileName === 'Presentation' ? 'Presentación' : profileName === 'Negotiation' ? 'Negociación' : 'Asistente de Examen'}`,
+            'fr-FR': `Salut, j'écoute votre ${profileName === 'Job Interview' ? 'Entretien d\'Embauche' : profileName === 'Sales Call' ? 'Appel Commercial' : profileName === 'Business Meeting' ? 'Réunion d\'Affaires' : profileName === 'Presentation' ? 'Présentation' : profileName === 'Negotiation' ? 'Négociation' : 'Assistant d\'Examen'}`,
+            'de-DE': `Hey, ich höre deinem ${profileName === 'Job Interview' ? 'Vorstellungsgespräch' : profileName === 'Sales Call' ? 'Verkaufsgespräch' : profileName === 'Business Meeting' ? 'Geschäftstreffen' : profileName === 'Presentation' ? 'Präsentation' : profileName === 'Negotiation' ? 'Verhandlung' : 'Prüfungsassistenten'} zu`,
+            'it-IT': `Ciao, sto ascoltando il tuo ${profileName === 'Job Interview' ? 'Colloquio di Lavoro' : profileName === 'Sales Call' ? 'Chiamata di Vendita' : profileName === 'Business Meeting' ? 'Riunione d\'Affari' : profileName === 'Presentation' ? 'Presentazione' : profileName === 'Negotiation' ? 'Negoziazione' : 'Assistente d\'Esame'}`,
+            'pt-BR': `Oi, estou ouvindo sua ${profileName === 'Job Interview' ? 'Entrevista de Emprego' : profileName === 'Sales Call' ? 'Chamada de Vendas' : profileName === 'Business Meeting' ? 'Reunião de Negócios' : profileName === 'Presentation' ? 'Apresentação' : profileName === 'Negotiation' ? 'Negociação' : 'Assistente de Exame'}`,
+            'pt-PT': `Olá, estou a ouvir a tua ${profileName === 'Job Interview' ? 'Entrevista de Emprego' : profileName === 'Sales Call' ? 'Chamada de Vendas' : profileName === 'Business Meeting' ? 'Reunião de Negócios' : profileName === 'Presentation' ? 'Apresentação' : profileName === 'Negotiation' ? 'Negociação' : 'Assistente de Exame'}`,
+            'ru-RU': `Привет, я слушаю ваше ${profileName === 'Job Interview' ? 'Собеседование' : profileName === 'Sales Call' ? 'Звонок по Продажам' : profileName === 'Business Meeting' ? 'Деловая Встреча' : profileName === 'Presentation' ? 'Презентация' : profileName === 'Negotiation' ? 'Переговоры' : 'Помощник на Экзамене'}`,
+            'ja-JP': `こんにちは、あなたの${profileName === 'Job Interview' ? '就職面接' : profileName === 'Sales Call' ? '営業電話' : profileName === 'Business Meeting' ? 'ビジネスミーティング' : profileName === 'Presentation' ? 'プレゼンテーション' : profileName === 'Negotiation' ? '交渉' : '試験アシスタント'}を聞いています`,
+            'ko-KR': `안녕하세요, 당신의 ${profileName === 'Job Interview' ? '취업 면접' : profileName === 'Sales Call' ? '영업 전화' : profileName === 'Business Meeting' ? '비즈니스 미팅' : profileName === 'Presentation' ? '프레젠테이션' : profileName === 'Negotiation' ? '협상' : '시험 도우미'}을 듣고 있습니다`,
+            'zh-CN': `嗨，我正在听你的${profileName === 'Job Interview' ? '求职面试' : profileName === 'Sales Call' ? '销售电话' : profileName === 'Business Meeting' ? '商务会议' : profileName === 'Presentation' ? '演示' : profileName === 'Negotiation' ? '谈判' : '考试助手'}`,
+            'zh-TW': `嗨，我正在聽你的${profileName === 'Job Interview' ? '求職面試' : profileName === 'Sales Call' ? '銷售電話' : profileName === 'Business Meeting' ? '商務會議' : profileName === 'Presentation' ? '演示' : profileName === 'Negotiation' ? '談判' : '考試助手'}`,
+            'ar-SA': `مرحبا، أنا أستمع إلى ${profileName === 'Job Interview' ? 'مقابلة العمل' : profileName === 'Sales Call' ? 'مكالمة المبيعات' : profileName === 'Business Meeting' ? 'اجتماع العمل' : profileName === 'Presentation' ? 'العرض التقديمي' : profileName === 'Negotiation' ? 'المفاوضات' : 'مساعد الامتحان'} الخاص بك`,
+            'hi-IN': `नमस्ते, मैं आपके ${profileName === 'Job Interview' ? 'नौकरी साक्षात्कार' : profileName === 'Sales Call' ? 'बिक्री कॉल' : profileName === 'Business Meeting' ? 'व्यावसायिक बैठक' : profileName === 'Presentation' ? 'प्रस्तुति' : profileName === 'Negotiation' ? 'बातचीत' : 'परीक्षा सहायक'} को सुन रहा हूं`,
+            'nl-NL': `Hé, ik luister naar je ${profileName === 'Job Interview' ? 'Sollicitatiegesprek' : profileName === 'Sales Call' ? 'Verkoopgesprek' : profileName === 'Business Meeting' ? 'Zakelijke Vergadering' : profileName === 'Presentation' ? 'Presentatie' : profileName === 'Negotiation' ? 'Onderhandeling' : 'Examen Assistent'}`,
+            'pl-PL': `Cześć, słucham twojego ${profileName === 'Job Interview' ? 'Rozmowy Kwalifikacyjnej' : profileName === 'Sales Call' ? 'Rozmowy Sprzedażowej' : profileName === 'Business Meeting' ? 'Spotkania Biznesowego' : profileName === 'Presentation' ? 'Prezentacji' : profileName === 'Negotiation' ? 'Negocjacji' : 'Asystenta Egzaminacyjnego'}`,
+            'tr-TR': `Merhaba, ${profileName === 'Job Interview' ? 'İş Görüşmenizi' : profileName === 'Sales Call' ? 'Satış Görüşmenizi' : profileName === 'Business Meeting' ? 'İş Toplantınızı' : profileName === 'Presentation' ? 'Sunumunuzu' : profileName === 'Negotiation' ? 'Müzakerenizi' : 'Sınav Asistanınızı'} dinliyorum`,
+            'sv-SE': `Hej, jag lyssnar på din ${profileName === 'Job Interview' ? 'Jobbintervju' : profileName === 'Sales Call' ? 'Försäljningssamtal' : profileName === 'Business Meeting' ? 'Affärsmöte' : profileName === 'Presentation' ? 'Presentation' : profileName === 'Negotiation' ? 'Förhandling' : 'Examenassistent'}`,
+            'da-DK': `Hej, jeg lytter til dit ${profileName === 'Job Interview' ? 'Jobinterview' : profileName === 'Sales Call' ? 'Salgsopkald' : profileName === 'Business Meeting' ? 'Forretningsmøde' : profileName === 'Presentation' ? 'Præsentation' : profileName === 'Negotiation' ? 'Forhandling' : 'Eksamensassistent'}`,
+            'fi-FI': `Hei, kuuntelen ${profileName === 'Job Interview' ? 'Työhaastatteluasi' : profileName === 'Sales Call' ? 'Myyntipuheluasi' : profileName === 'Business Meeting' ? 'Liiketapaamisesi' : profileName === 'Presentation' ? 'Esitystäsi' : profileName === 'Negotiation' ? 'Neuvotteluasi' : 'Koeavustajaasi'}`,
+            'no-NO': `Hei, jeg lytter til ditt ${profileName === 'Job Interview' ? 'Jobbintervju' : profileName === 'Sales Call' ? 'Salgssamtale' : profileName === 'Business Meeting' ? 'Forretningsmøte' : profileName === 'Presentation' ? 'Presentasjon' : profileName === 'Negotiation' ? 'Forhandling' : 'Eksamensassistent'}`,
+        };
+
+        return greetings[this.selectedLanguage] || greetings['en-US'];
+    }
+
+    getCurrentResponse() {
         return this.responses.length > 0 && this.currentResponseIndex >= 0
             ? this.responses[this.currentResponseIndex]
-            : `Hey, Im listening to your ${profileNames[this.selectedProfile] || 'session'}?`;
+            : this.getLocalizedGreeting();
     }
 
     renderMarkdown(content) {
