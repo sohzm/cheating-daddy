@@ -15,13 +15,13 @@ const VADState = {
 const VAD_CONFIG = {
     sampleRate: 16000,
     frameSize: 512, // 32ms at 16kHz
-    silenceThreshold: 300, // ms of silence before committing (reduced for faster response)
+    silenceThreshold: 200, // ms of silence before committing (OPTIMIZED for faster response)
     maxRecordingTime: 20000, // 20 seconds max recording (increased for longer questions)
-    minRecordingTime: 300, // Minimum 300ms recording (reduced to catch quick questions)
+    minRecordingTime: 200, // Minimum 200ms recording (OPTIMIZED to catch quick questions faster)
     preSpeechPadFrames: 2, // Frames to include before speech detection
-    postSpeechPadFrames: 2, // Frames to include after speech ends
+    postSpeechPadFrames: 1, // Frames to include after speech ends (REDUCED for speed)
     adaptiveThreshold: true, // Enable adaptive threshold adjustment
-    noiseGateThreshold: 0.02, // Minimum amplitude to consider as potential speech
+    noiseGateThreshold: 0.015, // Minimum amplitude to consider as potential speech (LOWERED for better detection)
 };
 
 class VADProcessor {
@@ -43,13 +43,13 @@ class VADProcessor {
         this.noiseLevelSamples = 0;
         this.speechConfidenceHistory = [];
 
-        // VAD configuration - these parameters may need tuning
+        // VAD configuration - OPTIMIZED for faster response (3-5 seconds target)
         this.vadConfig = {
             sampleRate: VAD_CONFIG.sampleRate,
             frameSize: VAD_CONFIG.frameSize,
-            positiveSpeechThreshold: 0.55, // Slightly lowered for better detection
-            negativeSpeechThreshold: 0.40, // Threshold for detecting non-speech
-            minSpeechFrames: 2, // Reduced to 2 for faster response
+            positiveSpeechThreshold: 0.50, // LOWERED for faster speech detection
+            negativeSpeechThreshold: 0.35, // LOWERED to detect silence faster
+            minSpeechFrames: 1, // REDUCED to 1 for immediate response
             maxSpeechFrames: 10, // Not used in our implementation
             preSpeechPadFrames: VAD_CONFIG.preSpeechPadFrames,
         };
