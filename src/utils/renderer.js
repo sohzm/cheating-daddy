@@ -40,6 +40,7 @@ let hiddenVideo = null;
 let offscreenCanvas = null;
 let offscreenContext = null;
 let currentImageQuality = 'medium'; // Store current image quality for manual screenshots
+let microphoneEnabled = false; // Microphone toggle state - starts OFF by default
 
 const isLinux = process.platform === 'linux';
 const isMacOS = process.platform === 'darwin';
@@ -314,7 +315,25 @@ function setupLinuxSystemAudioProcessing() {
         try {
             const vadEnabled = localStorage.getItem('vadEnabled') === 'true';
             if (vadEnabled) {
-                vadProcessor = new VADProcessor();
+                // Create VAD processor with onCommit callback
+                vadProcessor = new VADProcessor(
+                    async (audioSegment, metadata) => {
+                        try {
+                            // Convert Float32Array to Int16 PCM
+                            const pcmData16 = convertFloat32ToInt16(audioSegment);
+                            const base64Data = arrayBufferToBase64(pcmData16.buffer);
+
+                            await ipcRenderer.invoke('send-audio-content', {
+                                data: base64Data,
+                                mimeType: 'audio/pcm;rate=24000',
+                            });
+
+                            console.log('VAD audio segment sent:', metadata);
+                        } catch (error) {
+                            console.error('Failed to send VAD audio segment:', error);
+                        }
+                    }
+                );
                 isVADEnabled = true;
                 console.log('VAD enabled for Linux system audio processing');
             }
@@ -327,22 +346,21 @@ function setupLinuxSystemAudioProcessing() {
     const samplesPerChunk = SAMPLE_RATE * AUDIO_CHUNK_DURATION;
 
     audioProcessor.onaudioprocess = async e => {
+        // Skip audio processing if microphone is not enabled
+        if (!microphoneEnabled) {
+            return;
+        }
+
         const inputData = e.inputBuffer.getChannelData(0);
         audioBuffer.push(...inputData);
 
         // Process audio in chunks
         while (audioBuffer.length >= samplesPerChunk) {
             const chunk = audioBuffer.splice(0, samplesPerChunk);
-            
+
             if (isVADEnabled && vadProcessor) {
-                // Process with VAD
-                vadProcessor.processAudio(chunk, async (audioSegment) => {
-                    try {
-                        await ipcRenderer.invoke('send-vad-audio-segment', audioSegment);
-                    } catch (error) {
-                        console.error('Failed to send VAD audio segment:', error);
-                    }
-                });
+                // Process with VAD (VAD will check its own pause state)
+                await vadProcessor.processAudio(chunk);
             } else {
                 // Process without VAD (original behavior)
                 const pcmData16 = convertFloat32ToInt16(chunk);
@@ -372,7 +390,25 @@ function setupWindowsLoopbackProcessing() {
         try {
             const vadEnabled = localStorage.getItem('vadEnabled') === 'true';
             if (vadEnabled) {
-                vadProcessor = new VADProcessor();
+                // Create VAD processor with onCommit callback
+                vadProcessor = new VADProcessor(
+                    async (audioSegment, metadata) => {
+                        try {
+                            // Convert Float32Array to Int16 PCM
+                            const pcmData16 = convertFloat32ToInt16(audioSegment);
+                            const base64Data = arrayBufferToBase64(pcmData16.buffer);
+
+                            await ipcRenderer.invoke('send-audio-content', {
+                                data: base64Data,
+                                mimeType: 'audio/pcm;rate=24000',
+                            });
+
+                            console.log('VAD audio segment sent:', metadata);
+                        } catch (error) {
+                            console.error('Failed to send VAD audio segment:', error);
+                        }
+                    }
+                );
                 isVADEnabled = true;
                 console.log('VAD enabled for Windows loopback processing');
             }
@@ -385,22 +421,21 @@ function setupWindowsLoopbackProcessing() {
     const samplesPerChunk = SAMPLE_RATE * AUDIO_CHUNK_DURATION;
 
     audioProcessor.onaudioprocess = async e => {
+        // Skip audio processing if microphone is not enabled
+        if (!microphoneEnabled) {
+            return;
+        }
+
         const inputData = e.inputBuffer.getChannelData(0);
         audioBuffer.push(...inputData);
 
         // Process audio in chunks
         while (audioBuffer.length >= samplesPerChunk) {
             const chunk = audioBuffer.splice(0, samplesPerChunk);
-            
+
             if (isVADEnabled && vadProcessor) {
-                // Process with VAD
-                vadProcessor.processAudio(chunk, async (audioSegment) => {
-                    try {
-                        await ipcRenderer.invoke('send-vad-audio-segment', audioSegment);
-                    } catch (error) {
-                        console.error('Failed to send VAD audio segment:', error);
-                    }
-                });
+                // Process with VAD (VAD will check its own pause state)
+                await vadProcessor.processAudio(chunk);
             } else {
                 // Process without VAD (original behavior)
                 const pcmData16 = convertFloat32ToInt16(chunk);
@@ -558,6 +593,16 @@ function stopCapture() {
         audioContext = null;
     }
 
+    // Destroy VAD processor if active
+    if (vadProcessor) {
+        vadProcessor.destroy();
+        vadProcessor = null;
+        console.log('VAD processor destroyed');
+    }
+
+    // Reset microphone state
+    microphoneEnabled = false;
+
     if (mediaStream) {
         mediaStream.getTracks().forEach(track => track.stop());
         mediaStream = null;
@@ -698,6 +743,27 @@ function handleShortcut(shortcutKey) {
     }
 }
 
+// Microphone toggle function
+function toggleMicrophone(enabled) {
+    microphoneEnabled = enabled;
+
+    if (vadProcessor) {
+        if (enabled) {
+            // Resume VAD processor
+            vadProcessor.resume();
+            console.log('✅ Microphone enabled - VAD resumed');
+        } else {
+            // Pause VAD processor
+            vadProcessor.pause();
+            console.log('❌ Microphone disabled - VAD paused');
+        }
+    } else {
+        console.log(`Microphone ${enabled ? 'enabled' : 'disabled'} (no VAD processor active)`);
+    }
+
+    return { success: true, enabled: microphoneEnabled };
+}
+
 // Create reference to the main app element
 const cheatingDaddyApp = document.querySelector('cheating-daddy-app');
 
@@ -724,6 +790,7 @@ const cheddar = {
     stopCapture,
     sendTextMessage,
     handleShortcut,
+    toggleMicrophone,
 
     // Content protection function
     getContentProtection: () => {

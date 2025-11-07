@@ -487,6 +487,54 @@ export class AssistantView extends LitElement {
         .save-button svg {
             stroke: currentColor !important;
         }
+
+        .mic-toggle-button {
+            background: transparent;
+            border: 2px solid var(--button-border);
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: default;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .mic-toggle-button.active {
+            background: rgba(0, 122, 255, 0.3);
+            border-color: #007aff;
+            box-shadow: 0 0 8px rgba(0, 122, 255, 0.4);
+        }
+
+        .mic-toggle-button.inactive {
+            background: rgba(255, 59, 48, 0.15);
+            border-color: #ff3b30;
+        }
+
+        .mic-toggle-button.active:hover {
+            background: rgba(0, 122, 255, 0.45);
+            border-color: #007aff;
+            box-shadow: 0 0 12px rgba(0, 122, 255, 0.7);
+        }
+
+        .mic-toggle-button.inactive:hover {
+            background: rgba(255, 59, 48, 0.25);
+        }
+
+        .mic-toggle-button svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .mic-toggle-button.active svg {
+            stroke: white !important;
+        }
+
+        .mic-toggle-button.inactive svg {
+            stroke: #ff3b30 !important;
+        }
     `;
 
     static properties = {
@@ -498,6 +546,7 @@ export class AssistantView extends LitElement {
         shouldAnimateResponse: { type: Boolean },
         savedResponses: { type: Array },
         copiedFeedback: { type: Boolean },
+        micEnabled: { type: Boolean },
     };
 
     constructor() {
@@ -509,6 +558,8 @@ export class AssistantView extends LitElement {
         this.onSendText = () => {};
         this._lastAnimatedWordCount = 0;
         this.copiedFeedback = false;
+        // Microphone starts as OFF by default
+        this.micEnabled = false;
         // Load saved responses from localStorage
         try {
             this.savedResponses = JSON.parse(localStorage.getItem('savedResponses') || '[]');
@@ -933,6 +984,18 @@ export class AssistantView extends LitElement {
         }
     }
 
+    handleMicToggle() {
+        this.micEnabled = !this.micEnabled;
+
+        // Notify the renderer process about mic state change
+        if (window.cheddar && window.cheddar.toggleMicrophone) {
+            window.cheddar.toggleMicrophone(this.micEnabled);
+        }
+
+        console.log(`Microphone ${this.micEnabled ? 'enabled' : 'disabled'}`);
+        this.requestUpdate();
+    }
+
     render() {
         const currentResponse = this.getCurrentResponse();
         const responseCounter = this.getResponseCounter();
@@ -979,6 +1042,31 @@ export class AssistantView extends LitElement {
                         ></path>
                     </svg>
                 </button>
+
+                ${this.selectedProfile !== 'exam' ? html`
+                    <button
+                        class="mic-toggle-button ${this.micEnabled ? 'active' : 'inactive'}"
+                        @click=${this.handleMicToggle}
+                    >
+                        ${this.micEnabled ? html`
+                            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M12 1C10.3431 1 9 2.34315 9 4V12C9 13.6569 10.3431 15 12 15C13.6569 15 15 13.6569 15 12V4C15 2.34315 13.6569 1 12 1Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M19 10V12C19 15.866 15.866 19 12 19C8.13401 19 5 15.866 5 12V10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M12 19V23" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M8 23H16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        ` : html`
+                            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M1 1L23 23" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M9 9V12C9 13.6569 10.3431 15 12 15C12.9762 15 13.8416 14.5425 14.4005 13.8424" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M12 1C10.3431 1 9 2.34315 9 4V4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M15 5.5V12C15 12.3387 14.9629 12.6686 14.8934 12.9855" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M19 10V12C19 13.9585 18.2158 15.7355 16.9347 17.0165" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M5 10V12C5 15.866 8.13401 19 12 19M12 19V23M12 19M8 23H16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        `}
+                    </button>
+                ` : ''}
 
                 <input type="text" id="textInput" placeholder="Type a message to the AI..." @keydown=${this.handleTextKeydown} />
 

@@ -6,6 +6,7 @@ const VAD = require('@ricky0123/vad-node');
 
 const VADState = {
     IDLE: 'IDLE', // Not listening for speech
+    PAUSED: 'PAUSED', // Manually paused by user (mic off)
     LISTENING: 'LISTENING', // Listening for the start of speech
     RECORDING: 'RECORDING', // Actively recording speech
     COMMITTING: 'COMMITTING' // Speech has ended, preparing to send audio
@@ -59,8 +60,9 @@ class VADProcessor {
     async initializeVAD() {
         try {
             this.vad = new VAD.default(this.vadConfig);
-            this.setState(VADState.LISTENING);
-            console.log('VAD initialized successfully');
+            // Start in PAUSED state (mic off by default)
+            this.setState(VADState.PAUSED);
+            console.log('VAD initialized successfully - mic is OFF by default');
         } catch (error) {
             console.error('Failed to initialize VAD:', error);
             this.setState(VADState.IDLE);
@@ -80,7 +82,8 @@ class VADProcessor {
     }
 
     async processAudio(audioFrame) {
-        if (!this.vad || this.state === VADState.IDLE) {
+        // Don't process audio if VAD is not initialized, idle, or manually paused
+        if (!this.vad || this.state === VADState.IDLE || this.state === VADState.PAUSED) {
             return;
         }
 
@@ -411,6 +414,47 @@ class VADProcessor {
             bufferSize: this.audioBuffer.length,
             preSpeechBufferSize: this.preSpeechBuffer.length
         };
+    }
+
+    // Manual control methods for microphone toggle
+    pause() {
+        if (this.state !== VADState.IDLE) {
+            // Save the current state before pausing
+            const previousState = this.state;
+
+            // If we were recording, commit the current audio
+            if (this.state === VADState.RECORDING && this.audioBuffer.length > 0) {
+                console.log('Committing ongoing recording before pause');
+                this.commit();
+            }
+
+            // Clear buffers
+            this.audioBuffer = [];
+            this.preSpeechBuffer = [];
+            this.silenceStartTime = 0;
+            this.consecutiveSilenceFrames = 0;
+            this.consecutiveSpeechFrames = 0;
+
+            this.setState(VADState.PAUSED);
+            console.log(`VAD paused (was ${previousState}) - microphone is OFF`);
+        }
+    }
+
+    resume() {
+        if (this.state === VADState.PAUSED && this.vad) {
+            this.setState(VADState.LISTENING);
+            console.log('VAD resumed - microphone is ON, listening for speech');
+        }
+    }
+
+    // Check if VAD is currently active (not paused or idle)
+    isActive() {
+        return this.state !== VADState.IDLE && this.state !== VADState.PAUSED;
+    }
+
+    // Check if VAD is paused
+    isPaused() {
+        return this.state === VADState.PAUSED;
     }
 
     // Cleanup method
