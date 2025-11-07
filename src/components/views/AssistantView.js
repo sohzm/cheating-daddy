@@ -547,6 +547,7 @@ export class AssistantView extends LitElement {
         savedResponses: { type: Array },
         copiedFeedback: { type: Boolean },
         micEnabled: { type: Boolean },
+        vadMode: { type: String },
     };
 
     constructor() {
@@ -558,14 +559,37 @@ export class AssistantView extends LitElement {
         this.onSendText = () => {};
         this._lastAnimatedWordCount = 0;
         this.copiedFeedback = false;
-        // Microphone starts as OFF by default
+        // Microphone starts as OFF by default (for manual mode)
         this.micEnabled = false;
+        // Load VAD mode from localStorage
+        this.vadMode = localStorage.getItem('vadMode') || 'automatic';
         // Load saved responses from localStorage
         try {
             this.savedResponses = JSON.parse(localStorage.getItem('savedResponses') || '[]');
         } catch (e) {
             this.savedResponses = [];
         }
+
+        // Listen for VAD mode changes
+        this.setupVADModeListener();
+    }
+
+    setupVADModeListener() {
+        // Listen for localStorage changes from settings
+        window.addEventListener('storage', (e) => {
+            if (e.key === 'vadMode') {
+                this.vadMode = e.newValue || 'automatic';
+
+                // In automatic mode: enable mic automatically
+                if (this.vadMode === 'automatic') {
+                    this.micEnabled = true;
+                    if (window.cheddar && window.cheddar.toggleMicrophone) {
+                        window.cheddar.toggleMicrophone(true);
+                    }
+                }
+                this.requestUpdate();
+            }
+        });
     }
 
     getProfileNames() {
@@ -1043,7 +1067,7 @@ export class AssistantView extends LitElement {
                     </svg>
                 </button>
 
-                ${this.selectedProfile !== 'exam' ? html`
+                ${this.selectedProfile !== 'exam' && this.vadMode === 'manual' ? html`
                     <button
                         class="mic-toggle-button ${this.micEnabled ? 'active' : 'inactive'}"
                         @click=${this.handleMicToggle}

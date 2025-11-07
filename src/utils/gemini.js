@@ -1095,6 +1095,19 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
         }
     });
 
+    // VAD mode update handler
+    ipcMain.handle('update-vad-mode', async (event, vadMode) => {
+        try {
+            console.log(`VAD mode updated to: ${vadMode}`);
+            // The renderer process will handle the VAD mode change
+            // This handler is mainly for logging and potential future use
+            return { success: true, mode: vadMode };
+        } catch (error) {
+            console.error('Error updating VAD mode:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
     // Conversation history IPC handlers
     ipcMain.handle('get-current-session', async event => {
         try {

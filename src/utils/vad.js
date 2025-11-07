@@ -25,9 +25,10 @@ const VAD_CONFIG = {
 };
 
 class VADProcessor {
-    constructor(onCommit, onStateChange = null) {
+    constructor(onCommit, onStateChange = null, mode = 'automatic') {
         this.onCommit = onCommit; // Callback to send audio segment
         this.onStateChange = onStateChange; // Optional callback for state changes
+        this.mode = mode; // 'automatic' or 'manual'
         this.state = VADState.IDLE;
         this.audioBuffer = [];
         this.preSpeechBuffer = []; // Buffer for pre-speech padding
@@ -60,9 +61,17 @@ class VADProcessor {
     async initializeVAD() {
         try {
             this.vad = new VAD.default(this.vadConfig);
-            // Start in PAUSED state (mic off by default)
-            this.setState(VADState.PAUSED);
-            console.log('VAD initialized successfully - mic is OFF by default');
+
+            // Initialize based on mode
+            if (this.mode === 'automatic') {
+                // Automatic mode: Start listening immediately
+                this.setState(VADState.LISTENING);
+                console.log('VAD initialized in AUTOMATIC mode - listening for speech');
+            } else {
+                // Manual mode: Start paused (mic off by default)
+                this.setState(VADState.PAUSED);
+                console.log('VAD initialized in MANUAL mode - mic is OFF by default');
+            }
         } catch (error) {
             console.error('Failed to initialize VAD:', error);
             this.setState(VADState.IDLE);
@@ -236,6 +245,18 @@ class VADProcessor {
         // Always add audio to the recording buffer
         this.audioBuffer.push(audioFrame);
 
+        // In MANUAL mode: don't auto-commit on silence, wait for user to toggle mic off
+        if (this.mode === 'manual') {
+            // Only check for max recording time to prevent buffer overflow
+            const recordingDuration = Date.now() - this.recordingStartTime;
+            if (recordingDuration > VAD_CONFIG.maxRecordingTime) {
+                console.log(`[MANUAL MODE] Max recording time reached (${recordingDuration}ms), committing audio.`);
+                this.commit();
+            }
+            return; // Skip silence detection in manual mode
+        }
+
+        // In AUTOMATIC mode: auto-commit on silence detection
         if (!voice) {
             // Count silence frames
             this.consecutiveSilenceFrames++;
@@ -250,13 +271,13 @@ class VADProcessor {
             const silenceDuration = Date.now() - this.silenceStartTime;
             if (silenceDuration > VAD_CONFIG.silenceThreshold) {
                 const recordingDuration = Date.now() - this.recordingStartTime;
-                
+
                 // Only commit if we have a minimum recording duration
                 if (recordingDuration >= VAD_CONFIG.minRecordingTime) {
-                    console.log(`Silence threshold reached (${silenceDuration}ms), committing audio.`);
+                    console.log(`[AUTOMATIC MODE] Silence threshold reached (${silenceDuration}ms), committing audio.`);
                     this.commit();
                 } else {
-                    console.log(`Recording too short (${recordingDuration}ms), discarding and returning to listening.`);
+                    console.log(`[AUTOMATIC MODE] Recording too short (${recordingDuration}ms), discarding and returning to listening.`);
                     this.discardAndReturnToListening();
                 }
             }
@@ -270,7 +291,7 @@ class VADProcessor {
         // Check maximum recording time
         const recordingDuration = Date.now() - this.recordingStartTime;
         if (recordingDuration > VAD_CONFIG.maxRecordingTime) {
-            console.log(`Max recording time reached (${recordingDuration}ms), committing audio.`);
+            console.log(`[AUTOMATIC MODE] Max recording time reached (${recordingDuration}ms), committing audio.`);
             this.commit();
         }
     }
@@ -455,6 +476,31 @@ class VADProcessor {
     // Check if VAD is paused
     isPaused() {
         return this.state === VADState.PAUSED;
+    }
+
+    // Set VAD mode (automatic or manual)
+    setMode(newMode) {
+        if (this.mode === newMode) {
+            return; // No change needed
+        }
+
+        console.log(`Switching VAD mode from ${this.mode} to ${newMode}`);
+        this.mode = newMode;
+
+        // Adjust state based on new mode
+        if (newMode === 'automatic') {
+            // Automatic mode: resume listening if currently paused
+            if (this.state === VADState.PAUSED) {
+                this.setState(VADState.LISTENING);
+                console.log('Automatic mode enabled - VAD now listening');
+            }
+        } else if (newMode === 'manual') {
+            // Manual mode: pause if currently listening
+            if (this.state === VADState.LISTENING) {
+                this.setState(VADState.PAUSED);
+                console.log('Manual mode enabled - mic is OFF (click button to start)');
+            }
+        }
     }
 
     // Cleanup method

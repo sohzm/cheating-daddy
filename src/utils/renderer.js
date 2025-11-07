@@ -197,6 +197,17 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
     tokenTracker.reset();
     console.log('🎯 Token tracker reset for new capture session');
 
+    // Enable microphone if in automatic VAD mode
+    const vadEnabled = localStorage.getItem('vadEnabled') === 'true';
+    const vadMode = localStorage.getItem('vadMode') || 'automatic';
+    if (vadEnabled && vadMode === 'automatic') {
+        microphoneEnabled = true;
+        console.log('🎤 [AUTOMATIC MODE] Microphone enabled at session start');
+    } else if (vadEnabled && vadMode === 'manual') {
+        microphoneEnabled = false;
+        console.log('🔴 [MANUAL MODE] Microphone OFF - click button to enable');
+    }
+
     try {
         if (isMacOS) {
             // On macOS, use SystemAudioDump for audio and getDisplayMedia for screen
@@ -315,7 +326,11 @@ function setupLinuxSystemAudioProcessing() {
         try {
             const vadEnabled = localStorage.getItem('vadEnabled') === 'true';
             if (vadEnabled) {
-                // Create VAD processor with onCommit callback
+                // Get VAD mode from localStorage (default: 'automatic')
+                const vadMode = localStorage.getItem('vadMode') || 'automatic';
+                console.log(`Initializing VAD in ${vadMode.toUpperCase()} mode`);
+
+                // Create VAD processor with onCommit callback and mode
                 vadProcessor = new VADProcessor(
                     async (audioSegment, metadata) => {
                         try {
@@ -332,10 +347,18 @@ function setupLinuxSystemAudioProcessing() {
                         } catch (error) {
                             console.error('Failed to send VAD audio segment:', error);
                         }
-                    }
+                    },
+                    null, // onStateChange callback
+                    vadMode // VAD mode
                 );
                 isVADEnabled = true;
                 console.log('VAD enabled for Linux system audio processing');
+
+                // In AUTOMATIC mode: enable microphone by default
+                if (vadMode === 'automatic') {
+                    microphoneEnabled = true;
+                    console.log('🎤 Automatic mode - microphone enabled by default');
+                }
             }
         } catch (error) {
             console.error('Failed to initialize VAD:', error);
@@ -390,7 +413,11 @@ function setupWindowsLoopbackProcessing() {
         try {
             const vadEnabled = localStorage.getItem('vadEnabled') === 'true';
             if (vadEnabled) {
-                // Create VAD processor with onCommit callback
+                // Get VAD mode from localStorage (default: 'automatic')
+                const vadMode = localStorage.getItem('vadMode') || 'automatic';
+                console.log(`Initializing VAD in ${vadMode.toUpperCase()} mode`);
+
+                // Create VAD processor with onCommit callback and mode
                 vadProcessor = new VADProcessor(
                     async (audioSegment, metadata) => {
                         try {
@@ -407,10 +434,18 @@ function setupWindowsLoopbackProcessing() {
                         } catch (error) {
                             console.error('Failed to send VAD audio segment:', error);
                         }
-                    }
+                    },
+                    null, // onStateChange callback
+                    vadMode // VAD mode
                 );
                 isVADEnabled = true;
                 console.log('VAD enabled for Windows loopback processing');
+
+                // In AUTOMATIC mode: enable microphone by default
+                if (vadMode === 'automatic') {
+                    microphoneEnabled = true;
+                    console.log('🎤 Automatic mode - microphone enabled by default');
+                }
             }
         } catch (error) {
             console.error('Failed to initialize VAD:', error);
@@ -753,9 +788,21 @@ function toggleMicrophone(enabled) {
             vadProcessor.resume();
             console.log('✅ Microphone enabled - VAD resumed');
         } else {
-            // Pause VAD processor
-            vadProcessor.pause();
-            console.log('❌ Microphone disabled - VAD paused');
+            // In MANUAL mode: commit audio when mic is toggled OFF
+            // In AUTOMATIC mode: just pause normally
+            if (vadProcessor.mode === 'manual') {
+                // Check if we have recorded audio to commit
+                if (vadProcessor.audioBuffer && vadProcessor.audioBuffer.length > 0) {
+                    console.log('🎤 [MANUAL MODE] Mic toggled OFF - committing recorded audio');
+                    vadProcessor.commit();
+                } else {
+                    vadProcessor.pause();
+                    console.log('❌ Microphone disabled - no audio to commit');
+                }
+            } else {
+                vadProcessor.pause();
+                console.log('❌ Microphone disabled - VAD paused');
+            }
         }
     } else {
         console.log(`Microphone ${enabled ? 'enabled' : 'disabled'} (no VAD processor active)`);

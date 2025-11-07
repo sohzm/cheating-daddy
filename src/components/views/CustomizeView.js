@@ -435,6 +435,7 @@ export class CustomizeView extends LitElement {
         keybinds: { type: Object },
         googleSearchEnabled: { type: Boolean },
         vadEnabled: { type: Boolean },
+        vadMode: { type: String },
         backgroundTransparency: { type: Number },
         fontSize: { type: Number },
         onProfileChange: { type: Function },
@@ -471,6 +472,7 @@ export class CustomizeView extends LitElement {
 
         // VAD (Voice Activity Detection) default
         this.vadEnabled = true;
+        this.vadMode = 'automatic'; // 'automatic' or 'manual'
 
         // Background transparency default
         this.backgroundTransparency = 0.61;
@@ -902,6 +904,11 @@ export class CustomizeView extends LitElement {
         if (vadEnabled !== null) {
             this.vadEnabled = vadEnabled === 'true';
         }
+
+        const vadMode = localStorage.getItem('vadMode');
+        if (vadMode !== null) {
+            this.vadMode = vadMode;
+        }
     }
 
     async handleVADChange(e) {
@@ -915,6 +922,23 @@ export class CustomizeView extends LitElement {
                 await ipcRenderer.invoke('update-vad-setting', this.vadEnabled);
             } catch (error) {
                 console.error('Failed to notify main process of VAD setting change:', error);
+            }
+        }
+
+        this.requestUpdate();
+    }
+
+    async handleVADModeChange(e) {
+        this.vadMode = e.detail.value;
+        localStorage.setItem('vadMode', this.vadMode);
+
+        // Notify main process if available
+        if (window.require) {
+            try {
+                const { ipcRenderer } = window.require('electron');
+                await ipcRenderer.invoke('update-vad-mode', this.vadMode);
+            } catch (error) {
+                console.error('Failed to notify main process of VAD mode change:', error);
             }
         }
 
@@ -1150,12 +1174,39 @@ export class CustomizeView extends LitElement {
                                 />
                                 <label for="vad-enabled" class="checkbox-label">Enable Voice Activity Detection (VAD)</label>
                             </div>
-                            <div class="form-description" style="margin-left: 24px; margin-top: -8px;">
-                                Intelligently detect when you're speaking and only capture audio during speech. 
+                            <div class="form-description">
+                                Intelligently detect when you're speaking and only capture audio during speech.
                                 Improves privacy by avoiding recording of silence and background noise.
                                 <br /><strong>Benefits:</strong> Better privacy, reduced processing, natural conversation flow
                             </div>
                         </div>
+
+                        ${this.selectedProfile === 'interview' && this.vadEnabled ? html`
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="form-label">
+                                        VAD Control Mode
+                                        <span class="current-selection">${this.vadMode === 'automatic' ? 'Smart Detection' : 'Manual Control'}</span>
+                                    </label>
+                                    <custom-dropdown
+                                        .value=${this.vadMode}
+                                        .options=${[
+                                            { value: 'automatic', label: 'Smart Detection (Auto)' },
+                                            { value: 'manual', label: 'Manual Control (Push-to-Talk)' }
+                                        ]}
+                                        @change=${this.handleVADModeChange}
+                                    ></custom-dropdown>
+                                </div>
+                            </div>
+                            <div class="form-group full-width">
+                                <div class="form-description">
+                                    ${this.vadMode === 'automatic'
+                                        ? html`<strong>Smart Detection:</strong> VAD automatically detects speech and silence. Best for natural conversations where the interviewer speaks continuously.`
+                                        : html`<strong>Manual Control:</strong> Click the microphone button to start listening. VAD captures the entire question (including pauses) until you click again to generate the response. Perfect for interviewers who pause frequently mid-sentence.`
+                                    }
+                                </div>
+                            </div>
+                        ` : ''}
                     </div>
                 </div>
 
