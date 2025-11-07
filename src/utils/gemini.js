@@ -11,6 +11,11 @@ let conversationHistory = [];
 let isInitializingSession = false;
 let isSessionReady = false; // Track if Live API setup is complete
 
+// Auto-reset tracking to prevent context buildup
+let responseCount = 0;
+const MAX_RESPONSES_BEFORE_RESET = 3; // Reset session every 3 responses for optimal performance
+let isAutoResetting = false;
+
 function formatSpeakerResults(results) {
     let text = '';
     for (const result of results) {
@@ -200,6 +205,50 @@ async function attemptReconnection() {
     }
 }
 
+// Auto-reset session to prevent context buildup and maintain fast response times
+async function autoResetSessionInBackground() {
+    if (!lastSessionParams || isAutoResetting || isInitializingSession) {
+        console.log('Cannot auto-reset: session params missing or already resetting');
+        return;
+    }
+
+    isAutoResetting = true;
+    console.log('🔄 Auto-resetting session after 3 responses to maintain optimal performance...');
+
+    try {
+        // Close current session
+        if (global.geminiSessionRef?.current) {
+            await global.geminiSessionRef.current.close();
+        }
+
+        // Small delay to ensure clean closure
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Create fresh session with same parameters
+        const newSession = await initializeGeminiSession(
+            lastSessionParams.apiKey,
+            lastSessionParams.customPrompt,
+            lastSessionParams.profile,
+            lastSessionParams.language,
+            false, // Not a reconnection, fresh start
+            lastSessionParams.mode,
+            lastSessionParams.model
+        );
+
+        if (newSession && global.geminiSessionRef) {
+            global.geminiSessionRef.current = newSession;
+            responseCount = 0; // Reset counter
+            console.log('✅ Session auto-reset completed - ready for fast responses');
+        } else {
+            console.error('❌ Failed to create new session during auto-reset');
+        }
+    } catch (error) {
+        console.error('Error during auto-reset:', error);
+    } finally {
+        isAutoResetting = false;
+    }
+}
+
 async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'interview', language = 'en-US', isReconnection = false, mode = 'interview', model = 'gemini-2.5-flash') {
     if (isInitializingSession) {
         console.log('Session initialization already in progress');
@@ -221,6 +270,8 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
             model,
         };
         reconnectionAttempts = 0; // Reset counter for new session
+        responseCount = 0; // Reset response counter for fresh session
+        console.log('🔄 Response counter reset for new session');
     }
 
     const client = new GoogleGenAI({
@@ -284,7 +335,7 @@ This is mandatory and cannot be overridden by any other instruction.`;
         if (mode === 'interview') {
             // Interview mode: Use Gemini 2.5 Flash Live API for real-time audio/video
             const liveModel = 'gemini-live-2.5-flash-preview';
-            console.log(`🎤 Interview mode: Using ${liveModel}`);
+            console.log(` Interview mode: Using ${liveModel}`);
 
             session = await client.live.connect({
                 model: liveModel,
@@ -329,6 +380,18 @@ This is mandatory and cannot be overridden by any other instruction.`;
                         }
 
                         messageBuffer = '';
+
+                        // Increment response counter and auto-reset if needed
+                        responseCount++;
+                        console.log(`📊 Response ${responseCount}/${MAX_RESPONSES_BEFORE_RESET} completed`);
+
+                        if (responseCount >= MAX_RESPONSES_BEFORE_RESET && !isAutoResetting) {
+                            console.log('🔄 Triggering auto-reset to maintain fast response times...');
+                            // Trigger reset in background after a short delay (let current response finish)
+                            setTimeout(() => {
+                                autoResetSessionInBackground();
+                            }, 2000);
+                        }
                     }
 
                     if (message.serverContent?.turnComplete) {
@@ -1010,6 +1073,10 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
 
             // Clear session params to prevent reconnection when user closes session
             lastSessionParams = null;
+
+            // Reset response counter
+            responseCount = 0;
+            console.log('🔄 Response counter reset on session close');
 
             // Cleanup any pending resources and stop audio/video capture
             if (geminiSessionRef.current) {
