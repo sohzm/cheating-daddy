@@ -351,7 +351,7 @@ This is mandatory and cannot be overridden by any other instruction.`;
                         isSessionReady = true;
                         isInitializingSession = false;
                         sendToRenderer('session-initializing', false);
-                        sendToRenderer('update-status', 'Ready - Listening...');
+                        sendToRenderer('update-status', 'Listening...');
                         console.log('✅ Live API setup complete - session ready');
                     }
 
