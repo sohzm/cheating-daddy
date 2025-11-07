@@ -239,6 +239,10 @@ async function autoResetSessionInBackground() {
             global.geminiSessionRef.current = newSession;
             responseCount = 0; // Reset counter
             console.log('✅ Session auto-reset completed - ready for fast responses');
+
+            // IMPORTANT: Send conversation history to new session so it remembers previous Q&A
+            await sendReconnectionContext();
+            console.log('📝 Conversation context sent to new session - AI remembers previous answers');
         } else {
             console.error('❌ Failed to create new session during auto-reset');
         }
