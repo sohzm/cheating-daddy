@@ -1,13 +1,19 @@
 // renderer.js
 const { ipcRenderer } = require('electron');
+const path = require('path');
 
 // Import VAD functionality
 let VADProcessor;
 try {
-    const vad = require('./vad.js');
+    // __dirname resolves to 'src' folder when loaded from index.html
+    // So we need to go to 'utils/vad.js'
+    const vadPath = path.join(__dirname, 'utils', 'vad.js');
+    const vad = require(vadPath);
     VADProcessor = vad.VADProcessor;
+    console.log('✅ VAD module loaded successfully from:', vadPath);
 } catch (error) {
-    console.warn('VAD module not available:', error);
+    console.warn('❌ VAD module not available:', error);
+    console.warn('Tried path:', path.join(__dirname, 'utils', 'vad.js'));
     VADProcessor = null;
 }
 
@@ -367,10 +373,21 @@ function setupLinuxSystemAudioProcessing() {
 
     let audioBuffer = [];
     const samplesPerChunk = SAMPLE_RATE * AUDIO_CHUNK_DURATION;
+    let audioFrameCount = 0;
 
     audioProcessor.onaudioprocess = async e => {
+        audioFrameCount++;
+
+        // Debug: Log first few frames
+        if (audioFrameCount <= 3) {
+            console.log(`🔊 [AUDIO] Frame ${audioFrameCount}: microphoneEnabled=${microphoneEnabled}, isVADEnabled=${isVADEnabled}`);
+        }
+
         // Skip audio processing if microphone is not enabled
         if (!microphoneEnabled) {
+            if (audioFrameCount <= 3) {
+                console.log(`🚫 [AUDIO] Skipping frame - microphone is OFF`);
+            }
             return;
         }
 
@@ -454,10 +471,21 @@ function setupWindowsLoopbackProcessing() {
 
     let audioBuffer = [];
     const samplesPerChunk = SAMPLE_RATE * AUDIO_CHUNK_DURATION;
+    let audioFrameCount = 0;
 
     audioProcessor.onaudioprocess = async e => {
+        audioFrameCount++;
+
+        // Debug: Log first few frames
+        if (audioFrameCount <= 3) {
+            console.log(`🔊 [AUDIO] Frame ${audioFrameCount}: microphoneEnabled=${microphoneEnabled}, isVADEnabled=${isVADEnabled}`);
+        }
+
         // Skip audio processing if microphone is not enabled
         if (!microphoneEnabled) {
+            if (audioFrameCount <= 3) {
+                console.log(`🚫 [AUDIO] Skipping frame - microphone is OFF`);
+            }
             return;
         }
 
