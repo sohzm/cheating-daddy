@@ -811,14 +811,13 @@ async function toggleMicrophone(enabled) {
     microphoneEnabled = enabled;
 
     // Handle macOS separately (VAD runs in main process)
-    if (isMacOS && window.require) {
+    if (isMacOS) {
         try {
-            const { ipcRenderer } = window.require('electron');
             const result = await ipcRenderer.invoke('toggle-macos-microphone', enabled);
-            console.log('[macOS] Microphone toggle result:', result);
+            console.log('🍎 [macOS] Microphone toggle result:', result);
             return result;
         } catch (error) {
-            console.error('[macOS] Failed to toggle microphone:', error);
+            console.error('❌ [macOS] Failed to toggle microphone:', error);
             return { success: false, error: error.message };
         }
     }
