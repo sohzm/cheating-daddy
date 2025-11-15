@@ -62,6 +62,15 @@ const { setupGeminiIpcHandlers, stopMacOSAudioCapture, sendToRenderer } = requir
 const { initializeRandomProcessNames } = require('./utils/processRandomizer');
 const { applyAntiAnalysisMeasures } = require('./utils/stealthFeatures');
 const { getLocalConfig, writeConfig } = require('./config');
+const path = require('path');
+const os = require('os');
+
+// Fix userData directory to consistent location across dev/prod
+// This ensures settings persist when running npm start on macOS
+if (process.platform === 'darwin') {
+    const userDataPath = path.join(os.homedir(), 'Library', 'Application Support', 'cheating-daddy');
+    app.setPath('userData', userDataPath);
+}
 
 const geminiSessionRef = { current: null };
 let mainWindow = null;
@@ -93,6 +102,9 @@ if (!gotTheLock) {
     app.whenReady().then(async () => {
         // Apply anti-analysis measures with random delay
         await applyAntiAnalysisMeasures();
+
+        // Log user data directory for debugging persistence issues
+        console.log('📁 Electron user data directory:', app.getPath('userData'));
 
         createMainWindow();
         setupGeminiIpcHandlers(geminiSessionRef);
