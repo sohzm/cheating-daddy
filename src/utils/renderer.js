@@ -219,8 +219,12 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
             // On macOS, use SystemAudioDump for audio and getDisplayMedia for screen
             console.log('Starting macOS capture with SystemAudioDump...');
 
-            // Start macOS audio capture
-            const audioResult = await ipcRenderer.invoke('start-macos-audio');
+            // Get VAD settings from localStorage to pass to main process
+            const vadEnabled = localStorage.getItem('vadEnabled') === 'true';
+            const vadMode = localStorage.getItem('vadMode') || 'automatic';
+
+            // Start macOS audio capture with VAD settings
+            const audioResult = await ipcRenderer.invoke('start-macos-audio', vadEnabled, vadMode);
             if (!audioResult.success) {
                 throw new Error('Failed to start macOS audio capture: ' + audioResult.error);
             }

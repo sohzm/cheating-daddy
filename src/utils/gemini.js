@@ -762,7 +762,7 @@ function killExistingSystemAudioDump() {
     });
 }
 
-async function startMacOSAudioCapture(geminiSessionRef) {
+async function startMacOSAudioCapture(geminiSessionRef, vadEnabled = false, vadMode = 'automatic') {
     if (process.platform !== 'darwin') return false;
 
     // Kill any existing SystemAudioDump processes first
@@ -825,12 +825,9 @@ async function startMacOSAudioCapture(geminiSessionRef) {
 
     let audioBuffer = Buffer.alloc(0);
 
-    // Initialize VAD for macOS if enabled (get settings from localStorage-equivalent)
-    const Store = require('electron-store');
-    const store = new Store();
-
-    macVADEnabled = store.get('vadEnabled', false);
-    macVADMode = store.get('vadMode', 'automatic');
+    // Initialize VAD for macOS using settings passed from renderer
+    macVADEnabled = vadEnabled;
+    macVADMode = vadMode;
 
     console.log(`🔧 [macOS] VAD Settings: enabled=${macVADEnabled}, mode=${macVADMode}`);
 
@@ -1164,7 +1161,7 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
         }
     });
 
-    ipcMain.handle('start-macos-audio', async event => {
+    ipcMain.handle('start-macos-audio', async (event, vadEnabled = false, vadMode = 'automatic') => {
         if (process.platform !== 'darwin') {
             return {
                 success: false,
@@ -1173,7 +1170,7 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
         }
 
         try {
-            const success = await startMacOSAudioCapture(geminiSessionRef);
+            const success = await startMacOSAudioCapture(geminiSessionRef, vadEnabled, vadMode);
             return { success };
         } catch (error) {
             console.error('Error starting macOS audio capture:', error);
