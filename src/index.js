@@ -119,8 +119,23 @@ app.on('window-all-closed', () => {
     }
 });
 
-app.on('before-quit', () => {
+app.on('before-quit', async (event) => {
     stopMacOSAudioCapture();
+
+    // Flush localStorage and other storage to disk before quitting
+    // This is CRITICAL for macOS to persist localStorage between restarts
+    event.preventDefault();
+    try {
+        const { session } = require('electron');
+        console.log('💾 Flushing storage data to disk...');
+        await session.defaultSession.flushStorageData();
+        console.log('✅ Storage data flushed successfully');
+    } catch (error) {
+        console.error('❌ Error flushing storage data:', error);
+    }
+
+    // Now actually quit
+    app.exit();
 });
 
 app.on('activate', () => {
