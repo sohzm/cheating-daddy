@@ -89,8 +89,9 @@ function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
         // This keeps window above normal apps and UWP apps
         mainWindow.setAlwaysOnTop(true, 'pop-up-menu', 1);
     } else if (process.platform === 'darwin') {
-        // On macOS, use 'screen-saver' for maximum visibility
-        mainWindow.setAlwaysOnTop(true, 'screen-saver', 1);
+        // On macOS, use 'floating' level (allows system dialogs and Activity Monitor to appear above)
+        // 'screen-saver' is too aggressive and prevents users from closing the app
+        mainWindow.setAlwaysOnTop(true, 'floating', 1);
     } else {
         // Linux and other platforms
         mainWindow.setAlwaysOnTop(true, 'pop-up-menu');
