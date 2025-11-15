@@ -807,9 +807,23 @@ function handleShortcut(shortcutKey) {
 }
 
 // Microphone toggle function
-function toggleMicrophone(enabled) {
+async function toggleMicrophone(enabled) {
     microphoneEnabled = enabled;
 
+    // Handle macOS separately (VAD runs in main process)
+    if (isMacOS && window.require) {
+        try {
+            const { ipcRenderer } = window.require('electron');
+            const result = await ipcRenderer.invoke('toggle-macos-microphone', enabled);
+            console.log('[macOS] Microphone toggle result:', result);
+            return result;
+        } catch (error) {
+            console.error('[macOS] Failed to toggle microphone:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    // Handle Windows/Linux (VAD runs in renderer process)
     if (vadProcessor) {
         if (enabled) {
             // Resume VAD processor

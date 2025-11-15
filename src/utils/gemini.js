@@ -3,6 +3,7 @@ const { BrowserWindow, ipcMain } = require('electron');
 const { spawn } = require('child_process');
 const { saveDebugAudio } = require('../audioUtils');
 const { getSystemPrompt } = require('./prompts');
+const { VADProcessor } = require('./vad');
 
 // Conversation tracking variables
 let currentSessionId = null;
@@ -38,6 +39,12 @@ let reconnectionAttempts = 0;
 let maxReconnectionAttempts = 3;
 let reconnectionDelay = 2000; // 2 seconds between attempts
 let lastSessionParams = null;
+
+// macOS VAD tracking variables
+let macVADProcessor = null;
+let macVADEnabled = false;
+let macVADMode = 'automatic';
+let macMicrophoneEnabled = false;
 
 function sendToRenderer(channel, data) {
     const windows = BrowserWindow.getAllWindows();
@@ -792,14 +799,23 @@ async function startMacOSAudioCapture(geminiSessionRef) {
         spawnOptions.windowsHide = false;
     }
 
-    systemAudioProc = spawn(systemAudioPath, [], spawnOptions);
-
-    if (!systemAudioProc.pid) {
-        console.error('Failed to start SystemAudioDump');
+    try {
+        systemAudioProc = spawn(systemAudioPath, [], spawnOptions);
+    } catch (error) {
+        console.error(' Failed to spawn SystemAudioDump:', error.message);
+        console.error('Path:', systemAudioPath);
+        console.error('Hint: Make sure SystemAudioDump binary has execute permissions (chmod +x)');
         return false;
     }
 
-    console.log('SystemAudioDump started with PID:', systemAudioProc.pid);
+    if (!systemAudioProc.pid) {
+        console.error(' Failed to start SystemAudioDump - no PID');
+        console.error('Path:', systemAudioPath);
+        console.error('Hint: Binary may not have execute permissions or wrong architecture');
+        return false;
+    }
+
+    console.log(' SystemAudioDump started with PID:', systemAudioProc.pid);
 
     const CHUNK_DURATION = 0.1;
     const SAMPLE_RATE = 24000;
@@ -809,6 +825,47 @@ async function startMacOSAudioCapture(geminiSessionRef) {
 
     let audioBuffer = Buffer.alloc(0);
 
+    // Initialize VAD for macOS if enabled (get settings from localStorage-equivalent)
+    const Store = require('electron-store');
+    const store = new Store();
+
+    macVADEnabled = store.get('vadEnabled', false);
+    macVADMode = store.get('vadMode', 'automatic');
+
+    console.log(`🔧 [macOS] VAD Settings: enabled=${macVADEnabled}, mode=${macVADMode}`);
+
+    if (macVADEnabled) {
+        console.log(`🔧 [macOS] Initializing VAD in ${macVADMode.toUpperCase()} mode`);
+
+        // Initialize microphone state based on mode
+        if (macVADMode === 'automatic') {
+            macMicrophoneEnabled = true;
+            console.log('🎤 [macOS AUTOMATIC] Microphone enabled by default');
+        } else {
+            macMicrophoneEnabled = false;
+            console.log('🔴 [macOS MANUAL] Microphone OFF - click button to enable');
+        }
+
+        // Create VAD processor for macOS
+        macVADProcessor = new VADProcessor(
+            async (audioSegment, metadata) => {
+                try {
+                    // Convert Float32Array to PCM Buffer
+                    const pcmBuffer = convertFloat32ToPCMBuffer(audioSegment);
+                    const base64Data = pcmBuffer.toString('base64');
+                    await sendAudioToGemini(base64Data, geminiSessionRef);
+                    console.log('🎤 [macOS VAD] Audio segment sent:', metadata);
+                } catch (error) {
+                    console.error('❌ [macOS VAD] Failed to send audio segment:', error);
+                }
+            },
+            null, // onStateChange callback
+            macVADMode // VAD mode
+        );
+
+        console.log('✅ [macOS] VAD processor initialized');
+    }
+
     systemAudioProc.stdout.on('data', data => {
         audioBuffer = Buffer.concat([audioBuffer, data]);
 
@@ -817,8 +874,22 @@ async function startMacOSAudioCapture(geminiSessionRef) {
             audioBuffer = audioBuffer.slice(CHUNK_SIZE);
 
             const monoChunk = CHANNELS === 2 ? convertStereoToMono(chunk) : chunk;
-            const base64Data = monoChunk.toString('base64');
-            sendAudioToGemini(base64Data, geminiSessionRef);
+
+            if (macVADEnabled && macVADProcessor) {
+                // VAD mode: process through VAD
+                if (!macMicrophoneEnabled) {
+                    // Skip audio processing if mic is OFF in manual mode
+                    continue;
+                }
+
+                // Convert PCM Buffer to Float32Array for VAD
+                const float32Audio = convertPCMBufferToFloat32(monoChunk);
+                macVADProcessor.processAudio(float32Audio);
+            } else {
+                // No VAD: send directly to Gemini (legacy behavior)
+                const base64Data = monoChunk.toString('base64');
+                sendAudioToGemini(base64Data, geminiSessionRef);
+            }
 
             if (process.env.DEBUG_AUDIO) {
                 console.log(`Processed audio chunk: ${chunk.length} bytes`);
@@ -842,7 +913,20 @@ async function startMacOSAudioCapture(geminiSessionRef) {
     });
 
     systemAudioProc.on('error', err => {
-        console.error('SystemAudioDump process error:', err);
+        console.error(' SystemAudioDump process error:', err);
+
+        // Provide helpful error message for architecture issues
+        if (err.code === 'ENOENT') {
+            console.error('\n TROUBLESHOOTING:');
+            console.error('1. SystemAudioDump may not have execute permissions');
+            console.error('   Run: chmod +x /path/to/SystemAudioDump');
+            console.error('\n2. Binary may be wrong architecture for your Mac');
+            console.error('   - ARM64 binary requires Apple Silicon (M1/M2/M3)');
+            console.error('   - x64 binary requires Intel Mac or Rosetta 2');
+            console.error('\n3. For Intel Macs: Install Rosetta 2');
+            console.error('   Run: softwareupdate --install-rosetta');
+        }
+
         systemAudioProc = null;
     });
 
@@ -861,7 +945,43 @@ function convertStereoToMono(stereoBuffer) {
     return monoBuffer;
 }
 
+// Convert PCM Buffer (Int16) to Float32Array for VAD processing
+function convertPCMBufferToFloat32(pcmBuffer) {
+    const samples = pcmBuffer.length / 2; // 2 bytes per sample (Int16)
+    const float32Array = new Float32Array(samples);
+
+    for (let i = 0; i < samples; i++) {
+        const int16Sample = pcmBuffer.readInt16LE(i * 2);
+        // Convert from Int16 range [-32768, 32767] to Float32 range [-1, 1]
+        float32Array[i] = int16Sample / (int16Sample < 0 ? 32768 : 32767);
+    }
+
+    return float32Array;
+}
+
+// Convert Float32Array back to PCM Buffer (Int16) for sending to Gemini
+function convertFloat32ToPCMBuffer(float32Array) {
+    const pcmBuffer = Buffer.alloc(float32Array.length * 2); // 2 bytes per sample
+
+    for (let i = 0; i < float32Array.length; i++) {
+        // Clamp to [-1, 1] range
+        const sample = Math.max(-1, Math.min(1, float32Array[i]));
+        // Convert from Float32 range [-1, 1] to Int16 range [-32768, 32767]
+        const int16Sample = sample < 0 ? sample * 32768 : sample * 32767;
+        pcmBuffer.writeInt16LE(Math.round(int16Sample), i * 2);
+    }
+
+    return pcmBuffer;
+}
+
 function stopMacOSAudioCapture() {
+    // Clean up VAD processor
+    if (macVADProcessor) {
+        macVADProcessor.destroy();
+        macVADProcessor = null;
+        console.log('[macOS] VAD processor destroyed');
+    }
+
     if (systemAudioProc) {
         console.log('Stopping SystemAudioDump...');
         systemAudioProc.kill('SIGTERM');
@@ -1071,6 +1191,40 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
         }
     });
 
+    // macOS microphone toggle handler (for manual VAD mode)
+    ipcMain.handle('toggle-macos-microphone', async (event, enabled) => {
+        try {
+            if (process.platform !== 'darwin') {
+                return { success: false, error: 'macOS only' };
+            }
+
+            macMicrophoneEnabled = enabled;
+            console.log(`🎤 [macOS] Microphone ${enabled ? 'enabled' : 'disabled'}`);
+
+            if (macVADProcessor && macVADMode === 'manual') {
+                if (enabled) {
+                    // Manual mode: enable mic and start recording
+                    macVADProcessor.resume();
+                    console.log('[macOS MANUAL] Mic ON - now recording');
+                } else {
+                    // Manual mode: disable mic and commit audio
+                    if (macVADProcessor.audioBuffer && macVADProcessor.audioBuffer.length > 0) {
+                        console.log('[macOS MANUAL] Mic OFF - committing audio');
+                        macVADProcessor.commit();
+                    } else {
+                        macVADProcessor.pause();
+                        console.log('[macOS MANUAL] Mic OFF - no audio to commit');
+                    }
+                }
+            }
+
+            return { success: true, enabled: macMicrophoneEnabled };
+        } catch (error) {
+            console.error('Error toggling macOS microphone:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
     ipcMain.handle('close-session', async event => {
         try {
             stopMacOSAudioCapture();
@@ -1153,6 +1307,8 @@ module.exports = {
     killExistingSystemAudioDump,
     startMacOSAudioCapture,
     convertStereoToMono,
+    convertPCMBufferToFloat32,
+    convertFloat32ToPCMBuffer,
     stopMacOSAudioCapture,
     sendAudioToGemini,
     setupGeminiIpcHandlers,

@@ -69,6 +69,16 @@ A real-time AI assistant that provides contextual help during video calls, inter
 ## Audio Capture
 
 - **macOS**: [SystemAudioDump](https://github.com/Mohammed-Yasin-Mulla/Sound) for system audio
+## macOS Users - Audio Setup
+
+### Requirements:
+- **Apple Silicon (M1/M2/M3)**: Works natively 
+- **Intel Mac**: Requires Rosetta 2 (install with: `softwareupdate --install-rosetta`)
+
+### If audio doesn't work:
+1. Grant Screen Recording permission: System Settings → Privacy & Security → Screen Recording
+2. After building, set permissions: `chmod +x cheating-daddy.app/Contents/Resources/SystemAudioDump`
+
 - **Windows**: Loopback audio capture
 - **Linux**: Microphone input
 
