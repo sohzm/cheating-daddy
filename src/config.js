@@ -35,18 +35,18 @@ function getConfigFilePath() {
 // Ensure the config directory exists
 function ensureConfigDir() {
     const configDir = getConfigDir();
-    console.log('📂 Config directory path:', configDir);
+    console.log('Config directory path:', configDir);
     if (!fs.existsSync(configDir)) {
-        console.log('📂 Creating config directory...');
+        console.log('Creating config directory...');
         try {
             fs.mkdirSync(configDir, { recursive: true });
-            console.log('✅ Config directory created successfully');
+            console.log('Config directory created successfully');
         } catch (error) {
-            console.error('❌ Failed to create config directory:', error);
+            console.error('Failed to create config directory:', error);
             throw error;
         }
     } else {
-        console.log('✅ Config directory already exists');
+        console.log('Config directory already exists');
     }
 }
 

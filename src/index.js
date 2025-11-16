@@ -104,7 +104,7 @@ if (!gotTheLock) {
         await applyAntiAnalysisMeasures();
 
         // Log user data directory for debugging persistence issues
-        console.log('📁 Electron user data directory:', app.getPath('userData'));
+        console.log('Electron user data directory:', app.getPath('userData'));
 
         createMainWindow();
         setupGeminiIpcHandlers(geminiSessionRef);
@@ -127,11 +127,11 @@ app.on('before-quit', async (event) => {
     event.preventDefault();
     try {
         const { session } = require('electron');
-        console.log('💾 Flushing storage data to disk...');
+        console.log('Flushing storage data to disk...');
         await session.defaultSession.flushStorageData();
-        console.log('✅ Storage data flushed successfully');
+        console.log('Storage data flushed successfully');
     } catch (error) {
-        console.error('❌ Error flushing storage data:', error);
+        console.error('Error flushing storage data:', error);
     }
 
     // Now actually quit

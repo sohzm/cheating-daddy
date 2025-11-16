@@ -3,7 +3,9 @@ const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 
 module.exports = {
     packagerConfig: {
-        asar: true,
+        asar: {
+            unpack: '**/{onnxruntime-node,@ricky0123}/**/*',
+        },
         extraResource: ['./src/assets/SystemAudioDump'],
         name: 'Cheating Daddy',
         icon: 'src/assets/logo',
