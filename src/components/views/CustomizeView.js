@@ -4,11 +4,7 @@ import { resizeLayout } from '../../utils/windowResize.js';
 export class CustomizeView extends LitElement {
     static styles = css`
         * {
-            font-family:
-                'Inter',
-                -apple-system,
-                BlinkMacSystemFont,
-                sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             cursor: default;
             user-select: none;
         }
@@ -415,6 +411,10 @@ export class CustomizeView extends LitElement {
         onLayoutModeChange: { type: Function },
         advancedMode: { type: Boolean },
         onAdvancedModeChange: { type: Function },
+        inputDevices: { type: Array },
+        outputDevices: { type: Array },
+        selectedMicrophoneId: { type: String },
+        selectedSpeakerId: { type: String },
     };
 
     constructor() {
@@ -449,6 +449,12 @@ export class CustomizeView extends LitElement {
         this.loadAdvancedModeSettings();
         this.loadBackgroundTransparency();
         this.loadFontSize();
+
+        this.inputDevices = [];
+        this.outputDevices = [];
+        this.selectedMicrophoneId = localStorage.getItem('preferredMicrophoneId') || '';
+        this.selectedSpeakerId = localStorage.getItem('preferredSpeakerId') || '';
+        this.loadAudioDevices();
     }
 
     connectedCallback() {
@@ -457,6 +463,92 @@ export class CustomizeView extends LitElement {
         this.loadLayoutMode();
         // Resize window for this view
         resizeLayout();
+    }
+
+    async loadAudioDevices() {
+        try {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            this.inputDevices = devices.filter(d => d.kind === 'audioinput');
+            this.outputDevices = devices.filter(d => d.kind === 'audiooutput');
+
+            // Try to load saved devices from main process if available
+            if (window.require) {
+                try {
+                    const { ipcRenderer } = window.require('electron');
+                    const res = await ipcRenderer.invoke('get-audio-devices');
+                    if (res && res.success && res.audioDevices) {
+                        this.selectedMicrophoneId = res.audioDevices.microphoneId || this.selectedMicrophoneId;
+                        this.selectedSpeakerId = res.audioDevices.speakerId || this.selectedSpeakerId;
+                    }
+                } catch (e) {
+                    // ignore
+                }
+            }
+
+            // Persist to localStorage for renderer-side quick access
+            if (this.selectedMicrophoneId) localStorage.setItem('preferredMicrophoneId', this.selectedMicrophoneId);
+            if (this.selectedSpeakerId) localStorage.setItem('preferredSpeakerId', this.selectedSpeakerId);
+
+            this.requestUpdate();
+        } catch (err) {
+            console.warn('Failed to enumerate audio devices:', err);
+        }
+    }
+
+    async saveAudioDeviceSelection() {
+        // Persist to main config via IPC and to localStorage
+        localStorage.setItem('preferredMicrophoneId', this.selectedMicrophoneId || '');
+        localStorage.setItem('preferredSpeakerId', this.selectedSpeakerId || '');
+
+        if (window.require) {
+            try {
+                const { ipcRenderer } = window.require('electron');
+                await ipcRenderer.invoke('save-audio-devices', {
+                    microphoneId: this.selectedMicrophoneId || '',
+                    speakerId: this.selectedSpeakerId || '',
+                });
+            } catch (e) {
+                console.warn('Failed to save audio devices to main process:', e);
+            }
+        }
+        // Notify other renderer modules that preferred devices changed
+        try {
+            window.dispatchEvent(
+                new CustomEvent('preferred-audio-changed', {
+                    detail: {
+                        microphoneId: this.selectedMicrophoneId,
+                        speakerId: this.selectedSpeakerId,
+                    },
+                })
+            );
+        } catch (e) {
+            // ignore
+        }
+    }
+
+    handleMicrophoneSelect(e) {
+        this.selectedMicrophoneId = e.target.value;
+        this.saveAudioDeviceSelection();
+        this.requestUpdate();
+    }
+
+    async handleSpeakerSelect(e) {
+        this.selectedSpeakerId = e.target.value;
+        this.saveAudioDeviceSelection();
+        this.requestUpdate();
+        // Try to set sinkId on any existing audio elements (if supported)
+        try {
+            const audios = document.querySelectorAll('audio');
+            for (const a of audios) {
+                if (typeof a.setSinkId === 'function') {
+                    await a.setSinkId(this.selectedSpeakerId);
+                }
+            }
+        } catch (err) {
+            // ignore; not supported or failed
+        }
     }
 
     getProfiles() {
@@ -917,13 +1009,44 @@ export class CustomizeView extends LitElement {
                     <div class="form-grid">
                         <div class="form-group">
                             <label class="form-label">Audio Mode</label>
-                            <select class="form-control" .value=${localStorage.getItem('audioMode') || 'speaker_only'} @change=${e => localStorage.setItem('audioMode', e.target.value)}>
+                            <select class="form-control" .value=${localStorage.getItem('audioMode') || 'speaker_only'} @change=${e =>
+            localStorage.setItem('audioMode', e.target.value)}>
                                 <option value="speaker_only">Speaker Only (Interviewer)</option>
                                 <option value="mic_only">Microphone Only (Me)</option>
                                 <option value="both">Both Speaker & Microphone</option>
                             </select>
                             <div class="form-description">
                                 Choose which audio sources to capture for the AI.
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">Microphone</label>
+                                <select class="form-control" @change=${this.handleMicrophoneSelect} .value=${this.selectedMicrophoneId}>
+                                    <option value="">(Default system microphone)</option>
+                                    ${this.inputDevices.map(
+                                        d =>
+                                            html`<option value=${d.deviceId} ?selected=${this.selectedMicrophoneId === d.deviceId}>
+                                                ${d.label || d.deviceId}
+                                            </option>`
+                                    )}
+                                </select>
+                                <div class="form-description">Select which microphone to use for capture</div>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label">Speaker</label>
+                                <select class="form-control" @change=${this.handleSpeakerSelect} .value=${this.selectedSpeakerId}>
+                                    <option value="">(Default system speaker)</option>
+                                    ${this.outputDevices.map(
+                                        d =>
+                                            html`<option value=${d.deviceId} ?selected=${this.selectedSpeakerId === d.deviceId}>
+                                                ${d.label || d.deviceId}
+                                            </option>`
+                                    )}
+                                </select>
+                                <div class="form-description">Choose output device for audio playback (if supported)</div>
                             </div>
                         </div>
                     </div>
@@ -938,10 +1061,10 @@ export class CustomizeView extends LitElement {
                         <div class="form-group">
                             <label class="form-label">Profile</label>
                             <select class="form-control" .value=${localStorage.getItem('stealthProfile') || 'balanced'} @change=${e => {
-                                localStorage.setItem('stealthProfile', e.target.value);
-                                // We need to notify the main process to restart for some settings to apply
-                                alert('Restart the application for stealth changes to take full effect.');
-                            }}>
+            localStorage.setItem('stealthProfile', e.target.value);
+            // We need to notify the main process to restart for some settings to apply
+            alert('Restart the application for stealth changes to take full effect.');
+        }}>
                                 <option value="visible">Visible</option>
                                 <option value="balanced">Balanced</option>
                                 <option value="ultra">Ultra-Stealth</option>
@@ -1111,8 +1234,8 @@ export class CustomizeView extends LitElement {
                                         this.selectedImageQuality === 'high'
                                             ? 'Best quality, uses more tokens'
                                             : this.selectedImageQuality === 'medium'
-                                              ? 'Balanced quality and token usage'
-                                              : 'Lower quality, uses fewer tokens'
+                                            ? 'Balanced quality and token usage'
+                                            : 'Lower quality, uses fewer tokens'
                                     }
                                 </div>
                             </div>
