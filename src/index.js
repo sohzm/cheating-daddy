@@ -48,7 +48,7 @@ app.on('activate', () => {
 
 function setupGeneralIpcHandlers() {
     // Config-related IPC handlers
-    ipcMain.handle('set-onboarded', async (event) => {
+    ipcMain.handle('set-onboarded', async event => {
         try {
             const config = getLocalConfig();
             config.onboarded = true;
@@ -66,7 +66,7 @@ function setupGeneralIpcHandlers() {
             if (!validLevels.includes(stealthLevel)) {
                 throw new Error(`Invalid stealth level: ${stealthLevel}. Must be one of: ${validLevels.join(', ')}`);
             }
-            
+
             const config = getLocalConfig();
             config.stealthLevel = stealthLevel;
             writeConfig(config);
@@ -83,7 +83,7 @@ function setupGeneralIpcHandlers() {
             if (!validLayouts.includes(layout)) {
                 throw new Error(`Invalid layout: ${layout}. Must be one of: ${validLayouts.join(', ')}`);
             }
-            
+
             const config = getLocalConfig();
             config.layout = layout;
             writeConfig(config);
@@ -94,12 +94,37 @@ function setupGeneralIpcHandlers() {
         }
     });
 
-    ipcMain.handle('get-config', async (event) => {
+    ipcMain.handle('get-config', async event => {
         try {
             const config = getLocalConfig();
             return { success: true, config };
         } catch (error) {
             console.error('Error getting config:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    // Save audio device selections (microphone / speaker)
+    ipcMain.handle('save-audio-devices', async (event, devices) => {
+        try {
+            const config = getLocalConfig();
+            config.audioDevices = config.audioDevices || {};
+            if (devices.microphoneId !== undefined) config.audioDevices.microphoneId = devices.microphoneId;
+            if (devices.speakerId !== undefined) config.audioDevices.speakerId = devices.speakerId;
+            writeConfig(config);
+            return { success: true, config };
+        } catch (error) {
+            console.error('Error saving audio devices:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('get-audio-devices', async event => {
+        try {
+            const config = getLocalConfig();
+            return { success: true, audioDevices: config.audioDevices || {} };
+        } catch (error) {
+            console.error('Error getting audio devices:', error);
             return { success: false, error: error.message };
         }
     });
@@ -134,7 +159,6 @@ function setupGeneralIpcHandlers() {
     ipcMain.handle('update-content-protection', async (event, contentProtection) => {
         try {
             if (mainWindow) {
-
                 // Get content protection setting from localStorage via cheddar
                 const contentProtection = await mainWindow.webContents.executeJavaScript('cheddar.getContentProtection()');
                 mainWindow.setContentProtection(contentProtection);

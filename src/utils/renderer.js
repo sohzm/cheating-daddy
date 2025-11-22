@@ -34,6 +34,52 @@ let currentImageQuality = 'medium'; // Store current image quality for manual sc
 const isLinux = process.platform === 'linux';
 const isMacOS = process.platform === 'darwin';
 
+// Preferred device IDs (populated from config)
+let preferredMicrophoneId = '';
+let preferredSpeakerId = '';
+
+async function loadPreferredAudioDevices() {
+    try {
+        const res = await ipcRenderer.invoke('get-audio-devices');
+        if (res && res.success && res.audioDevices) {
+            preferredMicrophoneId = res.audioDevices.microphoneId || '';
+            preferredSpeakerId = res.audioDevices.speakerId || '';
+            console.log('Preferred audio devices loaded:', { preferredMicrophoneId, preferredSpeakerId });
+        }
+    } catch (err) {
+        console.warn('Failed to load preferred audio devices:', err);
+    }
+}
+
+// Try to load preferred devices early
+loadPreferredAudioDevices();
+
+// Listen for changes from settings UI
+window.addEventListener('preferred-audio-changed', async e => {
+    try {
+        preferredMicrophoneId = e.detail?.microphoneId || preferredMicrophoneId;
+        preferredSpeakerId = e.detail?.speakerId || preferredSpeakerId;
+
+        console.log('Preferred audio devices updated via event:', { preferredMicrophoneId, preferredSpeakerId });
+
+        // If we have audio elements, try to set sinkId
+        if (preferredSpeakerId) {
+            const audios = document.querySelectorAll('audio');
+            for (const a of audios) {
+                if (typeof a.setSinkId === 'function') {
+                    try {
+                        await a.setSinkId(preferredSpeakerId);
+                    } catch (err) {
+                        console.warn('Failed to set sinkId on audio element:', err);
+                    }
+                }
+            }
+        }
+    } catch (err) {
+        console.warn('Error handling preferred-audio-changed:', err);
+    }
+});
+
 // Token tracking system for rate limiting
 let tokenTracker = {
     tokens: [], // Array of {timestamp, count, type} objects
@@ -210,16 +256,18 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
             if (audioMode === 'mic_only' || audioMode === 'both') {
                 let micStream = null;
                 try {
-                    micStream = await navigator.mediaDevices.getUserMedia({
-                        audio: {
-                            sampleRate: SAMPLE_RATE,
-                            channelCount: 1,
-                            echoCancellation: true,
-                            noiseSuppression: true,
-                            autoGainControl: true,
-                        },
-                        video: false,
-                    });
+                    // Build audio constraints and include preferred deviceId if available
+                    const micConstraints = {
+                        sampleRate: SAMPLE_RATE,
+                        channelCount: 1,
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true,
+                    };
+                    if (preferredMicrophoneId) {
+                        micConstraints.deviceId = { exact: preferredMicrophoneId };
+                    }
+                    micStream = await navigator.mediaDevices.getUserMedia({ audio: micConstraints, video: false });
                     console.log('macOS microphone capture started');
                     setupLinuxMicProcessing(micStream);
                 } catch (micError) {
@@ -267,16 +315,17 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
             if (audioMode === 'mic_only' || audioMode === 'both') {
                 let micStream = null;
                 try {
-                    micStream = await navigator.mediaDevices.getUserMedia({
-                        audio: {
-                            sampleRate: SAMPLE_RATE,
-                            channelCount: 1,
-                            echoCancellation: true,
-                            noiseSuppression: true,
-                            autoGainControl: true,
-                        },
-                        video: false,
-                    });
+                    const micConstraints = {
+                        sampleRate: SAMPLE_RATE,
+                        channelCount: 1,
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true,
+                    };
+                    if (preferredMicrophoneId) {
+                        micConstraints.deviceId = { exact: preferredMicrophoneId };
+                    }
+                    micStream = await navigator.mediaDevices.getUserMedia({ audio: micConstraints, video: false });
 
                     console.log('Linux microphone capture started');
 
@@ -314,16 +363,17 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
             if (audioMode === 'mic_only' || audioMode === 'both') {
                 let micStream = null;
                 try {
-                    micStream = await navigator.mediaDevices.getUserMedia({
-                        audio: {
-                            sampleRate: SAMPLE_RATE,
-                            channelCount: 1,
-                            echoCancellation: true,
-                            noiseSuppression: true,
-                            autoGainControl: true,
-                        },
-                        video: false,
-                    });
+                    const micConstraints = {
+                        sampleRate: SAMPLE_RATE,
+                        channelCount: 1,
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true,
+                    };
+                    if (preferredMicrophoneId) {
+                        micConstraints.deviceId = { exact: preferredMicrophoneId };
+                    }
+                    micStream = await navigator.mediaDevices.getUserMedia({ audio: micConstraints, video: false });
                     console.log('Windows microphone capture started');
                     setupLinuxMicProcessing(micStream);
                 } catch (micError) {
