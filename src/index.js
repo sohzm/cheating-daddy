@@ -106,6 +106,12 @@ if (!gotTheLock) {
         // Log user data directory for debugging persistence issues
         console.log('Electron user data directory:', app.getPath('userData'));
 
+        // Hide dock icon on macOS for stealth (similar to InterviewCoder)
+        if (process.platform === 'darwin') {
+            app.dock.hide();
+            console.log('Dock icon hidden on macOS');
+        }
+
         createMainWindow();
         setupGeminiIpcHandlers(geminiSessionRef);
         setupGeneralIpcHandlers();

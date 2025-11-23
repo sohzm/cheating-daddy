@@ -57,10 +57,13 @@ function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
         backgroundColor: '#00000000',
     };
 
-    // Add Windows-specific options to hide from screen capture picker
+    // Add platform-specific window types for stealth
     if (process.platform === 'win32') {
         // type: 'toolbar' helps hide from various Windows UI elements
         windowOptions.type = 'toolbar';
+    } else if (process.platform === 'darwin') {
+        // type: 'panel' on macOS for better stealth (similar to InterviewCoder)
+        windowOptions.type = 'panel';
     }
 
     const mainWindow = new BrowserWindow(windowOptions);
