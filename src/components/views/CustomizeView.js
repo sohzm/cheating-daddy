@@ -681,11 +681,14 @@ export class CustomizeView extends LitElement {
             moveRight: isMac ? 'Alt+Right' : 'Ctrl+Right',
             toggleVisibility: isMac ? 'Cmd+\\' : 'Ctrl+\\',
             toggleClickThrough: isMac ? 'Cmd+M' : 'Ctrl+M',
+            toggleMicrophone: isMac ? 'Cmd+Shift+M' : 'Ctrl+Shift+M',
             nextStep: isMac ? 'Cmd+Enter' : 'Ctrl+Enter',
             previousResponse: isMac ? 'Cmd+[' : 'Ctrl+[',
             nextResponse: isMac ? 'Cmd+]' : 'Ctrl+]',
             scrollUp: isMac ? 'Cmd+Shift+Up' : 'Ctrl+Shift+Up',
             scrollDown: isMac ? 'Cmd+Shift+Down' : 'Ctrl+Shift+Down',
+            copyCodeBlocks: isMac ? 'Cmd+Shift+C' : 'Ctrl+Shift+C',
+            emergencyErase: isMac ? 'Cmd+Shift+E' : 'Ctrl+Shift+E',
         };
     }
 
@@ -759,6 +762,11 @@ export class CustomizeView extends LitElement {
                 description: 'Enable/disable click-through functionality',
             },
             {
+                key: 'toggleMicrophone',
+                name: 'Toggle Microphone',
+                description: 'Toggle microphone ON/OFF (Manual VAD mode only)',
+            },
+            {
                 key: 'nextStep',
                 name: 'Ask Next Step',
                 description: 'Take screenshot and ask AI for the next step suggestion',
@@ -782,6 +790,16 @@ export class CustomizeView extends LitElement {
                 key: 'scrollDown',
                 name: 'Scroll Response Down',
                 description: 'Scroll the AI response content down',
+            },
+            {
+                key: 'copyCodeBlocks',
+                name: 'Copy AI Response',
+                description: 'Copy the current AI response to clipboard',
+            },
+            {
+                key: 'emergencyErase',
+                name: 'Emergency Erase',
+                description: 'Immediately hide window, clear data, and quit application',
             },
         ];
     }
@@ -1103,7 +1121,7 @@ export class CustomizeView extends LitElement {
                 <!-- Mode Selection Section (Coding vs Interview) -->
                 <div class="settings-section">
                     <div class="section-title">
-                        <span>🎯 Application Mode</span>
+                        <span>Application Mode</span>
                     </div>
 
                     <div class="form-grid">
