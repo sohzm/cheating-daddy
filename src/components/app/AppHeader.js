@@ -219,8 +219,22 @@ export class AppHeader extends LitElement {
 
     getElapsedTime() {
         if (this.currentView === 'assistant' && this.startTime) {
-            const elapsed = Math.floor((Date.now() - this.startTime) / 1000);
-            return `${elapsed}s`;
+            const totalSeconds = Math.floor((Date.now() - this.startTime) / 1000);
+
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const seconds = totalSeconds % 60;
+
+            // Format with leading zeros
+            const pad = (num) => String(num).padStart(2, '0');
+
+            if (hours > 0) {
+                // Show hours when > 0: "1:23:45"
+                return `${hours}:${pad(minutes)}:${pad(seconds)}`;
+            } else {
+                // Show minutes and seconds: "23:45"
+                return `${minutes}:${pad(seconds)}`;
+            }
         }
         return '';
     }
