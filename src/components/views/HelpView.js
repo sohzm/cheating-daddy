@@ -258,6 +258,7 @@ export class HelpView extends LitElement {
             moveRight: isMac ? 'Alt+Right' : 'Ctrl+Right',
             toggleVisibility: isMac ? 'Cmd+\\' : 'Ctrl+\\',
             toggleClickThrough: isMac ? 'Cmd+M' : 'Ctrl+M',
+            toggleMicrophone: isMac ? 'Cmd+Shift+M' : 'Ctrl+Shift+M',
             nextStep: isMac ? 'Cmd+Enter' : 'Ctrl+Enter',
             previousResponse: isMac ? 'Cmd+[' : 'Ctrl+[',
             nextResponse: isMac ? 'Cmd+]' : 'Ctrl+]',
@@ -352,6 +353,10 @@ export class HelpView extends LitElement {
                             <div class="shortcut-item">
                                 <span class="shortcut-description">Take screenshot and ask for next step</span>
                                 <div class="shortcut-keys">${this.formatKeybind(this.keybinds.nextStep)}</div>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-description">Toggle microphone (Manual VAD mode only)</span>
+                                <div class="shortcut-keys">${this.formatKeybind(this.keybinds.toggleMicrophone)}</div>
                             </div>
                             <div class="shortcut-item">
                                 <span class="shortcut-description">Clear session and restart</span>
@@ -457,9 +462,14 @@ export class HelpView extends LitElement {
 
                 <div class="option-group">
                     <div class="option-label">
-                        <span>Audio Input</span>
+                        <span>Audio Input & VAD Modes</span>
                     </div>
-                    <div class="description">The AI listens to conversations and provides contextual assistance based on what it hears.</div>
+                    <div class="description">
+                        The AI listens to conversations and provides contextual assistance based on what it hears.<br /><br />
+                        <strong>Two VAD (Voice Activity Detection) Modes:</strong><br />
+                        • <strong>Automatic Mode:</strong> AI continuously listens and responds automatically when speech is detected<br />
+                        • <strong>Manual Mode:</strong> You control when the microphone is active. Use ${this.formatKeybind(this.keybinds.toggleMicrophone)} to toggle the mic ON/OFF during interview sessions. When toggled OFF, the AI generates a response based on the complete recorded question.<br /><br />
+                    </div>
                 </div>
             </div>
         `;

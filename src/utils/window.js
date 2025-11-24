@@ -219,6 +219,7 @@ function getDefaultKeybinds() {
         moveRight: isMac ? 'Alt+Right' : 'Ctrl+Right',
         toggleVisibility: isMac ? 'Cmd+\\' : 'Ctrl+\\',
         toggleClickThrough: isMac ? 'Cmd+M' : 'Ctrl+M',
+        toggleMicrophone: isMac ? 'Cmd+Shift+M' : 'Ctrl+Shift+M',
         nextStep: isMac ? 'Cmd+Enter' : 'Ctrl+Enter',
         previousResponse: isMac ? 'Cmd+[' : 'Ctrl+[',
         nextResponse: isMac ? 'Cmd+]' : 'Ctrl+]',
@@ -462,6 +463,81 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
             console.log(`Registered emergencyErase: ${keybinds.emergencyErase}`);
         } catch (error) {
             console.error(`Failed to register emergencyErase (${keybinds.emergencyErase}):`, error);
+        }
+    }
+
+    // Register toggle microphone shortcut (works globally in interview mode with manual VAD)
+    if (keybinds.toggleMicrophone) {
+        try {
+            globalShortcut.register(keybinds.toggleMicrophone, () => {
+                console.log('🎤 Toggle microphone shortcut triggered');
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                    // Execute without focusing the window - runs in background
+                    mainWindow.webContents.executeJavaScript(`
+                        (async () => {
+                            const selectedMode = localStorage.getItem('selectedMode') || 'interview';
+                            const vadMode = localStorage.getItem('vadMode') || 'automatic';
+                            const selectedProfile = localStorage.getItem('selectedProfile') || 'interview';
+                            const currentView = window.cheddar?.getCurrentView() || 'main';
+
+                            // Only allow mic toggle in interview mode with manual VAD mode
+                            // Must be in assistant view (active session)
+                            // Exclude exam profile from mic toggle
+                            if (selectedMode === 'interview' && vadMode === 'manual' && selectedProfile !== 'exam' && currentView === 'assistant') {
+                                // Try multiple ways to find AssistantView component
+                                let assistantView = document.querySelector('assistant-view');
+
+                                // If not found directly, check inside shadowRoot
+                                if (!assistantView) {
+                                    const app = document.querySelector('cheating-daddy-app');
+                                    if (app && app.shadowRoot) {
+                                        assistantView = app.shadowRoot.querySelector('assistant-view');
+                                    }
+                                }
+
+                                if (assistantView) {
+                                    // Toggle the mic state
+                                    const newState = !assistantView.micEnabled;
+                                    assistantView.micEnabled = newState;
+
+                                    // Trigger the mic toggle in renderer
+                                    if (window.cheddar && window.cheddar.toggleMicrophone) {
+                                        await window.cheddar.toggleMicrophone(newState);
+                                    }
+
+                                    // Update the UI
+                                    assistantView.requestUpdate();
+
+                                    console.log('🎤 Microphone toggled via shortcut: ' + (newState ? 'ON' : 'OFF'));
+                                    return { success: true, enabled: newState };
+                                } else {
+                                    return { success: false, reason: 'AssistantView element not found in DOM' };
+                                }
+                            }
+
+                            // Provide detailed reason for failure
+                            let reason = 'Conditions not met: ';
+                            if (selectedMode !== 'interview') reason += 'Not in interview mode. ';
+                            if (vadMode !== 'manual') reason += 'VAD mode is not manual (current: ' + vadMode + '). ';
+                            if (selectedProfile === 'exam') reason += 'Exam profile active. ';
+                            if (currentView !== 'assistant') reason += 'Not in assistant view (current: ' + currentView + '). ';
+
+                            return { success: false, reason: reason };
+                        })();
+                    `).then(result => {
+                        if (result.success) {
+                            console.log(`Microphone toggled: ${result.enabled ? 'ON' : 'OFF'}`);
+                        } else {
+                            console.log('Mic toggle skipped:', result.reason);
+                        }
+                    }).catch(err => {
+                        console.error('Error toggling microphone:', err);
+                    });
+                }
+            });
+            console.log(`Registered toggleMicrophone: ${keybinds.toggleMicrophone}`);
+        } catch (error) {
+            console.error(`Failed to register toggleMicrophone (${keybinds.toggleMicrophone}):`, error);
         }
     }
 
