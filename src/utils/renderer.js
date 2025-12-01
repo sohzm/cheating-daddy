@@ -152,7 +152,8 @@ function arrayBufferToBase64(buffer) {
 async function initializeGemini(profile = 'interview', language = 'en-US') {
     const apiKey = localStorage.getItem('apiKey')?.trim();
     if (apiKey) {
-        const success = await ipcRenderer.invoke('initialize-gemini', apiKey, localStorage.getItem('customPrompt') || '', profile, language);
+        const googleSearchEnabled = localStorage.getItem('googleSearchEnabled') !== 'false';
+        const success = await ipcRenderer.invoke('initialize-gemini', apiKey, localStorage.getItem('customPrompt') || '', profile, language, googleSearchEnabled);
         if (success) {
             cheddar.setStatus('Live');
         } else {

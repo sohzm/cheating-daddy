@@ -1,8 +1,8 @@
 {
-    "name": "cheating-daddy",
-    "productName": "cheating-daddy",
+    "name": "half-life-3",
+    "productName": "half-life-3",
     "version": "0.4.0",
-    "description": "cheating daddy",
+    "description": "half-life-3",
     "main": "src/index.js",
     "scripts": {
         "start": "electron-forge start",
@@ -13,11 +13,11 @@
         "test": "vitest run"
     },
     "keywords": [
-        "cheating daddy",
-        "cheating daddy ai",
-        "cheating daddy ai assistant",
-        "cheating daddy ai assistant for interviews",
-        "cheating daddy ai assistant for interviews"
+        "half-life-3",
+        "half-life-3 ai",
+        "half-life-3 ai assistant",
+        "half-life-3 ai assistant for interviews",
+        "half-life-3 ai assistant for interviews"
     ],
     "author": {
         "name": "sohzm",

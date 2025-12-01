@@ -5,7 +5,7 @@ module.exports = {
     packagerConfig: {
         asar: true,
         extraResource: ['./src/assets/SystemAudioDump'],
-        name: 'Cheating Daddy',
+        name: 'Half Life 3',
         icon: 'src/assets/logo',
         // use `security find-identity -v -p codesigning` to find your identity
         // for macos signing
@@ -30,9 +30,9 @@ module.exports = {
         {
             name: '@electron-forge/maker-squirrel',
             config: {
-                name: 'cheating-daddy',
-                productName: 'Cheating Daddy',
-                shortcutName: 'Cheating Daddy',
+                name: 'HalfLife3',
+                productName: 'Half Life 3',
+                shortcutName: 'Half Life 3',
                 createDesktopShortcut: true,
                 createStartMenuShortcut: true,
             },
@@ -46,10 +46,10 @@ module.exports = {
             platforms: ['linux'],
             config: {
                 options: {
-                    name: 'Cheating Daddy',
-                    productName: 'Cheating Daddy',
-                    genericName: 'AI Assistant',
-                    description: 'AI assistant for interviews and learning',
+                    name: 'HalfLife3',
+                    productName: 'Half Life 3',
+                    genericName: 'Half Life 3',
+                    description: 'Half Life 3',
                     categories: ['Development', 'Education'],
                     icon: 'src/assets/logo.png'
                 }

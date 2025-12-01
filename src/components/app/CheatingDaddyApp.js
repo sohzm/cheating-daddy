@@ -171,7 +171,7 @@ export class CheatingDaddyApp extends LitElement {
 
     setStatus(text) {
         this.statusText = text;
-        
+
         // Mark response as complete when we get certain status messages
         if (text.includes('Ready') || text.includes('Listening') || text.includes('Error')) {
             this._currentResponseIsComplete = true;
@@ -447,11 +447,11 @@ export class CheatingDaddyApp extends LitElement {
                         .shouldAnimateResponse=${this.shouldAnimateResponse}
                         @response-index-changed=${this.handleResponseIndexChanged}
                         @response-animation-complete=${() => {
-                            this.shouldAnimateResponse = false;
-                            this._currentResponseIsComplete = true;
-                            console.log('[response-animation-complete] Marked current response as complete');
-                            this.requestUpdate();
-                        }}
+                        this.shouldAnimateResponse = false;
+                        // this._currentResponseIsComplete = true; // Removed to fix streaming issue
+                        console.log('[response-animation-complete] Animation complete');
+                        this.requestUpdate();
+                    }}
                     ></assistant-view>
                 `;
 
@@ -461,9 +461,8 @@ export class CheatingDaddyApp extends LitElement {
     }
 
     render() {
-        const mainContentClass = `main-content ${
-            this.currentView === 'assistant' ? 'assistant-view' : this.currentView === 'onboarding' ? 'onboarding-view' : 'with-border'
-        }`;
+        const mainContentClass = `main-content ${this.currentView === 'assistant' ? 'assistant-view' : this.currentView === 'onboarding' ? 'onboarding-view' : 'with-border'
+            }`;
 
         return html`
             <div class="window-container">

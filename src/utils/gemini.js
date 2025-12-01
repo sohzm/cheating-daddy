@@ -108,14 +108,11 @@ async function sendReconnectionContext() {
     }
 }
 
-async function getEnabledTools() {
+function getEnabledTools(googleSearchEnabled) {
     const tools = [];
-
-    // Check if Google Search is enabled (default: true)
-    const googleSearchEnabled = await getStoredSetting('googleSearchEnabled', 'true');
     console.log('Google Search enabled:', googleSearchEnabled);
 
-    if (googleSearchEnabled === 'true') {
+    if (googleSearchEnabled) {
         tools.push({ googleSearch: {} });
         console.log('Added Google Search tool');
     } else {
@@ -177,6 +174,7 @@ async function attemptReconnection() {
             lastSessionParams.customPrompt,
             lastSessionParams.profile,
             lastSessionParams.language,
+            lastSessionParams.googleSearchEnabled,
             true // isReconnection flag
         );
 
@@ -204,7 +202,7 @@ async function attemptReconnection() {
     }
 }
 
-async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'interview', language = 'en-US', isReconnection = false) {
+async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'interview', language = 'en-US', googleSearchEnabled = true, isReconnection = false) {
     if (isInitializingSession) {
         console.log('Session initialization already in progress');
         return false;
@@ -220,6 +218,7 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
             customPrompt,
             profile,
             language,
+            googleSearchEnabled,
         };
         reconnectionAttempts = 0; // Reset counter for new session
     }
@@ -230,8 +229,8 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
     });
 
     // Get enabled tools first to determine Google Search status
-    const enabledTools = await getEnabledTools();
-    const googleSearchEnabled = enabledTools.some(tool => tool.googleSearch);
+    const enabledTools = getEnabledTools(googleSearchEnabled);
+    // const googleSearchEnabled = enabledTools.some(tool => tool.googleSearch); // Already have it
 
     const systemPrompt = getSystemPrompt(profile, customPrompt, googleSearchEnabled);
 
@@ -523,8 +522,8 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
     // Store the geminiSessionRef globally for reconnection access
     global.geminiSessionRef = geminiSessionRef;
 
-    ipcMain.handle('initialize-gemini', async (event, apiKey, customPrompt, profile = 'interview', language = 'en-US') => {
-        const session = await initializeGeminiSession(apiKey, customPrompt, profile, language);
+    ipcMain.handle('initialize-gemini', async (event, apiKey, customPrompt, profile = 'interview', language = 'en-US', googleSearchEnabled = true) => {
+        const session = await initializeGeminiSession(apiKey, customPrompt, profile, language, googleSearchEnabled);
         if (session) {
             geminiSessionRef.current = session;
             return true;
