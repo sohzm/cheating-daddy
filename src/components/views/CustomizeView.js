@@ -425,12 +425,12 @@ export class CustomizeView extends LitElement {
         this.selectedImageQuality = 'medium';
         this.layoutMode = 'normal';
         this.keybinds = this.getDefaultKeybinds();
-        this.onProfileChange = () => {};
-        this.onLanguageChange = () => {};
-        this.onScreenshotIntervalChange = () => {};
-        this.onImageQualityChange = () => {};
-        this.onLayoutModeChange = () => {};
-        this.onAdvancedModeChange = () => {};
+        this.onProfileChange = () => { };
+        this.onLanguageChange = () => { };
+        this.onScreenshotIntervalChange = () => { };
+        this.onImageQualityChange = () => { };
+        this.onLayoutModeChange = () => { };
+        this.onAdvancedModeChange = () => { };
 
         // Google Search default
         this.googleSearchEnabled = true;
@@ -487,6 +487,11 @@ export class CustomizeView extends LitElement {
                 description: 'Guidance for business negotiations and deals',
             },
             {
+                value: 'gd_helper',
+                name: 'Group Discussion Helper',
+                description: 'Get help with group discussions, points, and summaries',
+            },
+            {
                 value: 'exam',
                 name: 'Exam Assistant',
                 description: 'Academic assistance for test-taking and exam questions',
@@ -536,6 +541,7 @@ export class CustomizeView extends LitElement {
             meeting: 'Business Meeting',
             presentation: 'Presentation',
             negotiation: 'Negotiation',
+            gd_helper: 'Group Discussion Helper',
             exam: 'Exam Assistant',
         };
     }
@@ -880,12 +886,12 @@ export class CustomizeView extends LitElement {
                                 </label>
                                 <select class="form-control" .value=${this.selectedProfile} @change=${this.handleProfileSelect}>
                                     ${profiles.map(
-                                        profile => html`
+            profile => html`
                                             <option value=${profile.value} ?selected=${this.selectedProfile === profile.value}>
                                                 ${profile.name}
                                             </option>
                                         `
-                                    )}
+        )}
                                 </select>
                             </div>
                         </div>
@@ -894,9 +900,8 @@ export class CustomizeView extends LitElement {
                             <label class="form-label">Custom AI Instructions</label>
                             <textarea
                                 class="form-control"
-                                placeholder="Add specific instructions for how you want the AI to behave during ${
-                                    profileNames[this.selectedProfile] || 'this interaction'
-                                }..."
+                                placeholder="Add specific instructions for how you want the AI to behave during ${profileNames[this.selectedProfile] || 'this interaction'
+            }..."
                                 .value=${localStorage.getItem('customPrompt') || ''}
                                 rows="4"
                                 @input=${this.handleCustomPromptInput}
@@ -938,10 +943,10 @@ export class CustomizeView extends LitElement {
                         <div class="form-group">
                             <label class="form-label">Profile</label>
                             <select class="form-control" .value=${localStorage.getItem('stealthProfile') || 'balanced'} @change=${e => {
-                                localStorage.setItem('stealthProfile', e.target.value);
-                                // We need to notify the main process to restart for some settings to apply
-                                alert('Restart the application for stealth changes to take full effect.');
-                            }}>
+                localStorage.setItem('stealthProfile', e.target.value);
+                // We need to notify the main process to restart for some settings to apply
+                alert('Restart the application for stealth changes to take full effect.');
+            }}>
                                 <option value="visible">Visible</option>
                                 <option value="balanced">Balanced</option>
                                 <option value="ultra">Ultra-Stealth</option>
@@ -969,12 +974,12 @@ export class CustomizeView extends LitElement {
                                 </label>
                                 <select class="form-control" .value=${this.selectedLanguage} @change=${this.handleLanguageSelect}>
                                     ${languages.map(
-                                        language => html`
+                language => html`
                                             <option value=${language.value} ?selected=${this.selectedLanguage === language.value}>
                                                 ${language.name}
                                             </option>
                                         `
-                                    )}
+            )}
                                 </select>
                                 <div class="form-description">Language for speech recognition and AI responses</div>
                             </div>
@@ -1000,11 +1005,10 @@ export class CustomizeView extends LitElement {
                                     <option value="compact" ?selected=${this.layoutMode === 'compact'}>Compact</option>
                                 </select>
                                 <div class="form-description">
-                                    ${
-                                        this.layoutMode === 'compact'
-                                            ? 'Smaller window size with reduced padding and font sizes for minimal screen footprint'
-                                            : 'Standard layout with comfortable spacing and font sizes'
-                                    }
+                                    ${this.layoutMode === 'compact'
+                ? 'Smaller window size with reduced padding and font sizes for minimal screen footprint'
+                : 'Standard layout with comfortable spacing and font sizes'
+            }
                                 </div>
                             </div>
                         </div>
@@ -1086,11 +1090,10 @@ export class CustomizeView extends LitElement {
                                     <option value="10" ?selected=${this.selectedScreenshotInterval === '10'}>Every 10 seconds</option>
                                 </select>
                                 <div class="form-description">
-                                    ${
-                                        this.selectedScreenshotInterval === 'manual'
-                                            ? 'Screenshots will only be taken when you use the "Ask Next Step" shortcut'
-                                            : 'Automatic screenshots will be taken at the specified interval'
-                                    }
+                                    ${this.selectedScreenshotInterval === 'manual'
+                ? 'Screenshots will only be taken when you use the "Ask Next Step" shortcut'
+                : 'Automatic screenshots will be taken at the specified interval'
+            }
                                 </div>
                             </div>
 
@@ -1107,13 +1110,12 @@ export class CustomizeView extends LitElement {
                                     <option value="low" ?selected=${this.selectedImageQuality === 'low'}>Low Quality</option>
                                 </select>
                                 <div class="form-description">
-                                    ${
-                                        this.selectedImageQuality === 'high'
-                                            ? 'Best quality, uses more tokens'
-                                            : this.selectedImageQuality === 'medium'
-                                              ? 'Balanced quality and token usage'
-                                              : 'Lower quality, uses fewer tokens'
-                                    }
+                                    ${this.selectedImageQuality === 'high'
+                ? 'Best quality, uses more tokens'
+                : this.selectedImageQuality === 'medium'
+                    ? 'Balanced quality and token usage'
+                    : 'Lower quality, uses fewer tokens'
+            }
                                 </div>
                             </div>
                         </div>
@@ -1135,7 +1137,7 @@ export class CustomizeView extends LitElement {
                         </thead>
                         <tbody>
                             ${this.getKeybindActions().map(
-                                action => html`
+                action => html`
                                     <tr>
                                         <td>
                                             <div class="action-name">${action.name}</div>
@@ -1155,7 +1157,7 @@ export class CustomizeView extends LitElement {
                                         </td>
                                     </tr>
                                 `
-                            )}
+            )}
                             <tr class="table-reset-row">
                                 <td colspan="2">
                                     <button class="reset-keybinds-button" @click=${this.resetKeybinds}>Reset to Defaults</button>
