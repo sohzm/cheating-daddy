@@ -114,6 +114,7 @@ export class CheatingDaddyApp extends LitElement {
         _isClickThrough: { state: true },
         _awaitingNewResponse: { state: true },
         shouldAnimateResponse: { type: Boolean },
+        isViewLocked: { type: Boolean },
     };
 
     constructor() {
@@ -136,6 +137,7 @@ export class CheatingDaddyApp extends LitElement {
         this._awaitingNewResponse = false;
         this._currentResponseIsComplete = true;
         this.shouldAnimateResponse = false;
+        this.isViewLocked = false;
 
         // Apply layout mode to document root
         this.updateLayoutMode();
@@ -192,7 +194,9 @@ export class CheatingDaddyApp extends LitElement {
         if (this._awaitingNewResponse || this.responses.length === 0) {
             // Always add as new response when explicitly waiting for one
             this.responses = [...this.responses, response];
-            this.currentResponseIndex = this.responses.length - 1;
+            if (!this.isViewLocked) {
+                this.currentResponseIndex = this.responses.length - 1;
+            }
             this._awaitingNewResponse = false;
             this._currentResponseIsComplete = false;
             console.log('[setResponse] Pushed new response:', response);
@@ -204,7 +208,9 @@ export class CheatingDaddyApp extends LitElement {
         } else {
             // For filler responses or when current response is complete, add as new
             this.responses = [...this.responses, response];
-            this.currentResponseIndex = this.responses.length - 1;
+            if (!this.isViewLocked) {
+                this.currentResponseIndex = this.responses.length - 1;
+            }
             this._currentResponseIsComplete = false;
             console.log('[setResponse] Added response as new:', response);
         }
@@ -347,6 +353,14 @@ export class CheatingDaddyApp extends LitElement {
         this.requestUpdate();
     }
 
+    handleToggleLock() {
+        this.isViewLocked = !this.isViewLocked;
+        // If unlocking and there are newer responses, jump to the latest one?
+        // Or just stay where we are? Let's stay where we are to avoid disorientation.
+        // But if we want to "catch up", the user can just click next.
+        this.requestUpdate();
+    }
+
     // Onboarding event handlers
     handleOnboardingComplete() {
         this.currentView = 'main';
@@ -445,6 +459,8 @@ export class CheatingDaddyApp extends LitElement {
                         .selectedProfile=${this.selectedProfile}
                         .onSendText=${message => this.handleSendText(message)}
                         .shouldAnimateResponse=${this.shouldAnimateResponse}
+                        .isViewLocked=${this.isViewLocked}
+                        .onToggleLock=${() => this.handleToggleLock()}
                         @response-index-changed=${this.handleResponseIndexChanged}
                         @response-animation-complete=${() => {
                         this.shouldAnimateResponse = false;
