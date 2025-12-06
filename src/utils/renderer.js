@@ -152,7 +152,13 @@ function arrayBufferToBase64(buffer) {
 async function initializeGemini(profile = 'interview', language = 'en-US') {
     const apiKey = localStorage.getItem('apiKey')?.trim();
     if (apiKey) {
-        const success = await ipcRenderer.invoke('initialize-gemini', apiKey, localStorage.getItem('customPrompt') || '', profile, language);
+        const success = await ipcRenderer.invoke(
+            'initialize-gemini',
+            apiKey,
+            localStorage.getItem('customPrompt') || '',
+            profile,
+            language
+        );
         if (success) {
             cheddar.setStatus('Live');
         } else {
@@ -167,13 +173,13 @@ ipcRenderer.on('update-status', (event, status) => {
     cheddar.setStatus(status);
 });
 
-// Listen for responses - REMOVED: This is handled in CheatingDaddyApp.js to avoid duplicates
-// ipcRenderer.on('update-response', (event, response) => {
-//     console.log('Gemini response:', response);
-//     cheddar.e().setResponse(response);
-//     // You can add UI elements to display the response if needed
-// });
+// Listen for responses
+ipcRenderer.on('update-response', (event, response) => {
+    console.log('Gemini response:', response);
+    cheddar.setResponse(response);
+});
 
+// Start capture
 async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'medium') {
     // Store the image quality for manual screenshots
     currentImageQuality = imageQuality;
@@ -288,7 +294,12 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
                 }
             }
 
-            console.log('Linux capture started - system audio:', mediaStream.getAudioTracks().length > 0, 'microphone mode:', audioMode);
+            console.log(
+                'Linux capture started - system audio:',
+                mediaStream.getAudioTracks().length > 0,
+                'microphone mode:',
+                audioMode
+            );
         } else {
             // Windows - use display media with loopback for system audio
             mediaStream = await navigator.mediaDevices.getDisplayMedia({
@@ -535,9 +546,14 @@ async function captureScreenshot(imageQuality = 'medium', isManual = false) {
 
                 if (result.success) {
                     // Track image tokens after successful send
-                    const imageTokens = tokenTracker.calculateImageTokens(offscreenCanvas.width, offscreenCanvas.height);
+                    const imageTokens = tokenTracker.calculateImageTokens(
+                        offscreenCanvas.width,
+                        offscreenCanvas.height
+                    );
                     tokenTracker.addTokens(imageTokens, 'image');
-                    console.log(`📊 Image sent successfully - ${imageTokens} tokens used (${offscreenCanvas.width}x${offscreenCanvas.height})`);
+                    console.log(
+                        `📊 Image sent successfully - ${imageTokens} tokens used (${offscreenCanvas.width}x${offscreenCanvas.height})`
+                    );
                 } else {
                     console.error('Failed to send image:', result.error);
                 }
@@ -729,7 +745,6 @@ ipcRenderer.on('clear-sensitive-data', () => {
     console.log('Clearing renderer-side sensitive data...');
     localStorage.removeItem('apiKey');
     localStorage.removeItem('customPrompt');
-    // Consider clearing IndexedDB as well for full erasure
 });
 
 // Handle shortcuts based on current view
@@ -745,22 +760,27 @@ function handleShortcut(shortcutKey) {
     }
 }
 
-// Create reference to the main app element
-const cheatingDaddyApp = document.querySelector('cheating-daddy-app');
+// React bridge – provided by src/renderer/index.js
+const appApi = window.__CHEATING_APP_API__ || {
+    setStatus: () => {},
+    setResponse: () => {},
+    getCurrentView: () => 'onboarding',
+    getLayoutMode: () => 'normal',
+    handleStart: () => {},
+};
 
-// Consolidated cheddar object - all functions in one place
 const cheddar = {
-    // Element access
-    element: () => cheatingDaddyApp,
-    e: () => cheatingDaddyApp,
+    // Element access – keep API shape but return the bridge
+    element: () => appApi,
+    e: () => appApi,
 
-    // App state functions - access properties directly from the app element
-    getCurrentView: () => cheatingDaddyApp.currentView,
-    getLayoutMode: () => cheatingDaddyApp.layoutMode,
+    // App state functions
+    getCurrentView: () => appApi.getCurrentView(),
+    getLayoutMode: () => appApi.getLayoutMode(),
 
     // Status and response functions
-    setStatus: text => cheatingDaddyApp.setStatus(text),
-    setResponse: response => cheatingDaddyApp.setResponse(response),
+    setStatus: text => appApi.setStatus(text),
+    setResponse: response => appApi.setResponse(response),
 
     // Core functionality
     initializeGemini,
