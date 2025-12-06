@@ -75,7 +75,8 @@ function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
         mainWindow.setAlwaysOnTop(true, 'screen-saver', 1);
     }
 
-    mainWindow.loadFile(path.join(__dirname, '../index.html'));
+    // IMPORTANT: load the real HTML file via file:// URL
+    mainWindow.loadURL(`file://${path.join(__dirname, '../index.html')}`);
 
     // Set window title to random name if provided
     if (randomNames && randomNames.windowTitle) {
@@ -138,6 +139,9 @@ function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
 
     return mainWindow;
 }
+
+// (rest of the file unchanged: getDefaultKeybinds, updateGlobalShortcuts, setupWindowIpcHandlers, etc.)
+
 
 function getDefaultKeybinds() {
     const isMac = process.platform === 'darwin';
