@@ -18,7 +18,7 @@ A real-time AI assistant that provides contextual help during video calls, inter
 
 ## Features
 
-- **Live AI Assistance**: Real-time help powered by Google Gemini 2.0 Flash Live
+- **Live AI Assistance**: Real-time help powered by Google Gemini 2.5 Flash Preview (September 2025)
 - **Screen & Audio Capture**: Analyzes what you see and hear for contextual responses
 - **Multiple Profiles**: Interview, Sales Call, Business Meeting, Presentation, Negotiation
 - **Transparent Overlay**: Always-on-top window that can be positioned anywhere
