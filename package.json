@@ -1,7 +1,7 @@
 {
     "name": "cheating-daddy",
     "productName": "cheating-daddy",
-    "version": "0.4.0",
+    "version": "0.4.4",
     "description": "cheating daddy",
     "main": "src/index.js",
     "scripts": {
@@ -10,18 +10,32 @@
         "make": "electron-forge make",
         "publish": "electron-forge publish",
         "lint": "echo \"No linting configured\"",
-        "test": "vitest run"
+        "test": "vitest run",
+        "build": "electron-builder"
+    },
+    "build": {
+        "appId": "com.cheatingdaddy.app",
+        "productName": "Cheating Daddy",
+        "win": {
+            "target": "nsis",
+            "icon": "icon.ico"
+        },
+        "nsis": {
+            "oneClick": false,
+            "allowToChangeInstallationDirectory": true,
+            "createDesktopShortcut": true
+        },
+        "files": [
+            "src/**/*",
+            "package.json"
+        ]
     },
     "keywords": [
         "cheating daddy",
-        "cheating daddy ai",
-        "cheating daddy ai assistant",
-        "cheating daddy ai assistant for interviews",
-        "cheating daddy ai assistant for interviews"
+        "cheating daddy ai"
     ],
     "author": {
-        "name": "sohzm",
-        "email": "sohambharambe9@gmail.com"
+        "name": "dwk601"
     },
     "license": "GPL-3.0",
     "dependencies": {
