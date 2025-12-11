@@ -1,6 +1,10 @@
 name: CI Desktop
 
 on:
+    push:
+        branches: [main]
+        tags:
+            - 'v*'
     pull_request:
         branches: [main]
     schedule:
@@ -42,7 +46,7 @@ jobs:
             - name: Build Electron app
               uses: samuelmeuli/action-electron-builder@v1
               with:
-                  release: false
+                  release: true
                   args: -w --x64
                   # The action requires this specific input name
                   github_token: ${{ secrets.github_token }}
