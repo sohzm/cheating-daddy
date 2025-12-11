@@ -44,5 +44,5 @@ jobs:
               with:
                   release: false
                   args: -w --x64
-              env:
-                  GH_TOKEN: ${{ secrets.github_token }}
+                  # The action requires this specific input name
+                  github_token: ${{ secrets.github_token }}
