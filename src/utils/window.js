@@ -2,7 +2,6 @@ const { BrowserWindow, globalShortcut, ipcMain, screen } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const os = require('os');
-const { applyStealthMeasures, startTitleRandomization } = require('./stealthFeatures');
 
 let mouseEventsIgnored = false;
 let windowResizing = false;
@@ -25,7 +24,7 @@ function ensureDataDirectories() {
     return { imageDir, audioDir };
 }
 
-function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
+function createWindow(sendToRenderer, geminiSessionRef) {
     // Get layout preference (default to 'normal')
     let windowWidth = 1100;
     let windowHeight = 800;
@@ -37,8 +36,6 @@ function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
         transparent: true,
         hasShadow: false,
         alwaysOnTop: true,
-        skipTaskbar: true,
-        hiddenInMissionControl: true,
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false, // TODO: change to true
@@ -61,7 +58,6 @@ function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
     );
 
     mainWindow.setResizable(false);
-    mainWindow.setContentProtection(true);
     mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 
     // Center window at the top of the screen
@@ -76,18 +72,6 @@ function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
     }
 
     mainWindow.loadFile(path.join(__dirname, '../index.html'));
-
-    // Set window title to random name if provided
-    if (randomNames && randomNames.windowTitle) {
-        mainWindow.setTitle(randomNames.windowTitle);
-        console.log(`Set window title to: ${randomNames.windowTitle}`);
-    }
-
-    // Apply stealth measures
-    applyStealthMeasures(mainWindow);
-
-    // Start periodic title randomization for additional stealth
-    startTitleRandomization(mainWindow);
 
     // After window is created, check for layout preference and resize if needed
     mainWindow.webContents.once('dom-ready', () => {
@@ -114,21 +98,9 @@ function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
                         keybinds = { ...defaultKeybinds, ...savedSettings.keybinds };
                     }
 
-                    // Apply content protection setting via IPC handler
-                    try {
-                        const contentProtection = await mainWindow.webContents.executeJavaScript('cheddar.getContentProtection()');
-                        mainWindow.setContentProtection(contentProtection);
-                        console.log('Content protection loaded from settings:', contentProtection);
-                    } catch (error) {
-                        console.error('Error loading content protection:', error);
-                        mainWindow.setContentProtection(true);
-                    }
-
                     updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessionRef);
                 })
                 .catch(() => {
-                    // Default to content protection enabled
-                    mainWindow.setContentProtection(true);
                     updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessionRef);
                 });
         }, 150);

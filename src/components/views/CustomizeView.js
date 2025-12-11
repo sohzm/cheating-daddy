@@ -929,31 +929,6 @@ export class CustomizeView extends LitElement {
                     </div>
                 </div>
 
-                <!-- Stealth Profile Section -->
-                <div class="settings-section">
-                    <div class="section-title">
-                        <span>Stealth Profile</span>
-                    </div>
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label class="form-label">Profile</label>
-                            <select class="form-control" .value=${localStorage.getItem('stealthProfile') || 'balanced'} @change=${e => {
-                                localStorage.setItem('stealthProfile', e.target.value);
-                                // We need to notify the main process to restart for some settings to apply
-                                alert('Restart the application for stealth changes to take full effect.');
-                            }}>
-                                <option value="visible">Visible</option>
-                                <option value="balanced">Balanced</option>
-                                <option value="ultra">Ultra-Stealth</option>
-                            </select>
-                            <div class="form-description">
-                                Adjusts visibility and detection resistance. A restart is required for changes to apply.
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-
                 <!-- Language & Audio Section -->
                 <div class="settings-section">
                     <div class="section-title">

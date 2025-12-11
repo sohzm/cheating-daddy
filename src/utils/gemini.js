@@ -409,22 +409,12 @@ async function startMacOSAudioCapture(geminiSessionRef) {
 
     console.log('SystemAudioDump path:', systemAudioPath);
 
-    // Spawn SystemAudioDump with stealth options
     const spawnOptions = {
         stdio: ['ignore', 'pipe', 'pipe'],
         env: {
             ...process.env,
-            // Set environment variables that might help with stealth
-            PROCESS_NAME: 'AudioService',
-            APP_NAME: 'System Audio Service',
         },
     };
-
-    // On macOS, apply additional stealth measures
-    if (process.platform === 'darwin') {
-        spawnOptions.detached = false;
-        spawnOptions.windowsHide = false;
-    }
 
     systemAudioProc = spawn(systemAudioPath, [], spawnOptions);
 
