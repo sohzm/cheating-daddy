@@ -150,6 +150,7 @@ export class MainView extends LitElement {
         onLayoutModeChange: { type: Function },
         showApiKeyError: { type: Boolean },
         onClearAndRestart: { type: Function },
+        selectedProfile: { type: String },
     };
 
     constructor() {
@@ -161,6 +162,8 @@ export class MainView extends LitElement {
         this.showApiKeyError = false;
         this.onClearAndRestart = () => {};
         this.boundKeydownHandler = this.handleKeydown.bind(this);
+        // Load selected profile from localStorage
+        this.selectedProfile = localStorage.getItem('selectedProfile') || 'exam';
     }
 
     connectedCallback() {
@@ -176,6 +179,25 @@ export class MainView extends LitElement {
         this.loadLayoutMode();
         // Resize window for this view
         resizeLayout();
+
+        // Listen for profile changes from settings
+        this.profileChangeHandler = () => {
+            const newProfile = localStorage.getItem('selectedProfile') || 'exam';
+            if (newProfile !== this.selectedProfile) {
+                this.selectedProfile = newProfile;
+                this.requestUpdate();
+            }
+        };
+        window.addEventListener('storage', this.profileChangeHandler);
+
+        // Also check periodically for profile changes (in case storage event doesn't fire)
+        this.profileCheckInterval = setInterval(() => {
+            const newProfile = localStorage.getItem('selectedProfile') || 'exam';
+            if (newProfile !== this.selectedProfile) {
+                this.selectedProfile = newProfile;
+                this.requestUpdate();
+            }
+        }, 500);
     }
 
     disconnectedCallback() {
@@ -183,6 +205,13 @@ export class MainView extends LitElement {
         window.electron?.ipcRenderer?.removeAllListeners('session-initializing');
         // Remove keyboard event listener
         document.removeEventListener('keydown', this.boundKeydownHandler);
+        // Clean up profile change listener
+        if (this.profileChangeHandler) {
+            window.removeEventListener('storage', this.profileChangeHandler);
+        }
+        if (this.profileCheckInterval) {
+            clearInterval(this.profileCheckInterval);
+        }
     }
 
     handleKeydown(e) {
@@ -196,10 +225,46 @@ export class MainView extends LitElement {
     }
 
     handleInput(e) {
+        // Store API key based on current profile
+        const apiKeyName = this.isExamMode() ? 'geminiApiKey' : 'groqApiKey';
+        localStorage.setItem(apiKeyName, e.target.value);
+        // Also store in legacy 'apiKey' for backward compatibility
         localStorage.setItem('apiKey', e.target.value);
         // Clear error state when user starts typing
         if (this.showApiKeyError) {
             this.showApiKeyError = false;
+        }
+    }
+
+    // Check if current profile is exam mode (uses Gemini API)
+    isExamMode() {
+        return this.selectedProfile === 'exam';
+    }
+
+    // Get the current API key based on profile
+    getCurrentApiKey() {
+        if (this.isExamMode()) {
+            return localStorage.getItem('geminiApiKey') || localStorage.getItem('apiKey') || '';
+        } else {
+            return localStorage.getItem('groqApiKey') || '';
+        }
+    }
+
+    // Get the API key placeholder text
+    getApiKeyPlaceholder() {
+        if (this.isExamMode()) {
+            return 'Enter your Gemini API Key';
+        } else {
+            return 'Enter your Groq API Key';
+        }
+    }
+
+    // Get the help link text
+    getApiKeyHelpText() {
+        if (this.isExamMode()) {
+            return 'Get Gemini API key';
+        } else {
+            return 'Get Groq API key';
         }
     }
 
@@ -288,14 +353,20 @@ export class MainView extends LitElement {
     }
 
     render() {
+        const profileLabel = this.isExamMode() ? 'Exam Assistant' : 'Interview Mode';
+        const apiType = this.isExamMode() ? 'Gemini' : 'Groq';
+
         return html`
             <div class="welcome">Welcome</div>
+            <p class="description" style="margin-bottom: 12px; font-size: 12px; opacity: 0.7;">
+                Mode: <strong>${profileLabel}</strong> (using ${apiType} API)
+            </p>
 
             <div class="input-group">
                 <input
                     type="password"
-                    placeholder="Enter your Gemini API Key"
-                    .value=${localStorage.getItem('apiKey') || ''}
+                    placeholder="${this.getApiKeyPlaceholder()}"
+                    .value=${this.getCurrentApiKey()}
                     @input=${this.handleInput}
                     class="${this.showApiKeyError ? 'api-key-error' : ''}"
                 />
@@ -305,11 +376,11 @@ export class MainView extends LitElement {
             </div>
             <p class="description">
                 dont have an api key?
-                <span @click=${this.handleAPIKeyHelpClick} class="link">get one here</span>
+                <span @click=${this.handleAPIKeyHelpClick} class="link">${this.getApiKeyHelpText()}</span>
             </p>
-                    <p class="shortcut-hint">
-            Press <strong>Ctrl+Alt+R</strong> to clear session and automatically restart
-        </p>
+            <p class="shortcut-hint">
+                Press <strong>Ctrl+Alt+R</strong> to clear session and automatically restart
+            </p>
         `;
     }
 }

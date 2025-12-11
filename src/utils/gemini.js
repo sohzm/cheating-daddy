@@ -4,6 +4,7 @@ const { spawn } = require('child_process');
 const { saveDebugAudio } = require('../audioUtils');
 const { getSystemPrompt } = require('./prompts');
 const { VADProcessor } = require('./vad');
+const groq = require('./groq');
 
 // Conversation tracking variables
 let currentSessionId = null;
@@ -45,6 +46,7 @@ let macVADProcessor = null;
 let macVADEnabled = false;
 let macVADMode = 'automatic';
 let macMicrophoneEnabled = false;
+let macUseGroqForSTT = false; // Track if we should use Groq for STT (interview mode)
 
 function sendToRenderer(channel, data) {
     const windows = BrowserWindow.getAllWindows();
@@ -784,13 +786,15 @@ function killExistingSystemAudioDump() {
     });
 }
 
-async function startMacOSAudioCapture(geminiSessionRef, vadEnabled = false, vadMode = 'automatic') {
+async function startMacOSAudioCapture(geminiSessionRef, vadEnabled = false, vadMode = 'automatic', useGroqForSTT = false) {
     if (process.platform !== 'darwin') return false;
 
     // Kill any existing SystemAudioDump processes first
     await killExistingSystemAudioDump();
 
-    console.log('Starting macOS audio capture with SystemAudioDump...');
+    // Store Groq mode setting
+    macUseGroqForSTT = useGroqForSTT;
+    console.log(`Starting macOS audio capture with SystemAudioDump... (useGroq: ${macUseGroqForSTT})`);
 
     const { app } = require('electron');
     const path = require('path');
@@ -872,8 +876,17 @@ async function startMacOSAudioCapture(geminiSessionRef, vadEnabled = false, vadM
                     // Convert Float32Array to PCM Buffer
                     const pcmBuffer = convertFloat32ToPCMBuffer(audioSegment);
                     const base64Data = pcmBuffer.toString('base64');
-                    await sendAudioToGemini(base64Data, geminiSessionRef);
-                    console.log('🎤 [macOS VAD] Audio segment sent:', metadata);
+
+                    if (macUseGroqForSTT) {
+                        // Interview mode: Send to Groq for transcription
+                        // Add audio to buffer - auto-flush will process when enough audio accumulates
+                        groq.addAudioChunk(pcmBuffer);
+                        console.log('[GROQ macOS] VAD segment added, duration:', metadata?.duration || 'unknown');
+                    } else {
+                        // Exam mode: Send to Gemini
+                        await sendAudioToGemini(base64Data, geminiSessionRef);
+                        console.log('🎤 [macOS VAD] Audio segment sent:', metadata);
+                    }
                 } catch (error) {
                     console.error('❌ [macOS VAD] Failed to send audio segment:', error);
                 }
@@ -905,9 +918,15 @@ async function startMacOSAudioCapture(geminiSessionRef, vadEnabled = false, vadM
                 const float32Audio = convertPCMBufferToFloat32(monoChunk);
                 macVADProcessor.processAudio(float32Audio);
             } else {
-                // No VAD: send directly to Gemini (legacy behavior)
+                // No VAD: send directly to appropriate API
                 const base64Data = monoChunk.toString('base64');
-                sendAudioToGemini(base64Data, geminiSessionRef);
+                if (macUseGroqForSTT) {
+                    // Interview mode: Send to Groq for transcription
+                    groq.addAudioChunk(monoChunk);
+                } else {
+                    // Exam mode: Send to Gemini
+                    sendAudioToGemini(base64Data, geminiSessionRef);
+                }
             }
 
             if (process.env.DEBUG_AUDIO) {
@@ -1183,7 +1202,7 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
         }
     });
 
-    ipcMain.handle('start-macos-audio', async (event, vadEnabled = false, vadMode = 'automatic') => {
+    ipcMain.handle('start-macos-audio', async (event, vadEnabled = false, vadMode = 'automatic', useGroqForSTT = false) => {
         if (process.platform !== 'darwin') {
             return {
                 success: false,
@@ -1192,7 +1211,7 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
         }
 
         try {
-            const success = await startMacOSAudioCapture(geminiSessionRef, vadEnabled, vadMode);
+            const success = await startMacOSAudioCapture(geminiSessionRef, vadEnabled, vadMode, useGroqForSTT);
             return { success };
         } catch (error) {
             console.error('Error starting macOS audio capture:', error);

@@ -273,8 +273,24 @@ export class CheatingDaddyApp extends LitElement {
 
     // Main view event handlers
     async handleStart() {
-        // check if api key is empty do nothing
-        const apiKey = localStorage.getItem('apiKey')?.trim();
+        // Auto-set mode based on profile
+        let selectedMode;
+        if (this.selectedProfile === 'exam') {
+            // Exam Assistant -> Coding/OA mode (forced) - uses Gemini API
+            selectedMode = 'coding';
+            localStorage.setItem('selectedMode', 'coding');
+        } else {
+            // All other profiles -> Interview mode (forced) - uses Groq API
+            selectedMode = 'interview';
+            localStorage.setItem('selectedMode', 'interview');
+        }
+
+        // Check for the correct API key based on profile
+        const isExamMode = this.selectedProfile === 'exam';
+        const apiKey = isExamMode
+            ? (localStorage.getItem('geminiApiKey') || localStorage.getItem('apiKey'))?.trim()
+            : localStorage.getItem('groqApiKey')?.trim();
+
         if (!apiKey || apiKey === '') {
             // Trigger the red blink animation on the API key input
             const mainView = this.shadowRoot.querySelector('main-view');
@@ -284,27 +300,27 @@ export class CheatingDaddyApp extends LitElement {
             return;
         }
 
-        // Auto-set mode based on profile
-        let selectedMode;
-        if (this.selectedProfile === 'exam') {
-            // Exam Assistant -> Coding/OA mode (forced)
-            selectedMode = 'coding';
-            localStorage.setItem('selectedMode', 'coding');
-        } else {
-            // All other profiles -> Interview mode (forced)
-            selectedMode = 'interview';
-            localStorage.setItem('selectedMode', 'interview');
-        }
+        // Store the appropriate API key for the session
+        localStorage.setItem('apiKey', apiKey);
 
         // Get model from localStorage (only matters for coding mode)
         const selectedModel = localStorage.getItem('selectedModel') || 'gemini-2.5-pro';
 
-        await cheddar.initializeGemini(this.selectedProfile, this.selectedLanguage, selectedMode, selectedModel);
+        // Initialize the appropriate API based on mode
+        if (isExamMode) {
+            // Exam mode: Use Gemini API
+            await cheddar.initializeGemini(this.selectedProfile, this.selectedLanguage, selectedMode, selectedModel);
+        } else {
+            // Interview mode: Use Groq API for STT
+            await cheddar.initializeGroq(apiKey);
+            // Still initialize a basic Gemini session for response generation if needed
+            // For now, we'll handle this in the audio pipeline
+        }
 
         // Set current mode and model for header display
         this.currentMode = selectedMode;
         if (selectedMode === 'interview') {
-            this.currentModel = 'gemini-live-2.5-flash-preview';
+            this.currentModel = 'groq-whisper-large-v3-turbo';
         } else {
             this.currentModel = selectedModel;
         }

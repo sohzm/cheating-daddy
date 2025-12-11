@@ -182,10 +182,48 @@ async function initializeGemini(profile = 'interview', language = 'en-US', mode 
     }
 }
 
+// Initialize Groq API for interview mode STT
+async function initializeGroq(apiKey) {
+    if (!apiKey) {
+        console.error('[GROQ] No API key provided');
+        cheddar.setStatus('Error: No Groq API key');
+        return false;
+    }
+
+    try {
+        const result = await ipcRenderer.invoke('initialize-groq', apiKey);
+        if (result.success) {
+            console.log('[GROQ] Initialized successfully');
+            cheddar.setStatus('Groq Ready - Listening...');
+            return true;
+        } else {
+            console.error('[GROQ] Initialization failed:', result.error);
+            cheddar.setStatus('Error: ' + result.error);
+            return false;
+        }
+    } catch (error) {
+        console.error('[GROQ] Initialization error:', error);
+        cheddar.setStatus('Error: ' + error.message);
+        return false;
+    }
+}
+
 // Listen for status updates
 ipcRenderer.on('update-status', (event, status) => {
     console.log('Status update:', status);
     cheddar.setStatus(status);
+});
+
+// Listen for Groq transcription results
+ipcRenderer.on('groq-transcription', (event, transcription) => {
+    console.log('\n========================================');
+    console.log('[GROQ STT] RECEIVED TRANSCRIPTION:');
+    console.log('----------------------------------------');
+    console.log(transcription);
+    console.log('========================================\n');
+
+    // Update status to show transcription was received
+    cheddar.setStatus('Transcription received');
 });
 
 // Listen for responses - REMOVED: This is handled in CheatingDaddyApp.js to avoid duplicates
@@ -223,8 +261,13 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
             const vadEnabled = localStorage.getItem('vadEnabled') === 'true';
             const vadMode = localStorage.getItem('vadMode') || 'automatic';
 
-            // Start macOS audio capture with VAD settings
-            const audioResult = await ipcRenderer.invoke('start-macos-audio', vadEnabled, vadMode);
+            // Check if we're in interview mode (uses Groq) or exam mode (uses Gemini)
+            const selectedMode = localStorage.getItem('selectedMode') || 'interview';
+            const useGroqForSTT = selectedMode === 'interview';
+            console.log(`[macOS] Mode: ${selectedMode}, Using Groq for STT: ${useGroqForSTT}`);
+
+            // Start macOS audio capture with VAD settings and Groq mode
+            const audioResult = await ipcRenderer.invoke('start-macos-audio', vadEnabled, vadMode, useGroqForSTT);
             if (!audioResult.success) {
                 throw new Error('Failed to start macOS audio capture: ' + audioResult.error);
             }
@@ -330,6 +373,12 @@ function setupLinuxSystemAudioProcessing() {
     const source = audioContext.createMediaStreamSource(mediaStream);
     audioProcessor = audioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
 
+    // Check if we're in interview mode (uses Groq) or exam mode (uses Gemini)
+    const selectedMode = localStorage.getItem('selectedMode') || 'interview';
+    const useGroqForSTT = selectedMode === 'interview';
+
+    console.log(`[AUDIO] Mode: ${selectedMode}, Using Groq for STT: ${useGroqForSTT}`);
+
     // Initialize VAD if enabled and available
     let isVADEnabled = false;
     if (VADProcessor) {
@@ -348,12 +397,19 @@ function setupLinuxSystemAudioProcessing() {
                             const pcmData16 = convertFloat32ToInt16(audioSegment);
                             const base64Data = arrayBufferToBase64(pcmData16.buffer);
 
-                            await ipcRenderer.invoke('send-audio-content', {
-                                data: base64Data,
-                                mimeType: 'audio/pcm;rate=24000',
-                            });
-
-                            console.log('VAD audio segment sent:', metadata);
+                            if (useGroqForSTT) {
+                                // Interview mode: Send to Groq for transcription
+                                // Add audio to buffer - auto-flush will process when enough audio accumulates
+                                await ipcRenderer.invoke('groq-add-audio', { data: base64Data });
+                                console.log('[GROQ] VAD segment added, duration:', metadata?.duration || 'unknown');
+                            } else {
+                                // Exam mode: Send to Gemini
+                                await ipcRenderer.invoke('send-audio-content', {
+                                    data: base64Data,
+                                    mimeType: 'audio/pcm;rate=24000',
+                                });
+                                console.log('VAD audio segment sent:', metadata);
+                            }
                         } catch (error) {
                             console.error('Failed to send VAD audio segment:', error);
                         }
@@ -384,7 +440,7 @@ function setupLinuxSystemAudioProcessing() {
 
         // Debug: Log first few frames
         if (audioFrameCount <= 3) {
-            console.log(`🔊 [AUDIO] Frame ${audioFrameCount}: microphoneEnabled=${microphoneEnabled}, isVADEnabled=${isVADEnabled}`);
+            console.log(`🔊 [AUDIO] Frame ${audioFrameCount}: microphoneEnabled=${microphoneEnabled}, isVADEnabled=${isVADEnabled}, useGroq=${useGroqForSTT}`);
         }
 
         // Skip audio processing if microphone is not enabled
@@ -406,14 +462,20 @@ function setupLinuxSystemAudioProcessing() {
                 // Process with VAD (VAD will check its own pause state)
                 await vadProcessor.processAudio(chunk);
             } else {
-                // Process without VAD (original behavior)
+                // Process without VAD
                 const pcmData16 = convertFloat32ToInt16(chunk);
                 const base64Data = arrayBufferToBase64(pcmData16.buffer);
 
-                await ipcRenderer.invoke('send-audio-content', {
-                    data: base64Data,
-                    mimeType: 'audio/pcm;rate=24000',
-                });
+                if (useGroqForSTT) {
+                    // Interview mode: Send to Groq for transcription
+                    await ipcRenderer.invoke('groq-add-audio', { data: base64Data });
+                } else {
+                    // Exam mode: Send to Gemini
+                    await ipcRenderer.invoke('send-audio-content', {
+                        data: base64Data,
+                        mimeType: 'audio/pcm;rate=24000',
+                    });
+                }
             }
         }
     };
@@ -427,6 +489,12 @@ function setupWindowsLoopbackProcessing() {
     audioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
     const source = audioContext.createMediaStreamSource(mediaStream);
     audioProcessor = audioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
+
+    // Check if we're in interview mode (uses Groq) or exam mode (uses Gemini)
+    const selectedMode = localStorage.getItem('selectedMode') || 'interview';
+    const useGroqForSTT = selectedMode === 'interview';
+
+    console.log(`[AUDIO] Mode: ${selectedMode}, Using Groq for STT: ${useGroqForSTT}`);
 
     // Initialize VAD if enabled and available
     let isVADEnabled = false;
@@ -446,12 +514,19 @@ function setupWindowsLoopbackProcessing() {
                             const pcmData16 = convertFloat32ToInt16(audioSegment);
                             const base64Data = arrayBufferToBase64(pcmData16.buffer);
 
-                            await ipcRenderer.invoke('send-audio-content', {
-                                data: base64Data,
-                                mimeType: 'audio/pcm;rate=24000',
-                            });
-
-                            console.log('VAD audio segment sent:', metadata);
+                            if (useGroqForSTT) {
+                                // Interview mode: Send to Groq for transcription
+                                // Add audio to buffer - auto-flush will process when enough audio accumulates
+                                await ipcRenderer.invoke('groq-add-audio', { data: base64Data });
+                                console.log('[GROQ] VAD segment added, duration:', metadata?.duration || 'unknown');
+                            } else {
+                                // Exam mode: Send to Gemini
+                                await ipcRenderer.invoke('send-audio-content', {
+                                    data: base64Data,
+                                    mimeType: 'audio/pcm;rate=24000',
+                                });
+                                console.log('VAD audio segment sent:', metadata);
+                            }
                         } catch (error) {
                             console.error('Failed to send VAD audio segment:', error);
                         }
@@ -482,7 +557,7 @@ function setupWindowsLoopbackProcessing() {
 
         // Debug: Log first few frames
         if (audioFrameCount <= 3) {
-            console.log(`🔊 [AUDIO] Frame ${audioFrameCount}: microphoneEnabled=${microphoneEnabled}, isVADEnabled=${isVADEnabled}`);
+            console.log(`🔊 [AUDIO] Frame ${audioFrameCount}: microphoneEnabled=${microphoneEnabled}, isVADEnabled=${isVADEnabled}, useGroq=${useGroqForSTT}`);
         }
 
         // Skip audio processing if microphone is not enabled
@@ -504,14 +579,20 @@ function setupWindowsLoopbackProcessing() {
                 // Process with VAD (VAD will check its own pause state)
                 await vadProcessor.processAudio(chunk);
             } else {
-                // Process without VAD (original behavior)
+                // Process without VAD
                 const pcmData16 = convertFloat32ToInt16(chunk);
                 const base64Data = arrayBufferToBase64(pcmData16.buffer);
 
-                await ipcRenderer.invoke('send-audio-content', {
-                    data: base64Data,
-                    mimeType: 'audio/pcm;rate=24000',
-                });
+                if (useGroqForSTT) {
+                    // Interview mode: Send to Groq for transcription
+                    await ipcRenderer.invoke('groq-add-audio', { data: base64Data });
+                } else {
+                    // Exam mode: Send to Gemini
+                    await ipcRenderer.invoke('send-audio-content', {
+                        data: base64Data,
+                        mimeType: 'audio/pcm;rate=24000',
+                    });
+                }
             }
         }
     };
@@ -878,6 +959,7 @@ const cheddar = {
 
     // Core functionality
     initializeGemini,
+    initializeGroq,
     startCapture,
     stopCapture,
     sendTextMessage,
