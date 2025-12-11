@@ -240,7 +240,19 @@ export class HelpView extends LitElement {
         super();
         this.onExternalLinkClick = () => {};
         this.keybinds = this.getDefaultKeybinds();
-        this.loadKeybinds();
+        this._loadKeybinds();
+    }
+
+    async _loadKeybinds() {
+        try {
+            const keybinds = await cheddar.storage.getKeybinds();
+            if (keybinds) {
+                this.keybinds = { ...this.getDefaultKeybinds(), ...keybinds };
+                this.requestUpdate();
+            }
+        } catch (error) {
+            console.error('Error loading keybinds:', error);
+        }
     }
 
     connectedCallback() {
@@ -264,18 +276,6 @@ export class HelpView extends LitElement {
             scrollUp: isMac ? 'Cmd+Shift+Up' : 'Ctrl+Shift+Up',
             scrollDown: isMac ? 'Cmd+Shift+Down' : 'Ctrl+Shift+Down',
         };
-    }
-
-    loadKeybinds() {
-        const savedKeybinds = localStorage.getItem('customKeybinds');
-        if (savedKeybinds) {
-            try {
-                this.keybinds = { ...this.getDefaultKeybinds(), ...JSON.parse(savedKeybinds) };
-            } catch (e) {
-                console.error('Failed to parse saved keybinds:', e);
-                this.keybinds = this.getDefaultKeybinds();
-            }
-        }
     }
 
     formatKeybind(keybind) {

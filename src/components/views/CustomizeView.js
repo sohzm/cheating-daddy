@@ -444,17 +444,43 @@ export class CustomizeView extends LitElement {
         // Font size default (in pixels)
         this.fontSize = 20;
 
-        this.loadKeybinds();
-        this.loadGoogleSearchSettings();
-        this.loadAdvancedModeSettings();
-        this.loadBackgroundTransparency();
-        this.loadFontSize();
+        // Audio mode default
+        this.audioMode = 'speaker_only';
+
+        // Custom prompt
+        this.customPrompt = '';
+
+        this._loadFromStorage();
+    }
+
+    async _loadFromStorage() {
+        try {
+            const [prefs, keybinds] = await Promise.all([
+                cheddar.storage.getPreferences(),
+                cheddar.storage.getKeybinds()
+            ]);
+
+            this.googleSearchEnabled = prefs.googleSearchEnabled ?? true;
+            this.advancedMode = prefs.advancedMode ?? false;
+            this.backgroundTransparency = prefs.backgroundTransparency ?? 0.8;
+            this.fontSize = prefs.fontSize ?? 20;
+            this.audioMode = prefs.audioMode ?? 'speaker_only';
+            this.customPrompt = prefs.customPrompt ?? '';
+
+            if (keybinds) {
+                this.keybinds = { ...this.getDefaultKeybinds(), ...keybinds };
+            }
+
+            this.updateBackgroundTransparency();
+            this.updateFontSize();
+            this.requestUpdate();
+        } catch (error) {
+            console.error('Error loading settings:', error);
+        }
     }
 
     connectedCallback() {
         super.connectedCallback();
-        // Load layout mode for display purposes
-        this.loadLayoutMode();
         // Resize window for this view
         resizeLayout();
     }
@@ -542,19 +568,16 @@ export class CustomizeView extends LitElement {
 
     handleProfileSelect(e) {
         this.selectedProfile = e.target.value;
-        localStorage.setItem('selectedProfile', this.selectedProfile);
         this.onProfileChange(this.selectedProfile);
     }
 
     handleLanguageSelect(e) {
         this.selectedLanguage = e.target.value;
-        localStorage.setItem('selectedLanguage', this.selectedLanguage);
         this.onLanguageChange(this.selectedLanguage);
     }
 
     handleScreenshotIntervalSelect(e) {
         this.selectedScreenshotInterval = e.target.value;
-        localStorage.setItem('selectedScreenshotInterval', this.selectedScreenshotInterval);
         this.onScreenshotIntervalChange(this.selectedScreenshotInterval);
     }
 
@@ -565,12 +588,18 @@ export class CustomizeView extends LitElement {
 
     handleLayoutModeSelect(e) {
         this.layoutMode = e.target.value;
-        localStorage.setItem('layoutMode', this.layoutMode);
         this.onLayoutModeChange(e.target.value);
     }
 
-    handleCustomPromptInput(e) {
-        localStorage.setItem('customPrompt', e.target.value);
+    async handleCustomPromptInput(e) {
+        this.customPrompt = e.target.value;
+        await cheddar.storage.updatePreference('customPrompt', e.target.value);
+    }
+
+    async handleAudioModeSelect(e) {
+        this.audioMode = e.target.value;
+        await cheddar.storage.updatePreference('audioMode', e.target.value);
+        this.requestUpdate();
     }
 
     getDefaultKeybinds() {
@@ -590,20 +619,8 @@ export class CustomizeView extends LitElement {
         };
     }
 
-    loadKeybinds() {
-        const savedKeybinds = localStorage.getItem('customKeybinds');
-        if (savedKeybinds) {
-            try {
-                this.keybinds = { ...this.getDefaultKeybinds(), ...JSON.parse(savedKeybinds) };
-            } catch (e) {
-                console.error('Failed to parse saved keybinds:', e);
-                this.keybinds = this.getDefaultKeybinds();
-            }
-        }
-    }
-
-    saveKeybinds() {
-        localStorage.setItem('customKeybinds', JSON.stringify(this.keybinds));
+    async saveKeybinds() {
+        await cheddar.storage.setKeybinds(this.keybinds);
         // Send to main process to update global shortcuts
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
@@ -617,9 +634,9 @@ export class CustomizeView extends LitElement {
         this.requestUpdate();
     }
 
-    resetKeybinds() {
+    async resetKeybinds() {
         this.keybinds = this.getDefaultKeybinds();
-        localStorage.removeItem('customKeybinds');
+        await cheddar.storage.setKeybinds(null);
         this.requestUpdate();
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
@@ -762,16 +779,9 @@ export class CustomizeView extends LitElement {
         e.target.blur();
     }
 
-    loadGoogleSearchSettings() {
-        const googleSearchEnabled = localStorage.getItem('googleSearchEnabled');
-        if (googleSearchEnabled !== null) {
-            this.googleSearchEnabled = googleSearchEnabled === 'true';
-        }
-    }
-
     async handleGoogleSearchChange(e) {
         this.googleSearchEnabled = e.target.checked;
-        localStorage.setItem('googleSearchEnabled', this.googleSearchEnabled.toString());
+        await cheddar.storage.updatePreference('googleSearchEnabled', this.googleSearchEnabled);
 
         // Notify main process if available
         if (window.require) {
@@ -786,38 +796,16 @@ export class CustomizeView extends LitElement {
         this.requestUpdate();
     }
 
-    loadLayoutMode() {
-        const savedLayoutMode = localStorage.getItem('layoutMode');
-        if (savedLayoutMode) {
-            this.layoutMode = savedLayoutMode;
-        }
-    }
-
-    loadAdvancedModeSettings() {
-        const advancedMode = localStorage.getItem('advancedMode');
-        if (advancedMode !== null) {
-            this.advancedMode = advancedMode === 'true';
-        }
-    }
-
     async handleAdvancedModeChange(e) {
         this.advancedMode = e.target.checked;
-        localStorage.setItem('advancedMode', this.advancedMode.toString());
+        await cheddar.storage.updatePreference('advancedMode', this.advancedMode);
         this.onAdvancedModeChange(this.advancedMode);
         this.requestUpdate();
     }
 
-    loadBackgroundTransparency() {
-        const backgroundTransparency = localStorage.getItem('backgroundTransparency');
-        if (backgroundTransparency !== null) {
-            this.backgroundTransparency = parseFloat(backgroundTransparency) || 0.8;
-        }
-        this.updateBackgroundTransparency();
-    }
-
-    handleBackgroundTransparencyChange(e) {
+    async handleBackgroundTransparencyChange(e) {
         this.backgroundTransparency = parseFloat(e.target.value);
-        localStorage.setItem('backgroundTransparency', this.backgroundTransparency.toString());
+        await cheddar.storage.updatePreference('backgroundTransparency', this.backgroundTransparency);
         this.updateBackgroundTransparency();
         this.requestUpdate();
     }
@@ -836,17 +824,9 @@ export class CustomizeView extends LitElement {
         root.style.setProperty('--scrollbar-background', `rgba(0, 0, 0, ${this.backgroundTransparency * 0.5})`);
     }
 
-    loadFontSize() {
-        const fontSize = localStorage.getItem('fontSize');
-        if (fontSize !== null) {
-            this.fontSize = parseInt(fontSize, 10) || 20;
-        }
-        this.updateFontSize();
-    }
-
-    handleFontSizeChange(e) {
+    async handleFontSizeChange(e) {
         this.fontSize = parseInt(e.target.value, 10);
-        localStorage.setItem('fontSize', this.fontSize.toString());
+        await cheddar.storage.updatePreference('fontSize', this.fontSize);
         this.updateFontSize();
         this.requestUpdate();
     }
@@ -897,7 +877,7 @@ export class CustomizeView extends LitElement {
                                 placeholder="Add specific instructions for how you want the AI to behave during ${
                                     profileNames[this.selectedProfile] || 'this interaction'
                                 }..."
-                                .value=${localStorage.getItem('customPrompt') || ''}
+                                .value=${this.customPrompt}
                                 rows="4"
                                 @input=${this.handleCustomPromptInput}
                             ></textarea>
@@ -917,7 +897,7 @@ export class CustomizeView extends LitElement {
                     <div class="form-grid">
                         <div class="form-group">
                             <label class="form-label">Audio Mode</label>
-                            <select class="form-control" .value=${localStorage.getItem('audioMode') || 'speaker_only'} @change=${e => localStorage.setItem('audioMode', e.target.value)}>
+                            <select class="form-control" .value=${this.audioMode} @change=${this.handleAudioModeSelect}>
                                 <option value="speaker_only">Speaker Only (Interviewer)</option>
                                 <option value="mic_only">Microphone Only (Me)</option>
                                 <option value="both">Both Speaker & Microphone</option>

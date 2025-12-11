@@ -19,6 +19,94 @@ let currentImageQuality = 'medium'; // Store current image quality for manual sc
 const isLinux = process.platform === 'linux';
 const isMacOS = process.platform === 'darwin';
 
+// ============ STORAGE API ============
+// Wrapper for IPC-based storage access
+const storage = {
+    // Config
+    async getConfig() {
+        const result = await ipcRenderer.invoke('storage:get-config');
+        return result.success ? result.data : {};
+    },
+    async setConfig(config) {
+        return ipcRenderer.invoke('storage:set-config', config);
+    },
+    async updateConfig(key, value) {
+        return ipcRenderer.invoke('storage:update-config', key, value);
+    },
+
+    // Credentials
+    async getCredentials() {
+        const result = await ipcRenderer.invoke('storage:get-credentials');
+        return result.success ? result.data : {};
+    },
+    async setCredentials(credentials) {
+        return ipcRenderer.invoke('storage:set-credentials', credentials);
+    },
+    async getApiKey() {
+        const result = await ipcRenderer.invoke('storage:get-api-key');
+        return result.success ? result.data : '';
+    },
+    async setApiKey(apiKey) {
+        return ipcRenderer.invoke('storage:set-api-key', apiKey);
+    },
+
+    // Preferences
+    async getPreferences() {
+        const result = await ipcRenderer.invoke('storage:get-preferences');
+        return result.success ? result.data : {};
+    },
+    async setPreferences(preferences) {
+        return ipcRenderer.invoke('storage:set-preferences', preferences);
+    },
+    async updatePreference(key, value) {
+        return ipcRenderer.invoke('storage:update-preference', key, value);
+    },
+
+    // Keybinds
+    async getKeybinds() {
+        const result = await ipcRenderer.invoke('storage:get-keybinds');
+        return result.success ? result.data : null;
+    },
+    async setKeybinds(keybinds) {
+        return ipcRenderer.invoke('storage:set-keybinds', keybinds);
+    },
+
+    // Sessions (History)
+    async getAllSessions() {
+        const result = await ipcRenderer.invoke('storage:get-all-sessions');
+        return result.success ? result.data : [];
+    },
+    async getSession(sessionId) {
+        const result = await ipcRenderer.invoke('storage:get-session', sessionId);
+        return result.success ? result.data : null;
+    },
+    async saveSession(sessionId, data) {
+        return ipcRenderer.invoke('storage:save-session', sessionId, data);
+    },
+    async deleteSession(sessionId) {
+        return ipcRenderer.invoke('storage:delete-session', sessionId);
+    },
+    async deleteAllSessions() {
+        return ipcRenderer.invoke('storage:delete-all-sessions');
+    },
+
+    // Clear all
+    async clearAll() {
+        return ipcRenderer.invoke('storage:clear-all');
+    }
+};
+
+// Cache for preferences to avoid async calls in hot paths
+let preferencesCache = null;
+
+async function loadPreferencesCache() {
+    preferencesCache = await storage.getPreferences();
+    return preferencesCache;
+}
+
+// Initialize preferences cache
+loadPreferencesCache();
+
 // Token tracking system for rate limiting
 let tokenTracker = {
     tokens: [], // Array of {timestamp, count, type} objects
@@ -85,14 +173,15 @@ let tokenTracker = {
 
     // Check if we should throttle based on settings
     shouldThrottle() {
-        // Get rate limiting settings from localStorage
-        const throttleEnabled = localStorage.getItem('throttleTokens') === 'true';
+        if (!preferencesCache) return false;
+
+        const throttleEnabled = preferencesCache.throttleTokens;
         if (!throttleEnabled) {
             return false;
         }
 
-        const maxTokensPerMin = parseInt(localStorage.getItem('maxTokensPerMin') || '1000000', 10);
-        const throttleAtPercent = parseInt(localStorage.getItem('throttleAtPercent') || '75', 10);
+        const maxTokensPerMin = preferencesCache.maxTokensPerMin || 1000000;
+        const throttleAtPercent = preferencesCache.throttleAtPercent || 75;
 
         const currentTokens = this.getTokensInLastMinute();
         const throttleThreshold = Math.floor((maxTokensPerMin * throttleAtPercent) / 100);
@@ -135,9 +224,10 @@ function arrayBufferToBase64(buffer) {
 }
 
 async function initializeGemini(profile = 'interview', language = 'en-US') {
-    const apiKey = localStorage.getItem('apiKey')?.trim();
+    const apiKey = await storage.getApiKey();
     if (apiKey) {
-        const success = await ipcRenderer.invoke('initialize-gemini', apiKey, localStorage.getItem('customPrompt') || '', profile, language);
+        const prefs = await storage.getPreferences();
+        const success = await ipcRenderer.invoke('initialize-gemini', apiKey, prefs.customPrompt || '', profile, language);
         if (success) {
             cheddar.setStatus('Live');
         } else {
@@ -152,22 +242,17 @@ ipcRenderer.on('update-status', (event, status) => {
     cheddar.setStatus(status);
 });
 
-// Listen for responses - REMOVED: This is handled in CheatingDaddyApp.js to avoid duplicates
-// ipcRenderer.on('update-response', (event, response) => {
-//     console.log('Gemini response:', response);
-//     cheddar.e().setResponse(response);
-//     // You can add UI elements to display the response if needed
-// });
-
 async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'medium') {
     // Store the image quality for manual screenshots
     currentImageQuality = imageQuality;
 
     // Reset token tracker when starting new capture session
     tokenTracker.reset();
-    console.log('🎯 Token tracker reset for new capture session');
+    console.log('Token tracker reset for new capture session');
 
-    const audioMode = localStorage.getItem('audioMode') || 'speaker_only';
+    // Refresh preferences cache
+    await loadPreferencesCache();
+    const audioMode = preferencesCache.audioMode || 'speaker_only';
 
     try {
         if (isMacOS) {
@@ -439,7 +524,7 @@ async function captureScreenshot(imageQuality = 'medium', isManual = false) {
 
     // Check rate limiting for automated screenshots only
     if (!isManual && tokenTracker.shouldThrottle()) {
-        console.log('⚠️ Automated screenshot skipped due to rate limiting');
+        console.log('Automated screenshot skipped due to rate limiting');
         return;
     }
 
@@ -522,7 +607,7 @@ async function captureScreenshot(imageQuality = 'medium', isManual = false) {
                     // Track image tokens after successful send
                     const imageTokens = tokenTracker.calculateImageTokens(offscreenCanvas.width, offscreenCanvas.height);
                     tokenTracker.addTokens(imageTokens, 'image');
-                    console.log(`📊 Image sent successfully - ${imageTokens} tokens used (${offscreenCanvas.width}x${offscreenCanvas.height})`);
+                    console.log(`Image sent successfully - ${imageTokens} tokens used (${offscreenCanvas.width}x${offscreenCanvas.height})`);
                 } else {
                     console.error('Failed to send image:', result.error);
                 }
@@ -614,107 +699,20 @@ async function sendTextMessage(text) {
     }
 }
 
-// Conversation storage functions using IndexedDB
-let conversationDB = null;
-
-async function initConversationStorage() {
-    return new Promise((resolve, reject) => {
-        const request = indexedDB.open('ConversationHistory', 1);
-
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => {
-            conversationDB = request.result;
-            resolve(conversationDB);
-        };
-
-        request.onupgradeneeded = event => {
-            const db = event.target.result;
-
-            // Create sessions store
-            if (!db.objectStoreNames.contains('sessions')) {
-                const sessionStore = db.createObjectStore('sessions', { keyPath: 'sessionId' });
-                sessionStore.createIndex('timestamp', 'timestamp', { unique: false });
-            }
-        };
-    });
-}
-
-async function saveConversationSession(sessionId, conversationHistory) {
-    if (!conversationDB) {
-        await initConversationStorage();
-    }
-
-    const transaction = conversationDB.transaction(['sessions'], 'readwrite');
-    const store = transaction.objectStore('sessions');
-
-    const sessionData = {
-        sessionId: sessionId,
-        timestamp: parseInt(sessionId),
-        conversationHistory: conversationHistory,
-        lastUpdated: Date.now(),
-    };
-
-    return new Promise((resolve, reject) => {
-        const request = store.put(sessionData);
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => resolve(request.result);
-    });
-}
-
-async function getConversationSession(sessionId) {
-    if (!conversationDB) {
-        await initConversationStorage();
-    }
-
-    const transaction = conversationDB.transaction(['sessions'], 'readonly');
-    const store = transaction.objectStore('sessions');
-
-    return new Promise((resolve, reject) => {
-        const request = store.get(sessionId);
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => resolve(request.result);
-    });
-}
-
-async function getAllConversationSessions() {
-    if (!conversationDB) {
-        await initConversationStorage();
-    }
-
-    const transaction = conversationDB.transaction(['sessions'], 'readonly');
-    const store = transaction.objectStore('sessions');
-    const index = store.index('timestamp');
-
-    return new Promise((resolve, reject) => {
-        const request = index.getAll();
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => {
-            // Sort by timestamp descending (newest first)
-            const sessions = request.result.sort((a, b) => b.timestamp - a.timestamp);
-            resolve(sessions);
-        };
-    });
-}
-
-// Listen for conversation data from main process
+// Listen for conversation data from main process and save to storage
 ipcRenderer.on('save-conversation-turn', async (event, data) => {
     try {
-        await saveConversationSession(data.sessionId, data.fullHistory);
+        await storage.saveSession(data.sessionId, { conversationHistory: data.fullHistory });
         console.log('Conversation session saved:', data.sessionId);
     } catch (error) {
         console.error('Error saving conversation session:', error);
     }
 });
 
-// Initialize conversation storage when renderer loads
-initConversationStorage().catch(console.error);
-
 // Listen for emergency erase command from main process
-ipcRenderer.on('clear-sensitive-data', () => {
-    console.log('Clearing renderer-side sensitive data...');
-    localStorage.removeItem('apiKey');
-    localStorage.removeItem('customPrompt');
-    // Consider clearing IndexedDB as well for full erasure
+ipcRenderer.on('clear-sensitive-data', async () => {
+    console.log('Clearing all data...');
+    await storage.clearAll();
 });
 
 // Handle shortcuts based on current view
@@ -754,10 +752,11 @@ const cheddar = {
     sendTextMessage,
     handleShortcut,
 
-    // Conversation history functions
-    getAllConversationSessions,
-    getConversationSession,
-    initConversationStorage,
+    // Storage API
+    storage,
+
+    // Refresh preferences cache (call after updating preferences)
+    refreshPreferencesCache: loadPreferencesCache,
 
     // Platform detection
     isLinux: isLinux,

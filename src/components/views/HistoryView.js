@@ -308,8 +308,6 @@ export class HistoryView extends LitElement {
         sessions: { type: Array },
         selectedSession: { type: Object },
         loading: { type: Boolean },
-        activeTab: { type: String },
-        savedResponses: { type: Array },
     };
 
     constructor() {
@@ -317,13 +315,6 @@ export class HistoryView extends LitElement {
         this.sessions = [];
         this.selectedSession = null;
         this.loading = true;
-        this.activeTab = 'sessions';
-        // Load saved responses from localStorage
-        try {
-            this.savedResponses = JSON.parse(localStorage.getItem('savedResponses') || '[]');
-        } catch (e) {
-            this.savedResponses = [];
-        }
         this.loadSessions();
     }
 
@@ -336,12 +327,25 @@ export class HistoryView extends LitElement {
     async loadSessions() {
         try {
             this.loading = true;
-            this.sessions = await cheddar.getAllConversationSessions();
+            this.sessions = await cheddar.storage.getAllSessions();
         } catch (error) {
             console.error('Error loading conversation sessions:', error);
             this.sessions = [];
         } finally {
             this.loading = false;
+            this.requestUpdate();
+        }
+    }
+
+    async loadSelectedSession(sessionId) {
+        try {
+            const session = await cheddar.storage.getSession(sessionId);
+            if (session) {
+                this.selectedSession = session;
+                this.requestUpdate();
+            }
+        } catch (error) {
+            console.error('Error loading session:', error);
         }
     }
 
@@ -373,31 +377,16 @@ export class HistoryView extends LitElement {
     }
 
     getSessionPreview(session) {
-        if (!session.conversationHistory || session.conversationHistory.length === 0) {
-            return 'No conversation yet';
-        }
-
-        const firstTurn = session.conversationHistory[0];
-        const preview = firstTurn.transcription || firstTurn.ai_response || 'Empty conversation';
-        return preview.length > 100 ? preview.substring(0, 100) + '...' : preview;
+        // For session list items, we just show message count
+        return `${session.messageCount || 0} messages`;
     }
 
     handleSessionClick(session) {
-        this.selectedSession = session;
+        this.loadSelectedSession(session.sessionId);
     }
 
     handleBackClick() {
         this.selectedSession = null;
-    }
-
-    handleTabClick(tab) {
-        this.activeTab = tab;
-    }
-
-    deleteSavedResponse(index) {
-        this.savedResponses = this.savedResponses.filter((_, i) => i !== index);
-        localStorage.setItem('savedResponses', JSON.stringify(this.savedResponses));
-        this.requestUpdate();
     }
 
     getProfileNames() {
@@ -431,59 +420,10 @@ export class HistoryView extends LitElement {
                     session => html`
                         <div class="session-item" @click=${() => this.handleSessionClick(session)}>
                             <div class="session-header">
-                                <div class="session-date">${this.formatDate(session.timestamp)}</div>
-                                <div class="session-time">${this.formatTime(session.timestamp)}</div>
+                                <div class="session-date">${this.formatDate(session.createdAt)}</div>
+                                <div class="session-time">${this.formatTime(session.createdAt)}</div>
                             </div>
                             <div class="session-preview">${this.getSessionPreview(session)}</div>
-                        </div>
-                    `
-                )}
-            </div>
-        `;
-    }
-
-    renderSavedResponses() {
-        if (this.savedResponses.length === 0) {
-            return html`
-                <div class="empty-state">
-                    <div class="empty-state-title">No saved responses</div>
-                    <div>Use the save button during conversations to save important responses</div>
-                </div>
-            `;
-        }
-
-        const profileNames = this.getProfileNames();
-
-        return html`
-            <div class="sessions-list">
-                ${this.savedResponses.map(
-                    (saved, index) => html`
-                        <div class="saved-response-item">
-                            <div class="saved-response-header">
-                                <div>
-                                    <div class="saved-response-profile">${profileNames[saved.profile] || saved.profile}</div>
-                                    <div class="saved-response-date">${this.formatTimestamp(saved.timestamp)}</div>
-                                </div>
-                                <button class="delete-button" @click=${() => this.deleteSavedResponse(index)} title="Delete saved response">
-                                    <svg
-                                        width="16px"
-                                        height="16px"
-                                        stroke-width="1.7"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        xmlns="http://www.w3.org/2000/svg"
-                                    >
-                                        <path
-                                            d="M6 6L18 18M6 18L18 6"
-                                            stroke="currentColor"
-                                            stroke-width="1.7"
-                                            stroke-linecap="round"
-                                            stroke-linejoin="round"
-                                        ></path>
-                                    </svg>
-                                </button>
-                            </div>
-                            <div class="saved-response-content">${saved.response}</div>
                         </div>
                     `
                 )}
@@ -559,15 +499,7 @@ export class HistoryView extends LitElement {
 
         return html`
             <div class="history-container">
-                <div class="tabs-container">
-                    <button class="tab ${this.activeTab === 'sessions' ? 'active' : ''}" @click=${() => this.handleTabClick('sessions')}>
-                        Conversation History
-                    </button>
-                    <button class="tab ${this.activeTab === 'saved' ? 'active' : ''}" @click=${() => this.handleTabClick('saved')}>
-                        Saved Responses (${this.savedResponses.length})
-                    </button>
-                </div>
-                ${this.activeTab === 'sessions' ? this.renderSessionsList() : this.renderSavedResponses()}
+                ${this.renderSessionsList()}
             </div>
         `;
     }

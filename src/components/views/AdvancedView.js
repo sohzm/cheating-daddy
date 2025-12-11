@@ -339,7 +339,19 @@ export class AdvancedView extends LitElement {
         this.maxTokensPerMin = 1000000;
         this.throttleAtPercent = 75;
 
-        this.loadRateLimitSettings();
+        this._loadFromStorage();
+    }
+
+    async _loadFromStorage() {
+        try {
+            const prefs = await cheddar.storage.getPreferences();
+            this.throttleTokens = prefs.throttleTokens ?? true;
+            this.maxTokensPerMin = prefs.maxTokensPerMin ?? 1000000;
+            this.throttleAtPercent = prefs.throttleAtPercent ?? 75;
+            this.requestUpdate();
+        } catch (error) {
+            console.error('Error loading settings:', error);
+        }
     }
 
     connectedCallback() {
@@ -357,35 +369,10 @@ export class AdvancedView extends LitElement {
         this.requestUpdate();
 
         try {
-            // Clear localStorage
-            localStorage.clear();
+            // Clear all data via storage API
+            await cheddar.storage.clearAll();
 
-            // Clear sessionStorage
-            sessionStorage.clear();
-
-            // Clear IndexedDB databases
-            const databases = await indexedDB.databases();
-            const clearPromises = databases.map(db => {
-                return new Promise((resolve, reject) => {
-                    const deleteReq = indexedDB.deleteDatabase(db.name);
-                    deleteReq.onsuccess = () => resolve();
-                    deleteReq.onerror = () => reject(deleteReq.error);
-                    deleteReq.onblocked = () => {
-                        console.warn(`Deletion of database ${db.name} was blocked`);
-                        resolve(); // Continue anyway
-                    };
-                });
-            });
-
-            await Promise.all(clearPromises);
-
-            // Clear any other browser storage
-            if ('caches' in window) {
-                const cacheNames = await caches.keys();
-                await Promise.all(cacheNames.map(name => caches.delete(name)));
-            }
-
-            this.statusMessage = `✅ Successfully cleared all local data (${databases.length} databases, localStorage, sessionStorage, and caches)`;
+            this.statusMessage = '✅ Successfully cleared all local data';
             this.statusType = 'success';
 
             // Notify user that app will close
@@ -410,53 +397,42 @@ export class AdvancedView extends LitElement {
         }
     }
 
-    // Rate limiting methods
-    loadRateLimitSettings() {
-        const throttleTokens = localStorage.getItem('throttleTokens');
-        const maxTokensPerMin = localStorage.getItem('maxTokensPerMin');
-        const throttleAtPercent = localStorage.getItem('throttleAtPercent');
-
-        if (throttleTokens !== null) {
-            this.throttleTokens = throttleTokens === 'true';
-        }
-        if (maxTokensPerMin !== null) {
-            this.maxTokensPerMin = parseInt(maxTokensPerMin, 10) || 1000000;
-        }
-        if (throttleAtPercent !== null) {
-            this.throttleAtPercent = parseInt(throttleAtPercent, 10) || 75;
-        }
-    }
-
-    handleThrottleTokensChange(e) {
+    async handleThrottleTokensChange(e) {
         this.throttleTokens = e.target.checked;
-        localStorage.setItem('throttleTokens', this.throttleTokens.toString());
+        await cheddar.storage.updatePreference('throttleTokens', this.throttleTokens);
+        await cheddar.refreshPreferencesCache();
         this.requestUpdate();
     }
 
-    handleMaxTokensChange(e) {
+    async handleMaxTokensChange(e) {
         const value = parseInt(e.target.value, 10);
         if (!isNaN(value) && value > 0) {
             this.maxTokensPerMin = value;
-            localStorage.setItem('maxTokensPerMin', this.maxTokensPerMin.toString());
+            await cheddar.storage.updatePreference('maxTokensPerMin', this.maxTokensPerMin);
+            await cheddar.refreshPreferencesCache();
         }
     }
 
-    handleThrottlePercentChange(e) {
+    async handleThrottlePercentChange(e) {
         const value = parseInt(e.target.value, 10);
         if (!isNaN(value) && value >= 0 && value <= 100) {
             this.throttleAtPercent = value;
-            localStorage.setItem('throttleAtPercent', this.throttleAtPercent.toString());
+            await cheddar.storage.updatePreference('throttleAtPercent', this.throttleAtPercent);
+            await cheddar.refreshPreferencesCache();
         }
     }
 
-    resetRateLimitSettings() {
+    async resetRateLimitSettings() {
         this.throttleTokens = true;
         this.maxTokensPerMin = 1000000;
         this.throttleAtPercent = 75;
 
-        localStorage.removeItem('throttleTokens');
-        localStorage.removeItem('maxTokensPerMin');
-        localStorage.removeItem('throttleAtPercent');
+        await cheddar.storage.setPreferences({
+            throttleTokens: true,
+            maxTokensPerMin: 1000000,
+            throttleAtPercent: 75
+        });
+        await cheddar.refreshPreferencesCache();
 
         this.requestUpdate();
     }

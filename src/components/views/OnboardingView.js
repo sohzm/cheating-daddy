@@ -426,11 +426,11 @@ export class OnboardingView extends LitElement {
         this.contextText = e.target.value;
     }
 
-    completeOnboarding() {
+    async completeOnboarding() {
         if (this.contextText.trim()) {
-            localStorage.setItem('customPrompt', this.contextText.trim());
+            await cheddar.storage.updatePreference('customPrompt', this.contextText.trim());
         }
-        localStorage.setItem('onboardingCompleted', 'true');
+        await cheddar.storage.updateConfig('onboarded', true);
         this.onComplete();
     }
 

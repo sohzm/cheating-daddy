@@ -114,21 +114,23 @@ export class CheatingDaddyApp extends LitElement {
         _isClickThrough: { state: true },
         _awaitingNewResponse: { state: true },
         shouldAnimateResponse: { type: Boolean },
+        _storageLoaded: { state: true },
     };
 
     constructor() {
         super();
-        this.currentView = localStorage.getItem('onboardingCompleted') ? 'main' : 'onboarding';
+        // Set defaults - will be overwritten by storage
+        this.currentView = 'main'; // Will check onboarding after storage loads
         this.statusText = '';
         this.startTime = null;
         this.isRecording = false;
         this.sessionActive = false;
-        this.selectedProfile = localStorage.getItem('selectedProfile') || 'interview';
-        this.selectedLanguage = localStorage.getItem('selectedLanguage') || 'en-US';
-        this.selectedScreenshotInterval = localStorage.getItem('selectedScreenshotInterval') || '5';
-        this.selectedImageQuality = localStorage.getItem('selectedImageQuality') || 'medium';
-        this.layoutMode = localStorage.getItem('layoutMode') || 'normal';
-        this.advancedMode = localStorage.getItem('advancedMode') === 'true';
+        this.selectedProfile = 'interview';
+        this.selectedLanguage = 'en-US';
+        this.selectedScreenshotInterval = '5';
+        this.selectedImageQuality = 'medium';
+        this.layoutMode = 'normal';
+        this.advancedMode = false;
         this.responses = [];
         this.currentResponseIndex = -1;
         this._viewInstances = new Map();
@@ -136,13 +138,45 @@ export class CheatingDaddyApp extends LitElement {
         this._awaitingNewResponse = false;
         this._currentResponseIsComplete = true;
         this.shouldAnimateResponse = false;
+        this._storageLoaded = false;
 
-        // Apply layout mode to document root
-        this.updateLayoutMode();
+        // Load from storage
+        this._loadFromStorage();
+    }
+
+    async _loadFromStorage() {
+        try {
+            const [config, prefs] = await Promise.all([
+                cheddar.storage.getConfig(),
+                cheddar.storage.getPreferences()
+            ]);
+
+            // Check onboarding status
+            this.currentView = config.onboarded ? 'main' : 'onboarding';
+
+            // Load preferences
+            this.selectedProfile = prefs.selectedProfile || 'interview';
+            this.selectedLanguage = prefs.selectedLanguage || 'en-US';
+            this.selectedScreenshotInterval = prefs.selectedScreenshotInterval || '5';
+            this.selectedImageQuality = prefs.selectedImageQuality || 'medium';
+            this.layoutMode = config.layout || 'normal';
+            this.advancedMode = prefs.advancedMode || false;
+
+            this._storageLoaded = true;
+            this.updateLayoutMode();
+            this.requestUpdate();
+        } catch (error) {
+            console.error('Error loading from storage:', error);
+            this._storageLoaded = true;
+            this.requestUpdate();
+        }
     }
 
     connectedCallback() {
         super.connectedCallback();
+
+        // Apply layout mode to document root
+        this.updateLayoutMode();
 
         // Set up IPC listeners if needed
         if (window.require) {
@@ -171,7 +205,7 @@ export class CheatingDaddyApp extends LitElement {
 
     setStatus(text) {
         this.statusText = text;
-        
+
         // Mark response as complete when we get certain status messages
         if (text.includes('Ready') || text.includes('Listening') || text.includes('Error')) {
             this._currentResponseIsComplete = true;
@@ -266,7 +300,7 @@ export class CheatingDaddyApp extends LitElement {
     // Main view event handlers
     async handleStart() {
         // check if api key is empty do nothing
-        const apiKey = localStorage.getItem('apiKey')?.trim();
+        const apiKey = await cheddar.storage.getApiKey();
         if (!apiKey || apiKey === '') {
             // Trigger the red blink animation on the API key input
             const mainView = this.shadowRoot.querySelector('main-view');
@@ -293,26 +327,29 @@ export class CheatingDaddyApp extends LitElement {
     }
 
     // Customize view event handlers
-    handleProfileChange(profile) {
+    async handleProfileChange(profile) {
         this.selectedProfile = profile;
+        await cheddar.storage.updatePreference('selectedProfile', profile);
     }
 
-    handleLanguageChange(language) {
+    async handleLanguageChange(language) {
         this.selectedLanguage = language;
+        await cheddar.storage.updatePreference('selectedLanguage', language);
     }
 
-    handleScreenshotIntervalChange(interval) {
+    async handleScreenshotIntervalChange(interval) {
         this.selectedScreenshotInterval = interval;
+        await cheddar.storage.updatePreference('selectedScreenshotInterval', interval);
     }
 
-    handleImageQualityChange(quality) {
+    async handleImageQualityChange(quality) {
         this.selectedImageQuality = quality;
-        localStorage.setItem('selectedImageQuality', quality);
+        await cheddar.storage.updatePreference('selectedImageQuality', quality);
     }
 
-    handleAdvancedModeChange(advancedMode) {
+    async handleAdvancedModeChange(advancedMode) {
         this.advancedMode = advancedMode;
-        localStorage.setItem('advancedMode', advancedMode.toString());
+        await cheddar.storage.updatePreference('advancedMode', advancedMode);
     }
 
     handleBackClick() {
@@ -370,24 +407,8 @@ export class CheatingDaddyApp extends LitElement {
             }
         }
 
-        // Only update localStorage when these specific properties change
-        if (changedProperties.has('selectedProfile')) {
-            localStorage.setItem('selectedProfile', this.selectedProfile);
-        }
-        if (changedProperties.has('selectedLanguage')) {
-            localStorage.setItem('selectedLanguage', this.selectedLanguage);
-        }
-        if (changedProperties.has('selectedScreenshotInterval')) {
-            localStorage.setItem('selectedScreenshotInterval', this.selectedScreenshotInterval);
-        }
-        if (changedProperties.has('selectedImageQuality')) {
-            localStorage.setItem('selectedImageQuality', this.selectedImageQuality);
-        }
         if (changedProperties.has('layoutMode')) {
             this.updateLayoutMode();
-        }
-        if (changedProperties.has('advancedMode')) {
-            localStorage.setItem('advancedMode', this.advancedMode.toString());
         }
     }
 
@@ -501,7 +522,7 @@ export class CheatingDaddyApp extends LitElement {
 
     async handleLayoutModeChange(layoutMode) {
         this.layoutMode = layoutMode;
-        localStorage.setItem('layoutMode', layoutMode);
+        await cheddar.storage.updateConfig('layout', layoutMode);
         this.updateLayoutMode();
 
         // Notify main process about layout change for window resizing

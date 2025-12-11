@@ -159,6 +159,13 @@ export class MainView extends LitElement {
         this.onLayoutModeChange = () => {};
         this.showApiKeyError = false;
         this.boundKeydownHandler = this.handleKeydown.bind(this);
+        this.apiKey = '';
+        this._loadApiKey();
+    }
+
+    async _loadApiKey() {
+        this.apiKey = await cheddar.storage.getApiKey();
+        this.requestUpdate();
     }
 
     connectedCallback() {
@@ -170,8 +177,6 @@ export class MainView extends LitElement {
         // Add keyboard event listener for Ctrl+Enter (or Cmd+Enter on Mac)
         document.addEventListener('keydown', this.boundKeydownHandler);
 
-        // Load and apply layout mode on startup
-        this.loadLayoutMode();
         // Resize window for this view
         resizeLayout();
     }
@@ -193,8 +198,9 @@ export class MainView extends LitElement {
         }
     }
 
-    handleInput(e) {
-        localStorage.setItem('apiKey', e.target.value);
+    async handleInput(e) {
+        this.apiKey = e.target.value;
+        await cheddar.storage.setApiKey(e.target.value);
         // Clear error state when user starts typing
         if (this.showApiKeyError) {
             this.showApiKeyError = false;
@@ -210,20 +216,6 @@ export class MainView extends LitElement {
 
     handleAPIKeyHelpClick() {
         this.onAPIKeyHelp();
-    }
-
-    handleResetOnboarding() {
-        localStorage.removeItem('onboardingCompleted');
-        // Refresh the page to trigger onboarding
-        window.location.reload();
-    }
-
-    loadLayoutMode() {
-        const savedLayoutMode = localStorage.getItem('layoutMode');
-        if (savedLayoutMode && savedLayoutMode !== 'normal') {
-            // Notify parent component to apply the saved layout mode
-            this.onLayoutModeChange(savedLayoutMode);
-        }
     }
 
     // Method to trigger the red blink animation
@@ -289,7 +281,7 @@ export class MainView extends LitElement {
                 <input
                     type="password"
                     placeholder="Enter your Gemini API Key"
-                    .value=${localStorage.getItem('apiKey') || ''}
+                    .value=${this.apiKey}
                     @input=${this.handleInput}
                     class="${this.showApiKeyError ? 'api-key-error' : ''}"
                 />

@@ -2,6 +2,7 @@ const { BrowserWindow, globalShortcut, ipcMain, screen } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const os = require('os');
+const storage = require('../storage');
 
 let mouseEventsIgnored = false;
 let windowResizing = false;
@@ -73,36 +74,19 @@ function createWindow(sendToRenderer, geminiSessionRef) {
 
     mainWindow.loadFile(path.join(__dirname, '../index.html'));
 
-    // After window is created, check for layout preference and resize if needed
+    // After window is created, initialize keybinds
     mainWindow.webContents.once('dom-ready', () => {
         setTimeout(() => {
             const defaultKeybinds = getDefaultKeybinds();
             let keybinds = defaultKeybinds;
 
-            mainWindow.webContents
-                .executeJavaScript(
-                    `
-                try {
-                    const savedKeybinds = localStorage.getItem('customKeybinds');
-                    
-                    return {
-                        keybinds: savedKeybinds ? JSON.parse(savedKeybinds) : null
-                    };
-                } catch (e) {
-                    return { keybinds: null };
-                }
-            `
-                )
-                .then(async savedSettings => {
-                    if (savedSettings.keybinds) {
-                        keybinds = { ...defaultKeybinds, ...savedSettings.keybinds };
-                    }
+            // Load keybinds from storage
+            const savedKeybinds = storage.getKeybinds();
+            if (savedKeybinds) {
+                keybinds = { ...defaultKeybinds, ...savedKeybinds };
+            }
 
-                    updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessionRef);
-                })
-                .catch(() => {
-                    updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessionRef);
-                });
+            updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessionRef);
         }, 150);
     });
 
