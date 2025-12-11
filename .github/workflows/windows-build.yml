@@ -1,52 +1,40 @@
-name: CI Desktop
+name: Build & Release
 
 on:
-    push:
-        branches: [main]
-        tags:
-            - 'v*'
-    pull_request:
-        branches: [main]
-    schedule:
-        - cron: '0 2 2 */4 *'
-    workflow_dispatch:
+  push:
+    tags:
+      - 'v*' # Triggers only when you push a tag like v0.4.5
 
 permissions:
-    contents: write
-
-concurrency:
-    group: ci-${{ github.ref }}
-    cancel-in-progress: true
+  contents: write
 
 jobs:
-    build:
-        strategy:
-            fail-fast: true
-            matrix:
-                os: [windows-latest]
+  build-windows:
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-        runs-on: ${{ matrix.os }}
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
 
-        steps:
-            - name: Checkout repo
-              uses: actions/checkout@v4
+      - name: Install Dependencies
+        run: npm ci
 
-            - name: Setup NodeJS
-              uses: actions/setup-node@v4
-              with:
-                  node-version: 'lts/*'
-                  cache: 'npm'
+      - name: Build Windows App
+        # This runs "electron-builder" based on your package.json
+        run: npm run build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-            - name: Install JS dependencies
-              run: npm install
-
-            - name: Run tests
-              run: npm test
-
-            - name: Build Electron app
-              uses: samuelmeuli/action-electron-builder@v1
-              with:
-                  release: true
-                  args: -w --x64
-                  # The action requires this specific input name
-                  github_token: ${{ secrets.github_token }}
+      - name: Upload Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          # This looks for the EXE in the default "dist" folder
+          files: dist/*.exe
+          token: ${{ secrets.GITHUB_TOKEN }}
