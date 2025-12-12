@@ -456,6 +456,200 @@ function isGroqInitialized() {
     return groqApiKey !== null;
 }
 
+// Llama text generation configuration
+const LLAMA_MODEL = 'meta-llama/llama-4-maverick-17b-128e-instruct';
+
+// Conversation history for context
+let conversationHistory = [];
+let currentProfile = 'interview';
+let currentSystemPrompt = '';
+
+/**
+ * Set the current profile and system prompt for Llama generation
+ * @param {string} profile - The profile name (interview, sales, etc.)
+ * @param {string} systemPrompt - The system prompt to use
+ */
+function setLlamaConfig(profile, systemPrompt) {
+    currentProfile = profile;
+    currentSystemPrompt = systemPrompt;
+    conversationHistory = []; // Reset conversation on config change
+    console.log(`[GROQ LLAMA] Config set - Profile: ${profile}`);
+}
+
+/**
+ * Generate a response using Llama 4 Maverick via Groq API
+ * @param {string} userMessage - The user's question/transcription
+ * @param {string} [imageBase64] - Optional base64 encoded image
+ * @returns {Promise<string>} - The generated response
+ */
+async function generateWithLlama(userMessage, imageBase64 = null) {
+    return new Promise((resolve, reject) => {
+        if (!groqApiKey) {
+            reject(new Error('Groq API key not initialized'));
+            return;
+        }
+
+        console.log(`\n[GROQ LLAMA] Generating response for: "${userMessage.substring(0, 100)}..."`);
+        sendToRenderer('update-status', 'Thinking...');
+
+        // Build messages array
+        const messages = [];
+
+        // Add system prompt
+        if (currentSystemPrompt) {
+            messages.push({
+                role: 'system',
+                content: currentSystemPrompt
+            });
+        }
+
+        // Add conversation history for context
+        messages.push(...conversationHistory);
+
+        // Add current user message
+        const userContent = [];
+
+        // Add text content
+        userContent.push({
+            type: 'text',
+            text: userMessage
+        });
+
+        // Add image if provided (for vision-capable models)
+        if (imageBase64) {
+            userContent.push({
+                type: 'image_url',
+                image_url: {
+                    url: `data:image/jpeg;base64,${imageBase64}`
+                }
+            });
+        }
+
+        messages.push({
+            role: 'user',
+            content: userContent.length === 1 ? userMessage : userContent
+        });
+
+        const requestBody = JSON.stringify({
+            model: LLAMA_MODEL,
+            messages: messages,
+            temperature: 0.7,
+            max_tokens: 4096,
+            stream: true // Enable streaming for faster perceived response
+        });
+
+        const url = new URL(`${GROQ_API_BASE}/chat/completions`);
+
+        const options = {
+            hostname: url.hostname,
+            port: 443,
+            path: url.pathname,
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${groqApiKey}`,
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(requestBody)
+            }
+        };
+
+        let fullResponse = '';
+        let buffer = '';
+
+        const req = https.request(options, (res) => {
+            res.on('data', (chunk) => {
+                buffer += chunk.toString();
+
+                // Process complete SSE messages
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        const data = line.slice(6);
+                        if (data === '[DONE]') {
+                            continue;
+                        }
+                        try {
+                            const parsed = JSON.parse(data);
+                            const content = parsed.choices?.[0]?.delta?.content;
+                            if (content) {
+                                fullResponse += content;
+                                // Stream to renderer for live display
+                                sendToRenderer('update-response', fullResponse);
+                            }
+                        } catch (e) {
+                            // Ignore parse errors for incomplete chunks
+                        }
+                    }
+                }
+            });
+
+            res.on('end', () => {
+                if (res.statusCode === 200) {
+                    // Process any remaining buffer
+                    if (buffer.startsWith('data: ') && buffer.slice(6) !== '[DONE]') {
+                        try {
+                            const parsed = JSON.parse(buffer.slice(6));
+                            const content = parsed.choices?.[0]?.delta?.content;
+                            if (content) {
+                                fullResponse += content;
+                            }
+                        } catch (e) {}
+                    }
+
+                    if (fullResponse) {
+                        console.log('\n========================================');
+                        console.log('[GROQ LLAMA] RESPONSE:');
+                        console.log('----------------------------------------');
+                        console.log(fullResponse.substring(0, 500) + (fullResponse.length > 500 ? '...' : ''));
+                        console.log('========================================\n');
+
+                        // Save to conversation history
+                        conversationHistory.push(
+                            { role: 'user', content: userMessage },
+                            { role: 'assistant', content: fullResponse }
+                        );
+
+                        // Limit history to last 10 exchanges to prevent context overflow
+                        if (conversationHistory.length > 20) {
+                            conversationHistory = conversationHistory.slice(-20);
+                        }
+
+                        // Send final response to renderer
+                        sendToRenderer('update-response', fullResponse);
+                        sendToRenderer('update-status', 'Ready');
+                        resolve(fullResponse);
+                    } else {
+                        sendToRenderer('update-status', 'No response');
+                        reject(new Error('Empty response from Llama'));
+                    }
+                } else {
+                    console.error('[GROQ LLAMA] API Error:', res.statusCode, buffer);
+                    sendToRenderer('update-status', 'Error');
+                    reject(new Error(`Groq Llama API error: ${res.statusCode}`));
+                }
+            });
+        });
+
+        req.on('error', (e) => {
+            console.error('[GROQ LLAMA] Request error:', e);
+            sendToRenderer('update-status', 'Error');
+            reject(e);
+        });
+
+        req.write(requestBody);
+        req.end();
+    });
+}
+
+/**
+ * Clear conversation history
+ */
+function clearConversationHistory() {
+    conversationHistory = [];
+    console.log('[GROQ LLAMA] Conversation history cleared');
+}
+
 /**
  * Setup IPC handlers for Groq
  */
@@ -507,6 +701,32 @@ function setupGroqIpcHandlers() {
         return { success: true };
     });
 
+    // Llama text generation handlers
+    ipcMain.handle('groq-set-llama-config', async (event, { profile, systemPrompt }) => {
+        try {
+            setLlamaConfig(profile, systemPrompt);
+            return { success: true };
+        } catch (error) {
+            console.error('[GROQ] Set Llama config error:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('groq-generate-response', async (event, { message, imageBase64 }) => {
+        try {
+            const response = await generateWithLlama(message, imageBase64);
+            return { success: true, response };
+        } catch (error) {
+            console.error('[GROQ] Generate response error:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('groq-clear-history', async (event) => {
+        clearConversationHistory();
+        return { success: true };
+    });
+
     console.log('[GROQ] IPC handlers registered');
 }
 
@@ -521,5 +741,9 @@ module.exports = {
     getBufferDuration,
     isGroqInitialized,
     setupGroqIpcHandlers,
-    sendToRenderer
+    sendToRenderer,
+    // Llama text generation
+    setLlamaConfig,
+    generateWithLlama,
+    clearConversationHistory
 };

@@ -194,7 +194,7 @@ async function initializeGroq(apiKey) {
         const result = await ipcRenderer.invoke('initialize-groq', apiKey);
         if (result.success) {
             console.log('[GROQ] Initialized successfully');
-            cheddar.setStatus('Groq Ready - Listening...');
+            cheddar.setStatus('Listening...');
             return true;
         } else {
             console.error('[GROQ] Initialization failed:', result.error);
@@ -214,8 +214,8 @@ ipcRenderer.on('update-status', (event, status) => {
     cheddar.setStatus(status);
 });
 
-// Listen for Groq transcription results
-ipcRenderer.on('groq-transcription', (event, transcription) => {
+// Listen for Groq transcription results and generate response with Llama
+ipcRenderer.on('groq-transcription', async (event, transcription) => {
     console.log('\n========================================');
     console.log('[GROQ STT] RECEIVED TRANSCRIPTION:');
     console.log('----------------------------------------');
@@ -224,6 +224,40 @@ ipcRenderer.on('groq-transcription', (event, transcription) => {
 
     // Update status to show transcription was received
     cheddar.setStatus('Transcription received');
+
+    // Trim and validate transcription
+    const cleanTranscription = transcription?.trim();
+    if (!cleanTranscription || cleanTranscription.length < 3) {
+        console.log('[GROQ] Transcription too short, skipping Llama generation');
+        return;
+    }
+
+    // Check if we're in interview mode (non-exam mode uses Groq)
+    const selectedMode = localStorage.getItem('selectedMode') || 'interview';
+    if (selectedMode === 'coding') {
+        console.log('[GROQ] In coding/exam mode - skipping Llama generation');
+        return;
+    }
+
+    // Generate response using Llama
+    try {
+        console.log('[GROQ LLAMA] Sending transcription to Llama for response...');
+        cheddar.setStatus('Generating response...');
+
+        const result = await ipcRenderer.invoke('groq-generate-response', {
+            message: cleanTranscription,
+            imageBase64: null // Text-only for now, screenshots handled separately
+        });
+
+        if (!result.success) {
+            console.error('[GROQ LLAMA] Generation failed:', result.error);
+            cheddar.setStatus('Error generating response');
+        }
+        // Response is streamed via update-response event, handled by CheatingDaddyApp.js
+    } catch (error) {
+        console.error('[GROQ LLAMA] Error:', error);
+        cheddar.setStatus('Error: ' + error.message);
+    }
 });
 
 // Listen for responses - REMOVED: This is handled in CheatingDaddyApp.js to avoid duplicates
@@ -710,16 +744,103 @@ async function captureManualScreenshot(imageQuality = null) {
     console.log('Manual screenshot triggered');
     const quality = imageQuality || currentImageQuality;
 
-    // Check if we're in coding mode
+    // Check if we're in interview or coding mode
     const selectedMode = localStorage.getItem('selectedMode') || 'interview';
 
     if (selectedMode === 'coding') {
-        // For coding mode, ONLY send screenshot - system prompt will handle it
+        // For coding/exam mode, send screenshot to Gemini
         await captureScreenshot(quality, true);
     } else {
-        // For interview mode, just send screenshot
-        await captureScreenshot(quality, true);
+        // For interview mode, capture screenshot and send to Groq Llama
+        await captureScreenshotForGroq(quality);
     }
+}
+
+// Capture screenshot and send to Groq Llama for interview mode
+async function captureScreenshotForGroq(imageQuality = 'medium') {
+    console.log('[GROQ] Capturing screenshot for Llama analysis...');
+    if (!mediaStream) {
+        console.error('No media stream available');
+        cheddar.setStatus('Error: No screen capture');
+        return;
+    }
+
+    // Lazy init of video element
+    if (!hiddenVideo) {
+        hiddenVideo = document.createElement('video');
+        hiddenVideo.srcObject = mediaStream;
+        hiddenVideo.muted = true;
+        hiddenVideo.playsInline = true;
+        await hiddenVideo.play();
+
+        await new Promise(resolve => {
+            if (hiddenVideo.readyState >= 2) return resolve();
+            hiddenVideo.onloadedmetadata = () => resolve();
+        });
+
+        offscreenCanvas = document.createElement('canvas');
+        offscreenCanvas.width = hiddenVideo.videoWidth;
+        offscreenCanvas.height = hiddenVideo.videoHeight;
+        offscreenContext = offscreenCanvas.getContext('2d');
+    }
+
+    offscreenContext.drawImage(hiddenVideo, 0, 0);
+
+    // Get quality value
+    let qualityValue;
+    switch (imageQuality) {
+        case 'high':
+            qualityValue = 0.9;
+            break;
+        case 'medium':
+            qualityValue = 0.7;
+            break;
+        case 'low':
+            qualityValue = 0.5;
+            break;
+        default:
+            qualityValue = 0.7;
+    }
+
+    offscreenCanvas.toBlob(
+        async blob => {
+            if (!blob) {
+                console.error('Failed to create blob from canvas');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onloadend = async () => {
+                const base64data = reader.result.split(',')[1];
+
+                if (!base64data || base64data.length < 100) {
+                    console.error('Invalid base64 data generated');
+                    return;
+                }
+
+                console.log('[GROQ] Sending screenshot to Llama for analysis...');
+                cheddar.setStatus('Analyzing screenshot...');
+
+                try {
+                    const result = await ipcRenderer.invoke('groq-generate-response', {
+                        message: 'Please analyze this screenshot and answer the question or problem shown. If it shows a coding problem, provide a complete solution. If it shows an interview question, provide a natural, conversational answer.',
+                        imageBase64: base64data
+                    });
+
+                    if (!result.success) {
+                        console.error('[GROQ] Screenshot analysis failed:', result.error);
+                        cheddar.setStatus('Error analyzing');
+                    }
+                } catch (error) {
+                    console.error('[GROQ] Screenshot analysis error:', error);
+                    cheddar.setStatus('Error: ' + error.message);
+                }
+            };
+            reader.readAsDataURL(blob);
+        },
+        'image/jpeg',
+        qualityValue
+    );
 }
 
 // Expose functions to global scope for external access

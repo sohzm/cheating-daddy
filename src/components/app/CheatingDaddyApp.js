@@ -311,26 +311,40 @@ export class CheatingDaddyApp extends LitElement {
             // Exam mode: Use Gemini API
             await cheddar.initializeGemini(this.selectedProfile, this.selectedLanguage, selectedMode, selectedModel);
         } else {
-            // Interview mode: Use Groq API for STT
+            // Interview mode: Use Groq API for STT + Llama for response generation
             await cheddar.initializeGroq(apiKey);
-            // Still initialize a basic Gemini session for response generation if needed
-            // For now, we'll handle this in the audio pipeline
+
+            // Set up Llama config with system prompt from prompts.js
+            const { ipcRenderer } = window.require('electron');
+            const customPrompt = localStorage.getItem(`customPrompt_${this.selectedProfile}`) || '';
+
+            // Import prompts module to get system prompt
+            const { getSystemPrompt } = window.require('./utils/prompts.js');
+            const systemPrompt = getSystemPrompt(this.selectedProfile, customPrompt, true);
+
+            await ipcRenderer.invoke('groq-set-llama-config', {
+                profile: this.selectedProfile,
+                systemPrompt: systemPrompt
+            });
+            console.log(`[GROQ] Llama config set for profile: ${this.selectedProfile}`);
         }
 
         // Set current mode and model for header display
         this.currentMode = selectedMode;
         if (selectedMode === 'interview') {
-            this.currentModel = 'groq-whisper-large-v3-turbo';
+            this.currentModel = 'llama-4-maverick';
         } else {
             this.currentModel = selectedModel;
         }
 
-        // For coding/OA mode (exam-assistant), ALWAYS use manual mode to avoid rate limits
-        // For interview mode, use the user's selected interval
-        const screenshotMode = selectedMode === 'coding' ? 'manual' : this.selectedScreenshotInterval;
+        // ALWAYS use manual mode for both interview and coding modes to avoid rate limits
+        // User must press Ctrl+Enter to capture screenshots
+        const screenshotMode = 'manual';
 
         if (selectedMode === 'coding') {
             console.log('💻 Coding/OA mode (Exam Assistant): Manual capture only - Press Ctrl+Enter to analyze screenshot');
+        } else {
+            console.log('🎤 Interview mode: Manual capture only - Press Ctrl+Enter if needed. Voice questions are auto-detected.');
         }
 
         cheddar.startCapture(screenshotMode, this.selectedImageQuality);
