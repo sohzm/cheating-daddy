@@ -25,10 +25,7 @@ const DEFAULT_PREFERENCES = {
     audioMode: 'speaker_only',
     fontSize: 'medium',
     backgroundTransparency: 0.9,
-    googleSearchEnabled: false,
-    throttleTokens: true,
-    maxTokensPerMin: 1000000,
-    throttleAtPercent: 75
+    googleSearchEnabled: false
 };
 
 const DEFAULT_KEYBINDS = null; // null means use system defaults

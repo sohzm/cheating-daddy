@@ -256,76 +256,12 @@ export class AdvancedView extends LitElement {
             background: var(--input-hover-background, rgba(0, 0, 0, 0.35));
         }
 
-        .checkbox-group {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 10px;
-            padding: 8px;
-            background: var(--checkbox-background, rgba(255, 255, 255, 0.02));
-            border-radius: 4px;
-            border: 1px solid var(--checkbox-border, rgba(255, 255, 255, 0.06));
-        }
-
-        .checkbox-input {
-            width: 14px;
-            height: 14px;
-            accent-color: var(--focus-border-color, #007aff);
-            cursor: pointer;
-        }
-
-        .checkbox-label {
-            font-weight: 500;
-            font-size: 12px;
-            color: var(--label-color, rgba(255, 255, 255, 0.9));
-            cursor: pointer;
-            user-select: none;
-        }
-
-        .rate-limit-controls {
-            margin-left: 22px;
-            opacity: 0.7;
-            transition: opacity 0.15s ease;
-        }
-
-        .rate-limit-controls.enabled {
-            opacity: 1;
-        }
-
-        .rate-limit-reset {
-            margin-top: 10px;
-            padding-top: 10px;
-            border-top: 1px solid var(--table-border, rgba(255, 255, 255, 0.08));
-        }
-
-        .rate-limit-warning {
-            background: var(--warning-background, rgba(251, 191, 36, 0.08));
-            border: 1px solid var(--warning-border, rgba(251, 191, 36, 0.2));
-            border-radius: 4px;
-            padding: 10px;
-            margin-bottom: 12px;
-            font-size: 11px;
-            color: var(--warning-color, #fbbf24);
-            display: flex;
-            align-items: flex-start;
-            gap: 8px;
-            line-height: 1.4;
-        }
-
-        .rate-limit-warning-icon {
-            flex-shrink: 0;
-            font-size: 12px;
-            margin-top: 1px;
-        }
     `;
 
     static properties = {
         isClearing: { type: Boolean },
         statusMessage: { type: String },
         statusType: { type: String },
-        throttleTokens: { type: Boolean },
-        maxTokensPerMin: { type: Number },
-        throttleAtPercent: { type: Number },
     };
 
     constructor() {
@@ -333,25 +269,6 @@ export class AdvancedView extends LitElement {
         this.isClearing = false;
         this.statusMessage = '';
         this.statusType = '';
-
-        // Rate limiting defaults
-        this.throttleTokens = true;
-        this.maxTokensPerMin = 1000000;
-        this.throttleAtPercent = 75;
-
-        this._loadFromStorage();
-    }
-
-    async _loadFromStorage() {
-        try {
-            const prefs = await cheatingDaddy.storage.getPreferences();
-            this.throttleTokens = prefs.throttleTokens ?? true;
-            this.maxTokensPerMin = prefs.maxTokensPerMin ?? 1000000;
-            this.throttleAtPercent = prefs.throttleAtPercent ?? 75;
-            this.requestUpdate();
-        } catch (error) {
-            console.error('Error loading settings:', error);
-        }
     }
 
     connectedCallback() {
@@ -397,123 +314,9 @@ export class AdvancedView extends LitElement {
         }
     }
 
-    async handleThrottleTokensChange(e) {
-        this.throttleTokens = e.target.checked;
-        await cheatingDaddy.storage.updatePreference('throttleTokens', this.throttleTokens);
-        await cheatingDaddy.refreshPreferencesCache();
-        this.requestUpdate();
-    }
-
-    async handleMaxTokensChange(e) {
-        const value = parseInt(e.target.value, 10);
-        if (!isNaN(value) && value > 0) {
-            this.maxTokensPerMin = value;
-            await cheatingDaddy.storage.updatePreference('maxTokensPerMin', this.maxTokensPerMin);
-            await cheatingDaddy.refreshPreferencesCache();
-        }
-    }
-
-    async handleThrottlePercentChange(e) {
-        const value = parseInt(e.target.value, 10);
-        if (!isNaN(value) && value >= 0 && value <= 100) {
-            this.throttleAtPercent = value;
-            await cheatingDaddy.storage.updatePreference('throttleAtPercent', this.throttleAtPercent);
-            await cheatingDaddy.refreshPreferencesCache();
-        }
-    }
-
-    async resetRateLimitSettings() {
-        this.throttleTokens = true;
-        this.maxTokensPerMin = 1000000;
-        this.throttleAtPercent = 75;
-
-        await cheatingDaddy.storage.setPreferences({
-            throttleTokens: true,
-            maxTokensPerMin: 1000000,
-            throttleAtPercent: 75
-        });
-        await cheatingDaddy.refreshPreferencesCache();
-
-        this.requestUpdate();
-    }
-
     render() {
         return html`
             <div class="advanced-container">
-                <!-- Rate Limiting Section -->
-                <div class="advanced-section">
-                    <div class="section-title">
-                        <span>⏱️ Rate Limiting</span>
-                    </div>
-
-                    <div class="rate-limit-warning">
-                        <span class="rate-limit-warning-icon">⚠️</span>
-                        <span
-                            ><strong>Warning:</strong> Don't mess with these settings if you don't know what this is about. Incorrect rate limiting
-                            settings may cause the application to stop working properly or hit API limits unexpectedly.</span
-                        >
-                    </div>
-
-                    <div class="form-grid">
-                        <div class="checkbox-group">
-                            <input
-                                type="checkbox"
-                                class="checkbox-input"
-                                id="throttle-tokens"
-                                .checked=${this.throttleTokens}
-                                @change=${this.handleThrottleTokensChange}
-                            />
-                            <label for="throttle-tokens" class="checkbox-label"> Throttle tokens when close to rate limit </label>
-                        </div>
-
-                        <div class="rate-limit-controls ${this.throttleTokens ? 'enabled' : ''}">
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label class="form-label">Max Allowed Tokens Per Minute</label>
-                                    <input
-                                        type="number"
-                                        class="form-control"
-                                        .value=${this.maxTokensPerMin}
-                                        min="1000"
-                                        max="10000000"
-                                        step="1000"
-                                        @input=${this.handleMaxTokensChange}
-                                        ?disabled=${!this.throttleTokens}
-                                    />
-                                    <div class="form-description">Maximum number of tokens allowed per minute before throttling kicks in</div>
-                                </div>
-
-                                <div class="form-group">
-                                    <label class="form-label">Throttle At Percent</label>
-                                    <input
-                                        type="number"
-                                        class="form-control"
-                                        .value=${this.throttleAtPercent}
-                                        min="1"
-                                        max="99"
-                                        step="1"
-                                        @input=${this.handleThrottlePercentChange}
-                                        ?disabled=${!this.throttleTokens}
-                                    />
-                                    <div class="form-description">
-                                        Start throttling when this percentage of the limit is reached (${this.throttleAtPercent}% =
-                                        ${Math.floor((this.maxTokensPerMin * this.throttleAtPercent) / 100)} tokens)
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="rate-limit-reset">
-                                <button class="action-button" @click=${this.resetRateLimitSettings} ?disabled=${!this.throttleTokens}>
-                                    Reset to Defaults
-                                </button>
-                                <div class="form-description" style="margin-top: 8px;">Reset rate limiting settings to default values</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-
-
                 <!-- Data Management Section -->
                 <div class="advanced-section danger-section">
                     <div class="section-title danger">
