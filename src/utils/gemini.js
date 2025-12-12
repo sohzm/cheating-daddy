@@ -1,4 +1,4 @@
-const { GoogleGenAI } = require('@google/genai');
+const { GoogleGenAI, Modality } = require('@google/genai');
 const { BrowserWindow, ipcMain } = require('electron');
 const { spawn } = require('child_process');
 const { saveDebugAudio } = require('../audioUtils');
@@ -27,17 +27,32 @@ module.exports.formatSpeakerResults = formatSpeakerResults;
 let systemAudioProc = null;
 let messageBuffer = '';
 
-// Reconnection tracking variables
-let reconnectionAttempts = 0;
-let maxReconnectionAttempts = 3;
-let reconnectionDelay = 2000; // 2 seconds between attempts
-let lastSessionParams = null;
+// Reconnection variables
+let isUserClosing = false;
+let sessionParams = null;
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 3;
+const RECONNECT_DELAY = 2000;
 
 function sendToRenderer(channel, data) {
     const windows = BrowserWindow.getAllWindows();
     if (windows.length > 0) {
         windows[0].webContents.send(channel, data);
     }
+}
+
+// Build context message for session restoration
+function buildContextMessage() {
+    const lastTurns = conversationHistory.slice(-20);
+    const validTurns = lastTurns.filter(turn => turn.transcription?.trim() && turn.ai_response?.trim());
+
+    if (validTurns.length === 0) return null;
+
+    const contextLines = validTurns.map(turn =>
+        `[Interviewer]: ${turn.transcription.trim()}\n[Your answer]: ${turn.ai_response.trim()}`
+    );
+
+    return `Session reconnected. Here's the conversation so far:\n\n${contextLines.join('\n\n')}\n\nContinue from here.`;
 }
 
 // Conversation management functions
@@ -75,37 +90,6 @@ function getCurrentSessionData() {
         sessionId: currentSessionId,
         history: conversationHistory,
     };
-}
-
-async function sendReconnectionContext() {
-    if (!global.geminiSessionRef?.current || conversationHistory.length === 0) {
-        return;
-    }
-
-    try {
-        // Gather all transcriptions from the conversation history
-        const transcriptions = conversationHistory
-            .map(turn => turn.transcription)
-            .filter(transcription => transcription && transcription.trim().length > 0);
-
-        if (transcriptions.length === 0) {
-            return;
-        }
-
-        // Create the context message
-        const contextMessage = `Till now all these questions were asked in the interview, answer the last one please:\n\n${transcriptions.join(
-            '\n'
-        )}`;
-
-        console.log('Sending reconnection context with', transcriptions.length, 'previous questions');
-
-        // Send the context message to the new session
-        await global.geminiSessionRef.current.sendRealtimeInput({
-            text: contextMessage,
-        });
-    } catch (error) {
-        console.error('Error sending reconnection context:', error);
-    }
 }
 
 async function getEnabledTools() {
@@ -158,75 +142,27 @@ async function getStoredSetting(key, defaultValue) {
     return defaultValue;
 }
 
-async function attemptReconnection() {
-    if (!lastSessionParams || reconnectionAttempts >= maxReconnectionAttempts) {
-        console.log('Max reconnection attempts reached or no session params stored');
-        sendToRenderer('update-status', 'Session closed');
-        return false;
-    }
-
-    reconnectionAttempts++;
-    console.log(`Attempting reconnection ${reconnectionAttempts}/${maxReconnectionAttempts}...`);
-
-    // Wait before attempting reconnection
-    await new Promise(resolve => setTimeout(resolve, reconnectionDelay));
-
-    try {
-        const session = await initializeGeminiSession(
-            lastSessionParams.apiKey,
-            lastSessionParams.customPrompt,
-            lastSessionParams.profile,
-            lastSessionParams.language,
-            true // isReconnection flag
-        );
-
-        if (session && global.geminiSessionRef) {
-            global.geminiSessionRef.current = session;
-            reconnectionAttempts = 0; // Reset counter on successful reconnection
-            console.log('Live session reconnected');
-
-            // Send context message with previous transcriptions
-            await sendReconnectionContext();
-
-            return true;
-        }
-    } catch (error) {
-        console.error(`Reconnection attempt ${reconnectionAttempts} failed:`, error);
-    }
-
-    // If this attempt failed, try again
-    if (reconnectionAttempts < maxReconnectionAttempts) {
-        return attemptReconnection();
-    } else {
-        console.log('All reconnection attempts failed');
-        sendToRenderer('update-status', 'Session closed');
-        return false;
-    }
-}
-
-async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'interview', language = 'en-US', isReconnection = false) {
+async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'interview', language = 'en-US', isReconnect = false) {
     if (isInitializingSession) {
         console.log('Session initialization already in progress');
         return false;
     }
 
     isInitializingSession = true;
-    sendToRenderer('session-initializing', true);
+    if (!isReconnect) {
+        sendToRenderer('session-initializing', true);
+    }
 
-    // Store session parameters for reconnection (only if not already reconnecting)
-    if (!isReconnection) {
-        lastSessionParams = {
-            apiKey,
-            customPrompt,
-            profile,
-            language,
-        };
-        reconnectionAttempts = 0; // Reset counter for new session
+    // Store params for reconnection
+    if (!isReconnect) {
+        sessionParams = { apiKey, customPrompt, profile, language };
+        reconnectAttempts = 0;
     }
 
     const client = new GoogleGenAI({
         vertexai: false,
         apiKey: apiKey,
+        httpOptions: { apiVersion: 'v1alpha' },
     });
 
     // Get enabled tools first to determine Google Search status
@@ -235,14 +171,14 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
 
     const systemPrompt = getSystemPrompt(profile, customPrompt, googleSearchEnabled);
 
-    // Initialize new conversation session (only if not reconnecting)
-    if (!isReconnection) {
+    // Initialize new conversation session only on first connect
+    if (!isReconnect) {
         initializeNewSession();
     }
 
     try {
         const session = await client.live.connect({
-            model: 'gemini-live-2.5-flash-preview',
+            model: 'gemini-2.5-flash-native-audio-preview-09-2025',
             callbacks: {
                 onopen: function () {
                     sendToRenderer('update-status', 'Live session connected');
@@ -250,30 +186,36 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                 onmessage: function (message) {
                     console.log('----------------', message);
 
+                    // Handle input transcription (what was spoken)
                     if (message.serverContent?.inputTranscription?.results) {
                         currentTranscription += formatSpeakerResults(message.serverContent.inputTranscription.results);
+                    } else if (message.serverContent?.inputTranscription?.text) {
+                        const text = message.serverContent.inputTranscription.text;
+                        if (text.trim() !== '') {
+                            currentTranscription += text;
+                        }
                     }
 
-                    // Handle AI model response
-                    if (message.serverContent?.modelTurn?.parts) {
-                        for (const part of message.serverContent.modelTurn.parts) {
-                            console.log(part);
-                            if (part.text) {
-                                messageBuffer += part.text;
-                                sendToRenderer('update-response', messageBuffer);
-                            }
-                        }
+                    // Handle AI model response via output transcription (native audio model)
+                    if (message.serverContent?.outputTranscription?.text) {
+                        const text = message.serverContent.outputTranscription.text;
+                        if (text.trim() === '') return; // Ignore empty transcriptions
+                        const isNewResponse = messageBuffer === '';
+                        messageBuffer += text;
+                        sendToRenderer(isNewResponse ? 'new-response' : 'update-response', messageBuffer);
                     }
 
                     if (message.serverContent?.generationComplete) {
-                        sendToRenderer('update-response', messageBuffer);
+                        // Only send/save if there's actual content
+                        if (messageBuffer.trim() !== '') {
+                            sendToRenderer('update-response', messageBuffer);
 
-                        // Save conversation turn when we have both transcription and AI response
-                        if (currentTranscription && messageBuffer) {
-                            saveConversationTurn(currentTranscription, messageBuffer);
-                            currentTranscription = ''; // Reset for next turn
+                            // Save conversation turn when we have both transcription and AI response
+                            if (currentTranscription) {
+                                saveConversationTurn(currentTranscription, messageBuffer);
+                                currentTranscription = ''; // Reset for next turn
+                            }
                         }
-
                         messageBuffer = '';
                     }
 
@@ -282,56 +224,31 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                     }
                 },
                 onerror: function (e) {
-                    console.debug('Error:', e.message);
-
-                    // Check if the error is related to invalid API key
-                    const isApiKeyError =
-                        e.message &&
-                        (e.message.includes('API key not valid') ||
-                            e.message.includes('invalid API key') ||
-                            e.message.includes('authentication failed') ||
-                            e.message.includes('unauthorized'));
-
-                    if (isApiKeyError) {
-                        console.log('Error due to invalid API key - stopping reconnection attempts');
-                        lastSessionParams = null; // Clear session params to prevent reconnection
-                        reconnectionAttempts = maxReconnectionAttempts; // Stop further attempts
-                        sendToRenderer('update-status', 'Error: Invalid API key');
-                        return;
-                    }
-
+                    console.log('Session error:', e.message);
                     sendToRenderer('update-status', 'Error: ' + e.message);
                 },
                 onclose: function (e) {
-                    console.debug('Session closed:', e.reason);
+                    console.log('Session closed:', e.reason);
 
-                    // Check if the session closed due to invalid API key
-                    const isApiKeyError =
-                        e.reason &&
-                        (e.reason.includes('API key not valid') ||
-                            e.reason.includes('invalid API key') ||
-                            e.reason.includes('authentication failed') ||
-                            e.reason.includes('unauthorized'));
-
-                    if (isApiKeyError) {
-                        console.log('Session closed due to invalid API key - stopping reconnection attempts');
-                        lastSessionParams = null; // Clear session params to prevent reconnection
-                        reconnectionAttempts = maxReconnectionAttempts; // Stop further attempts
-                        sendToRenderer('update-status', 'Session closed: Invalid API key');
+                    // Don't reconnect if user intentionally closed
+                    if (isUserClosing) {
+                        isUserClosing = false;
+                        sendToRenderer('update-status', 'Session closed');
                         return;
                     }
 
-                    // Attempt automatic reconnection for server-side closures
-                    if (lastSessionParams && reconnectionAttempts < maxReconnectionAttempts) {
-                        console.log('Attempting automatic reconnection...');
-                        attemptReconnection();
+                    // Attempt reconnection
+                    if (sessionParams && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                        attemptReconnect();
                     } else {
                         sendToRenderer('update-status', 'Session closed');
                     }
                 },
             },
             config: {
-                responseModalities: ['TEXT'],
+                responseModalities: [Modality.AUDIO],
+                proactivity: { proactiveAudio: true },
+                outputAudioTranscription: {},
                 tools: enabledTools,
                 // Enable speaker diarization
                 inputAudioTranscription: {
@@ -348,14 +265,78 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
         });
 
         isInitializingSession = false;
-        sendToRenderer('session-initializing', false);
+        if (!isReconnect) {
+            sendToRenderer('session-initializing', false);
+        }
         return session;
     } catch (error) {
         console.error('Failed to initialize Gemini session:', error);
         isInitializingSession = false;
-        sendToRenderer('session-initializing', false);
+        if (!isReconnect) {
+            sendToRenderer('session-initializing', false);
+        }
         return null;
     }
+}
+
+async function attemptReconnect() {
+    reconnectAttempts++;
+    console.log(`Reconnection attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}`);
+
+    // Clear stale buffers
+    messageBuffer = '';
+    currentTranscription = '';
+
+    sendToRenderer('update-status', `Reconnecting... (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
+
+    // Wait before attempting
+    await new Promise(resolve => setTimeout(resolve, RECONNECT_DELAY));
+
+    try {
+        const session = await initializeGeminiSession(
+            sessionParams.apiKey,
+            sessionParams.customPrompt,
+            sessionParams.profile,
+            sessionParams.language,
+            true // isReconnect
+        );
+
+        if (session && global.geminiSessionRef) {
+            global.geminiSessionRef.current = session;
+
+            // Restore context from conversation history via text message
+            const contextMessage = buildContextMessage();
+            if (contextMessage) {
+                try {
+                    console.log('Restoring conversation context...');
+                    await session.sendRealtimeInput({ text: contextMessage });
+                } catch (contextError) {
+                    console.error('Failed to restore context:', contextError);
+                    // Continue without context - better than failing
+                }
+            }
+
+            // Don't reset reconnectAttempts here - let it reset on next fresh session
+            sendToRenderer('update-status', 'Reconnected! Listening...');
+            console.log('Session reconnected successfully');
+            return true;
+        }
+    } catch (error) {
+        console.error(`Reconnection attempt ${reconnectAttempts} failed:`, error);
+    }
+
+    // If we still have attempts left, try again
+    if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+        return attemptReconnect();
+    }
+
+    // Max attempts reached - notify frontend
+    console.log('Max reconnection attempts reached');
+    sendToRenderer('reconnect-failed', {
+        message: 'Tried 3 times to reconnect. Must be upstream/network issues. Try restarting or download updated app from site.',
+    });
+    sessionParams = null;
+    return false;
 }
 
 function killExistingSystemAudioDump() {
@@ -627,10 +608,11 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
         try {
             stopMacOSAudioCapture();
 
-            // Clear session params to prevent reconnection when user closes session
-            lastSessionParams = null;
+            // Set flag to prevent reconnection attempts
+            isUserClosing = true;
+            sessionParams = null;
 
-            // Cleanup any pending resources and stop audio/video capture
+            // Cleanup session
             if (geminiSessionRef.current) {
                 await geminiSessionRef.current.close();
                 geminiSessionRef.current = null;
@@ -684,13 +666,11 @@ module.exports = {
     initializeNewSession,
     saveConversationTurn,
     getCurrentSessionData,
-    sendReconnectionContext,
     killExistingSystemAudioDump,
     startMacOSAudioCapture,
     convertStereoToMono,
     stopMacOSAudioCapture,
     sendAudioToGemini,
     setupGeminiIpcHandlers,
-    attemptReconnection,
     formatSpeakerResults,
 };

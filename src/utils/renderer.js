@@ -634,7 +634,8 @@ const cheatingDaddy = {
 
     // Status and response functions
     setStatus: text => cheatingDaddyApp.setStatus(text),
-    setResponse: response => cheatingDaddyApp.setResponse(response),
+    addNewResponse: response => cheatingDaddyApp.addNewResponse(response),
+    updateCurrentResponse: response => cheatingDaddyApp.updateCurrentResponse(response),
 
     // Core functionality
     initializeGemini,

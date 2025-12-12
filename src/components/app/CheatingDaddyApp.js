@@ -223,14 +223,20 @@ export class CheatingDaddyApp extends LitElement {
         // Set up IPC listeners if needed
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
+            ipcRenderer.on('new-response', (_, response) => {
+                this.addNewResponse(response);
+            });
             ipcRenderer.on('update-response', (_, response) => {
-                this.setResponse(response);
+                this.updateCurrentResponse(response);
             });
             ipcRenderer.on('update-status', (_, status) => {
                 this.setStatus(status);
             });
             ipcRenderer.on('click-through-toggled', (_, isEnabled) => {
                 this._isClickThrough = isEnabled;
+            });
+            ipcRenderer.on('reconnect-failed', (_, data) => {
+                this.addNewResponse(data.message);
             });
         }
     }
@@ -239,9 +245,11 @@ export class CheatingDaddyApp extends LitElement {
         super.disconnectedCallback();
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
+            ipcRenderer.removeAllListeners('new-response');
             ipcRenderer.removeAllListeners('update-response');
             ipcRenderer.removeAllListeners('update-status');
             ipcRenderer.removeAllListeners('click-through-toggled');
+            ipcRenderer.removeAllListeners('reconnect-failed');
         }
     }
 
@@ -255,36 +263,24 @@ export class CheatingDaddyApp extends LitElement {
         }
     }
 
-    setResponse(response) {
-        // Check if this looks like a filler response (very short responses to hmm, ok, etc)
-        const isFillerResponse =
-            response.length < 30 &&
-            (response.toLowerCase().includes('hmm') ||
-                response.toLowerCase().includes('okay') ||
-                response.toLowerCase().includes('next') ||
-                response.toLowerCase().includes('go on') ||
-                response.toLowerCase().includes('continue'));
+    addNewResponse(response) {
+        // Add a new response entry (first word of a new AI response)
+        this.responses = [...this.responses, response];
+        this.currentResponseIndex = this.responses.length - 1;
+        this._awaitingNewResponse = false;
+        console.log('[addNewResponse] Added:', response);
+        this.requestUpdate();
+    }
 
-        if (this._awaitingNewResponse || this.responses.length === 0) {
-            // Always add as new response when explicitly waiting for one
-            this.responses = [...this.responses, response];
-            this.currentResponseIndex = this.responses.length - 1;
-            this._awaitingNewResponse = false;
-            this._currentResponseIsComplete = false;
-            console.log('[setResponse] Pushed new response:', response);
-        } else if (!this._currentResponseIsComplete && !isFillerResponse && this.responses.length > 0) {
-            // For substantial responses, update the last one (streaming behavior)
-            // Only update if the current response is not marked as complete
-            this.responses = [...this.responses.slice(0, this.responses.length - 1), response];
-            console.log('[setResponse] Updated last response:', response);
+    updateCurrentResponse(response) {
+        // Update the current response in place (streaming subsequent words)
+        if (this.responses.length > 0) {
+            this.responses = [...this.responses.slice(0, -1), response];
+            console.log('[updateCurrentResponse] Updated to:', response);
         } else {
-            // For filler responses or when current response is complete, add as new
-            this.responses = [...this.responses, response];
-            this.currentResponseIndex = this.responses.length - 1;
-            this._currentResponseIsComplete = false;
-            console.log('[setResponse] Added response as new:', response);
+            // Fallback: if no responses exist, add as new
+            this.addNewResponse(response);
         }
-        this.shouldAnimateResponse = true;
         this.requestUpdate();
     }
 

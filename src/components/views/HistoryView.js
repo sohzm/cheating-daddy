@@ -88,11 +88,11 @@ export class HistoryView extends LitElement {
         }
 
         .message.user {
-            border-left-color: var(--text-secondary);
+            border-left-color: #3b82f6;
         }
 
         .message.ai {
-            border-left-color: var(--text-color);
+            border-left-color: #ef4444;
         }
 
         .back-header {
@@ -100,7 +100,7 @@ export class HistoryView extends LitElement {
             justify-content: space-between;
             align-items: center;
             margin-bottom: 12px;
-            padding-bottom: 12px;
+            padding: 12px 12px 12px 12px;
             border-bottom: 1px solid var(--border-color);
         }
 
@@ -143,11 +143,11 @@ export class HistoryView extends LitElement {
         }
 
         .legend-dot.user {
-            background-color: var(--text-secondary);
+            background-color: #3b82f6;
         }
 
         .legend-dot.ai {
-            background-color: var(--text-color);
+            background-color: #ef4444;
         }
 
         .empty-state {
