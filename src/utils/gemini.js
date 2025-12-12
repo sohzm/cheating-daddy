@@ -9,6 +9,9 @@ const { getAvailableModel, incrementLimitCount, getApiKey } = require('../storag
 let currentSessionId = null;
 let currentTranscription = '';
 let conversationHistory = [];
+let screenAnalysisHistory = [];
+let currentProfile = null;
+let currentCustomPrompt = null;
 let isInitializingSession = false;
 
 function formatSpeakerResults(results) {
@@ -57,11 +60,23 @@ function buildContextMessage() {
 }
 
 // Conversation management functions
-function initializeNewSession() {
+function initializeNewSession(profile = null, customPrompt = null) {
     currentSessionId = Date.now().toString();
     currentTranscription = '';
     conversationHistory = [];
-    console.log('New conversation session started:', currentSessionId);
+    screenAnalysisHistory = [];
+    currentProfile = profile;
+    currentCustomPrompt = customPrompt;
+    console.log('New conversation session started:', currentSessionId, 'profile:', profile);
+
+    // Save initial session with profile context
+    if (profile) {
+        sendToRenderer('save-session-context', {
+            sessionId: currentSessionId,
+            profile: profile,
+            customPrompt: customPrompt || ''
+        });
+    }
 }
 
 function saveConversationTurn(transcription, aiResponse) {
@@ -83,6 +98,31 @@ function saveConversationTurn(transcription, aiResponse) {
         sessionId: currentSessionId,
         turn: conversationTurn,
         fullHistory: conversationHistory,
+    });
+}
+
+function saveScreenAnalysis(prompt, response, model) {
+    if (!currentSessionId) {
+        initializeNewSession();
+    }
+
+    const analysisEntry = {
+        timestamp: Date.now(),
+        prompt: prompt,
+        response: response.trim(),
+        model: model
+    };
+
+    screenAnalysisHistory.push(analysisEntry);
+    console.log('Saved screen analysis:', analysisEntry);
+
+    // Send to renderer to save
+    sendToRenderer('save-screen-analysis', {
+        sessionId: currentSessionId,
+        analysis: analysisEntry,
+        fullHistory: screenAnalysisHistory,
+        profile: currentProfile,
+        customPrompt: currentCustomPrompt
     });
 }
 
@@ -174,7 +214,7 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
 
     // Initialize new conversation session only on first connect
     if (!isReconnect) {
-        initializeNewSession();
+        initializeNewSession(profile, customPrompt);
     }
 
     try {
@@ -539,6 +579,10 @@ async function sendImageToGeminiHttp(base64Data, prompt) {
         }
 
         console.log(`Image response completed from ${model}`);
+
+        // Save screen analysis to history
+        saveScreenAnalysis(prompt, fullText, model);
+
         return { success: true, text: fullText, model: model };
     } catch (error) {
         console.error('Error sending image to Gemini HTTP:', error);

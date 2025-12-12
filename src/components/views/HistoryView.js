@@ -85,6 +85,8 @@ export class HistoryView extends LitElement {
             background: var(--bg-secondary);
             user-select: text;
             cursor: text;
+            white-space: pre-wrap;
+            word-wrap: break-word;
         }
 
         .message.user {
@@ -148,6 +150,85 @@ export class HistoryView extends LitElement {
 
         .legend-dot.ai {
             background-color: #ef4444;
+        }
+
+        .legend-dot.screen {
+            background-color: #22c55e;
+        }
+
+        .session-context {
+            padding: 8px 12px;
+            margin-bottom: 8px;
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+            font-size: 11px;
+        }
+
+        .session-context-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+
+        .session-context-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .context-label {
+            color: var(--text-muted);
+            min-width: 80px;
+        }
+
+        .context-value {
+            color: var(--text-color);
+            font-weight: 500;
+        }
+
+        .custom-prompt-value {
+            color: var(--text-secondary);
+            font-style: italic;
+            word-break: break-word;
+            white-space: pre-wrap;
+        }
+
+        .view-tabs {
+            display: flex;
+            gap: 0;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 8px;
+        }
+
+        .view-tab {
+            background: transparent;
+            color: var(--text-muted);
+            border: none;
+            padding: 8px 16px;
+            font-size: 11px;
+            font-weight: 500;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+            transition: color 0.1s ease;
+        }
+
+        .view-tab:hover {
+            color: var(--text-color);
+        }
+
+        .view-tab.active {
+            color: var(--text-color);
+            border-bottom-color: var(--text-color);
+        }
+
+        .message.screen {
+            border-left-color: #22c55e;
+        }
+
+        .analysis-meta {
+            font-size: 10px;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+            font-family: 'SF Mono', Monaco, monospace;
         }
 
         .empty-state {
@@ -274,6 +355,7 @@ export class HistoryView extends LitElement {
         sessions: { type: Array },
         selectedSession: { type: Object },
         loading: { type: Boolean },
+        activeTab: { type: String },
     };
 
     constructor() {
@@ -281,6 +363,7 @@ export class HistoryView extends LitElement {
         this.sessions = [];
         this.selectedSession = null;
         this.loading = true;
+        this.activeTab = 'conversation'; // 'conversation' or 'screen'
         this.loadSessions();
     }
 
@@ -343,8 +426,18 @@ export class HistoryView extends LitElement {
     }
 
     getSessionPreview(session) {
-        // For session list items, we just show message count
-        return `${session.messageCount || 0} messages`;
+        const parts = [];
+        if (session.messageCount > 0) {
+            parts.push(`${session.messageCount} messages`);
+        }
+        if (session.screenAnalysisCount > 0) {
+            parts.push(`${session.screenAnalysisCount} screen analysis`);
+        }
+        if (session.profile) {
+            const profileNames = this.getProfileNames();
+            parts.push(profileNames[session.profile] || session.profile);
+        }
+        return parts.length > 0 ? parts.join(' • ') : 'Empty session';
     }
 
     handleSessionClick(session) {
@@ -353,6 +446,11 @@ export class HistoryView extends LitElement {
 
     handleBackClick() {
         this.selectedSession = null;
+        this.activeTab = 'conversation';
+    }
+
+    handleTabClick(tab) {
+        this.activeTab = tab;
     }
 
     getProfileNames() {
@@ -397,9 +495,33 @@ export class HistoryView extends LitElement {
         `;
     }
 
-    renderConversationView() {
-        if (!this.selectedSession) return html``;
+    renderContextContent() {
+        const { profile, customPrompt } = this.selectedSession;
+        const profileNames = this.getProfileNames();
 
+        if (!profile && !customPrompt) {
+            return html`<div class="empty-state">No profile context available</div>`;
+        }
+
+        return html`
+            <div class="session-context">
+                ${profile ? html`
+                    <div class="session-context-row">
+                        <span class="context-label">Profile:</span>
+                        <span class="context-value">${profileNames[profile] || profile}</span>
+                    </div>
+                ` : ''}
+                ${customPrompt ? html`
+                    <div class="session-context-row">
+                        <span class="context-label">Custom Prompt:</span>
+                        <span class="custom-prompt-value">${customPrompt}</span>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+    }
+
+    renderConversationContent() {
         const { conversationHistory } = this.selectedSession;
 
         // Flatten the conversation turns into individual messages
@@ -422,6 +544,33 @@ export class HistoryView extends LitElement {
                 }
             });
         }
+
+        if (messages.length === 0) {
+            return html`<div class="empty-state">No conversation data available</div>`;
+        }
+
+        return messages.map(message => html`<div class="message ${message.type}">${message.content}</div>`);
+    }
+
+    renderScreenAnalysisContent() {
+        const { screenAnalysisHistory } = this.selectedSession;
+
+        if (!screenAnalysisHistory || screenAnalysisHistory.length === 0) {
+            return html`<div class="empty-state">No screen analysis data available</div>`;
+        }
+
+        return screenAnalysisHistory.map(analysis => html`
+            <div class="message screen"><div class="analysis-meta">${this.formatTimestamp(analysis.timestamp)} • ${analysis.model || 'unknown model'}</div>${analysis.response}</div>
+        `);
+    }
+
+    renderConversationView() {
+        if (!this.selectedSession) return html``;
+
+        const { conversationHistory, screenAnalysisHistory, profile, customPrompt } = this.selectedSession;
+        const hasConversation = conversationHistory && conversationHistory.length > 0;
+        const hasScreenAnalysis = screenAnalysisHistory && screenAnalysisHistory.length > 0;
+        const hasContext = profile || customPrompt;
 
         return html`
             <div class="back-header">
@@ -448,12 +597,38 @@ export class HistoryView extends LitElement {
                         <div class="legend-dot ai"></div>
                         <span>Suggestion</span>
                     </div>
+                    <div class="legend-item">
+                        <div class="legend-dot screen"></div>
+                        <span>Screen</span>
+                    </div>
                 </div>
             </div>
+            <div class="view-tabs">
+                <button
+                    class="view-tab ${this.activeTab === 'conversation' ? 'active' : ''}"
+                    @click=${() => this.handleTabClick('conversation')}
+                >
+                    Conversation ${hasConversation ? `(${conversationHistory.length})` : ''}
+                </button>
+                <button
+                    class="view-tab ${this.activeTab === 'screen' ? 'active' : ''}"
+                    @click=${() => this.handleTabClick('screen')}
+                >
+                    Screen ${hasScreenAnalysis ? `(${screenAnalysisHistory.length})` : ''}
+                </button>
+                <button
+                    class="view-tab ${this.activeTab === 'context' ? 'active' : ''}"
+                    @click=${() => this.handleTabClick('context')}
+                >
+                    Context ${hasContext ? '' : '(empty)'}
+                </button>
+            </div>
             <div class="conversation-view">
-                ${messages.length > 0
-                    ? messages.map(message => html` <div class="message ${message.type}">${message.content}</div> `)
-                    : html`<div class="empty-state">No conversation data available</div>`}
+                ${this.activeTab === 'conversation'
+                    ? this.renderConversationContent()
+                    : this.activeTab === 'screen'
+                        ? this.renderScreenAnalysisContent()
+                        : this.renderContextContent()}
             </div>
         `;
     }

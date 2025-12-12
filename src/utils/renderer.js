@@ -679,6 +679,33 @@ ipcRenderer.on('save-conversation-turn', async (event, data) => {
     }
 });
 
+// Listen for session context (profile info) when session starts
+ipcRenderer.on('save-session-context', async (event, data) => {
+    try {
+        await storage.saveSession(data.sessionId, {
+            profile: data.profile,
+            customPrompt: data.customPrompt
+        });
+        console.log('Session context saved:', data.sessionId, 'profile:', data.profile);
+    } catch (error) {
+        console.error('Error saving session context:', error);
+    }
+});
+
+// Listen for screen analysis responses (from ctrl+enter)
+ipcRenderer.on('save-screen-analysis', async (event, data) => {
+    try {
+        await storage.saveSession(data.sessionId, {
+            screenAnalysisHistory: data.fullHistory,
+            profile: data.profile,
+            customPrompt: data.customPrompt
+        });
+        console.log('Screen analysis saved:', data.sessionId);
+    } catch (error) {
+        console.error('Error saving screen analysis:', error);
+    }
+});
+
 // Listen for emergency erase command from main process
 ipcRenderer.on('clear-sensitive-data', async () => {
     console.log('Clearing all data...');

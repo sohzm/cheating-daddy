@@ -88,6 +88,15 @@ export class AppHeader extends LitElement {
             font-size: 11px;
             font-family: 'SF Mono', Monaco, monospace;
         }
+
+        .click-through-indicator {
+            font-size: 10px;
+            color: var(--text-muted);
+            background: var(--key-background);
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'SF Mono', Monaco, monospace;
+        }
     `;
 
     static properties = {
@@ -186,6 +195,11 @@ export class AppHeader extends LitElement {
     getElapsedTime() {
         if (this.currentView === 'assistant' && this.startTime) {
             const elapsed = Math.floor((Date.now() - this.startTime) / 1000);
+            if (elapsed >= 60) {
+                const minutes = Math.floor(elapsed / 60);
+                const seconds = elapsed % 60;
+                return `${minutes}m ${seconds}s`;
+            }
             return `${elapsed}s`;
         }
         return '';
@@ -207,6 +221,7 @@ export class AppHeader extends LitElement {
                         ? html`
                               <span>${elapsedTime}</span>
                               <span>${this.statusText}</span>
+                              ${this.isClickThrough ? html`<span class="click-through-indicator">click-through</span>` : ''}
                           `
                         : ''}
                     ${this.currentView === 'main'

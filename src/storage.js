@@ -313,11 +313,20 @@ function getSessionPath(sessionId) {
 
 function saveSession(sessionId, data) {
     const sessionPath = getSessionPath(sessionId);
+
+    // Load existing session to preserve metadata
+    const existingSession = readJsonFile(sessionPath, null);
+
     const sessionData = {
         sessionId,
-        createdAt: parseInt(sessionId),
+        createdAt: existingSession?.createdAt || parseInt(sessionId),
         lastUpdated: Date.now(),
-        conversationHistory: data.conversationHistory || []
+        // Profile context - set once when session starts
+        profile: data.profile || existingSession?.profile || null,
+        customPrompt: data.customPrompt || existingSession?.customPrompt || null,
+        // Conversation data
+        conversationHistory: data.conversationHistory || existingSession?.conversationHistory || [],
+        screenAnalysisHistory: data.screenAnalysisHistory || existingSession?.screenAnalysisHistory || []
     };
     return writeJsonFile(sessionPath, sessionData);
 }
@@ -351,7 +360,10 @@ function getAllSessions() {
                     sessionId,
                     createdAt: data.createdAt,
                     lastUpdated: data.lastUpdated,
-                    messageCount: data.conversationHistory?.length || 0
+                    messageCount: data.conversationHistory?.length || 0,
+                    screenAnalysisCount: data.screenAnalysisHistory?.length || 0,
+                    profile: data.profile || null,
+                    customPrompt: data.customPrompt || null
                 };
             }
             return null;
