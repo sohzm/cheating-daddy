@@ -234,6 +234,10 @@ function setupStorageIpcHandlers() {
 }
 
 function setupGeneralIpcHandlers() {
+    ipcMain.handle('get-app-version', async () => {
+        return app.getVersion();
+    });
+
     ipcMain.handle('quit-application', async event => {
         try {
             stopMacOSAudioCapture();

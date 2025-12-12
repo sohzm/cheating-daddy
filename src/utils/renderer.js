@@ -918,6 +918,9 @@ const theme = {
 
 // Consolidated cheatingDaddy object - all functions in one place
 const cheatingDaddy = {
+    // App version
+    getVersion: async () => ipcRenderer.invoke('get-app-version'),
+
     // Element access
     element: () => cheatingDaddyApp,
     e: () => cheatingDaddyApp,
