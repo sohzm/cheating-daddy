@@ -894,16 +894,20 @@ function stopCapture() {
     offscreenContext = null;
 }
 
-// Send text message to Gemini with automatic screenshot (combined in one request)
+// Send text message with automatic screenshot (supports both Gemini and Groq modes)
 async function sendTextMessage(text) {
     if (!text || text.trim().length === 0) {
         console.warn('Cannot send empty text message');
         return { success: false, error: 'Empty message' };
     }
 
+    // Check which mode we're in
+    const selectedMode = localStorage.getItem('selectedMode') || 'interview';
+    const useGroq = selectedMode === 'interview';
+
     try {
         // Capture screenshot and get base64 data
-        console.log('Capturing screenshot with text message...');
+        console.log(`Capturing screenshot with text message (${useGroq ? 'Groq' : 'Gemini'} mode)...`);
 
         if (!mediaStream) {
             console.error('No media stream available');
@@ -970,20 +974,40 @@ async function sendTextMessage(text) {
             reader.readAsDataURL(blob);
         });
 
-        // Send both screenshot and text together in one request
-        const result = await ipcRenderer.invoke('send-screenshot-with-text', {
-            imageData: base64data,
-            text: text.trim()
-        });
+        let result;
 
-        if (result.success) {
-            // Track image tokens
-            const imageTokens = tokenTracker.calculateImageTokens(offscreenCanvas.width, offscreenCanvas.height);
-            tokenTracker.addTokens(imageTokens, 'image');
-            console.log('Screenshot + text sent successfully in one request');
+        if (useGroq) {
+            // Interview mode: Use Groq Llama
+            console.log('[GROQ] Sending text message to Llama...');
+            cheddar.setStatus('Generating response...');
+
+            result = await ipcRenderer.invoke('groq-generate-response', {
+                message: text.trim(),
+                imageBase64: base64data
+            });
+
+            if (result.success) {
+                console.log('Text + screenshot sent successfully to Groq Llama');
+            } else {
+                console.error('Failed to send to Groq Llama:', result.error);
+            }
         } else {
-            console.error('Failed to send screenshot with text:', result.error);
+            // Exam/Coding mode: Use Gemini
+            result = await ipcRenderer.invoke('send-screenshot-with-text', {
+                imageData: base64data,
+                text: text.trim()
+            });
+
+            if (result.success) {
+                // Track image tokens
+                const imageTokens = tokenTracker.calculateImageTokens(offscreenCanvas.width, offscreenCanvas.height);
+                tokenTracker.addTokens(imageTokens, 'image');
+                console.log('Screenshot + text sent successfully to Gemini');
+            } else {
+                console.error('Failed to send to Gemini:', result.error);
+            }
         }
+
         return result;
     } catch (error) {
         console.error('Error sending text message with screenshot:', error);

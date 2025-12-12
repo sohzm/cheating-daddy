@@ -357,7 +357,12 @@ export class CheatingDaddyApp extends LitElement {
     async handleAPIKeyHelp() {
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
-            await ipcRenderer.invoke('open-external', 'https://cheatingdaddy.com/help/api-key');
+            // Open different URLs based on current profile
+            const isExamMode = this.selectedProfile === 'exam';
+            const url = isExamMode
+                ? 'https://aistudio.google.com/'
+                : 'https://groq.com/';
+            await ipcRenderer.invoke('open-external', url);
         }
     }
 
