@@ -534,9 +534,6 @@ async function sendAudioToGemini(base64Data, geminiSessionRef) {
 async function sendImageToGeminiHttp(base64Data, prompt) {
     // Get available model based on rate limits
     const model = getAvailableModel();
-    if (!model) {
-        return { success: false, error: 'Rate limit exceeded for today. Both flash and flash-lite limits reached.' };
-    }
 
     const apiKey = getApiKey();
     if (!apiKey) {

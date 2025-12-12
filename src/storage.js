@@ -296,13 +296,14 @@ function getAvailableModel() {
     const todayLimits = getTodayLimits();
 
     // RPD limits: flash = 20, flash-lite = 20
+    // After both exhausted, fall back to flash (for paid API users)
     if (todayLimits.flash.count < 20) {
         return 'gemini-2.5-flash';
     } else if (todayLimits.flashLite.count < 20) {
         return 'gemini-2.5-flash-lite';
     }
 
-    return null; // Both exhausted
+    return 'gemini-2.5-flash'; // Default to flash for paid API users
 }
 
 // ============ HISTORY ============
