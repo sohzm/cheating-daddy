@@ -778,6 +778,14 @@ const theme = {
             btnPrimaryBg: '#ff79c6', btnPrimaryText: '#282a36', btnPrimaryHover: '#ff92d0',
             tooltipBg: '#44475a', tooltipText: '#f8f8f2',
             keyBg: 'rgba(255,121,198,0.15)'
+        },
+        abyss: {
+            background: '#0a0a0a',
+            text: '#d4d4d4', textSecondary: '#808080', textMuted: '#505050',
+            border: '#1a1a1a', accent: '#ffffff',
+            btnPrimaryBg: '#ffffff', btnPrimaryText: '#0a0a0a', btnPrimaryHover: '#d4d4d4',
+            tooltipBg: '#141414', tooltipText: '#d4d4d4',
+            keyBg: 'rgba(255,255,255,0.08)'
         }
     },
 
@@ -794,7 +802,8 @@ const theme = {
             midnight: 'Midnight Blue',
             sepia: 'Sepia',
             nord: 'Nord',
-            dracula: 'Dracula'
+            dracula: 'Dracula',
+            abyss: 'Abyss'
         };
         return Object.keys(this.themes).map(key => ({
             value: key,
