@@ -30,6 +30,10 @@ const DEFAULT_PREFERENCES = {
 
 const DEFAULT_KEYBINDS = null; // null means use system defaults
 
+const DEFAULT_LIMITS = {
+    data: [] // Array of { date: 'YYYY-MM-DD', flash: { count: 0 }, flashLite: { count: 0 } }
+};
+
 // Get the config directory path based on OS
 function getConfigDir() {
     const platform = os.platform();
@@ -61,6 +65,10 @@ function getPreferencesPath() {
 
 function getKeybindsPath() {
     return path.join(getConfigDir(), 'keybinds.json');
+}
+
+function getLimitsPath() {
+    return path.join(getConfigDir(), 'limits.json');
 }
 
 function getHistoryDir() {
@@ -213,6 +221,90 @@ function setKeybinds(keybinds) {
     return writeJsonFile(getKeybindsPath(), keybinds);
 }
 
+// ============ LIMITS (Rate Limiting) ============
+
+function getLimits() {
+    return readJsonFile(getLimitsPath(), DEFAULT_LIMITS);
+}
+
+function setLimits(limits) {
+    return writeJsonFile(getLimitsPath(), limits);
+}
+
+function getTodayDateString() {
+    const now = new Date();
+    return now.toISOString().split('T')[0]; // YYYY-MM-DD
+}
+
+function getTodayLimits() {
+    const limits = getLimits();
+    const today = getTodayDateString();
+
+    // Find today's entry
+    const todayEntry = limits.data.find(entry => entry.date === today);
+
+    if (todayEntry) {
+        return todayEntry;
+    }
+
+    // No entry for today - clean old entries and create new one
+    limits.data = limits.data.filter(entry => entry.date === today);
+    const newEntry = {
+        date: today,
+        flash: { count: 0 },
+        flashLite: { count: 0 }
+    };
+    limits.data.push(newEntry);
+    setLimits(limits);
+
+    return newEntry;
+}
+
+function incrementLimitCount(model) {
+    const limits = getLimits();
+    const today = getTodayDateString();
+
+    // Find or create today's entry
+    let todayEntry = limits.data.find(entry => entry.date === today);
+
+    if (!todayEntry) {
+        // Clean old entries and create new one
+        limits.data = [];
+        todayEntry = {
+            date: today,
+            flash: { count: 0 },
+            flashLite: { count: 0 }
+        };
+        limits.data.push(todayEntry);
+    } else {
+        // Clean old entries, keep only today
+        limits.data = limits.data.filter(entry => entry.date === today);
+    }
+
+    // Increment the appropriate model count
+    if (model === 'gemini-2.5-flash') {
+        todayEntry.flash.count++;
+    } else if (model === 'gemini-2.5-flash-lite') {
+        todayEntry.flashLite.count++;
+    }
+
+    setLimits(limits);
+    return todayEntry;
+}
+
+function getAvailableModel() {
+    const todayLimits = getTodayLimits();
+
+    // RPD limits: flash = 20, flash-lite = 20
+    if (todayLimits.flash.count < 20) {
+        return 'gemini-2.5-flash';
+    } else if (todayLimits.flashLite.count < 20) {
+        return 'gemini-2.5-flash-lite';
+    }
+
+    return null; // Both exhausted
+}
+
 // ============ HISTORY ============
 
 function getSessionPath(sessionId) {
@@ -330,6 +422,13 @@ module.exports = {
     // Keybinds
     getKeybinds,
     setKeybinds,
+
+    // Limits (Rate Limiting)
+    getLimits,
+    setLimits,
+    getTodayLimits,
+    incrementLimitCount,
+    getAvailableModel,
 
     // History
     saveSession,

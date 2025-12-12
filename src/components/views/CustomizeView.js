@@ -77,6 +77,17 @@ export class CustomizeView extends LitElement {
             flex: 1;
             padding: 16px 0;
             overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .settings-content > * {
+            flex-shrink: 0;
+        }
+
+        .settings-content > .profile-section {
+            flex: 1;
+            min-height: 0;
         }
 
         .settings-content::-webkit-scrollbar {
@@ -197,6 +208,30 @@ export class CustomizeView extends LitElement {
             min-height: 60px;
             line-height: 1.4;
             font-family: inherit;
+        }
+
+        /* Profile section with expanding textarea */
+        .profile-section {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .profile-section .form-grid {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .profile-section .form-group.expand {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .profile-section .form-group.expand textarea {
+            flex: 1;
+            resize: none;
         }
 
         textarea.form-control::placeholder {
@@ -1095,37 +1130,38 @@ export class CustomizeView extends LitElement {
         const currentProfile = profiles.find(p => p.value === this.selectedProfile);
 
         return html`
-            <div class="content-header">AI Profile</div>
-            <div class="form-grid">
-                <div class="form-group">
-                    <label class="form-label">
-                        Profile Type
-                        <span class="current-selection">${currentProfile?.name || 'Unknown'}</span>
-                    </label>
-                    <select class="form-control" .value=${this.selectedProfile} @change=${this.handleProfileSelect}>
-                        ${profiles.map(
-                            profile => html`
-                                <option value=${profile.value} ?selected=${this.selectedProfile === profile.value}>
-                                    ${profile.name}
-                                </option>
-                            `
-                        )}
-                    </select>
-                </div>
+            <div class="profile-section">
+                <div class="content-header">AI Profile</div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">
+                            Profile Type
+                            <span class="current-selection">${currentProfile?.name || 'Unknown'}</span>
+                        </label>
+                        <select class="form-control" .value=${this.selectedProfile} @change=${this.handleProfileSelect}>
+                            ${profiles.map(
+                                profile => html`
+                                    <option value=${profile.value} ?selected=${this.selectedProfile === profile.value}>
+                                        ${profile.name}
+                                    </option>
+                                `
+                            )}
+                        </select>
+                    </div>
 
-                <div class="form-group">
-                    <label class="form-label">Custom AI Instructions</label>
-                    <textarea
-                        class="form-control"
-                        placeholder="Add specific instructions for how you want the AI to behave during ${
-                            profileNames[this.selectedProfile] || 'this interaction'
-                        }..."
-                        .value=${this.customPrompt}
-                        rows="5"
-                        @input=${this.handleCustomPromptInput}
-                    ></textarea>
-                    <div class="form-description">
-                        Personalize the AI's behavior with specific instructions
+                    <div class="form-group expand">
+                        <label class="form-label">Custom AI Instructions</label>
+                        <textarea
+                            class="form-control"
+                            placeholder="Add specific instructions for how you want the AI to behave during ${
+                                profileNames[this.selectedProfile] || 'this interaction'
+                            }..."
+                            .value=${this.customPrompt}
+                            @input=${this.handleCustomPromptInput}
+                        ></textarea>
+                        <div class="form-description">
+                            Personalize the AI's behavior with specific instructions
+                        </div>
                     </div>
                 </div>
             </div>

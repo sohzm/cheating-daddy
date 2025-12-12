@@ -211,6 +211,16 @@ function setupStorageIpcHandlers() {
         }
     });
 
+    // ============ LIMITS ============
+    ipcMain.handle('storage:get-today-limits', async () => {
+        try {
+            return { success: true, data: storage.getTodayLimits() };
+        } catch (error) {
+            console.error('Error getting today limits:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
     // ============ CLEAR ALL ============
     ipcMain.handle('storage:clear-all', async () => {
         try {

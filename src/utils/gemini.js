@@ -3,6 +3,7 @@ const { BrowserWindow, ipcMain } = require('electron');
 const { spawn } = require('child_process');
 const { saveDebugAudio } = require('../audioUtils');
 const { getSystemPrompt } = require('./prompts');
+const { getAvailableModel, incrementLimitCount, getApiKey } = require('../storage');
 
 // Conversation tracking variables
 let currentSessionId = null;
@@ -490,6 +491,61 @@ async function sendAudioToGemini(base64Data, geminiSessionRef) {
     }
 }
 
+async function sendImageToGeminiHttp(base64Data, prompt) {
+    // Get available model based on rate limits
+    const model = getAvailableModel();
+    if (!model) {
+        return { success: false, error: 'Rate limit exceeded for today. Both flash and flash-lite limits reached.' };
+    }
+
+    const apiKey = getApiKey();
+    if (!apiKey) {
+        return { success: false, error: 'No API key configured' };
+    }
+
+    try {
+        const ai = new GoogleGenAI({ apiKey: apiKey });
+
+        const contents = [
+            {
+                inlineData: {
+                    mimeType: 'image/jpeg',
+                    data: base64Data,
+                },
+            },
+            { text: prompt },
+        ];
+
+        console.log(`Sending image to ${model} (streaming)...`);
+        const response = await ai.models.generateContentStream({
+            model: model,
+            contents: contents,
+        });
+
+        // Increment count after successful call
+        incrementLimitCount(model);
+
+        // Stream the response
+        let fullText = '';
+        let isFirst = true;
+        for await (const chunk of response) {
+            const chunkText = chunk.text;
+            if (chunkText) {
+                fullText += chunkText;
+                // Send to renderer - new response for first chunk, update for subsequent
+                sendToRenderer(isFirst ? 'new-response' : 'update-response', fullText);
+                isFirst = false;
+            }
+        }
+
+        console.log(`Image response completed from ${model}`);
+        return { success: true, text: fullText, model: model };
+    } catch (error) {
+        console.error('Error sending image to Gemini HTTP:', error);
+        return { success: false, error: error.message };
+    }
+}
+
 function setupGeminiIpcHandlers(geminiSessionRef) {
     // Store the geminiSessionRef globally for reconnection access
     global.geminiSessionRef = geminiSessionRef;
@@ -532,9 +588,7 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
         }
     });
 
-    ipcMain.handle('send-image-content', async (event, { data, debug }) => {
-        if (!geminiSessionRef.current) return { success: false, error: 'No active Gemini session' };
-
+    ipcMain.handle('send-image-content', async (event, { data, prompt }) => {
         try {
             if (!data || typeof data !== 'string') {
                 console.error('Invalid image data received');
@@ -549,11 +603,10 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
             }
 
             process.stdout.write('!');
-            await geminiSessionRef.current.sendRealtimeInput({
-                media: { data: data, mimeType: 'image/jpeg' },
-            });
 
-            return { success: true };
+            // Use HTTP API instead of realtime session
+            const result = await sendImageToGeminiHttp(data, prompt);
+            return result;
         } catch (error) {
             console.error('Error sending image:', error);
             return { success: false, error: error.message };
@@ -671,6 +724,7 @@ module.exports = {
     convertStereoToMono,
     stopMacOSAudioCapture,
     sendAudioToGemini,
+    sendImageToGeminiHttp,
     setupGeminiIpcHandlers,
     formatSpeakerResults,
 };
