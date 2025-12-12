@@ -262,4 +262,9 @@ function setupGeneralIpcHandlers() {
             updateGlobalShortcuts(newKeybinds, mainWindow, sendToRenderer, geminiSessionRef);
         }
     });
+
+    // Debug logging from renderer
+    ipcMain.on('log-message', (event, msg) => {
+        console.log(msg);
+    });
 }

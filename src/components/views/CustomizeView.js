@@ -538,20 +538,18 @@ export class CustomizeView extends LitElement {
     static properties = {
         selectedProfile: { type: String },
         selectedLanguage: { type: String },
-        selectedScreenshotInterval: { type: String },
         selectedImageQuality: { type: String },
         layoutMode: { type: String },
         keybinds: { type: Object },
         googleSearchEnabled: { type: Boolean },
         backgroundTransparency: { type: Number },
         fontSize: { type: Number },
+        theme: { type: String },
         onProfileChange: { type: Function },
         onLanguageChange: { type: Function },
-        onScreenshotIntervalChange: { type: Function },
         onImageQualityChange: { type: Function },
         onLayoutModeChange: { type: Function },
         activeSection: { type: String },
-        backgroundColor: { type: String },
         isClearing: { type: Boolean },
         clearStatusMessage: { type: String },
         clearStatusType: { type: String },
@@ -561,13 +559,11 @@ export class CustomizeView extends LitElement {
         super();
         this.selectedProfile = 'interview';
         this.selectedLanguage = 'en-US';
-        this.selectedScreenshotInterval = '5';
         this.selectedImageQuality = 'medium';
         this.layoutMode = 'normal';
         this.keybinds = this.getDefaultKeybinds();
         this.onProfileChange = () => {};
         this.onLanguageChange = () => {};
-        this.onScreenshotIntervalChange = () => {};
         this.onImageQualityChange = () => {};
         this.onLayoutModeChange = () => {};
 
@@ -594,10 +590,14 @@ export class CustomizeView extends LitElement {
         // Active section for sidebar navigation
         this.activeSection = 'profile';
 
-        // Background color default
-        this.backgroundColor = '#1e1e1e';
+        // Theme default
+        this.theme = 'dark';
 
         this._loadFromStorage();
+    }
+
+    getThemes() {
+        return cheatingDaddy.theme.getAll();
     }
 
     setActiveSection(section) {
@@ -677,10 +677,10 @@ export class CustomizeView extends LitElement {
 
             this.googleSearchEnabled = prefs.googleSearchEnabled ?? true;
             this.backgroundTransparency = prefs.backgroundTransparency ?? 0.8;
-            this.backgroundColor = prefs.backgroundColor ?? '#1e1e1e';
             this.fontSize = prefs.fontSize ?? 20;
             this.audioMode = prefs.audioMode ?? 'speaker_only';
             this.customPrompt = prefs.customPrompt ?? '';
+            this.theme = prefs.theme ?? 'dark';
 
             if (keybinds) {
                 this.keybinds = { ...this.getDefaultKeybinds(), ...keybinds };
@@ -791,11 +791,6 @@ export class CustomizeView extends LitElement {
         this.onLanguageChange(this.selectedLanguage);
     }
 
-    handleScreenshotIntervalSelect(e) {
-        this.selectedScreenshotInterval = e.target.value;
-        this.onScreenshotIntervalChange(this.selectedScreenshotInterval);
-    }
-
     handleImageQualitySelect(e) {
         this.selectedImageQuality = e.target.value;
         this.onImageQualityChange(e.target.value);
@@ -814,6 +809,13 @@ export class CustomizeView extends LitElement {
     async handleAudioModeSelect(e) {
         this.audioMode = e.target.value;
         await cheatingDaddy.storage.updatePreference('audioMode', e.target.value);
+        this.requestUpdate();
+    }
+
+    async handleThemeChange(e) {
+        this.theme = e.target.value;
+        await cheatingDaddy.theme.save(this.theme);
+        this.updateBackgroundAppearance();
         this.requestUpdate();
     }
 
@@ -1054,57 +1056,10 @@ export class CustomizeView extends LitElement {
         this.requestUpdate();
     }
 
-    async handleBackgroundColorChange(e) {
-        this.backgroundColor = e.target.value;
-        await cheatingDaddy.storage.updatePreference('backgroundColor', this.backgroundColor);
-        this.updateBackgroundAppearance();
-        this.requestUpdate();
-    }
-
-    async resetBackgroundColor() {
-        this.backgroundColor = '#1e1e1e';
-        await cheatingDaddy.storage.updatePreference('backgroundColor', this.backgroundColor);
-        this.updateBackgroundAppearance();
-        this.requestUpdate();
-    }
-
-    hexToRgb(hex) {
-        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-        return result ? {
-            r: parseInt(result[1], 16),
-            g: parseInt(result[2], 16),
-            b: parseInt(result[3], 16)
-        } : { r: 30, g: 30, b: 30 };
-    }
-
-    lightenColor(rgb, amount) {
-        return {
-            r: Math.min(255, rgb.r + amount),
-            g: Math.min(255, rgb.g + amount),
-            b: Math.min(255, rgb.b + amount)
-        };
-    }
-
     updateBackgroundAppearance() {
-        const root = document.documentElement;
-        const alpha = this.backgroundTransparency;
-        const baseRgb = this.hexToRgb(this.backgroundColor);
-
-        // Generate color variants based on the base color
-        const secondary = this.lightenColor(baseRgb, 7);
-        const tertiary = this.lightenColor(baseRgb, 15);
-        const hover = this.lightenColor(baseRgb, 20);
-
-        root.style.setProperty('--header-background', `rgba(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}, ${alpha})`);
-        root.style.setProperty('--main-content-background', `rgba(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}, ${alpha})`);
-        root.style.setProperty('--bg-primary', `rgba(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}, ${alpha})`);
-        root.style.setProperty('--bg-secondary', `rgba(${secondary.r}, ${secondary.g}, ${secondary.b}, ${alpha})`);
-        root.style.setProperty('--bg-tertiary', `rgba(${tertiary.r}, ${tertiary.g}, ${tertiary.b}, ${alpha})`);
-        root.style.setProperty('--bg-hover', `rgba(${hover.r}, ${hover.g}, ${hover.b}, ${alpha})`);
-        root.style.setProperty('--input-background', `rgba(${tertiary.r}, ${tertiary.g}, ${tertiary.b}, ${alpha})`);
-        root.style.setProperty('--input-focus-background', `rgba(${tertiary.r}, ${tertiary.g}, ${tertiary.b}, ${alpha})`);
-        root.style.setProperty('--hover-background', `rgba(${hover.r}, ${hover.g}, ${hover.b}, ${alpha})`);
-        root.style.setProperty('--scrollbar-background', `rgba(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}, ${alpha})`);
+        // Use theme's background color
+        const colors = cheatingDaddy.theme.get(this.theme);
+        cheatingDaddy.theme.applyBackgrounds(colors.background, this.backgroundTransparency);
     }
 
     // Keep old function name for backwards compatibility
@@ -1215,9 +1170,31 @@ export class CustomizeView extends LitElement {
     }
 
     renderAppearanceSection() {
+        const themes = this.getThemes();
+        const currentTheme = themes.find(t => t.value === this.theme);
+
         return html`
             <div class="content-header">Appearance</div>
             <div class="form-grid">
+                <div class="form-group">
+                    <label class="form-label">
+                        Theme
+                        <span class="current-selection">${currentTheme?.name || 'Dark'}</span>
+                    </label>
+                    <select class="form-control" .value=${this.theme} @change=${this.handleThemeChange}>
+                        ${themes.map(
+                            theme => html`
+                                <option value=${theme.value} ?selected=${this.theme === theme.value}>
+                                    ${theme.name}
+                                </option>
+                            `
+                        )}
+                    </select>
+                    <div class="form-description">
+                        Choose a color theme for the interface
+                    </div>
+                </div>
+
                 <div class="form-group">
                     <label class="form-label">
                         Layout Mode
@@ -1232,29 +1209,6 @@ export class CustomizeView extends LitElement {
                             ? 'Smaller window with reduced padding'
                             : 'Standard layout with comfortable spacing'
                         }
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label">Background Color</label>
-                    <div class="color-picker-container">
-                        <input
-                            type="color"
-                            class="color-picker-input"
-                            .value=${this.backgroundColor}
-                            @input=${this.handleBackgroundColorChange}
-                        />
-                        <input
-                            type="text"
-                            class="form-control color-hex-input"
-                            .value=${this.backgroundColor}
-                            @change=${this.handleBackgroundColorChange}
-                            maxlength="7"
-                        />
-                        <button class="reset-color-button" @click=${this.resetBackgroundColor}>Reset</button>
-                    </div>
-                    <div class="form-description">
-                        Choose a custom background color for the interface
                     </div>
                 </div>
 
@@ -1309,26 +1263,6 @@ export class CustomizeView extends LitElement {
         return html`
             <div class="content-header">Screen Capture</div>
             <div class="form-grid">
-                <div class="form-group">
-                    <label class="form-label">
-                        Capture Interval
-                        <span class="current-selection">${this.selectedScreenshotInterval === 'manual' ? 'Manual' : this.selectedScreenshotInterval + 's'}</span>
-                    </label>
-                    <select class="form-control" .value=${this.selectedScreenshotInterval} @change=${this.handleScreenshotIntervalSelect}>
-                        <option value="manual" ?selected=${this.selectedScreenshotInterval === 'manual'}>Manual (On demand)</option>
-                        <option value="1" ?selected=${this.selectedScreenshotInterval === '1'}>Every 1 second</option>
-                        <option value="2" ?selected=${this.selectedScreenshotInterval === '2'}>Every 2 seconds</option>
-                        <option value="5" ?selected=${this.selectedScreenshotInterval === '5'}>Every 5 seconds</option>
-                        <option value="10" ?selected=${this.selectedScreenshotInterval === '10'}>Every 10 seconds</option>
-                    </select>
-                    <div class="form-description">
-                        ${this.selectedScreenshotInterval === 'manual'
-                            ? 'Screenshots only when you use the shortcut'
-                            : 'Automatic screenshots at the specified interval'
-                        }
-                    </div>
-                </div>
-
                 <div class="form-group">
                     <label class="form-label">
                         Image Quality

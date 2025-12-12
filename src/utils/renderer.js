@@ -701,6 +701,185 @@ function handleShortcut(shortcutKey) {
 // Create reference to the main app element
 const cheatingDaddyApp = document.querySelector('cheating-daddy-app');
 
+// ============ THEME SYSTEM ============
+const theme = {
+    themes: {
+        dark: {
+            background: '#1e1e1e',
+            text: '#e0e0e0', textSecondary: '#a0a0a0', textMuted: '#6b6b6b',
+            border: '#333333', accent: '#ffffff',
+            btnPrimaryBg: '#ffffff', btnPrimaryText: '#000000', btnPrimaryHover: '#e0e0e0',
+            tooltipBg: '#1a1a1a', tooltipText: '#ffffff',
+            keyBg: 'rgba(255,255,255,0.1)'
+        },
+        light: {
+            background: '#ffffff',
+            text: '#1a1a1a', textSecondary: '#555555', textMuted: '#888888',
+            border: '#e0e0e0', accent: '#000000',
+            btnPrimaryBg: '#1a1a1a', btnPrimaryText: '#ffffff', btnPrimaryHover: '#333333',
+            tooltipBg: '#1a1a1a', tooltipText: '#ffffff',
+            keyBg: 'rgba(0,0,0,0.1)'
+        },
+        midnight: {
+            background: '#0d1117',
+            text: '#c9d1d9', textSecondary: '#8b949e', textMuted: '#6e7681',
+            border: '#30363d', accent: '#58a6ff',
+            btnPrimaryBg: '#58a6ff', btnPrimaryText: '#0d1117', btnPrimaryHover: '#79b8ff',
+            tooltipBg: '#161b22', tooltipText: '#c9d1d9',
+            keyBg: 'rgba(88,166,255,0.15)'
+        },
+        sepia: {
+            background: '#f4ecd8',
+            text: '#5c4b37', textSecondary: '#7a6a56', textMuted: '#998875',
+            border: '#d4c8b0', accent: '#8b4513',
+            btnPrimaryBg: '#5c4b37', btnPrimaryText: '#f4ecd8', btnPrimaryHover: '#7a6a56',
+            tooltipBg: '#5c4b37', tooltipText: '#f4ecd8',
+            keyBg: 'rgba(92,75,55,0.15)'
+        },
+        nord: {
+            background: '#2e3440',
+            text: '#eceff4', textSecondary: '#d8dee9', textMuted: '#4c566a',
+            border: '#3b4252', accent: '#88c0d0',
+            btnPrimaryBg: '#88c0d0', btnPrimaryText: '#2e3440', btnPrimaryHover: '#8fbcbb',
+            tooltipBg: '#3b4252', tooltipText: '#eceff4',
+            keyBg: 'rgba(136,192,208,0.15)'
+        },
+        dracula: {
+            background: '#282a36',
+            text: '#f8f8f2', textSecondary: '#bd93f9', textMuted: '#6272a4',
+            border: '#44475a', accent: '#ff79c6',
+            btnPrimaryBg: '#ff79c6', btnPrimaryText: '#282a36', btnPrimaryHover: '#ff92d0',
+            tooltipBg: '#44475a', tooltipText: '#f8f8f2',
+            keyBg: 'rgba(255,121,198,0.15)'
+        }
+    },
+
+    current: 'dark',
+
+    get(name) {
+        return this.themes[name] || this.themes.dark;
+    },
+
+    getAll() {
+        const names = {
+            dark: 'Dark',
+            light: 'Light',
+            midnight: 'Midnight Blue',
+            sepia: 'Sepia',
+            nord: 'Nord',
+            dracula: 'Dracula'
+        };
+        return Object.keys(this.themes).map(key => ({
+            value: key,
+            name: names[key] || key,
+            colors: this.themes[key]
+        }));
+    },
+
+    hexToRgb(hex) {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? {
+            r: parseInt(result[1], 16),
+            g: parseInt(result[2], 16),
+            b: parseInt(result[3], 16)
+        } : { r: 30, g: 30, b: 30 };
+    },
+
+    lightenColor(rgb, amount) {
+        return {
+            r: Math.min(255, rgb.r + amount),
+            g: Math.min(255, rgb.g + amount),
+            b: Math.min(255, rgb.b + amount)
+        };
+    },
+
+    darkenColor(rgb, amount) {
+        return {
+            r: Math.max(0, rgb.r - amount),
+            g: Math.max(0, rgb.g - amount),
+            b: Math.max(0, rgb.b - amount)
+        };
+    },
+
+    applyBackgrounds(backgroundColor, alpha = 0.8) {
+        const root = document.documentElement;
+        const baseRgb = this.hexToRgb(backgroundColor);
+
+        // For light themes, darken; for dark themes, lighten
+        const isLight = (baseRgb.r + baseRgb.g + baseRgb.b) / 3 > 128;
+        const adjust = isLight ? this.darkenColor.bind(this) : this.lightenColor.bind(this);
+
+        const secondary = adjust(baseRgb, 7);
+        const tertiary = adjust(baseRgb, 15);
+        const hover = adjust(baseRgb, 20);
+
+        root.style.setProperty('--header-background', `rgba(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}, ${alpha})`);
+        root.style.setProperty('--main-content-background', `rgba(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}, ${alpha})`);
+        root.style.setProperty('--bg-primary', `rgba(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}, ${alpha})`);
+        root.style.setProperty('--bg-secondary', `rgba(${secondary.r}, ${secondary.g}, ${secondary.b}, ${alpha})`);
+        root.style.setProperty('--bg-tertiary', `rgba(${tertiary.r}, ${tertiary.g}, ${tertiary.b}, ${alpha})`);
+        root.style.setProperty('--bg-hover', `rgba(${hover.r}, ${hover.g}, ${hover.b}, ${alpha})`);
+        root.style.setProperty('--input-background', `rgba(${tertiary.r}, ${tertiary.g}, ${tertiary.b}, ${alpha})`);
+        root.style.setProperty('--input-focus-background', `rgba(${tertiary.r}, ${tertiary.g}, ${tertiary.b}, ${alpha})`);
+        root.style.setProperty('--hover-background', `rgba(${hover.r}, ${hover.g}, ${hover.b}, ${alpha})`);
+        root.style.setProperty('--scrollbar-background', `rgba(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}, ${alpha})`);
+    },
+
+    apply(themeName, alpha = 0.8) {
+        const colors = this.get(themeName);
+        this.current = themeName;
+        const root = document.documentElement;
+
+        // Text colors
+        root.style.setProperty('--text-color', colors.text);
+        root.style.setProperty('--text-secondary', colors.textSecondary);
+        root.style.setProperty('--text-muted', colors.textMuted);
+        // Border colors
+        root.style.setProperty('--border-color', colors.border);
+        root.style.setProperty('--border-default', colors.accent);
+        // Misc
+        root.style.setProperty('--placeholder-color', colors.textMuted);
+        root.style.setProperty('--scrollbar-thumb', colors.border);
+        root.style.setProperty('--scrollbar-thumb-hover', colors.textMuted);
+        root.style.setProperty('--key-background', colors.keyBg);
+        // Primary button
+        root.style.setProperty('--btn-primary-bg', colors.btnPrimaryBg);
+        root.style.setProperty('--btn-primary-text', colors.btnPrimaryText);
+        root.style.setProperty('--btn-primary-hover', colors.btnPrimaryHover);
+        // Start button (same as primary)
+        root.style.setProperty('--start-button-background', colors.btnPrimaryBg);
+        root.style.setProperty('--start-button-color', colors.btnPrimaryText);
+        root.style.setProperty('--start-button-hover-background', colors.btnPrimaryHover);
+        // Tooltip
+        root.style.setProperty('--tooltip-bg', colors.tooltipBg);
+        root.style.setProperty('--tooltip-text', colors.tooltipText);
+        // Error color (stays constant)
+        root.style.setProperty('--error-color', '#f14c4c');
+        root.style.setProperty('--success-color', '#4caf50');
+
+        // Also apply background colors from theme
+        this.applyBackgrounds(colors.background, alpha);
+    },
+
+    async load() {
+        try {
+            const prefs = await storage.getPreferences();
+            const themeName = prefs.theme || 'dark';
+            const alpha = prefs.backgroundTransparency ?? 0.8;
+            this.apply(themeName, alpha);
+            return themeName;
+        } catch (err) {
+            this.apply('dark');
+            return 'dark';
+        }
+    },
+
+    async save(themeName) {
+        await storage.updatePreference('theme', themeName);
+        this.apply(themeName);
+    }
+};
+
 // Consolidated cheatingDaddy object - all functions in one place
 const cheatingDaddy = {
     // Element access
@@ -726,6 +905,9 @@ const cheatingDaddy = {
     // Storage API
     storage,
 
+    // Theme API
+    theme,
+
     // Refresh preferences cache (call after updating preferences)
     refreshPreferencesCache: loadPreferencesCache,
 
@@ -736,3 +918,10 @@ const cheatingDaddy = {
 
 // Make it globally available
 window.cheatingDaddy = cheatingDaddy;
+
+// Load theme after DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => theme.load());
+} else {
+    theme.load();
+}

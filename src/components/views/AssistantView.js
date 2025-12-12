@@ -223,8 +223,8 @@ export class AssistantView extends LitElement {
             display: flex;
             align-items: center;
             gap: 6px;
-            background: #ffffff;
-            color: #000000;
+            background: var(--btn-primary-bg, #ffffff);
+            color: var(--btn-primary-text, #000000);
             border: none;
             padding: 6px 12px;
             border-radius: 20px;
@@ -236,7 +236,7 @@ export class AssistantView extends LitElement {
         }
 
         .screen-answer-btn:hover {
-            background: #f0f0f0;
+            background: var(--btn-primary-hover, #f0f0f0);
         }
 
         .screen-answer-btn svg {
@@ -260,8 +260,8 @@ export class AssistantView extends LitElement {
             bottom: 100%;
             right: 0;
             margin-bottom: 8px;
-            background: #1a1a1a;
-            color: #fff;
+            background: var(--tooltip-bg, #1a1a1a);
+            color: var(--tooltip-text, #ffffff);
             padding: 8px 12px;
             border-radius: 6px;
             font-size: 11px;
@@ -280,7 +280,7 @@ export class AssistantView extends LitElement {
             top: 100%;
             right: 16px;
             border: 6px solid transparent;
-            border-top-color: #1a1a1a;
+            border-top-color: var(--tooltip-bg, #1a1a1a);
         }
 
         .screen-answer-btn-wrapper:hover .tooltip {
@@ -594,7 +594,7 @@ export class AssistantView extends LitElement {
             <div class="text-input-container">
                 <button class="nav-button" @click=${this.navigateToPreviousResponse} ?disabled=${this.currentResponseIndex <= 0}>
                     <svg width="24px" height="24px" stroke-width="1.7" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M15 6L9 12L15 18" stroke="#ffffff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
+                        <path d="M15 6L9 12L15 18" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
                     </svg>
                 </button>
 
@@ -602,7 +602,7 @@ export class AssistantView extends LitElement {
 
                 <button class="nav-button" @click=${this.navigateToNextResponse} ?disabled=${this.currentResponseIndex >= this.responses.length - 1}>
                     <svg width="24px" height="24px" stroke-width="1.7" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M9 6L15 12L9 18" stroke="#ffffff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
+                        <path d="M9 6L15 12L9 18" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
                     </svg>
                 </button>
 
