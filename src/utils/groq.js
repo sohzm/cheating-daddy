@@ -8,22 +8,32 @@ const GROQ_API_BASE = 'https://api.groq.com/openai/v1';
 const WHISPER_MODEL = 'whisper-large-v3-turbo';
 
 // Audio buffer for accumulating audio chunks before sending to Groq
-let audioBuffer = [];
+let speechBuffer = []; // Only contains speech segments
+let contextBuffer = []; // Rolling buffer for pre-speech context
 let isProcessing = false;
 let groqApiKey = null;
 
 // Minimum audio duration in seconds before sending to Groq (to avoid sending tiny clips)
-const MIN_AUDIO_DURATION_SECONDS = 2.0; // Increased to 2 seconds for better transcription
+const MIN_AUDIO_DURATION_SECONDS = 1.5; // Reduced since we now only buffer speech
 const SAMPLE_RATE = 24000; // 24kHz as used in the app
 const BYTES_PER_SAMPLE = 2; // 16-bit PCM
 
-// Auto-flush timer for continuous audio accumulation
-let autoFlushTimer = null;
-const AUTO_FLUSH_INTERVAL_MS = 5000; // Flush every 5 seconds if we have enough audio
+// Context buffer settings - keep some silence before speech starts
+const MAX_CONTEXT_CHUNKS = 10; // Keep ~1 second of pre-speech context
 
-// Audio energy threshold - RMS below this is considered silence
-// This prevents Whisper from hallucinating on silent audio
-const SILENCE_RMS_THRESHOLD = 500; // Adjust based on your audio levels (16-bit PCM range: 0-32767)
+// Speech detection thresholds
+const SILENCE_RMS_THRESHOLD = 300; // RMS below this is considered silence (lowered for sensitivity)
+const SPEECH_RMS_THRESHOLD = 500; // RMS above this is considered speech
+
+// Speech state tracking for smarter flush
+let lastSpeechTime = 0; // Timestamp of last detected speech
+let isSpeaking = false; // Currently in speech segment
+const SILENCE_AFTER_SPEECH_MS = 1500; // Wait 1.5 seconds of silence after speech before flushing
+const POST_SPEECH_CONTEXT_MS = 500; // Include 0.5s of silence after speech ends
+
+// Periodic check timer
+let checkTimer = null;
+const CHECK_INTERVAL_MS = 500; // Check every 500ms for faster response
 
 function sendToRenderer(channel, data) {
     const windows = BrowserWindow.getAllWindows();
@@ -196,26 +206,92 @@ async function transcribeWithGroq(wavBuffer) {
  * @param {Buffer} pcmBuffer - PCM audio buffer (16-bit, mono, 24kHz)
  */
 function addAudioChunk(pcmBuffer) {
-    audioBuffer.push(pcmBuffer);
+    const chunkRMS = calculateRMS(pcmBuffer);
+    const now = Date.now();
+    const isSpeechChunk = chunkRMS >= SPEECH_RMS_THRESHOLD;
 
-    // Calculate total duration
-    const totalBytes = audioBuffer.reduce((sum, buf) => sum + buf.length, 0);
-    const totalDuration = totalBytes / (SAMPLE_RATE * BYTES_PER_SAMPLE);
-
-    // Log progress every 1 second of audio (reduced spam)
-    if (totalDuration >= 1 && Math.floor(totalDuration) > Math.floor(totalDuration - pcmBuffer.length / (SAMPLE_RATE * BYTES_PER_SAMPLE))) {
-        console.log(`[GROQ] Audio buffer: ${totalDuration.toFixed(1)}s`);
+    if (isSpeechChunk) {
+        // Speech detected!
+        if (!isSpeaking) {
+            // Speech just started - add context buffer first
+            if (contextBuffer.length > 0) {
+                speechBuffer.push(...contextBuffer);
+                contextBuffer = [];
+            }
+            isSpeaking = true;
+            console.log(`[GROQ] Speech started (RMS: ${chunkRMS.toFixed(0)})`);
+        }
+        // Add speech chunk to buffer
+        speechBuffer.push(pcmBuffer);
+        lastSpeechTime = now;
+    } else {
+        // Silence or low audio
+        if (isSpeaking) {
+            // Was speaking, now silence - add some post-speech context
+            const timeSinceSpeech = now - lastSpeechTime;
+            if (timeSinceSpeech < POST_SPEECH_CONTEXT_MS) {
+                // Still in post-speech window, keep adding
+                speechBuffer.push(pcmBuffer);
+            } else {
+                // Post-speech context complete
+                isSpeaking = false;
+            }
+        } else {
+            // Pure silence - add to rolling context buffer (trim to max size)
+            contextBuffer.push(pcmBuffer);
+            // Trim context buffer to max size
+            while (contextBuffer.length > MAX_CONTEXT_CHUNKS) {
+                contextBuffer.shift();
+            }
+        }
     }
 
-    // Start auto-flush timer if not already running
-    if (!autoFlushTimer && totalDuration >= MIN_AUDIO_DURATION_SECONDS) {
-        autoFlushTimer = setTimeout(async () => {
-            autoFlushTimer = null;
-            if (audioBuffer.length > 0 && !isProcessing) {
-                console.log('[GROQ] Auto-flushing audio buffer...');
-                await processAudioBuffer();
-            }
-        }, AUTO_FLUSH_INTERVAL_MS);
+    // Start periodic check timer if we have speech and timer not running
+    if (speechBuffer.length > 0 && !checkTimer) {
+        checkTimer = setInterval(() => {
+            checkAndFlush();
+        }, CHECK_INTERVAL_MS);
+    }
+}
+
+/**
+ * Check if we should flush the speech buffer
+ */
+async function checkAndFlush() {
+    if (isProcessing || speechBuffer.length === 0) {
+        return;
+    }
+
+    const now = Date.now();
+    const timeSinceSpeech = now - lastSpeechTime;
+    const speechBytes = speechBuffer.reduce((sum, buf) => sum + buf.length, 0);
+    const speechDuration = speechBytes / (SAMPLE_RATE * BYTES_PER_SAMPLE);
+
+    // Log status occasionally
+    if (speechDuration >= 1) {
+        console.log(`[GROQ] Speech buffer: ${speechDuration.toFixed(1)}s | Silence: ${(timeSinceSpeech/1000).toFixed(1)}s | Speaking: ${isSpeaking}`);
+    }
+
+    // Flush conditions:
+    // 1. Have enough audio AND sustained silence after speech
+    // 2. Buffer too large (>20s) - force flush
+    const shouldFlush =
+        (speechDuration >= MIN_AUDIO_DURATION_SECONDS && timeSinceSpeech >= SILENCE_AFTER_SPEECH_MS && !isSpeaking) ||
+        (speechDuration > 20);
+
+    if (shouldFlush) {
+        if (speechDuration > 20) {
+            console.log(`[GROQ] Buffer large (${speechDuration.toFixed(1)}s) - flushing...`);
+        } else {
+            console.log(`[GROQ] Speech ended ${(timeSinceSpeech/1000).toFixed(1)}s ago - flushing...`);
+        }
+        await processAudioBuffer();
+    }
+
+    // Stop timer if no more speech
+    if (speechBuffer.length === 0 && checkTimer) {
+        clearInterval(checkTimer);
+        checkTimer = null;
     }
 }
 
@@ -224,12 +300,12 @@ function addAudioChunk(pcmBuffer) {
  * @returns {Promise<string|null>} - Transcribed text or null if buffer too small
  */
 async function processAudioBuffer() {
-    if (isProcessing || audioBuffer.length === 0) {
+    if (isProcessing || speechBuffer.length === 0) {
         return null;
     }
 
     // Calculate total duration
-    const totalBytes = audioBuffer.reduce((sum, buf) => sum + buf.length, 0);
+    const totalBytes = speechBuffer.reduce((sum, buf) => sum + buf.length, 0);
     const totalDuration = totalBytes / (SAMPLE_RATE * BYTES_PER_SAMPLE);
 
     if (totalDuration < MIN_AUDIO_DURATION_SECONDS) {
@@ -241,10 +317,10 @@ async function processAudioBuffer() {
 
     try {
         // Combine all audio chunks
-        const combinedPcm = Buffer.concat(audioBuffer);
+        const combinedPcm = Buffer.concat(speechBuffer);
 
         // Clear buffer
-        audioBuffer = [];
+        speechBuffer = [];
 
         // Check audio energy (RMS) to avoid sending silence
         const rms = calculateRMS(combinedPcm);
@@ -270,9 +346,16 @@ async function processAudioBuffer() {
             sendToRenderer('groq-transcription', transcription);
         }
 
+        // Reset speech tracking state for next utterance
+        isSpeaking = false;
+        lastSpeechTime = 0;
+
         return transcription;
     } catch (error) {
         console.error('[GROQ] Error processing audio:', error);
+        // Reset state even on error
+        isSpeaking = false;
+        lastSpeechTime = 0;
         return null;
     } finally {
         isProcessing = false;
@@ -284,24 +367,25 @@ async function processAudioBuffer() {
  * @returns {Promise<string|null>}
  */
 async function flushAudioBuffer() {
-    if (audioBuffer.length === 0) {
+    if (speechBuffer.length === 0) {
         return null;
     }
 
-    // Cancel any pending auto-flush
-    if (autoFlushTimer) {
-        clearTimeout(autoFlushTimer);
-        autoFlushTimer = null;
+    // Cancel any pending check timer
+    if (checkTimer) {
+        clearInterval(checkTimer);
+        checkTimer = null;
     }
 
     // Force process even if below minimum duration
-    const totalBytes = audioBuffer.reduce((sum, buf) => sum + buf.length, 0);
+    const totalBytes = speechBuffer.reduce((sum, buf) => sum + buf.length, 0);
     const totalDuration = totalBytes / (SAMPLE_RATE * BYTES_PER_SAMPLE);
 
     // Need at least 0.5 seconds for meaningful transcription
     if (totalDuration < 0.5) {
         // Too short - silently discard (don't spam logs)
-        audioBuffer = [];
+        speechBuffer = [];
+        contextBuffer = [];
         return null;
     }
 
@@ -309,8 +393,9 @@ async function flushAudioBuffer() {
     console.log(`\n[GROQ] Flush processing ${totalDuration.toFixed(2)}s of audio...`);
 
     try {
-        const combinedPcm = Buffer.concat(audioBuffer);
-        audioBuffer = [];
+        const combinedPcm = Buffer.concat(speechBuffer);
+        speechBuffer = [];
+        contextBuffer = [];
 
         const wavBuffer = pcmToWav(combinedPcm);
         const transcription = await transcribeWithGroq(wavBuffer);
@@ -318,6 +403,10 @@ async function flushAudioBuffer() {
         if (transcription && transcription.trim()) {
             sendToRenderer('groq-transcription', transcription);
         }
+
+        // Reset state
+        isSpeaking = false;
+        lastSpeechTime = 0;
 
         return transcription;
     } catch (error) {
@@ -332,10 +421,13 @@ async function flushAudioBuffer() {
  * Clear the audio buffer without processing
  */
 function clearAudioBuffer() {
-    audioBuffer = [];
-    if (autoFlushTimer) {
-        clearTimeout(autoFlushTimer);
-        autoFlushTimer = null;
+    speechBuffer = [];
+    contextBuffer = [];
+    isSpeaking = false;
+    lastSpeechTime = 0;
+    if (checkTimer) {
+        clearInterval(checkTimer);
+        checkTimer = null;
     }
     console.log('[GROQ] Audio buffer cleared');
 }
@@ -345,7 +437,7 @@ function clearAudioBuffer() {
  * @returns {number}
  */
 function getBufferDuration() {
-    const totalBytes = audioBuffer.reduce((sum, buf) => sum + buf.length, 0);
+    const totalBytes = speechBuffer.reduce((sum, buf) => sum + buf.length, 0);
     return totalBytes / (SAMPLE_RATE * BYTES_PER_SAMPLE);
 }
 
