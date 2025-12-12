@@ -46,6 +46,26 @@ function createWindow(sendToRenderer, geminiSessionRef) {
     mainWindow.setContentProtection(true);
     mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 
+    // Hide from Windows taskbar
+    if (process.platform === 'win32') {
+        try {
+            mainWindow.setSkipTaskbar(true);
+            console.log('Hidden from Windows taskbar');
+        } catch (error) {
+            console.warn('Could not hide from taskbar:', error.message);
+        }
+    }
+
+    // Hide from Mission Control on macOS
+    if (process.platform === 'darwin') {
+        try {
+            mainWindow.setHiddenInMissionControl(true);
+            console.log('Hidden from macOS Mission Control');
+        } catch (error) {
+            console.warn('Could not hide from Mission Control:', error.message);
+        }
+    }
+
     // Center window at the top of the screen
     const primaryDisplay = screen.getPrimaryDisplay();
     const { width: screenWidth } = primaryDisplay.workAreaSize;
