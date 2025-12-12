@@ -456,8 +456,8 @@ export class CustomizeView extends LitElement {
     async _loadFromStorage() {
         try {
             const [prefs, keybinds] = await Promise.all([
-                cheddar.storage.getPreferences(),
-                cheddar.storage.getKeybinds()
+                cheatingDaddy.storage.getPreferences(),
+                cheatingDaddy.storage.getKeybinds()
             ]);
 
             this.googleSearchEnabled = prefs.googleSearchEnabled ?? true;
@@ -593,17 +593,17 @@ export class CustomizeView extends LitElement {
 
     async handleCustomPromptInput(e) {
         this.customPrompt = e.target.value;
-        await cheddar.storage.updatePreference('customPrompt', e.target.value);
+        await cheatingDaddy.storage.updatePreference('customPrompt', e.target.value);
     }
 
     async handleAudioModeSelect(e) {
         this.audioMode = e.target.value;
-        await cheddar.storage.updatePreference('audioMode', e.target.value);
+        await cheatingDaddy.storage.updatePreference('audioMode', e.target.value);
         this.requestUpdate();
     }
 
     getDefaultKeybinds() {
-        const isMac = cheddar.isMacOS || navigator.platform.includes('Mac');
+        const isMac = cheatingDaddy.isMacOS || navigator.platform.includes('Mac');
         return {
             moveUp: isMac ? 'Alt+Up' : 'Ctrl+Up',
             moveDown: isMac ? 'Alt+Down' : 'Ctrl+Down',
@@ -620,7 +620,7 @@ export class CustomizeView extends LitElement {
     }
 
     async saveKeybinds() {
-        await cheddar.storage.setKeybinds(this.keybinds);
+        await cheatingDaddy.storage.setKeybinds(this.keybinds);
         // Send to main process to update global shortcuts
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
@@ -636,7 +636,7 @@ export class CustomizeView extends LitElement {
 
     async resetKeybinds() {
         this.keybinds = this.getDefaultKeybinds();
-        await cheddar.storage.setKeybinds(null);
+        await cheatingDaddy.storage.setKeybinds(null);
         this.requestUpdate();
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
@@ -781,7 +781,7 @@ export class CustomizeView extends LitElement {
 
     async handleGoogleSearchChange(e) {
         this.googleSearchEnabled = e.target.checked;
-        await cheddar.storage.updatePreference('googleSearchEnabled', this.googleSearchEnabled);
+        await cheatingDaddy.storage.updatePreference('googleSearchEnabled', this.googleSearchEnabled);
 
         // Notify main process if available
         if (window.require) {
@@ -798,14 +798,14 @@ export class CustomizeView extends LitElement {
 
     async handleAdvancedModeChange(e) {
         this.advancedMode = e.target.checked;
-        await cheddar.storage.updatePreference('advancedMode', this.advancedMode);
+        await cheatingDaddy.storage.updatePreference('advancedMode', this.advancedMode);
         this.onAdvancedModeChange(this.advancedMode);
         this.requestUpdate();
     }
 
     async handleBackgroundTransparencyChange(e) {
         this.backgroundTransparency = parseFloat(e.target.value);
-        await cheddar.storage.updatePreference('backgroundTransparency', this.backgroundTransparency);
+        await cheatingDaddy.storage.updatePreference('backgroundTransparency', this.backgroundTransparency);
         this.updateBackgroundTransparency();
         this.requestUpdate();
     }
@@ -826,7 +826,7 @@ export class CustomizeView extends LitElement {
 
     async handleFontSizeChange(e) {
         this.fontSize = parseInt(e.target.value, 10);
-        await cheddar.storage.updatePreference('fontSize', this.fontSize);
+        await cheatingDaddy.storage.updatePreference('fontSize', this.fontSize);
         this.updateFontSize();
         this.requestUpdate();
     }

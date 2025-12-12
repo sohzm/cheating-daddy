@@ -229,9 +229,9 @@ async function initializeGemini(profile = 'interview', language = 'en-US') {
         const prefs = await storage.getPreferences();
         const success = await ipcRenderer.invoke('initialize-gemini', apiKey, prefs.customPrompt || '', profile, language);
         if (success) {
-            cheddar.setStatus('Live');
+            cheatingDaddy.setStatus('Live');
         } else {
-            cheddar.setStatus('error');
+            cheatingDaddy.setStatus('error');
         }
     }
 }
@@ -239,7 +239,7 @@ async function initializeGemini(profile = 'interview', language = 'en-US') {
 // Listen for status updates
 ipcRenderer.on('update-status', (event, status) => {
     console.log('Status update:', status);
-    cheddar.setStatus(status);
+    cheatingDaddy.setStatus(status);
 });
 
 async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'medium') {
@@ -421,7 +421,7 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
         }
     } catch (err) {
         console.error('Error starting capture:', err);
-        cheddar.setStatus('error');
+        cheatingDaddy.setStatus('error');
     }
 }
 
@@ -717,11 +717,11 @@ ipcRenderer.on('clear-sensitive-data', async () => {
 
 // Handle shortcuts based on current view
 function handleShortcut(shortcutKey) {
-    const currentView = cheddar.getCurrentView();
+    const currentView = cheatingDaddy.getCurrentView();
 
     if (shortcutKey === 'ctrl+enter' || shortcutKey === 'cmd+enter') {
         if (currentView === 'main') {
-            cheddar.element().handleStart();
+            cheatingDaddy.element().handleStart();
         } else {
             captureManualScreenshot();
         }
@@ -731,8 +731,8 @@ function handleShortcut(shortcutKey) {
 // Create reference to the main app element
 const cheatingDaddyApp = document.querySelector('cheating-daddy-app');
 
-// Consolidated cheddar object - all functions in one place
-const cheddar = {
+// Consolidated cheatingDaddy object - all functions in one place
+const cheatingDaddy = {
     // Element access
     element: () => cheatingDaddyApp,
     e: () => cheatingDaddyApp,
@@ -764,4 +764,4 @@ const cheddar = {
 };
 
 // Make it globally available
-window.cheddar = cheddar;
+window.cheatingDaddy = cheatingDaddy;

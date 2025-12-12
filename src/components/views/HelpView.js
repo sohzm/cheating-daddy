@@ -245,7 +245,7 @@ export class HelpView extends LitElement {
 
     async _loadKeybinds() {
         try {
-            const keybinds = await cheddar.storage.getKeybinds();
+            const keybinds = await cheatingDaddy.storage.getKeybinds();
             if (keybinds) {
                 this.keybinds = { ...this.getDefaultKeybinds(), ...keybinds };
                 this.requestUpdate();
@@ -262,7 +262,7 @@ export class HelpView extends LitElement {
     }
 
     getDefaultKeybinds() {
-        const isMac = cheddar.isMacOS || navigator.platform.includes('Mac');
+        const isMac = cheatingDaddy.isMacOS || navigator.platform.includes('Mac');
         return {
             moveUp: isMac ? 'Alt+Up' : 'Ctrl+Up',
             moveDown: isMac ? 'Alt+Down' : 'Ctrl+Down',
@@ -287,8 +287,8 @@ export class HelpView extends LitElement {
     }
 
     render() {
-        const isMacOS = cheddar.isMacOS || false;
-        const isLinux = cheddar.isLinux || false;
+        const isMacOS = cheatingDaddy.isMacOS || false;
+        const isLinux = cheatingDaddy.isLinux || false;
 
         return html`
             <div class="help-container">

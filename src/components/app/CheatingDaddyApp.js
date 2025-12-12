@@ -147,8 +147,8 @@ export class CheatingDaddyApp extends LitElement {
     async _loadFromStorage() {
         try {
             const [config, prefs] = await Promise.all([
-                cheddar.storage.getConfig(),
-                cheddar.storage.getPreferences()
+                cheatingDaddy.storage.getConfig(),
+                cheatingDaddy.storage.getPreferences()
             ]);
 
             // Check onboarding status
@@ -271,7 +271,7 @@ export class CheatingDaddyApp extends LitElement {
         if (this.currentView === 'customize' || this.currentView === 'help' || this.currentView === 'history') {
             this.currentView = 'main';
         } else if (this.currentView === 'assistant') {
-            cheddar.stopCapture();
+            cheatingDaddy.stopCapture();
 
             // Close the session
             if (window.require) {
@@ -300,7 +300,7 @@ export class CheatingDaddyApp extends LitElement {
     // Main view event handlers
     async handleStart() {
         // check if api key is empty do nothing
-        const apiKey = await cheddar.storage.getApiKey();
+        const apiKey = await cheatingDaddy.storage.getApiKey();
         if (!apiKey || apiKey === '') {
             // Trigger the red blink animation on the API key input
             const mainView = this.shadowRoot.querySelector('main-view');
@@ -310,9 +310,9 @@ export class CheatingDaddyApp extends LitElement {
             return;
         }
 
-        await cheddar.initializeGemini(this.selectedProfile, this.selectedLanguage);
+        await cheatingDaddy.initializeGemini(this.selectedProfile, this.selectedLanguage);
         // Pass the screenshot interval as string (including 'manual' option)
-        cheddar.startCapture(this.selectedScreenshotInterval, this.selectedImageQuality);
+        cheatingDaddy.startCapture(this.selectedScreenshotInterval, this.selectedImageQuality);
         this.responses = [];
         this.currentResponseIndex = -1;
         this.startTime = Date.now();
@@ -329,27 +329,27 @@ export class CheatingDaddyApp extends LitElement {
     // Customize view event handlers
     async handleProfileChange(profile) {
         this.selectedProfile = profile;
-        await cheddar.storage.updatePreference('selectedProfile', profile);
+        await cheatingDaddy.storage.updatePreference('selectedProfile', profile);
     }
 
     async handleLanguageChange(language) {
         this.selectedLanguage = language;
-        await cheddar.storage.updatePreference('selectedLanguage', language);
+        await cheatingDaddy.storage.updatePreference('selectedLanguage', language);
     }
 
     async handleScreenshotIntervalChange(interval) {
         this.selectedScreenshotInterval = interval;
-        await cheddar.storage.updatePreference('selectedScreenshotInterval', interval);
+        await cheatingDaddy.storage.updatePreference('selectedScreenshotInterval', interval);
     }
 
     async handleImageQualityChange(quality) {
         this.selectedImageQuality = quality;
-        await cheddar.storage.updatePreference('selectedImageQuality', quality);
+        await cheatingDaddy.storage.updatePreference('selectedImageQuality', quality);
     }
 
     async handleAdvancedModeChange(advancedMode) {
         this.advancedMode = advancedMode;
-        await cheddar.storage.updatePreference('advancedMode', advancedMode);
+        await cheatingDaddy.storage.updatePreference('advancedMode', advancedMode);
     }
 
     handleBackClick() {
@@ -367,7 +367,7 @@ export class CheatingDaddyApp extends LitElement {
 
     // Assistant view event handlers
     async handleSendText(message) {
-        const result = await window.cheddar.sendTextMessage(message);
+        const result = await window.cheatingDaddy.sendTextMessage(message);
 
         if (!result.success) {
             console.error('Failed to send message:', result.error);
@@ -522,7 +522,7 @@ export class CheatingDaddyApp extends LitElement {
 
     async handleLayoutModeChange(layoutMode) {
         this.layoutMode = layoutMode;
-        await cheddar.storage.updateConfig('layout', layoutMode);
+        await cheatingDaddy.storage.updateConfig('layout', layoutMode);
         this.updateLayoutMode();
 
         // Notify main process about layout change for window resizing

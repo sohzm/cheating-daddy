@@ -327,7 +327,7 @@ export class HistoryView extends LitElement {
     async loadSessions() {
         try {
             this.loading = true;
-            this.sessions = await cheddar.storage.getAllSessions();
+            this.sessions = await cheatingDaddy.storage.getAllSessions();
         } catch (error) {
             console.error('Error loading conversation sessions:', error);
             this.sessions = [];
@@ -339,7 +339,7 @@ export class HistoryView extends LitElement {
 
     async loadSelectedSession(sessionId) {
         try {
-            const session = await cheddar.storage.getSession(sessionId);
+            const session = await cheatingDaddy.storage.getSession(sessionId);
             if (session) {
                 this.selectedSession = session;
                 this.requestUpdate();

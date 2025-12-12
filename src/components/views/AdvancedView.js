@@ -344,7 +344,7 @@ export class AdvancedView extends LitElement {
 
     async _loadFromStorage() {
         try {
-            const prefs = await cheddar.storage.getPreferences();
+            const prefs = await cheatingDaddy.storage.getPreferences();
             this.throttleTokens = prefs.throttleTokens ?? true;
             this.maxTokensPerMin = prefs.maxTokensPerMin ?? 1000000;
             this.throttleAtPercent = prefs.throttleAtPercent ?? 75;
@@ -370,7 +370,7 @@ export class AdvancedView extends LitElement {
 
         try {
             // Clear all data via storage API
-            await cheddar.storage.clearAll();
+            await cheatingDaddy.storage.clearAll();
 
             this.statusMessage = '✅ Successfully cleared all local data';
             this.statusType = 'success';
@@ -399,8 +399,8 @@ export class AdvancedView extends LitElement {
 
     async handleThrottleTokensChange(e) {
         this.throttleTokens = e.target.checked;
-        await cheddar.storage.updatePreference('throttleTokens', this.throttleTokens);
-        await cheddar.refreshPreferencesCache();
+        await cheatingDaddy.storage.updatePreference('throttleTokens', this.throttleTokens);
+        await cheatingDaddy.refreshPreferencesCache();
         this.requestUpdate();
     }
 
@@ -408,8 +408,8 @@ export class AdvancedView extends LitElement {
         const value = parseInt(e.target.value, 10);
         if (!isNaN(value) && value > 0) {
             this.maxTokensPerMin = value;
-            await cheddar.storage.updatePreference('maxTokensPerMin', this.maxTokensPerMin);
-            await cheddar.refreshPreferencesCache();
+            await cheatingDaddy.storage.updatePreference('maxTokensPerMin', this.maxTokensPerMin);
+            await cheatingDaddy.refreshPreferencesCache();
         }
     }
 
@@ -417,8 +417,8 @@ export class AdvancedView extends LitElement {
         const value = parseInt(e.target.value, 10);
         if (!isNaN(value) && value >= 0 && value <= 100) {
             this.throttleAtPercent = value;
-            await cheddar.storage.updatePreference('throttleAtPercent', this.throttleAtPercent);
-            await cheddar.refreshPreferencesCache();
+            await cheatingDaddy.storage.updatePreference('throttleAtPercent', this.throttleAtPercent);
+            await cheatingDaddy.refreshPreferencesCache();
         }
     }
 
@@ -427,12 +427,12 @@ export class AdvancedView extends LitElement {
         this.maxTokensPerMin = 1000000;
         this.throttleAtPercent = 75;
 
-        await cheddar.storage.setPreferences({
+        await cheatingDaddy.storage.setPreferences({
             throttleTokens: true,
             maxTokensPerMin: 1000000,
             throttleAtPercent: 75
         });
-        await cheddar.refreshPreferencesCache();
+        await cheatingDaddy.refreshPreferencesCache();
 
         this.requestUpdate();
     }
