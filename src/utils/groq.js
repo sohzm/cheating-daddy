@@ -267,6 +267,13 @@ async function checkAndFlush() {
     const speechBytes = speechBuffer.reduce((sum, buf) => sum + buf.length, 0);
     const speechDuration = speechBytes / (SAMPLE_RATE * BYTES_PER_SAMPLE);
 
+    // Time-based speech end detection (handles push-to-talk mode where mic turns off)
+    // If enough time has passed since last speech, mark speaking as ended
+    if (isSpeaking && timeSinceSpeech >= SILENCE_AFTER_SPEECH_MS) {
+        console.log(`[GROQ] No audio for ${(timeSinceSpeech/1000).toFixed(1)}s - marking speech ended`);
+        isSpeaking = false;
+    }
+
     // Log status occasionally
     if (speechDuration >= 1) {
         console.log(`[GROQ] Speech buffer: ${speechDuration.toFixed(1)}s | Silence: ${(timeSinceSpeech/1000).toFixed(1)}s | Speaking: ${isSpeaking}`);
