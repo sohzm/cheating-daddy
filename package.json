@@ -8,6 +8,10 @@
         "start": "electron-forge start",
         "package": "electron-forge package",
         "make": "electron-forge make",
+        "make:linux": "electron-forge make --platform=linux",
+        "make:deb": "electron-forge make --platform=linux --targets=@electron-forge/maker-deb",
+        "make:rpm": "electron-forge make --platform=linux --targets=@electron-forge/maker-rpm",
+        "make:appimage": "electron-forge make --platform=linux --targets=@reforged/maker-appimage",
         "publish": "electron-forge publish",
         "lint": "echo \"No linting configured\"",
         "test": "vitest run"
