@@ -24,7 +24,7 @@ const DEFAULT_PREFERENCES = {
     advancedMode: false,
     audioMode: 'speaker_only',
     fontSize: 'medium',
-    backgroundTransparency: 0.9,
+    backgroundTransparency: 0.8,
     googleSearchEnabled: false
 };
 

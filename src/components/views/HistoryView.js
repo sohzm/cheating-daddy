@@ -25,88 +25,74 @@ export class HistoryView extends LitElement {
         .sessions-list {
             flex: 1;
             overflow-y: auto;
-            margin-bottom: 16px;
-            padding-bottom: 20px;
         }
 
         .session-item {
-            background: var(--input-background);
-            border: 1px solid var(--button-border);
-            border-radius: 6px;
             padding: 12px;
-            margin-bottom: 8px;
+            border-bottom: 1px solid var(--border-color);
             cursor: pointer;
-            transition: all 0.15s ease;
+            transition: background 0.1s ease;
         }
 
         .session-item:hover {
             background: var(--hover-background);
-            border-color: var(--focus-border-color);
         }
 
         .session-item.selected {
-            background: var(--focus-box-shadow);
-            border-color: var(--focus-border-color);
+            background: var(--bg-secondary);
         }
 
         .session-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 6px;
+            margin-bottom: 4px;
         }
 
         .session-date {
             font-size: 12px;
-            font-weight: 600;
+            font-weight: 500;
             color: var(--text-color);
         }
 
         .session-time {
             font-size: 11px;
-            color: var(--description-color);
+            color: var(--text-muted);
+            font-family: 'SF Mono', Monaco, monospace;
         }
 
         .session-preview {
             font-size: 11px;
-            color: var(--description-color);
+            color: var(--text-muted);
             line-height: 1.3;
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
         }
 
         .conversation-view {
             flex: 1;
             overflow-y: auto;
-            background: var(--main-content-background);
-            border: 1px solid var(--button-border);
-            border-radius: 6px;
-            padding: 12px;
-            padding-bottom: 20px;
+            background: var(--bg-primary);
+            padding: 12px 0;
             user-select: text;
             cursor: text;
         }
 
         .message {
-            margin-bottom: 6px;
-            padding: 6px 10px;
-            border-left: 3px solid transparent;
+            margin-bottom: 8px;
+            padding: 8px 12px;
+            border-left: 2px solid transparent;
             font-size: 12px;
             line-height: 1.4;
-            background: var(--input-background);
-            border-radius: 0 4px 4px 0;
+            background: var(--bg-secondary);
             user-select: text;
             cursor: text;
         }
 
         .message.user {
-            border-left-color: #5865f2; /* Discord blue */
+            border-left-color: var(--text-secondary);
         }
 
         .message.ai {
-            border-left-color: #ed4245; /* Discord red */
+            border-left-color: var(--text-color);
         }
 
         .back-header {
@@ -114,21 +100,23 @@ export class HistoryView extends LitElement {
             justify-content: space-between;
             align-items: center;
             margin-bottom: 12px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border-color);
         }
 
         .back-button {
-            background: var(--button-background);
+            background: transparent;
             color: var(--text-color);
-            border: 1px solid var(--button-border);
+            border: 1px solid var(--border-color);
             padding: 6px 12px;
-            border-radius: 4px;
+            border-radius: 3px;
             font-size: 11px;
             font-weight: 500;
             cursor: pointer;
             display: flex;
             align-items: center;
             gap: 6px;
-            transition: all 0.15s ease;
+            transition: background 0.1s ease;
         }
 
         .back-button:hover {
@@ -145,139 +133,117 @@ export class HistoryView extends LitElement {
             display: flex;
             align-items: center;
             gap: 4px;
-            font-size: 11px;
-            color: var(--description-color);
+            font-size: 10px;
+            color: var(--text-muted);
         }
 
         .legend-dot {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
+            width: 8px;
+            height: 2px;
         }
 
         .legend-dot.user {
-            background-color: #5865f2; /* Discord blue */
+            background-color: var(--text-secondary);
         }
 
         .legend-dot.ai {
-            background-color: #ed4245; /* Discord red */
+            background-color: var(--text-color);
         }
 
         .empty-state {
             text-align: center;
-            color: var(--description-color);
+            color: var(--text-muted);
             font-size: 12px;
             margin-top: 32px;
         }
 
         .empty-state-title {
-            font-size: 16px;
-            font-weight: 600;
+            font-size: 14px;
+            font-weight: 500;
             margin-bottom: 6px;
-            color: var(--text-color);
+            color: var(--text-secondary);
         }
 
         .loading {
             text-align: center;
-            color: var(--description-color);
+            color: var(--text-muted);
             font-size: 12px;
             margin-top: 32px;
         }
 
-        /* Scrollbar styles for scrollable elements */
-        .sessions-list::-webkit-scrollbar {
-            width: 6px;
-        }
-
-        .sessions-list::-webkit-scrollbar-track {
-            background: var(--scrollbar-track, rgba(0, 0, 0, 0.2));
-            border-radius: 3px;
-        }
-
-        .sessions-list::-webkit-scrollbar-thumb {
-            background: var(--scrollbar-thumb, rgba(255, 255, 255, 0.2));
-            border-radius: 3px;
-        }
-
-        .sessions-list::-webkit-scrollbar-thumb:hover {
-            background: var(--scrollbar-thumb-hover, rgba(255, 255, 255, 0.3));
-        }
-
+        .sessions-list::-webkit-scrollbar,
         .conversation-view::-webkit-scrollbar {
-            width: 6px;
+            width: 8px;
         }
 
+        .sessions-list::-webkit-scrollbar-track,
         .conversation-view::-webkit-scrollbar-track {
-            background: var(--scrollbar-track, rgba(0, 0, 0, 0.2));
-            border-radius: 3px;
+            background: transparent;
         }
 
+        .sessions-list::-webkit-scrollbar-thumb,
         .conversation-view::-webkit-scrollbar-thumb {
-            background: var(--scrollbar-thumb, rgba(255, 255, 255, 0.2));
-            border-radius: 3px;
+            background: var(--scrollbar-thumb);
+            border-radius: 4px;
         }
 
+        .sessions-list::-webkit-scrollbar-thumb:hover,
         .conversation-view::-webkit-scrollbar-thumb:hover {
-            background: var(--scrollbar-thumb-hover, rgba(255, 255, 255, 0.3));
+            background: var(--scrollbar-thumb-hover);
         }
 
         .tabs-container {
             display: flex;
-            gap: 8px;
+            gap: 0;
             margin-bottom: 16px;
-            border-bottom: 1px solid var(--button-border);
-            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border-color);
         }
 
         .tab {
             background: transparent;
-            color: var(--description-color);
+            color: var(--text-muted);
             border: none;
             padding: 8px 16px;
-            border-radius: 4px 4px 0 0;
             font-size: 12px;
             font-weight: 500;
             cursor: pointer;
-            transition: all 0.15s ease;
+            transition: color 0.1s ease;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
         }
 
         .tab:hover {
-            background: var(--hover-background);
             color: var(--text-color);
         }
 
         .tab.active {
-            background: var(--focus-box-shadow);
             color: var(--text-color);
-            border-bottom: 2px solid var(--focus-border-color);
+            border-bottom-color: var(--text-color);
         }
 
         .saved-response-item {
-            background: var(--input-background);
-            border: 1px solid var(--button-border);
-            border-radius: 6px;
-            padding: 12px;
-            margin-bottom: 8px;
-            transition: all 0.15s ease;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border-color);
         }
 
         .saved-response-header {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
         }
 
         .saved-response-profile {
             font-size: 11px;
-            font-weight: 600;
-            color: var(--focus-border-color);
+            font-weight: 500;
+            color: var(--text-secondary);
             text-transform: capitalize;
         }
 
         .saved-response-date {
             font-size: 10px;
-            color: var(--description-color);
+            color: var(--text-muted);
+            font-family: 'SF Mono', Monaco, monospace;
         }
 
         .saved-response-content {
@@ -290,17 +256,17 @@ export class HistoryView extends LitElement {
 
         .delete-button {
             background: transparent;
-            color: var(--description-color);
+            color: var(--text-muted);
             border: none;
             padding: 4px;
-            border-radius: 4px;
+            border-radius: 3px;
             cursor: pointer;
-            transition: all 0.15s ease;
+            transition: all 0.1s ease;
         }
 
         .delete-button:hover {
-            background: rgba(255, 0, 0, 0.1);
-            color: #ff4444;
+            background: rgba(241, 76, 76, 0.1);
+            color: var(--error-color);
         }
     `;
 

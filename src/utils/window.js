@@ -431,6 +431,10 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
 
             // Adjust height based on view
             switch (viewName) {
+                case 'main':
+                    targetWidth = baseWidth;
+                    targetHeight = layoutMode === 'compact' ? 320 : 400;
+                    break;
                 case 'customize':
                 case 'settings':
                     targetWidth = baseWidth;
@@ -444,11 +448,6 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
                     targetWidth = baseWidth;
                     targetHeight = layoutMode === 'compact' ? 650 : 750;
                     break;
-                case 'advanced':
-                    targetWidth = baseWidth;
-                    targetHeight = layoutMode === 'compact' ? 600 : 700;
-                    break;
-                case 'main':
                 case 'assistant':
                 case 'onboarding':
                 default:

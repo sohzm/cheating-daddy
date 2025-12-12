@@ -9,30 +9,27 @@ export class AssistantView extends LitElement {
         }
 
         * {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             cursor: default;
         }
 
         .response-container {
-            height: calc(100% - 60px);
+            height: calc(100% - 50px);
             overflow-y: auto;
-            border-radius: 10px;
-            font-size: var(--response-font-size, 18px);
+            font-size: var(--response-font-size, 16px);
             line-height: 1.6;
-            background: var(--main-content-background);
-            padding: 16px;
+            background: var(--bg-primary);
+            padding: 12px;
             scroll-behavior: smooth;
             user-select: text;
             cursor: text;
         }
 
-        /* Allow text selection for all content within the response container */
         .response-container * {
             user-select: text;
             cursor: text;
         }
 
-        /* Restore default cursor for interactive elements */
         .response-container a {
             cursor: pointer;
         }
@@ -40,9 +37,9 @@ export class AssistantView extends LitElement {
         /* Animated word-by-word reveal */
         .response-container [data-word] {
             opacity: 0;
-            filter: blur(10px);
+            filter: blur(8px);
             display: inline-block;
-            transition: opacity 0.5s, filter 0.5s;
+            transition: opacity 0.4s, filter 0.4s;
         }
         .response-container [data-word].visible {
             opacity: 1;
@@ -56,118 +53,95 @@ export class AssistantView extends LitElement {
         .response-container h4,
         .response-container h5,
         .response-container h6 {
-            margin: 1.2em 0 0.6em 0;
+            margin: 1em 0 0.5em 0;
             color: var(--text-color);
             font-weight: 600;
         }
 
-        .response-container h1 {
-            font-size: 1.8em;
-        }
-        .response-container h2 {
-            font-size: 1.5em;
-        }
-        .response-container h3 {
-            font-size: 1.3em;
-        }
-        .response-container h4 {
-            font-size: 1.1em;
-        }
-        .response-container h5 {
-            font-size: 1em;
-        }
-        .response-container h6 {
-            font-size: 0.9em;
-        }
+        .response-container h1 { font-size: 1.6em; }
+        .response-container h2 { font-size: 1.4em; }
+        .response-container h3 { font-size: 1.2em; }
+        .response-container h4 { font-size: 1.1em; }
+        .response-container h5 { font-size: 1em; }
+        .response-container h6 { font-size: 0.9em; }
 
         .response-container p {
-            margin: 0.8em 0;
+            margin: 0.6em 0;
             color: var(--text-color);
         }
 
         .response-container ul,
         .response-container ol {
-            margin: 0.8em 0;
-            padding-left: 2em;
+            margin: 0.6em 0;
+            padding-left: 1.5em;
             color: var(--text-color);
         }
 
         .response-container li {
-            margin: 0.4em 0;
+            margin: 0.3em 0;
         }
 
         .response-container blockquote {
-            margin: 1em 0;
+            margin: 0.8em 0;
             padding: 0.5em 1em;
-            border-left: 4px solid var(--focus-border-color);
-            background: rgba(0, 122, 255, 0.1);
-            font-style: italic;
+            border-left: 2px solid var(--border-default);
+            background: var(--bg-secondary);
         }
 
         .response-container code {
-            background: rgba(255, 255, 255, 0.1);
-            padding: 0.2em 0.4em;
+            background: var(--bg-tertiary);
+            padding: 0.15em 0.4em;
             border-radius: 3px;
-            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-family: 'SF Mono', Monaco, monospace;
             font-size: 0.85em;
         }
 
         .response-container pre {
-            background: var(--input-background);
-            border: 1px solid var(--button-border);
-            border-radius: 6px;
-            padding: 1em;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 3px;
+            padding: 12px;
             overflow-x: auto;
-            margin: 1em 0;
+            margin: 0.8em 0;
         }
 
         .response-container pre code {
             background: none;
             padding: 0;
-            border-radius: 0;
         }
 
         .response-container a {
-            color: var(--link-color);
-            text-decoration: none;
-        }
-
-        .response-container a:hover {
+            color: var(--text-color);
             text-decoration: underline;
+            text-underline-offset: 2px;
         }
 
         .response-container strong,
         .response-container b {
             font-weight: 600;
-            color: var(--text-color);
-        }
-
-        .response-container em,
-        .response-container i {
-            font-style: italic;
         }
 
         .response-container hr {
             border: none;
             border-top: 1px solid var(--border-color);
-            margin: 2em 0;
+            margin: 1.5em 0;
         }
 
         .response-container table {
             border-collapse: collapse;
             width: 100%;
-            margin: 1em 0;
+            margin: 0.8em 0;
         }
 
         .response-container th,
         .response-container td {
             border: 1px solid var(--border-color);
-            padding: 0.5em;
+            padding: 8px;
             text-align: left;
         }
 
         .response-container th {
-            background: var(--input-background);
+            background: var(--bg-secondary);
             font-weight: 600;
         }
 
@@ -176,8 +150,7 @@ export class AssistantView extends LitElement {
         }
 
         .response-container::-webkit-scrollbar-track {
-            background: var(--scrollbar-track);
-            border-radius: 4px;
+            background: transparent;
         }
 
         .response-container::-webkit-scrollbar-thumb {
@@ -191,8 +164,8 @@ export class AssistantView extends LitElement {
 
         .text-input-container {
             display: flex;
-            gap: 10px;
-            margin-top: 10px;
+            gap: 8px;
+            margin-top: 8px;
             align-items: center;
         }
 
@@ -200,51 +173,37 @@ export class AssistantView extends LitElement {
             flex: 1;
             background: var(--input-background);
             color: var(--text-color);
-            border: 1px solid var(--button-border);
-            padding: 10px 14px;
-            border-radius: 8px;
-            font-size: 14px;
+            border: 1px solid var(--border-color);
+            padding: 8px 12px;
+            border-radius: 3px;
+            font-size: 13px;
         }
 
         .text-input-container input:focus {
             outline: none;
-            border-color: var(--focus-border-color);
-            box-shadow: 0 0 0 3px var(--focus-box-shadow);
-            background: var(--input-focus-background);
+            border-color: var(--border-default);
         }
 
         .text-input-container input::placeholder {
             color: var(--placeholder-color);
         }
 
-        .text-input-container button {
-            background: transparent;
-            color: var(--start-button-background);
-            border: none;
-            padding: 0;
-            border-radius: 100px;
-        }
-
-        .text-input-container button:hover {
-            background: var(--text-input-button-hover);
-        }
-
         .nav-button {
             background: transparent;
-            color: white;
+            color: var(--text-secondary);
             border: none;
-            padding: 4px;
-            border-radius: 50%;
+            padding: 6px;
+            border-radius: 3px;
             font-size: 12px;
             display: flex;
             align-items: center;
-            width: 36px;
-            height: 36px;
             justify-content: center;
+            transition: all 0.1s ease;
         }
 
         .nav-button:hover {
-            background: rgba(255, 255, 255, 0.1);
+            background: var(--hover-background);
+            color: var(--text-color);
         }
 
         .nav-button:disabled {
@@ -252,42 +211,18 @@ export class AssistantView extends LitElement {
         }
 
         .nav-button svg {
-            stroke: white !important;
+            width: 18px;
+            height: 18px;
+            stroke: currentColor;
         }
 
         .response-counter {
-            font-size: 12px;
-            color: var(--description-color);
+            font-size: 11px;
+            color: var(--text-muted);
             white-space: nowrap;
-            min-width: 60px;
+            min-width: 50px;
             text-align: center;
-        }
-
-        .save-button {
-            background: transparent;
-            color: var(--start-button-background);
-            border: none;
-            padding: 4px;
-            border-radius: 50%;
-            font-size: 12px;
-            display: flex;
-            align-items: center;
-            width: 36px;
-            height: 36px;
-            justify-content: center;
-            cursor: pointer;
-        }
-
-        .save-button:hover {
-            background: rgba(255, 255, 255, 0.1);
-        }
-
-        .save-button.saved {
-            color: #4caf50;
-        }
-
-        .save-button svg {
-            stroke: currentColor !important;
+            font-family: 'SF Mono', Monaco, monospace;
         }
     `;
 

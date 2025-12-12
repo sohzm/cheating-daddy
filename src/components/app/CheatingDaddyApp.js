@@ -6,7 +6,6 @@ import { HelpView } from '../views/HelpView.js';
 import { HistoryView } from '../views/HistoryView.js';
 import { AssistantView } from '../views/AssistantView.js';
 import { OnboardingView } from '../views/OnboardingView.js';
-import { AdvancedView } from '../views/AdvancedView.js';
 
 export class CheatingDaddyApp extends LitElement {
     static styles = css`
@@ -29,8 +28,8 @@ export class CheatingDaddyApp extends LitElement {
 
         .window-container {
             height: 100vh;
-            border-radius: 7px;
             overflow: hidden;
+            background: var(--bg-primary);
         }
 
         .container {
@@ -43,52 +42,49 @@ export class CheatingDaddyApp extends LitElement {
             flex: 1;
             padding: var(--main-content-padding);
             overflow-y: auto;
-            margin-top: var(--main-content-margin-top);
-            border-radius: var(--content-border-radius);
-            transition: all 0.15s ease-out;
             background: var(--main-content-background);
         }
 
         .main-content.with-border {
-            border: 1px solid var(--border-color);
+            border-top: none;
         }
 
         .main-content.assistant-view {
-            padding: 10px;
-            border: none;
+            padding: 12px;
         }
 
         .main-content.onboarding-view {
             padding: 0;
-            border: none;
             background: transparent;
+        }
+
+        .main-content.settings-view,
+        .main-content.help-view,
+        .main-content.history-view {
+            padding: 0;
         }
 
         .view-container {
             opacity: 1;
-            transform: translateY(0);
-            transition: opacity 0.15s ease-out, transform 0.15s ease-out;
             height: 100%;
         }
 
         .view-container.entering {
             opacity: 0;
-            transform: translateY(10px);
         }
 
         ::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
+            width: 8px;
+            height: 8px;
         }
 
         ::-webkit-scrollbar-track {
-            background: var(--scrollbar-background);
-            border-radius: 3px;
+            background: transparent;
         }
 
         ::-webkit-scrollbar-thumb {
             background: var(--scrollbar-thumb);
-            border-radius: 3px;
+            border-radius: 4px;
         }
 
         ::-webkit-scrollbar-thumb:hover {
@@ -109,7 +105,6 @@ export class CheatingDaddyApp extends LitElement {
         selectedScreenshotInterval: { type: String },
         selectedImageQuality: { type: String },
         layoutMode: { type: String },
-        advancedMode: { type: Boolean },
         _viewInstances: { type: Object, state: true },
         _isClickThrough: { state: true },
         _awaitingNewResponse: { state: true },
@@ -130,7 +125,6 @@ export class CheatingDaddyApp extends LitElement {
         this.selectedScreenshotInterval = '5';
         this.selectedImageQuality = 'medium';
         this.layoutMode = 'normal';
-        this.advancedMode = false;
         this.responses = [];
         this.currentResponseIndex = -1;
         this._viewInstances = new Map();
@@ -154,13 +148,18 @@ export class CheatingDaddyApp extends LitElement {
             // Check onboarding status
             this.currentView = config.onboarded ? 'main' : 'onboarding';
 
+            // Apply background appearance (color + transparency)
+            this.applyBackgroundAppearance(
+                prefs.backgroundColor ?? '#1e1e1e',
+                prefs.backgroundTransparency ?? 0.8
+            );
+
             // Load preferences
             this.selectedProfile = prefs.selectedProfile || 'interview';
             this.selectedLanguage = prefs.selectedLanguage || 'en-US';
             this.selectedScreenshotInterval = prefs.selectedScreenshotInterval || '5';
             this.selectedImageQuality = prefs.selectedImageQuality || 'medium';
             this.layoutMode = config.layout || 'normal';
-            this.advancedMode = prefs.advancedMode || false;
 
             this._storageLoaded = true;
             this.updateLayoutMode();
@@ -170,6 +169,49 @@ export class CheatingDaddyApp extends LitElement {
             this._storageLoaded = true;
             this.requestUpdate();
         }
+    }
+
+    hexToRgb(hex) {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? {
+            r: parseInt(result[1], 16),
+            g: parseInt(result[2], 16),
+            b: parseInt(result[3], 16)
+        } : { r: 30, g: 30, b: 30 };
+    }
+
+    lightenColor(rgb, amount) {
+        return {
+            r: Math.min(255, rgb.r + amount),
+            g: Math.min(255, rgb.g + amount),
+            b: Math.min(255, rgb.b + amount)
+        };
+    }
+
+    applyBackgroundAppearance(backgroundColor, alpha) {
+        const root = document.documentElement;
+        const baseRgb = this.hexToRgb(backgroundColor);
+
+        // Generate color variants based on the base color
+        const secondary = this.lightenColor(baseRgb, 7);
+        const tertiary = this.lightenColor(baseRgb, 15);
+        const hover = this.lightenColor(baseRgb, 20);
+
+        root.style.setProperty('--header-background', `rgba(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}, ${alpha})`);
+        root.style.setProperty('--main-content-background', `rgba(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}, ${alpha})`);
+        root.style.setProperty('--bg-primary', `rgba(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}, ${alpha})`);
+        root.style.setProperty('--bg-secondary', `rgba(${secondary.r}, ${secondary.g}, ${secondary.b}, ${alpha})`);
+        root.style.setProperty('--bg-tertiary', `rgba(${tertiary.r}, ${tertiary.g}, ${tertiary.b}, ${alpha})`);
+        root.style.setProperty('--bg-hover', `rgba(${hover.r}, ${hover.g}, ${hover.b}, ${alpha})`);
+        root.style.setProperty('--input-background', `rgba(${tertiary.r}, ${tertiary.g}, ${tertiary.b}, ${alpha})`);
+        root.style.setProperty('--input-focus-background', `rgba(${tertiary.r}, ${tertiary.g}, ${tertiary.b}, ${alpha})`);
+        root.style.setProperty('--hover-background', `rgba(${hover.r}, ${hover.g}, ${hover.b}, ${alpha})`);
+        root.style.setProperty('--scrollbar-background', `rgba(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}, ${alpha})`);
+    }
+
+    // Keep old function name for backwards compatibility
+    applyBackgroundTransparency(alpha) {
+        this.applyBackgroundAppearance('#1e1e1e', alpha);
     }
 
     connectedCallback() {
@@ -262,12 +304,7 @@ export class CheatingDaddyApp extends LitElement {
         this.requestUpdate();
     }
 
-    handleAdvancedClick() {
-        this.currentView = 'advanced';
-        this.requestUpdate();
-    }
-
-    async handleClose() {
+        async handleClose() {
         if (this.currentView === 'customize' || this.currentView === 'help' || this.currentView === 'history') {
             this.currentView = 'main';
         } else if (this.currentView === 'assistant') {
@@ -345,11 +382,6 @@ export class CheatingDaddyApp extends LitElement {
     async handleImageQualityChange(quality) {
         this.selectedImageQuality = quality;
         await cheatingDaddy.storage.updatePreference('selectedImageQuality', quality);
-    }
-
-    async handleAdvancedModeChange(advancedMode) {
-        this.advancedMode = advancedMode;
-        await cheatingDaddy.storage.updatePreference('advancedMode', advancedMode);
     }
 
     handleBackClick() {
@@ -439,13 +471,11 @@ export class CheatingDaddyApp extends LitElement {
                         .selectedScreenshotInterval=${this.selectedScreenshotInterval}
                         .selectedImageQuality=${this.selectedImageQuality}
                         .layoutMode=${this.layoutMode}
-                        .advancedMode=${this.advancedMode}
                         .onProfileChange=${profile => this.handleProfileChange(profile)}
                         .onLanguageChange=${language => this.handleLanguageChange(language)}
                         .onScreenshotIntervalChange=${interval => this.handleScreenshotIntervalChange(interval)}
                         .onImageQualityChange=${quality => this.handleImageQualityChange(quality)}
                         .onLayoutModeChange=${layoutMode => this.handleLayoutModeChange(layoutMode)}
-                        .onAdvancedModeChange=${advancedMode => this.handleAdvancedModeChange(advancedMode)}
                     ></customize-view>
                 `;
 
@@ -454,9 +484,6 @@ export class CheatingDaddyApp extends LitElement {
 
             case 'history':
                 return html` <history-view></history-view> `;
-
-            case 'advanced':
-                return html` <advanced-view></advanced-view> `;
 
             case 'assistant':
                 return html`
@@ -482,9 +509,14 @@ export class CheatingDaddyApp extends LitElement {
     }
 
     render() {
-        const mainContentClass = `main-content ${
-            this.currentView === 'assistant' ? 'assistant-view' : this.currentView === 'onboarding' ? 'onboarding-view' : 'with-border'
-        }`;
+        const viewClassMap = {
+            'assistant': 'assistant-view',
+            'onboarding': 'onboarding-view',
+            'customize': 'settings-view',
+            'help': 'help-view',
+            'history': 'history-view',
+        };
+        const mainContentClass = `main-content ${viewClassMap[this.currentView] || 'with-border'}`;
 
         return html`
             <div class="window-container">
@@ -493,11 +525,9 @@ export class CheatingDaddyApp extends LitElement {
                         .currentView=${this.currentView}
                         .statusText=${this.statusText}
                         .startTime=${this.startTime}
-                        .advancedMode=${this.advancedMode}
                         .onCustomizeClick=${() => this.handleCustomizeClick()}
                         .onHelpClick=${() => this.handleHelpClick()}
                         .onHistoryClick=${() => this.handleHistoryClick()}
-                        .onAdvancedClick=${() => this.handleAdvancedClick()}
                         .onCloseClick=${() => this.handleClose()}
                         .onBackClick=${() => this.handleBackClick()}
                         .onHideToggleClick=${() => this.handleHideToggle()}
