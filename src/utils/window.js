@@ -43,6 +43,7 @@ function createWindow(sendToRenderer, geminiSessionRef) {
     );
 
     mainWindow.setResizable(false);
+    mainWindow.setContentProtection(true);
     mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 
     // Center window at the top of the screen
