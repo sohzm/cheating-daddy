@@ -314,6 +314,9 @@ export class CheatingDaddyApp extends LitElement {
             // Interview mode: Use Groq API for STT + Llama for response generation
             await cheddar.initializeGroq(apiKey);
 
+            // Get the selected Groq model (default to maverick)
+            const selectedGroqModel = localStorage.getItem('selectedGroqModel') || 'llama-4-maverick';
+
             // Set up Llama config with system prompt from prompts.js
             const { ipcRenderer } = window.require('electron');
             const customPrompt = localStorage.getItem(`customPrompt_${this.selectedProfile}`) || '';
@@ -324,15 +327,17 @@ export class CheatingDaddyApp extends LitElement {
 
             await ipcRenderer.invoke('groq-set-llama-config', {
                 profile: this.selectedProfile,
-                systemPrompt: systemPrompt
+                systemPrompt: systemPrompt,
+                model: selectedGroqModel
             });
-            console.log(`[GROQ] Llama config set for profile: ${this.selectedProfile}`);
+            console.log(`[GROQ] Llama config set - Profile: ${this.selectedProfile}, Model: ${selectedGroqModel}`);
         }
 
         // Set current mode and model for header display
         this.currentMode = selectedMode;
         if (selectedMode === 'interview') {
-            this.currentModel = 'llama-4-maverick';
+            const selectedGroqModel = localStorage.getItem('selectedGroqModel') || 'llama-4-maverick';
+            this.currentModel = selectedGroqModel;
         } else {
             this.currentModel = selectedModel;
         }

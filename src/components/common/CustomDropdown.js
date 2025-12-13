@@ -109,6 +109,33 @@ export class CustomDropdown extends LitElement {
             font-weight: 500;
         }
 
+        .option-content {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .option-icon {
+            width: 12px;
+            height: 12px;
+            object-fit: contain;
+            flex-shrink: 0;
+        }
+
+        .selected-content {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            overflow: hidden;
+        }
+
+        .selected-icon {
+            width: 12px;
+            height: 12px;
+            object-fit: contain;
+            flex-shrink: 0;
+        }
+
         .dropdown-menu::-webkit-scrollbar {
             width: 8px;
         }
@@ -190,6 +217,7 @@ export class CustomDropdown extends LitElement {
     render() {
         const selectedOption = this.getSelectedOption();
         const displayText = selectedOption ? selectedOption.label : 'Select...';
+        const selectedIcon = selectedOption?.icon;
 
         return html`
             <div class="dropdown-container">
@@ -199,7 +227,10 @@ export class CustomDropdown extends LitElement {
                     ?disabled=${this.disabled}
                     aria-disabled="${this.disabled}"
                 >
-                    <span>${displayText}</span>
+                    <span class="selected-content">
+                        ${selectedIcon ? html`<img class="selected-icon" src="${selectedIcon}" alt="" />` : ''}
+                        <span>${displayText}</span>
+                    </span>
                     <svg
                         class="dropdown-arrow"
                         fill="none"
@@ -222,7 +253,10 @@ export class CustomDropdown extends LitElement {
                                 class="dropdown-option ${this.value === option.value ? 'selected' : ''}"
                                 @click=${e => this.selectOption(option.value, e)}
                             >
-                                ${option.label}
+                                <span class="option-content">
+                                    ${option.icon ? html`<img class="option-icon" src="${option.icon}" alt="" />` : ''}
+                                    <span>${option.label}</span>
+                                </span>
                             </div>
                         `
                     )}

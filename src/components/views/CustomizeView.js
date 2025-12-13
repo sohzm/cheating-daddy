@@ -447,6 +447,7 @@ export class CustomizeView extends LitElement {
         onAdvancedModeChange: { type: Function },
         selectedMode: { type: String },
         selectedModel: { type: String },
+        selectedGroqModel: { type: String },
     };
 
     constructor() {
@@ -483,6 +484,7 @@ export class CustomizeView extends LitElement {
         // Mode and model selection defaults
         this.selectedMode = 'interview';
         this.selectedModel = 'gemini-2.5-pro';
+        this.selectedGroqModel = 'llama-4-maverick';
 
         this.loadKeybinds();
         this.loadGoogleSearchSettings();
@@ -1035,9 +1037,11 @@ export class CustomizeView extends LitElement {
     loadModeSettings() {
         const selectedMode = localStorage.getItem('selectedMode');
         const selectedModel = localStorage.getItem('selectedModel');
+        const selectedGroqModel = localStorage.getItem('selectedGroqModel');
 
         this.selectedMode = selectedMode || 'interview';
         this.selectedModel = selectedModel || 'gemini-2.5-pro';
+        this.selectedGroqModel = selectedGroqModel || 'llama-4-maverick';
     }
 
     async handleModeChange(e) {
@@ -1065,6 +1069,13 @@ export class CustomizeView extends LitElement {
     async handleModelChange(e) {
         this.selectedModel = e.target.value;
         localStorage.setItem('selectedModel', this.selectedModel);
+
+        this.requestUpdate();
+    }
+
+    async handleGroqModelChange(e) {
+        this.selectedGroqModel = e.detail.value;
+        localStorage.setItem('selectedGroqModel', this.selectedGroqModel);
 
         this.requestUpdate();
     }
@@ -1145,8 +1156,8 @@ export class CustomizeView extends LitElement {
                                     <custom-dropdown
                                         .value=${this.selectedModel}
                                         .options=${[
-                                            { value: 'gemini-2.5-flash', label: '⚡ Gemini 2.5 Flash (Faster, Balanced)' },
-                                            { value: 'gemini-2.5-pro', label: '🚀 Gemini 2.5 Pro (Slower, More Accurate)' }
+                                            { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (Faster, Balanced)', icon: './assets/models/500px-Google_Gemini_icon_2025.svg.png' },
+                                            { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (Slower, More Accurate)', icon: './assets/models/500px-Google_Gemini_icon_2025.svg.png' }
                                         ]}
                                         @change=${e => this.handleModelChange({ target: { value: e.detail.value } })}
                                     ></custom-dropdown>
@@ -1158,15 +1169,34 @@ export class CustomizeView extends LitElement {
                                 </div>
                             </div>
                         ` : html`
-                            <!-- Other profiles: Only Interview mode available -->
+                            <!-- Other profiles: Interview mode with Groq/Llama -->
                             <div class="form-row">
                                 <div class="form-group">
                                     <label class="form-label">Mode (Fixed for ${this.getProfileNames()[this.selectedProfile]})</label>
                                     <div class="mode-display-box">
-                                        🎤 Interview Mode (Real-time Audio/Video)
+                                        🎤 Interview Mode (Real-time Audio)
                                     </div>
                                     <div class="form-description">
-                                        ${this.getProfileNames()[this.selectedProfile]} profile uses Interview mode with Gemini 2.5 Flash for real-time audio processing and live interactions.
+                                        ${this.getProfileNames()[this.selectedProfile]} profile uses Groq Whisper for speech-to-text and Llama 4 for response generation.
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="form-label">Model Selection</label>
+                                    <custom-dropdown
+                                        .value=${this.selectedGroqModel}
+                                        .options=${[
+                                            { value: 'llama-4-maverick', label: 'Llama 4 Maverick (Fast, More Accurate)', icon: './assets/models/metalogo.dcf881ba.svg' },
+                                            { value: 'llama-4-scout', label: 'Llama 4 Scout (Faster, Balanced)', icon: './assets/models/metalogo.dcf881ba.svg' }
+                                        ]}
+                                        @change=${this.handleGroqModelChange}
+                                    ></custom-dropdown>
+                                    <div class="form-description">
+                                        ${this.selectedGroqModel === 'llama-4-maverick'
+                                            ? 'Llama 4 Maverick: 17B parameters with 128 experts. More accurate and detailed responses for complex questions.'
+                                            : 'Llama 4 Scout: 17B parameters with 16 experts. Faster responses, ideal for quick interactions.'}
                                     </div>
                                 </div>
                             </div>

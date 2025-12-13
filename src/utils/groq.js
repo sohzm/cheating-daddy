@@ -457,7 +457,13 @@ function isGroqInitialized() {
 }
 
 // Llama text generation configuration
-const LLAMA_MODEL = 'meta-llama/llama-4-maverick-17b-128e-instruct';
+const LLAMA_MODELS = {
+    'llama-4-maverick': 'meta-llama/llama-4-maverick-17b-128e-instruct',
+    'llama-4-scout': 'meta-llama/llama-4-scout-17b-16e-instruct'
+};
+
+// Default to Maverick
+let currentLlamaModel = LLAMA_MODELS['llama-4-maverick'];
 
 // Conversation history for context
 let conversationHistory = [];
@@ -465,15 +471,17 @@ let currentProfile = 'interview';
 let currentSystemPrompt = '';
 
 /**
- * Set the current profile and system prompt for Llama generation
+ * Set the current profile, system prompt, and model for Llama generation
  * @param {string} profile - The profile name (interview, sales, etc.)
  * @param {string} systemPrompt - The system prompt to use
+ * @param {string} [model] - The model key ('llama-4-maverick' or 'llama-4-scout')
  */
-function setLlamaConfig(profile, systemPrompt) {
+function setLlamaConfig(profile, systemPrompt, model = 'llama-4-maverick') {
     currentProfile = profile;
     currentSystemPrompt = systemPrompt;
+    currentLlamaModel = LLAMA_MODELS[model] || LLAMA_MODELS['llama-4-maverick'];
     conversationHistory = []; // Reset conversation on config change
-    console.log(`[GROQ LLAMA] Config set - Profile: ${profile}`);
+    console.log(`[GROQ LLAMA] Config set - Profile: ${profile}, Model: ${model} (${currentLlamaModel})`);
 }
 
 /**
@@ -531,7 +539,7 @@ async function generateWithLlama(userMessage, imageBase64 = null) {
         });
 
         const requestBody = JSON.stringify({
-            model: LLAMA_MODEL,
+            model: currentLlamaModel,
             messages: messages,
             temperature: 0.7,
             max_tokens: 4096,
@@ -702,9 +710,9 @@ function setupGroqIpcHandlers() {
     });
 
     // Llama text generation handlers
-    ipcMain.handle('groq-set-llama-config', async (event, { profile, systemPrompt }) => {
+    ipcMain.handle('groq-set-llama-config', async (event, { profile, systemPrompt, model }) => {
         try {
-            setLlamaConfig(profile, systemPrompt);
+            setLlamaConfig(profile, systemPrompt, model);
             return { success: true };
         } catch (error) {
             console.error('[GROQ] Set Llama config error:', error);
