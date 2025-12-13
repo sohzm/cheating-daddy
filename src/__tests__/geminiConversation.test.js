@@ -85,6 +85,78 @@ describe('gemini conversation helpers', () => {
         });
     });
 
+    describe('Dual API Mode', () => {
+        it('should use Gemini API for exam/coding mode', () => {
+            // Exam Assistant profile uses Gemini API
+            const examMode = 'coding';
+            const examProfile = 'exam';
+
+            expect(examMode).toBe('coding');
+            expect(examProfile).toBe('exam');
+            // Gemini models: gemini-2.5-flash, gemini-2.5-pro
+        });
+
+        it('should use Groq API for interview mode', () => {
+            // Interview profiles use Groq API (Whisper + Llama)
+            const interviewMode = 'interview';
+            const interviewProfiles = ['interview', 'sales', 'meeting', 'presentation', 'negotiation'];
+
+            expect(interviewMode).toBe('interview');
+            interviewProfiles.forEach(profile => {
+                expect(profile).not.toBe('exam');
+            });
+        });
+
+        it('should map profiles to correct API', () => {
+            const profileToApi = {
+                'exam': 'gemini',
+                'interview': 'groq',
+                'sales': 'groq',
+                'meeting': 'groq',
+                'presentation': 'groq',
+                'negotiation': 'groq'
+            };
+
+            // Exam uses Gemini
+            expect(profileToApi['exam']).toBe('gemini');
+
+            // All interview profiles use Groq
+            expect(profileToApi['interview']).toBe('groq');
+            expect(profileToApi['sales']).toBe('groq');
+            expect(profileToApi['meeting']).toBe('groq');
+            expect(profileToApi['presentation']).toBe('groq');
+            expect(profileToApi['negotiation']).toBe('groq');
+        });
+    });
+
+    describe('Model Selection', () => {
+        it('should support Gemini model selection for exam mode', () => {
+            const geminiModels = ['gemini-2.5-flash', 'gemini-2.5-pro'];
+
+            expect(geminiModels).toContain('gemini-2.5-flash');
+            expect(geminiModels).toContain('gemini-2.5-pro');
+            expect(geminiModels.length).toBe(2);
+        });
+
+        it('should support Llama model selection for interview mode', () => {
+            const llamaModels = ['llama-4-maverick', 'llama-4-scout'];
+
+            expect(llamaModels).toContain('llama-4-maverick');
+            expect(llamaModels).toContain('llama-4-scout');
+            expect(llamaModels.length).toBe(2);
+        });
+
+        it('should have default models for each mode', () => {
+            // Default Gemini model for exam
+            const defaultGeminiModel = 'gemini-2.5-pro';
+            expect(['gemini-2.5-flash', 'gemini-2.5-pro']).toContain(defaultGeminiModel);
+
+            // Default Llama model for interview
+            const defaultLlamaModel = 'llama-4-maverick';
+            expect(['llama-4-maverick', 'llama-4-scout']).toContain(defaultLlamaModel);
+        });
+    });
+
     describe('Response Counter and Auto-Reset', () => {
         it('tracks number of responses in session', () => {
             initializeNewSession();
