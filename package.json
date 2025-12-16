@@ -5,9 +5,13 @@
     "description": "cheating daddy",
     "main": "src/index.js",
     "scripts": {
-        "start": "electron-forge start",
-        "package": "electron-forge package",
-        "make": "electron-forge make",
+        "start": "concurrently \"npm run dev\" \"npm run electron:dev\"",
+        "dev": "vite",
+        "electron:dev": "cross-env NODE_ENV=development electron-forge start",
+        "build": "vite build",
+        "electron:build": "npm run build && electron-forge make",
+        "package": "npm run build && electron-forge package",
+        "make": "npm run build && electron-forge make",
         "publish": "electron-forge publish",
         "lint": "echo \"No linting configured\""
     },

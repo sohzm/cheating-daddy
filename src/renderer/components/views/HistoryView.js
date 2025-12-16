@@ -1,5 +1,5 @@
-import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
-import { resizeLayout } from '../../utils/windowResize.js';
+import { html, css, LitElement } from '../../../assets/lit-core-2.7.4.min.js';
+import { resizeLayout } from '../../../main/utils/windowResize.js';
 
 export class HistoryView extends LitElement {
     static styles = css`
