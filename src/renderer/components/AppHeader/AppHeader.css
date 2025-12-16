@@ -1,0 +1,110 @@
+.header {
+    -webkit-app-region: drag;
+    display: flex;
+    align-items: center;
+    padding: var(--header-padding);
+    background: var(--header-background);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.header-title {
+    flex: 1;
+    font-size: var(--header-font-size);
+    font-weight: 500;
+    color: var(--text-color);
+    -webkit-app-region: drag;
+}
+
+.header-actions {
+    display: flex;
+    gap: var(--header-gap);
+    align-items: center;
+    -webkit-app-region: no-drag;
+}
+
+.header-actions span {
+    font-size: var(--header-font-size-small);
+    color: var(--text-secondary);
+}
+
+.button {
+    background: transparent;
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    padding: var(--header-button-padding);
+    border-radius: 3px;
+    font-size: var(--header-font-size-small);
+    font-weight: 500;
+    transition: background 0.1s ease;
+    cursor: pointer;
+}
+
+.button:hover {
+    background: var(--hover-background);
+}
+
+.icon-button {
+    background: transparent;
+    color: var(--text-secondary);
+    border: none;
+    padding: var(--header-icon-padding);
+    border-radius: 3px;
+    font-size: var(--header-font-size-small);
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.1s ease;
+    cursor: pointer;
+}
+
+.icon-button svg {
+    width: var(--icon-size);
+    height: var(--icon-size);
+}
+
+.icon-button:hover {
+    background: var(--hover-background);
+    color: var(--text-color);
+}
+
+.key {
+    background: var(--key-background);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-family: 'SF Mono', Monaco, monospace;
+}
+
+.click-through-indicator {
+    font-size: 10px;
+    color: var(--text-muted);
+    background: var(--key-background);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: 'SF Mono', Monaco, monospace;
+}
+
+.update-button {
+    background: transparent;
+    color: #f14c4c;
+    border: 1px solid #f14c4c;
+    padding: var(--header-button-padding);
+    border-radius: 3px;
+    font-size: var(--header-font-size-small);
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.1s ease;
+    cursor: pointer;
+}
+
+.update-button svg {
+    width: 14px;
+    height: 14px;
+}
+
+.update-button:hover {
+    background: rgba(241, 76, 76, 0.1);
+}
