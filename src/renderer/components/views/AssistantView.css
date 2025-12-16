@@ -1,0 +1,309 @@
+.assistant-view {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.response-container {
+    height: calc(100% - 50px);
+    overflow-y: auto;
+    font-size: var(--response-font-size, 16px);
+    line-height: 1.6;
+    background: var(--bg-primary);
+    padding: 12px;
+    scroll-behavior: smooth;
+    user-select: text;
+    cursor: text;
+}
+
+.response-container * {
+    user-select: text;
+    cursor: text;
+}
+
+.response-container a {
+    cursor: pointer;
+}
+
+/* Word display (no animation) */
+.response-container [data-word] {
+    display: inline-block;
+}
+
+/* Markdown styling */
+.response-container h1,
+.response-container h2,
+.response-container h3,
+.response-container h4,
+.response-container h5,
+.response-container h6 {
+    margin: 1em 0 0.5em 0;
+    color: var(--text-color);
+    font-weight: 600;
+}
+
+.response-container h1 { font-size: 1.6em; }
+.response-container h2 { font-size: 1.4em; }
+.response-container h3 { font-size: 1.2em; }
+.response-container h4 { font-size: 1.1em; }
+.response-container h5 { font-size: 1em; }
+.response-container h6 { font-size: 0.9em; }
+
+.response-container p {
+    margin: 0.6em 0;
+    color: var(--text-color);
+}
+
+.response-container ul,
+.response-container ol {
+    margin: 0.6em 0;
+    padding-left: 1.5em;
+    color: var(--text-color);
+}
+
+.response-container li {
+    margin: 0.3em 0;
+}
+
+.response-container blockquote {
+    margin: 0.8em 0;
+    padding: 0.5em 1em;
+    border-left: 2px solid var(--border-default);
+    background: var(--bg-secondary);
+}
+
+.response-container code {
+    background: var(--bg-tertiary);
+    padding: 0.15em 0.4em;
+    border-radius: 3px;
+    font-family: 'SF Mono', Monaco, monospace;
+    font-size: 0.85em;
+}
+
+.response-container pre {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    padding: 12px;
+    overflow-x: auto;
+    margin: 0.8em 0;
+}
+
+.response-container pre code {
+    background: none;
+    padding: 0;
+}
+
+.response-container a {
+    color: var(--text-color);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.response-container strong,
+.response-container b {
+    font-weight: 600;
+}
+
+.response-container hr {
+    border: none;
+    border-top: 1px solid var(--border-color);
+    margin: 1.5em 0;
+}
+
+.response-container table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 0.8em 0;
+}
+
+.response-container th,
+.response-container td {
+    border: 1px solid var(--border-color);
+    padding: 8px;
+    text-align: left;
+}
+
+.response-container th {
+    background: var(--bg-secondary);
+    font-weight: 600;
+}
+
+.response-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+.response-container::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.response-container::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 4px;
+}
+
+.response-container::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover);
+}
+
+.text-input-container {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+    align-items: center;
+}
+
+.text-input-container input {
+    flex: 1;
+    background: transparent;
+    color: var(--text-color);
+    border: none;
+    border-bottom: 1px solid var(--border-color);
+    padding: 8px 4px;
+    border-radius: 0;
+    font-size: 13px;
+}
+
+.text-input-container input:focus {
+    outline: none;
+    border-bottom-color: var(--text-color);
+}
+
+.text-input-container input::placeholder {
+    color: var(--placeholder-color);
+}
+
+.nav-button {
+    background: transparent;
+    color: var(--text-secondary);
+    border: none;
+    padding: 6px;
+    border-radius: 3px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.1s ease;
+    cursor: pointer;
+}
+
+.nav-button:hover {
+    background: var(--hover-background);
+    color: var(--text-color);
+}
+
+.nav-button:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.nav-button svg {
+    width: 18px;
+    height: 18px;
+    stroke: currentColor;
+}
+
+.response-counter {
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    min-width: 50px;
+    text-align: center;
+    font-family: 'SF Mono', Monaco, monospace;
+}
+
+.screen-answer-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--btn-primary-bg, #ffffff);
+    color: var(--btn-primary-text, #000000);
+    border: none;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.screen-answer-btn:hover {
+    background: var(--btn-primary-hover, #f0f0f0);
+}
+
+.screen-answer-btn svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+}
+
+.screen-answer-btn .usage-count {
+    font-size: 11px;
+    opacity: 0.7;
+    font-family: 'SF Mono', Monaco, monospace;
+}
+
+.screen-answer-btn-wrapper {
+    position: relative;
+}
+
+.screen-answer-btn-wrapper .tooltip {
+    position: absolute;
+    bottom: 100%;
+    right: 0;
+    margin-bottom: 8px;
+    background: var(--tooltip-bg, #1a1a1a);
+    color: var(--tooltip-text, #ffffff);
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 11px;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.15s ease, visibility 0.15s ease;
+    pointer-events: none;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    z-index: 100;
+}
+
+.screen-answer-btn-wrapper .tooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    right: 16px;
+    border: 6px solid transparent;
+    border-top-color: var(--tooltip-bg, #1a1a1a);
+}
+
+.screen-answer-btn-wrapper:hover .tooltip {
+    opacity: 1;
+    visibility: visible;
+}
+
+.tooltip-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 4px;
+}
+
+.tooltip-row:last-child {
+    margin-bottom: 0;
+}
+
+.tooltip-label {
+    opacity: 0.7;
+}
+
+.tooltip-value {
+    font-family: 'SF Mono', Monaco, monospace;
+}
+
+.tooltip-note {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    opacity: 0.5;
+    font-size: 10px;
+}
