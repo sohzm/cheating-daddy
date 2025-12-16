@@ -1,0 +1,43 @@
+.window-container {
+    height: 100vh;
+    overflow: hidden;
+    background: var(--bg-primary);
+}
+
+.container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.main-content {
+    flex: 1;
+    padding: var(--main-content-padding);
+    overflow-y: auto;
+    background: var(--main-content-background);
+}
+
+.main-content.with-border {
+    border-top: none;
+}
+
+.main-content.assistant-view {
+    padding: 12px;
+}
+
+.main-content.onboarding-view {
+    padding: 0;
+    background: transparent;
+}
+
+.main-content.settings-view,
+.main-content.help-view,
+.main-content.history-view {
+    padding: 0;
+}
+
+.view-container {
+    opacity: 1;
+    height: 100%;
+    transition: opacity 0.2s ease;
+}

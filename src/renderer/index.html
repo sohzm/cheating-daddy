@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="content-security-policy" content="script-src 'self' 'unsafe-inline'" />
+    <title>Cheating Daddy</title>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <!-- Load markdown and syntax highlighting libraries -->
+    <script src="/marked-4.3.0.min.js"></script>
+    <script src="/highlight-11.9.0.min.js"></script>
+    <link rel="stylesheet" href="/highlight-vscode-dark.min.css" />
+    
+    <!-- Load renderer utilities (window.cheatingDaddy API) - must load BEFORE React -->
+    <script src="/renderer.js"></script>
+    
+    <!-- Load React app -->
+    <script type="module" src="/index.jsx"></script>
+</body>
+</html>

@@ -1,0 +1,114 @@
+.main-view {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 480px;
+}
+
+.welcome {
+    font-size: 20px;
+    margin-bottom: 6px;
+    font-weight: 500;
+    color: var(--text-color);
+    margin-top: auto;
+}
+
+.input-group {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.input-group input {
+    flex: 1;
+}
+
+.main-view input {
+    background: var(--input-background);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    padding: 10px 12px;
+    width: 100%;
+    border-radius: 3px;
+    font-size: 13px;
+    transition: border-color 0.1s ease;
+}
+
+.main-view input:focus {
+    outline: none;
+    border-color: var(--border-default);
+}
+
+.main-view input::placeholder {
+    color: var(--placeholder-color);
+}
+
+.main-view input.api-key-error {
+    animation: blink-red 0.6s ease-in-out;
+    border-color: var(--error-color);
+}
+
+@keyframes blink-red {
+    0%,
+    100% {
+        border-color: var(--border-color);
+    }
+    50% {
+        border-color: var(--error-color);
+        background: rgba(241, 76, 76, 0.1);
+    }
+}
+
+.start-button {
+    background: var(--start-button-background);
+    color: var(--start-button-color);
+    border: none;
+    padding: 10px 16px;
+    border-radius: 3px;
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background 0.1s ease;
+    cursor: pointer;
+}
+
+.start-button:hover {
+    background: var(--start-button-hover-background);
+}
+
+.start-button.initializing {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.start-button.initializing:hover {
+    background: var(--start-button-background);
+}
+
+.shortcut-hint {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: 'SF Mono', Monaco, monospace;
+}
+
+.description {
+    color: var(--text-secondary);
+    font-size: 13px;
+    margin-bottom: 20px;
+    line-height: 1.5;
+}
+
+.link {
+    color: var(--text-color);
+    text-decoration: underline;
+    cursor: pointer;
+    text-underline-offset: 2px;
+}
+
+.link:hover {
+    color: var(--text-color);
+}

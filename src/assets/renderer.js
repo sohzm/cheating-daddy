@@ -1,5 +1,26 @@
-// renderer.js
-const { ipcRenderer } = require('electron');
+// renderer.js - Works with preload-exposed APIs
+// Check if we're in Electron context
+if (!window.electron && !window.require) {
+    console.error('❌ Not running in Electron context!');
+    console.error('👉 Make sure you run: npm run electron:dev (not just npm run dev)');
+    console.error('👉 Or run: npm start (to run both Vite and Electron together)');
+    
+    // Create a dummy API so the page doesn't crash
+    window.electron = {
+        ipcRenderer: {
+            send: () => console.warn('IPC not available - running outside Electron'),
+            on: () => {},
+            once: () => {},
+            invoke: async () => { throw new Error('IPC not available'); },
+            removeAllListeners: () => {},
+        },
+        process: { platform: 'unknown' }
+    };
+}
+
+// Use window.electron (exposed by preload) or window.require as fallback
+const electronModule = window.electron || (window.require ? window.require('electron') : null);
+const { ipcRenderer } = electronModule || {};
 
 let mediaStream = null;
 let screenshotInterval = null;
@@ -16,8 +37,8 @@ let offscreenCanvas = null;
 let offscreenContext = null;
 let currentImageQuality = 'medium'; // Store current image quality for manual screenshots
 
-const isLinux = process.platform === 'linux';
-const isMacOS = process.platform === 'darwin';
+const isLinux = electronModule?.process?.platform === 'linux';
+const isMacOS = electronModule?.process?.platform === 'darwin';
 
 // ============ STORAGE API ============
 // Wrapper for IPC-based storage access
@@ -138,18 +159,16 @@ async function initializeGemini(profile = 'interview', language = 'en-US') {
     if (apiKey) {
         const prefs = await storage.getPreferences();
         const success = await ipcRenderer.invoke('initialize-gemini', apiKey, prefs.customPrompt || '', profile, language);
-        if (success) {
-            cheatingDaddy.setStatus('Live');
-        } else {
-            cheatingDaddy.setStatus('error');
-        }
+        // Status updates are now handled by React via IPC events
+        return success;
     }
+    return false;
 }
 
-// Listen for status updates
+// Listen for status updates (handled by React)
 ipcRenderer.on('update-status', (event, status) => {
     console.log('Status update:', status);
-    cheatingDaddy.setStatus(status);
+    // React components will handle this via their own IPC listeners
 });
 
 async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'medium') {
@@ -712,21 +731,16 @@ ipcRenderer.on('clear-sensitive-data', async () => {
     await storage.clearAll();
 });
 
-// Handle shortcuts based on current view
+// Handle shortcuts - React components handle their own shortcuts
+// This is kept for compatibility with main process shortcut handling
 function handleShortcut(shortcutKey) {
-    const currentView = cheatingDaddy.getCurrentView();
-
+    // Manual screenshot shortcut (handled in assistant view)
     if (shortcutKey === 'ctrl+enter' || shortcutKey === 'cmd+enter') {
-        if (currentView === 'main') {
-            cheatingDaddy.element().handleStart();
-        } else {
-            captureManualScreenshot();
-        }
+        captureManualScreenshot();
     }
 }
 
-// Create reference to the main app element
-const cheatingDaddyApp = document.querySelector('cheating-daddy-app');
+// Note: React app manages its own state, no need for direct element access
 
 // ============ THEME SYSTEM ============
 const theme = {
@@ -920,19 +934,6 @@ const theme = {
 const cheatingDaddy = {
     // App version
     getVersion: async () => ipcRenderer.invoke('get-app-version'),
-
-    // Element access
-    element: () => cheatingDaddyApp,
-    e: () => cheatingDaddyApp,
-
-    // App state functions - access properties directly from the app element
-    getCurrentView: () => cheatingDaddyApp.currentView,
-    getLayoutMode: () => cheatingDaddyApp.layoutMode,
-
-    // Status and response functions
-    setStatus: text => cheatingDaddyApp.setStatus(text),
-    addNewResponse: response => cheatingDaddyApp.addNewResponse(response),
-    updateCurrentResponse: response => cheatingDaddyApp.updateCurrentResponse(response),
 
     // Core functionality
     initializeGemini,

@@ -11,26 +11,37 @@ const RESIZE_ANIMATION_DURATION = 500; // milliseconds
 
 function createWindow(sendToRenderer, geminiSessionRef) {
     // Get layout preference (default to 'normal')
-    let windowWidth = 1100;
-    let windowHeight = 800;
+    const defaultWindowWidth = 900;
+    const defaultWindowHeight = 600;
+    let windowWidth = defaultWindowWidth;
+    let windowHeight = defaultWindowHeight;
 
+    const isDev = process.env.NODE_ENV === 'development';
+    
     const mainWindow = new BrowserWindow({
-        width: windowWidth,
-        height: windowHeight,
+        width: defaultWindowWidth,
+        height: defaultWindowHeight,
+        minWidth: 300,
+        minHeight: 200,
         frame: false,
         transparent: true,
-        hasShadow: false,
         alwaysOnTop: true,
-        webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false, // TODO: change to true
-            backgroundThrottling: false,
-            enableBlinkFeatures: 'GetDisplayMedia',
-            webSecurity: true,
-            allowRunningInsecureContent: false,
-        },
         backgroundColor: '#00000000',
+        skipTaskbar: false,
+        webPreferences: {
+            preload: path.join(__dirname, '../preload.js'),
+            contextIsolation: true,
+            nodeIntegration: false,
+        },
     });
+
+    // Load the React app
+    if (isDev) {
+        mainWindow.loadURL('http://localhost:3000');
+        mainWindow.webContents.openDevTools();
+    } else {
+        mainWindow.loadFile(path.join(__dirname, '../../dist/renderer/index.html'));
+    }
 
     const { session, desktopCapturer } = require('electron');
     session.defaultSession.setDisplayMediaRequestHandler(
@@ -76,8 +87,6 @@ function createWindow(sendToRenderer, geminiSessionRef) {
     if (process.platform === 'win32') {
         mainWindow.setAlwaysOnTop(true, 'screen-saver', 1);
     }
-
-    mainWindow.loadFile(path.join(__dirname, '../index.html'));
 
     // After window is created, initialize keybinds
     mainWindow.webContents.once('dom-ready', () => {
@@ -431,15 +440,16 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
                 return { success: false, error: 'Window has been destroyed' };
             }
 
-            // Get current view and layout mode from renderer
-            let viewName, layoutMode;
+            // Get current view and layout mode from storage (React manages its own state)
+            let viewName = 'main';
+            let layoutMode = 'normal';
             try {
-                viewName = await event.sender.executeJavaScript('cheatingDaddy.getCurrentView()');
-                layoutMode = await event.sender.executeJavaScript('cheatingDaddy.getLayoutMode()');
+                const config = storage.getConfig();
+                const prefs = storage.getPreferences();
+                layoutMode = config.layout || 'normal';
+                // Note: React manages currentView internally, use default 'main' for window sizing
             } catch (error) {
-                console.warn('Failed to get view/layout from renderer, using defaults:', error);
-                viewName = 'main';
-                layoutMode = 'normal';
+                console.warn('Failed to get layout from storage, using defaults:', error);
             }
 
             console.log('Size update requested for view:', viewName, 'layout:', layoutMode);
