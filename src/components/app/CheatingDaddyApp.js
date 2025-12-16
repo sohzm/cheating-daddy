@@ -98,6 +98,7 @@ export class CheatingDaddyApp extends LitElement {
         startTime: { type: Number },
         isRecording: { type: Boolean },
         sessionActive: { type: Boolean },
+        isConversationPaused: { type: Boolean },
         selectedProfile: { type: String },
         selectedLanguage: { type: String },
         responses: { type: Array },
@@ -120,6 +121,7 @@ export class CheatingDaddyApp extends LitElement {
         this.startTime = null;
         this.isRecording = false;
         this.sessionActive = false;
+        this.isConversationPaused = false;
         this.selectedProfile = 'interview';
         this.selectedLanguage = 'en-US';
         this.selectedScreenshotInterval = '5';
@@ -380,6 +382,27 @@ export class CheatingDaddyApp extends LitElement {
         await cheatingDaddy.storage.updatePreference('selectedImageQuality', quality);
     }
 
+    toggleConversationPlayback() {
+        this.isConversationPaused = !this.isConversationPaused;
+        
+        if (this.isConversationPaused) {
+            // Pause conversation - stop audio capture and AI processing
+            console.log('Conversation paused');
+            if (window.cheatingDaddy && window.cheatingDaddy.pauseCapture) {
+                window.cheatingDaddy.pauseCapture();
+            }
+        } else {
+            // Resume conversation - restart audio capture and AI processing
+            console.log('Conversation resumed');
+            if (window.cheatingDaddy && window.cheatingDaddy.resumeCapture) {
+                window.cheatingDaddy.resumeCapture();
+            }
+        }
+        
+        this.requestUpdate();
+        return this.isConversationPaused;
+    }
+
     handleBackClick() {
         this.currentView = 'main';
         this.requestUpdate();
@@ -489,6 +512,7 @@ export class CheatingDaddyApp extends LitElement {
                         .selectedProfile=${this.selectedProfile}
                         .onSendText=${message => this.handleSendText(message)}
                         .shouldAnimateResponse=${this.shouldAnimateResponse}
+                        .isConversationPaused=${this.isConversationPaused}
                         @response-index-changed=${this.handleResponseIndexChanged}
                         @response-animation-complete=${() => {
                             this.shouldAnimateResponse = false;

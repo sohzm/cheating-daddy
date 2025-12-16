@@ -114,6 +114,8 @@ function getDefaultKeybinds() {
         nextResponse: isMac ? 'Cmd+]' : 'Ctrl+]',
         scrollUp: isMac ? 'Cmd+Shift+Up' : 'Ctrl+Shift+Up',
         scrollDown: isMac ? 'Cmd+Shift+Down' : 'Ctrl+Shift+Down',
+        analyzeScreen: isMac ? 'Cmd+Backspace' : 'Ctrl+Backspace',
+        playPauseConversation: isMac ? 'Alt+X' : 'Alt+X',
         emergencyErase: isMac ? 'Cmd+Shift+E' : 'Ctrl+Shift+E',
     };
 }
@@ -274,6 +276,36 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
             console.log(`Registered scrollDown: ${keybinds.scrollDown}`);
         } catch (error) {
             console.error(`Failed to register scrollDown (${keybinds.scrollDown}):`, error);
+        }
+    }
+
+    // Register analyze screen shortcut
+    if (keybinds.analyzeScreen) {
+        try {
+            globalShortcut.register(keybinds.analyzeScreen, () => {
+                console.log('Analyze screen shortcut triggered');
+                mainWindow.webContents.executeJavaScript(`
+                    if (window.captureManualScreenshot) {
+                        window.captureManualScreenshot();
+                    }
+                `);
+            });
+            console.log(`Registered analyzeScreen: ${keybinds.analyzeScreen}`);
+        } catch (error) {
+            console.error(`Failed to register analyzeScreen (${keybinds.analyzeScreen}):`, error);
+        }
+    }
+
+    // Register play/pause conversation shortcut
+    if (keybinds.playPauseConversation) {
+        try {
+            globalShortcut.register(keybinds.playPauseConversation, () => {
+                console.log('Play/Pause conversation shortcut triggered');
+                sendToRenderer('toggle-conversation-playback');
+            });
+            console.log(`Registered playPauseConversation: ${keybinds.playPauseConversation}`);
+        } catch (error) {
+            console.error(`Failed to register playPauseConversation (${keybinds.playPauseConversation}):`, error);
         }
     }
 
