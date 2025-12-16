@@ -1,0 +1,120 @@
+:root {
+    /* Backgrounds - with default 0.8 transparency */
+    --background-transparent: transparent;
+    --bg-primary: rgba(30, 30, 30, 0.8);
+    --bg-secondary: rgba(37, 37, 38, 0.8);
+    --bg-tertiary: rgba(45, 45, 45, 0.8);
+    --bg-hover: rgba(50, 50, 50, 0.8);
+
+    /* Text */
+    --text-color: #e5e5e5;
+    --text-secondary: #a0a0a0;
+    --text-muted: #6b6b6b;
+    --description-color: #a0a0a0;
+    --placeholder-color: #6b6b6b;
+
+    /* Borders */
+    --border-color: #3c3c3c;
+    --border-subtle: #3c3c3c;
+    --border-default: #4a4a4a;
+
+    /* Component backgrounds */
+    --header-background: rgba(30, 30, 30, 0.8);
+    --header-actions-color: #a0a0a0;
+    --main-content-background: rgba(30, 30, 30, 0.8);
+    --button-background: transparent;
+    --button-border: #3c3c3c;
+    --icon-button-color: #a0a0a0;
+    --hover-background: rgba(50, 50, 50, 0.8);
+    --input-background: rgba(45, 45, 45, 0.8);
+    --input-focus-background: rgba(45, 45, 45, 0.8);
+
+    /* Focus states */
+    --focus-border-color: #4a4a4a;
+    --focus-box-shadow: transparent;
+
+    /* Scrollbar */
+    --scrollbar-track: #1e1e1e;
+    --scrollbar-thumb: #3c3c3c;
+    --scrollbar-thumb-hover: #4a4a4a;
+    --scrollbar-background: #1e1e1e;
+
+    /* Buttons */
+    --start-button-background: #ffffff;
+    --start-button-color: #1e1e1e;
+    --start-button-border: #ffffff;
+    --start-button-hover-background: #e0e0e0;
+    --start-button-hover-border: #e0e0e0;
+    --text-input-button-background: #ffffff;
+    --text-input-button-hover: #e0e0e0;
+
+    /* Links */
+    --link-color: #e5e5e5;
+    --key-background: #2d2d2d;
+
+    /* Status colors */
+    --success-color: #4ec9b0;
+    --warning-color: #dcdcaa;
+    --error-color: #f14c4c;
+    --danger-color: #f14c4c;
+
+    /* Layout */
+    --header-padding: 8px 16px;
+    --header-font-size: 14px;
+    --header-gap: 8px;
+    --header-button-padding: 6px 12px;
+    --header-icon-padding: 6px;
+    --header-font-size-small: 12px;
+    --main-content-padding: 16px;
+    --icon-size: 18px;
+    --border-radius: 3px;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html,
+body,
+#root {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: transparent;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color: var(--text-color);
+    cursor: default;
+    user-select: none;
+}
+
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover);
+}
+
+/* Compact layout styles */
+:root.compact-layout {
+    --header-padding: 6px 12px;
+    --header-font-size: 12px;
+    --header-gap: 6px;
+    --header-button-padding: 4px 8px;
+    --header-icon-padding: 4px;
+    --header-font-size-small: 10px;
+    --main-content-padding: 12px;
+    --icon-size: 16px;
+}
