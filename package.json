@@ -3,7 +3,7 @@
     "productName": "cheating-daddy",
     "version": "0.5.0",
     "description": "cheating daddy",
-    "main": "src/index.js",
+    "main": "src/main/index.js",
     "scripts": {
         "start": "concurrently \"npm run dev\" \"npm run electron:dev\"",
         "dev": "vite",
@@ -29,6 +29,7 @@
     "license": "GPL-3.0",
     "dependencies": {
         "@google/genai": "^1.2.0",
+        "concurrently": "^9.2.1",
         "electron-squirrel-startup": "^1.0.1",
         "react": "^19.2.3",
         "react-dom": "^19.2.3"
@@ -45,6 +46,7 @@
         "@electron/fuses": "^1.8.0",
         "@reforged/maker-appimage": "^5.0.0",
         "@vitejs/plugin-react": "^5.1.2",
+        "cross-env": "^7.0.3",
         "electron": "^30.0.5",
         "vite": "^7.3.0"
     }

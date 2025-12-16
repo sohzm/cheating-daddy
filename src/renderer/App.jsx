@@ -212,6 +212,9 @@ function App() {
                         currentResponseIndex={currentResponseIndex}
                         selectedProfile={selectedProfile}
                         onResponseIndexChanged={(index) => setCurrentResponseIndex(index)}
+                        onSendText={async (text) => {
+                            await window.cheatingDaddy.sendTextMessage(text);
+                        }}
                     />
                 );
             case 'customize':

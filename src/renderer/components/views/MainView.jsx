@@ -37,16 +37,16 @@ function MainView({ onStart, onLayoutModeChange }) {
             const isStartShortcut = isMac
                 ? e.metaKey && e.key === 'Enter'
                 : e.ctrlKey && e.key === 'Enter';
-
-            if (isStartShortcut) {
+    
+            if (isStartShortcut && !isInitializing) {
                 e.preventDefault();
-                handleStartClick();
+                onStart();  // Call onStart directly here
             }
         };
-
+    
         document.addEventListener('keydown', handleKeydown);
         return () => document.removeEventListener('keydown', handleKeydown);
-    }, [isInitializing]); // Re-create listener when isInitializing changes
+    }, [isInitializing, onStart]); // Add onStart to dependencies
 
     const handleInput = async (e) => {
         const value = e.target.value;
