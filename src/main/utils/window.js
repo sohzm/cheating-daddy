@@ -14,23 +14,32 @@ function createWindow(sendToRenderer, geminiSessionRef) {
     let windowWidth = 1100;
     let windowHeight = 800;
 
-    const mainWindow = new BrowserWindow({
-        width: windowWidth,
-        height: windowHeight,
+    const isDev = process.env.NODE_ENV === 'development';
+    
+    mainWindow = new BrowserWindow({
+        width: defaultWindowWidth,
+        height: defaultWindowHeight,
+        minWidth: 300,
+        minHeight: 200,
         frame: false,
         transparent: true,
-        hasShadow: false,
         alwaysOnTop: true,
-        webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false, // TODO: change to true
-            backgroundThrottling: false,
-            enableBlinkFeatures: 'GetDisplayMedia',
-            webSecurity: true,
-            allowRunningInsecureContent: false,
-        },
         backgroundColor: '#00000000',
+        skipTaskbar: false,
+        webPreferences: {
+            preload: path.join(__dirname, '../preload.js'),
+            contextIsolation: true,
+            nodeIntegration: false,
+        },
     });
+
+    // Load the React app
+    if (isDev) {
+        mainWindow.loadURL('http://localhost:3000');
+        mainWindow.webContents.openDevTools();
+    } else {
+        mainWindow.loadFile(path.join(__dirname, '../../dist/renderer/index.html'));
+    }
 
     const { session, desktopCapturer } = require('electron');
     session.defaultSession.setDisplayMediaRequestHandler(
