@@ -20,6 +20,7 @@ const DEFAULT_PREFERENCES = {
     selectedProfile: 'interview',
     selectedLanguage: 'en-US',
     selectedOutputLanguage: 'en-US',
+    selectedOutputProgrammingLanguage: 'python',
     selectedScreenshotInterval: '5',
     selectedImageQuality: 'medium',
     advancedMode: false,

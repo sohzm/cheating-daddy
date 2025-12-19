@@ -101,6 +101,7 @@ export class CheatingDaddyApp extends LitElement {
         selectedProfile: { type: String },
         selectedLanguage: { type: String },
         selectedOutputLanguage: { type: String },
+        selectedOutputProgrammingLanguage: { type: String },
         responses: { type: Array },
         currentResponseIndex: { type: Number },
         selectedScreenshotInterval: { type: String },
@@ -124,6 +125,7 @@ export class CheatingDaddyApp extends LitElement {
         this.selectedProfile = 'interview';
         this.selectedLanguage = 'en-US';
         this.selectedOutputLanguage = 'en-US';
+        this.selectedOutputProgrammingLanguage = 'python';
         this.selectedScreenshotInterval = '5';
         this.selectedImageQuality = 'medium';
         this.layoutMode = 'normal';
@@ -160,6 +162,7 @@ export class CheatingDaddyApp extends LitElement {
             this.selectedProfile = prefs.selectedProfile || 'interview';
             this.selectedLanguage = prefs.selectedLanguage || 'en-US';
             this.selectedOutputLanguage = prefs.selectedOutputLanguage || 'en-US';
+            this.selectedOutputProgrammingLanguage = prefs.selectedOutputProgrammingLanguage || 'python';
             this.selectedScreenshotInterval = prefs.selectedScreenshotInterval || '5';
             this.selectedImageQuality = prefs.selectedImageQuality || 'medium';
             this.layoutMode = config.layout || 'normal';
@@ -378,6 +381,11 @@ export class CheatingDaddyApp extends LitElement {
         await cheatingDaddy.storage.updatePreference('selectedOutputLanguage', language);
     }
 
+    async handleOutputProgrammingLanguageChange(language) {
+        this.selectedOutputProgrammingLanguage = language;
+        await cheatingDaddy.storage.updatePreference('selectedOutputProgrammingLanguage', language);
+    }
+
     async handleScreenshotIntervalChange(interval) {
         this.selectedScreenshotInterval = interval;
         await cheatingDaddy.storage.updatePreference('selectedScreenshotInterval', interval);
@@ -473,12 +481,14 @@ export class CheatingDaddyApp extends LitElement {
                         .selectedProfile=${this.selectedProfile}
                         .selectedLanguage=${this.selectedLanguage}
                         .selectedOutputLanguage=${this.selectedOutputLanguage}
+                        .selectedOutputProgrammingLanguage=${this.selectedOutputProgrammingLanguage}
                         .selectedScreenshotInterval=${this.selectedScreenshotInterval}
                         .selectedImageQuality=${this.selectedImageQuality}
                         .layoutMode=${this.layoutMode}
                         .onProfileChange=${profile => this.handleProfileChange(profile)}
                         .onLanguageChange=${language => this.handleLanguageChange(language)}
                         .onOutputLanguageChange=${language => this.handleOutputLanguageChange(language)}
+                        .onOutputProgrammingLanguageChange=${language => this.handleOutputProgrammingLanguageChange(language)}
                         .onScreenshotIntervalChange=${interval => this.handleScreenshotIntervalChange(interval)}
                         .onImageQualityChange=${quality => this.handleImageQualityChange(quality)}
                         .onLayoutModeChange=${layoutMode => this.handleLayoutModeChange(layoutMode)}

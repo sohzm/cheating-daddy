@@ -532,10 +532,28 @@ async function captureScreenshot(imageQuality = 'medium', isManual = false) {
     );
 }
 
-const MANUAL_SCREENSHOT_PROMPT = `Help me on this page, give me the answer no bs, complete answer.
-So if its a code question, give me the approach in few bullet points, then the entire code. Also if theres anything else i need to know, tell me.
-If its a question about the website, give me the answer no bs, complete answer.
-If its a mcq question, give me the answer no bs, complete answer.`;
+const OUTPUT_PROGRAMMING_LANGUAGE_LABELS = {
+    python: 'Python',
+    java: 'Java',
+    sql: 'SQL',
+    javascript: 'JavaScript',
+    cpp: 'C++',
+    c: 'C',
+    csharp: 'C#',
+};
+
+const MANUAL_SCREENSHOT_PROMPT_EN = programmingLanguage => `This is a coding/Low-Level Design problem. Please answer in English with the following structure:
+1. Translation: Complete translation of the problem
+2. Approach: What algorithm you use and your core thinking
+3. Code: ${programmingLanguage} implementation, readable and optimal. Don't use generator expression.
+4. Input/Output: 2 edge cases with explanations
+5. Time Complexity: O(?), explain in 2 sentences
+6. Space Complexity: O(?), explain in 2 sentences`;
+const MANUAL_SCREENSHOT_PROMPT_ZH = programmingLanguage => `截图是题目(有可能只有部分题目)及其我的solution.中文回答.基于我的solution,回答结构如下:
+1. 思路:用什么算法/数据结构来优化当前的回答?降低时间复杂度/空间复杂度?
+2. 代码: 用 ${programmingLanguage} 给我完整的实现.不要把代码写在同一行,要易于理解.核心且难于理解的地方给我中文注释
+3. 新的时间复杂度: O(?), 中文解释,2句话就行,这里无须换行
+4. 新的空间复杂度: O(?), 中文解释,2句话就行,这里无须换行`;
 
 async function captureManualScreenshot(imageQuality = null) {
     console.log('Manual screenshot triggered');
@@ -605,10 +623,19 @@ async function captureManualScreenshot(imageQuality = null) {
                     return;
                 }
 
+                const prefs = await storage.getPreferences();
+                const outputLanguage = prefs.selectedOutputLanguage || 'en-US';
+                const outputProgrammingLanguage = prefs.selectedOutputProgrammingLanguage || 'python';
+                const programmingLanguageLabel =
+                    OUTPUT_PROGRAMMING_LANGUAGE_LABELS[outputProgrammingLanguage] || OUTPUT_PROGRAMMING_LANGUAGE_LABELS.python;
+                const prompt = outputLanguage.toLowerCase().startsWith('en')
+                    ? MANUAL_SCREENSHOT_PROMPT_EN(programmingLanguageLabel)
+                    : MANUAL_SCREENSHOT_PROMPT_ZH(programmingLanguageLabel);
+
                 // Send image with prompt to HTTP API (response streams via IPC events)
                 const result = await ipcRenderer.invoke('send-image-content', {
                     data: base64data,
-                    prompt: MANUAL_SCREENSHOT_PROMPT,
+                    prompt: prompt,
                 });
 
                 if (result.success) {

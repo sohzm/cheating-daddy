@@ -208,7 +208,7 @@ Provide direct exam answers in **markdown format**. Include the question text, t
                     请你分析当前的面试对话,尤其参考下面的'User-provided context'`,
 
             formatRequirements: `**RESPONSE FORMAT REQUIREMENTS:**
-                - 保持回答简短,清晰 (1-3句话)
+                - 保持回答简短,清晰 (3-5句话)
                 - 简体中文回答, 专业/特殊短语使用英文
                 - 使用markdown formatting提升可读性
                 - 小数直接使用1/3这种格式就行,不要使用$frac{1}{3}$这种格式
