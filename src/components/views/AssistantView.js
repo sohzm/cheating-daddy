@@ -1,7 +1,10 @@
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
+import { codeHighlightStyles } from '../styles/codeHighlightStyles.js';
 
 export class AssistantView extends LitElement {
-    static styles = css`
+    static styles = [
+        codeHighlightStyles,
+        css`
         :host {
             height: 100%;
             display: flex;
@@ -277,7 +280,8 @@ export class AssistantView extends LitElement {
             flex-shrink: 0;
         }
 
-    `;
+        `,
+    ];
 
     static properties = {
         responses: { type: Array },
@@ -342,7 +346,7 @@ export class AssistantView extends LitElement {
     wrapWordsInSpans(html) {
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, 'text/html');
-        const tagsToSkip = ['PRE'];
+        const tagsToSkip = ['PRE', 'CODE'];
 
         function wrap(node) {
             if (node.nodeType === Node.TEXT_NODE && node.textContent.trim() && !tagsToSkip.includes(node.parentNode.tagName)) {
@@ -545,6 +549,11 @@ export class AssistantView extends LitElement {
             const renderedResponse = this.renderMarkdown(currentResponse);
             console.log('Rendered response:', renderedResponse);
             container.innerHTML = renderedResponse;
+            if (window.hljs) {
+                container.querySelectorAll('pre code').forEach(block => {
+                    window.hljs.highlightElement(block);
+                });
+            }
             // Show all words immediately (no animation)
             if (this.shouldAnimateResponse) {
                 this.dispatchEvent(new CustomEvent('response-animation-complete', { bubbles: true, composed: true }));
