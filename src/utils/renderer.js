@@ -12,6 +12,7 @@ const AUDIO_CHUNK_DURATION = 0.1; // seconds
 const BUFFER_SIZE = 4096; // Increased buffer size for smoother audio
 let audioMuted = false;
 let manualScreenshotStatusBackup = null;
+let manualScreenshotMode = null;
 
 let hiddenVideo = null;
 let offscreenCanvas = null;
@@ -555,6 +556,66 @@ const MANUAL_SCREENSHOT_PROMPT_ZH = programmingLanguage => `截图是题目(有�
 2. 代码: 用 ${programmingLanguage} 给我完整的实现.不要把代码写在同一行,要易于理解.核心且难于理解的地方给我中文注释
 3. 新的时间复杂度: O(?), 中文解释,2句话就行,这里无须换行
 4. 新的空间复杂度: O(?), 中文解释,2句话就行,这里无须换行`;
+const MANUAL_SCREENSHOT_MODE_PROMPTS = {
+    optimization: {
+        en: programmingLanguage => `The screenshot shows the question (possibly part of it) and my solution. Answer in English. Based on my solution, the answer structure is as follows:
+1. Thought: What algorithm/data structure should be used to optimize the current answer?
+2. Code: Implemented in ${programmingLanguage} (if possible, make modifications based on my response). Don't write the code on the same line. Make it easy to understand. Give me Chinese annotations for the core and difficult-to-understand parts
+3. New time complexity: O(?)" The Chinese explanation only needs two sentences. There is no need for a line break here
+4. New space complexity: O(?)" The Chinese explanation only needs two sentences. There is no need for a line break here`,
+        zh: programmingLanguage => `截图是题目(可能是部分)及其我的solution.中文回答.基于我的solution,回答结构如下:
+1. 思路:用什么算法/数据结构来优化当前的回答?降低时间复杂度/空间复杂度?
+2. 代码: 用 ${programmingLanguage} 实现 (如果可以的话在我的回答基础上进行修改).不要把代码写在同一行,要易于理解.核心且难于理解的地方给我中文注释
+3. 新的时间复杂度: O(?), 中文解释,2句话就行,这里无须换行
+4. 新的空间复杂度: O(?), 中文解释,2句话就行,这里无须换行`,
+    },
+    review: {
+        en: programmingLanguage => `Please perform a code review and answer in English with the following structure:
+1. Functionality Description:
+    - What the code is doing overall, summarize in 1-2 sentences
+    - Explain any functions/special structures if present
+2. Basic Style: Are naming conventions reasonable; any unclear or repetitive parts
+3. Security & Performance: Any risks present; any obviously inefficient implementations
+4. Modifications & Additions: If there are obvious deficiencies in the code, provide the code in ${programmingLanguage}
+5. Suggestions:
+    - Overall suggestions (1-2 sentences)
+    - Basic style suggestions if there are issues
+    - Security and performance suggestions if there are issues`,
+        zh: programmingLanguage => `题目是进行code review,按以下结构中文回答:
+1. 功能说明:
+    - 代码整体在做什么,用1-2句话总结
+    - 如有function/特殊结构需要解释功能
+2. 基础风格:命名是否合理;有没有不清晰或者重复的部分
+3. 安全&性能:是否存在风险(e.g.注入风险);是否有明显低效的实现
+4. 修改&补充: 如果代码有明显缺失/需要补齐/标注缺失的地方,请给我code,使用 ${programmingLanguage}
+5. 建议:
+    - 总体建议(1-2句话)
+    - 基础风格如有问题,给出1条建议
+    - 安全和性能如有问题,给出2-3条建议`,
+    },
+    design: {
+        en: programmingLanguage => `This is a design problem. Please answer in English with the following structure:
+1. Translation: Complete translation of the problem
+2. Approach: What design principles you use and your core thinking
+3. Code: Use ${programmingLanguage} for the main classes and interfaces`,
+        zh: programmingLanguage => `题目是一道Oriented-Object Design.请你用中文回答!
+按以下结构中文回答:
+1. 翻译: 直接完整翻译题目(不要bullet point)
+2. 思路: 1句话概括你的思路和design pattern
+3. 代码: 用 ${programmingLanguage} 实现多个class (不要抽象类). 要易于理解且比较optimal.用简易的单行注释.
+4. 复杂度: 告诉我每个class主要func的时间复杂度`,
+    },
+};
+
+
+function setManualScreenshotMode(mode) {
+    manualScreenshotMode = mode;
+    return manualScreenshotMode;
+}
+
+function getManualScreenshotMode() {
+    return manualScreenshotMode;
+}
 
 function setManualScreenshotPendingState(isPending) {
     if (!window.cheatingDaddy?.element) return;
@@ -661,9 +722,16 @@ async function captureManualScreenshot(imageQuality = null) {
                 const outputProgrammingLanguage = prefs.selectedOutputProgrammingLanguage || 'python';
                 const programmingLanguageLabel =
                     OUTPUT_PROGRAMMING_LANGUAGE_LABELS[outputProgrammingLanguage] || OUTPUT_PROGRAMMING_LANGUAGE_LABELS.python;
-                const prompt = outputLanguage.toLowerCase().startsWith('en')
-                    ? MANUAL_SCREENSHOT_PROMPT_EN(programmingLanguageLabel)
-                    : MANUAL_SCREENSHOT_PROMPT_ZH(programmingLanguageLabel);
+                const isEnglish = outputLanguage.toLowerCase().startsWith('en');
+                const modePromptEntry = manualScreenshotMode
+                    ? MANUAL_SCREENSHOT_MODE_PROMPTS[manualScreenshotMode]?.[isEnglish ? 'en' : 'zh']
+                    : '';
+                const modePrompt = typeof modePromptEntry === 'function' ? modePromptEntry(programmingLanguageLabel) : modePromptEntry;
+                const prompt = modePrompt && modePrompt.trim()
+                    ? modePrompt
+                    : isEnglish
+                        ? MANUAL_SCREENSHOT_PROMPT_EN(programmingLanguageLabel)
+                        : MANUAL_SCREENSHOT_PROMPT_ZH(programmingLanguageLabel);
 
                 // Send image with prompt to HTTP API (response streams via IPC events)
                 const result = await ipcRenderer.invoke('send-image-content', {
@@ -1027,6 +1095,8 @@ const cheatingDaddy = {
     stopCapture,
     sendTextMessage,
     handleShortcut,
+    setManualScreenshotMode,
+    getManualScreenshotMode,
     setAudioMuted,
     getAudioMuted,
 

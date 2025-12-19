@@ -182,6 +182,34 @@ export class AssistantView extends LitElement {
             color: var(--placeholder-color);
         }
 
+        .mode-toggle {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .mode-button {
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+            padding: 4px 8px;
+            border-radius: 14px;
+            font-size: 11px;
+            font-weight: 500;
+            transition: all 0.1s ease;
+        }
+
+        .mode-button:hover {
+            background: var(--hover-background);
+            color: var(--text-color);
+        }
+
+        .mode-button.is-active {
+            background: var(--btn-primary-bg, #ffffff);
+            color: var(--btn-primary-text, #000000);
+            border-color: transparent;
+        }
+
         .nav-button {
             background: transparent;
             color: var(--text-secondary);
@@ -258,6 +286,7 @@ export class AssistantView extends LitElement {
         onSendText: { type: Function },
         shouldAnimateResponse: { type: Boolean },
         audioMuted: { type: Boolean },
+        manualScreenshotMode: { type: String },
     };
 
     constructor() {
@@ -267,6 +296,7 @@ export class AssistantView extends LitElement {
         this.selectedProfile = 'interview';
         this.onSendText = () => {};
         this.audioMuted = false;
+        this.manualScreenshotMode = '';
     }
 
     getProfileNames() {
@@ -388,6 +418,10 @@ export class AssistantView extends LitElement {
             this.audioMuted = window.cheatingDaddy.getAudioMuted();
         }
 
+        if (window.cheatingDaddy && typeof window.cheatingDaddy.getManualScreenshotMode === 'function') {
+            this.manualScreenshotMode = window.cheatingDaddy.getManualScreenshotMode() || '';
+        }
+
         // Set up IPC listeners for keyboard shortcuts
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
@@ -462,6 +496,13 @@ export class AssistantView extends LitElement {
         }
     }
 
+    handleManualScreenshotModeSelect(mode) {
+        this.manualScreenshotMode = this.manualScreenshotMode === mode ? '' : mode;
+        if (window.cheatingDaddy && typeof window.cheatingDaddy.setManualScreenshotMode === 'function') {
+            window.cheatingDaddy.setManualScreenshotMode(this.manualScreenshotMode || null);
+        }
+    }
+
     async handleToggleAudioMuted() {
         const nextMuted = !this.audioMuted;
         this.audioMuted = nextMuted;
@@ -533,6 +574,27 @@ export class AssistantView extends LitElement {
                         <path d="M9 6L15 12L9 18" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
                     </svg>
                 </button>
+
+                <div class="mode-toggle">
+                    <button
+                        class="mode-button ${this.manualScreenshotMode === 'optimization' ? 'is-active' : ''}"
+                        @click=${() => this.handleManualScreenshotModeSelect('optimization')}
+                    >
+                        Optimize
+                    </button>
+                    <button
+                        class="mode-button ${this.manualScreenshotMode === 'review' ? 'is-active' : ''}"
+                        @click=${() => this.handleManualScreenshotModeSelect('review')}
+                    >
+                        Review
+                    </button>
+                    <button
+                        class="mode-button ${this.manualScreenshotMode === 'design' ? 'is-active' : ''}"
+                        @click=${() => this.handleManualScreenshotModeSelect('design')}
+                    >
+                        Design
+                    </button>
+                </div>
 
                 <input type="text" id="textInput" placeholder="Type a message to the AI..." @keydown=${this.handleTextKeydown} />
 
