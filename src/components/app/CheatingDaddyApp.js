@@ -100,6 +100,7 @@ export class CheatingDaddyApp extends LitElement {
         sessionActive: { type: Boolean },
         selectedProfile: { type: String },
         selectedLanguage: { type: String },
+        selectedOutputLanguage: { type: String },
         responses: { type: Array },
         currentResponseIndex: { type: Number },
         selectedScreenshotInterval: { type: String },
@@ -122,6 +123,7 @@ export class CheatingDaddyApp extends LitElement {
         this.sessionActive = false;
         this.selectedProfile = 'interview';
         this.selectedLanguage = 'en-US';
+        this.selectedOutputLanguage = 'en-US';
         this.selectedScreenshotInterval = '5';
         this.selectedImageQuality = 'medium';
         this.layoutMode = 'normal';
@@ -157,6 +159,7 @@ export class CheatingDaddyApp extends LitElement {
             // Load preferences
             this.selectedProfile = prefs.selectedProfile || 'interview';
             this.selectedLanguage = prefs.selectedLanguage || 'en-US';
+            this.selectedOutputLanguage = prefs.selectedOutputLanguage || 'en-US';
             this.selectedScreenshotInterval = prefs.selectedScreenshotInterval || '5';
             this.selectedImageQuality = prefs.selectedImageQuality || 'medium';
             this.layoutMode = config.layout || 'normal';
@@ -343,7 +346,7 @@ export class CheatingDaddyApp extends LitElement {
             return;
         }
 
-        await cheatingDaddy.initializeGemini(this.selectedProfile, this.selectedLanguage);
+        await cheatingDaddy.initializeGemini(this.selectedProfile, this.selectedLanguage, this.selectedOutputLanguage);
         // Pass the screenshot interval as string (including 'manual' option)
         cheatingDaddy.startCapture(this.selectedScreenshotInterval, this.selectedImageQuality);
         this.responses = [];
@@ -368,6 +371,11 @@ export class CheatingDaddyApp extends LitElement {
     async handleLanguageChange(language) {
         this.selectedLanguage = language;
         await cheatingDaddy.storage.updatePreference('selectedLanguage', language);
+    }
+
+    async handleOutputLanguageChange(language) {
+        this.selectedOutputLanguage = language;
+        await cheatingDaddy.storage.updatePreference('selectedOutputLanguage', language);
     }
 
     async handleScreenshotIntervalChange(interval) {
@@ -464,11 +472,13 @@ export class CheatingDaddyApp extends LitElement {
                     <customize-view
                         .selectedProfile=${this.selectedProfile}
                         .selectedLanguage=${this.selectedLanguage}
+                        .selectedOutputLanguage=${this.selectedOutputLanguage}
                         .selectedScreenshotInterval=${this.selectedScreenshotInterval}
                         .selectedImageQuality=${this.selectedImageQuality}
                         .layoutMode=${this.layoutMode}
                         .onProfileChange=${profile => this.handleProfileChange(profile)}
                         .onLanguageChange=${language => this.handleLanguageChange(language)}
+                        .onOutputLanguageChange=${language => this.handleOutputLanguageChange(language)}
                         .onScreenshotIntervalChange=${interval => this.handleScreenshotIntervalChange(interval)}
                         .onImageQualityChange=${quality => this.handleImageQualityChange(quality)}
                         .onLayoutModeChange=${layoutMode => this.handleLayoutModeChange(layoutMode)}

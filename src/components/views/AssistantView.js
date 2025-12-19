@@ -245,75 +245,6 @@ export class AssistantView extends LitElement {
             flex-shrink: 0;
         }
 
-        .screen-answer-btn .usage-count {
-            font-size: 11px;
-            opacity: 0.7;
-            font-family: 'SF Mono', Monaco, monospace;
-        }
-
-        .screen-answer-btn-wrapper {
-            position: relative;
-        }
-
-        .screen-answer-btn-wrapper .tooltip {
-            position: absolute;
-            bottom: 100%;
-            right: 0;
-            margin-bottom: 8px;
-            background: var(--tooltip-bg, #1a1a1a);
-            color: var(--tooltip-text, #ffffff);
-            padding: 8px 12px;
-            border-radius: 6px;
-            font-size: 11px;
-            white-space: nowrap;
-            opacity: 0;
-            visibility: hidden;
-            transition: opacity 0.15s ease, visibility 0.15s ease;
-            pointer-events: none;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            z-index: 100;
-        }
-
-        .screen-answer-btn-wrapper .tooltip::after {
-            content: '';
-            position: absolute;
-            top: 100%;
-            right: 16px;
-            border: 6px solid transparent;
-            border-top-color: var(--tooltip-bg, #1a1a1a);
-        }
-
-        .screen-answer-btn-wrapper:hover .tooltip {
-            opacity: 1;
-            visibility: visible;
-        }
-
-        .tooltip-row {
-            display: flex;
-            justify-content: space-between;
-            gap: 16px;
-            margin-bottom: 4px;
-        }
-
-        .tooltip-row:last-child {
-            margin-bottom: 0;
-        }
-
-        .tooltip-label {
-            opacity: 0.7;
-        }
-
-        .tooltip-value {
-            font-family: 'SF Mono', Monaco, monospace;
-        }
-
-        .tooltip-note {
-            margin-top: 6px;
-            padding-top: 6px;
-            border-top: 1px solid rgba(255,255,255,0.1);
-            opacity: 0.5;
-            font-size: 10px;
-        }
     `;
 
     static properties = {
@@ -322,8 +253,6 @@ export class AssistantView extends LitElement {
         selectedProfile: { type: String },
         onSendText: { type: Function },
         shouldAnimateResponse: { type: Boolean },
-        flashCount: { type: Number },
-        flashLiteCount: { type: Number },
     };
 
     constructor() {
@@ -332,8 +261,6 @@ export class AssistantView extends LitElement {
         this.currentResponseIndex = -1;
         this.selectedProfile = 'interview';
         this.onSendText = () => {};
-        this.flashCount = 0;
-        this.flashLiteCount = 0;
     }
 
     getProfileNames() {
@@ -451,9 +378,6 @@ export class AssistantView extends LitElement {
     connectedCallback() {
         super.connectedCallback();
 
-        // Load limits on mount
-        this.loadLimits();
-
         // Set up IPC listeners for keyboard shortcuts
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
@@ -522,27 +446,9 @@ export class AssistantView extends LitElement {
         }
     }
 
-    async loadLimits() {
-        if (window.cheatingDaddy?.storage?.getTodayLimits) {
-            const limits = await window.cheatingDaddy.storage.getTodayLimits();
-            this.flashCount = limits.flash?.count || 0;
-            this.flashLiteCount = limits.flashLite?.count || 0;
-        }
-    }
-
-    getTotalUsed() {
-        return this.flashCount + this.flashLiteCount;
-    }
-
-    getTotalAvailable() {
-        return 40; // 20 flash + 20 flash-lite
-    }
-
     async handleScreenAnswer() {
         if (window.captureManualScreenshot) {
             window.captureManualScreenshot();
-            // Reload limits after a short delay to catch the update
-            setTimeout(() => this.loadLimits(), 1000);
         }
     }
 
@@ -608,26 +514,12 @@ export class AssistantView extends LitElement {
 
                 <input type="text" id="textInput" placeholder="Type a message to the AI..." @keydown=${this.handleTextKeydown} />
 
-                <div class="screen-answer-btn-wrapper">
-                    <div class="tooltip">
-                        <div class="tooltip-row">
-                            <span class="tooltip-label">Flash</span>
-                            <span class="tooltip-value">${this.flashCount}/20</span>
-                        </div>
-                        <div class="tooltip-row">
-                            <span class="tooltip-label">Flash Lite</span>
-                            <span class="tooltip-value">${this.flashLiteCount}/20</span>
-                        </div>
-                        <div class="tooltip-note">Resets every 24 hours</div>
-                    </div>
-                    <button class="screen-answer-btn" @click=${this.handleScreenAnswer}>
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                            <path d="M15.98 1.804a1 1 0 0 0-1.96 0l-.24 1.192a1 1 0 0 1-.784.785l-1.192.238a1 1 0 0 0 0 1.962l1.192.238a1 1 0 0 1 .785.785l.238 1.192a1 1 0 0 0 1.962 0l.238-1.192a1 1 0 0 1 .785-.785l1.192-.238a1 1 0 0 0 0-1.962l-1.192-.238a1 1 0 0 1-.785-.785l-.238-1.192ZM6.949 5.684a1 1 0 0 0-1.898 0l-.683 2.051a1 1 0 0 1-.633.633l-2.051.683a1 1 0 0 0 0 1.898l2.051.684a1 1 0 0 1 .633.632l.683 2.051a1 1 0 0 0 1.898 0l.683-2.051a1 1 0 0 1 .633-.633l2.051-.683a1 1 0 0 0 0-1.898l-2.051-.683a1 1 0 0 1-.633-.633L6.95 5.684ZM13.949 13.684a1 1 0 0 0-1.898 0l-.184.551a1 1 0 0 1-.632.633l-.551.183a1 1 0 0 0 0 1.898l.551.183a1 1 0 0 1 .633.633l.183.551a1 1 0 0 0 1.898 0l.184-.551a1 1 0 0 1 .632-.633l.551-.183a1 1 0 0 0 0-1.898l-.551-.184a1 1 0 0 1-.633-.632l-.183-.551Z" />
-                        </svg>
-                        <span>Analyze screen</span>
-                        <span class="usage-count">(${this.getTotalUsed()}/${this.getTotalAvailable()})</span>
-                    </button>
-                </div>
+                <button class="screen-answer-btn" @click=${this.handleScreenAnswer}>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M15.98 1.804a1 1 0 0 0-1.96 0l-.24 1.192a1 1 0 0 1-.784.785l-1.192.238a1 1 0 0 0 0 1.962l1.192.238a1 1 0 0 1 .785.785l.238 1.192a1 1 0 0 0 1.962 0l.238-1.192a1 1 0 0 1 .785-.785l1.192-.238a1 1 0 0 0 0-1.962l-1.192-.238a1 1 0 0 1-.785-.785l-.238-1.192ZM6.949 5.684a1 1 0 0 0-1.898 0l-.683 2.051a1 1 0 0 1-.633.633l-2.051.683a1 1 0 0 0 0 1.898l2.051.684a1 1 0 0 1 .633.632l.683 2.051a1 1 0 0 0 1.898 0l.683-2.051a1 1 0 0 1 .633-.633l2.051-.683a1 1 0 0 0 0-1.898l-2.051-.683a1 1 0 0 1-.633-.633L6.95 5.684ZM13.949 13.684a1 1 0 0 0-1.898 0l-.184.551a1 1 0 0 1-.632.633l-.551.183a1 1 0 0 0 0 1.898l.551.183a1 1 0 0 1 .633.633l.183.551a1 1 0 0 0 1.898 0l.184-.551a1 1 0 0 1 .632-.633l.551-.183a1 1 0 0 0 0-1.898l-.551-.184a1 1 0 0 1-.633-.632l-.183-.551Z" />
+                    </svg>
+                    <span>Analyze screen</span>
+                </button>
             </div>
         `;
     }

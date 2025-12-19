@@ -183,7 +183,7 @@ async function getStoredSetting(key, defaultValue) {
     return defaultValue;
 }
 
-async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'interview', language = 'en-US', isReconnect = false) {
+async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'interview', language = 'en-US', outputLanguage = 'en-US', isReconnect = false) {
     if (isInitializingSession) {
         console.log('Session initialization already in progress');
         return false;
@@ -196,7 +196,7 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
 
     // Store params for reconnection
     if (!isReconnect) {
-        sessionParams = { apiKey, customPrompt, profile, language };
+        sessionParams = { apiKey, customPrompt, profile, language, outputLanguage };
         reconnectAttempts = 0;
     }
 
@@ -210,7 +210,7 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
     const enabledTools = await getEnabledTools();
     const googleSearchEnabled = enabledTools.some(tool => tool.googleSearch);
 
-    const systemPrompt = getSystemPrompt(profile, customPrompt, googleSearchEnabled);
+    const systemPrompt = getSystemPrompt(profile, customPrompt, googleSearchEnabled, outputLanguage);
 
     // Initialize new conversation session only on first connect
     if (!isReconnect) {
@@ -339,6 +339,7 @@ async function attemptReconnect() {
             sessionParams.customPrompt,
             sessionParams.profile,
             sessionParams.language,
+            sessionParams.outputLanguage,
             true // isReconnect
         );
 
@@ -532,7 +533,7 @@ async function sendAudioToGemini(base64Data, geminiSessionRef) {
 }
 
 async function sendImageToGeminiHttp(base64Data, prompt) {
-    // Get available model based on rate limits
+    // Always use the default model (no local rate limiting)
     const model = getAvailableModel();
 
     const apiKey = getApiKey();
@@ -591,8 +592,8 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
     // Store the geminiSessionRef globally for reconnection access
     global.geminiSessionRef = geminiSessionRef;
 
-    ipcMain.handle('initialize-gemini', async (event, apiKey, customPrompt, profile = 'interview', language = 'en-US') => {
-        const session = await initializeGeminiSession(apiKey, customPrompt, profile, language);
+    ipcMain.handle('initialize-gemini', async (event, apiKey, customPrompt, profile = 'interview', language = 'en-US', outputLanguage = 'en-US') => {
+        const session = await initializeGeminiSession(apiKey, customPrompt, profile, language, outputLanguage);
         if (session) {
             geminiSessionRef.current = session;
             return true;

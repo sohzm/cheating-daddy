@@ -538,6 +538,7 @@ export class CustomizeView extends LitElement {
     static properties = {
         selectedProfile: { type: String },
         selectedLanguage: { type: String },
+        selectedOutputLanguage: { type: String },
         selectedImageQuality: { type: String },
         layoutMode: { type: String },
         keybinds: { type: Object },
@@ -547,6 +548,7 @@ export class CustomizeView extends LitElement {
         theme: { type: String },
         onProfileChange: { type: Function },
         onLanguageChange: { type: Function },
+        onOutputLanguageChange: { type: Function },
         onImageQualityChange: { type: Function },
         onLayoutModeChange: { type: Function },
         activeSection: { type: String },
@@ -559,11 +561,13 @@ export class CustomizeView extends LitElement {
         super();
         this.selectedProfile = 'interview';
         this.selectedLanguage = 'en-US';
+        this.selectedOutputLanguage = 'en-US';
         this.selectedImageQuality = 'medium';
         this.layoutMode = 'normal';
         this.keybinds = this.getDefaultKeybinds();
         this.onProfileChange = () => {};
         this.onLanguageChange = () => {};
+        this.onOutputLanguageChange = () => {};
         this.onImageQualityChange = () => {};
         this.onLayoutModeChange = () => {};
 
@@ -770,6 +774,13 @@ export class CustomizeView extends LitElement {
         ];
     }
 
+    getOutputLanguages() {
+        return [
+            { value: 'en-US', name: 'English' },
+            { value: 'cmn-CN', name: 'Chinese (Simplified)' },
+        ];
+    }
+
     getProfileNames() {
         return {
             interview: 'Job Interview',
@@ -789,6 +800,11 @@ export class CustomizeView extends LitElement {
     handleLanguageSelect(e) {
         this.selectedLanguage = e.target.value;
         this.onLanguageChange(this.selectedLanguage);
+    }
+
+    handleOutputLanguageSelect(e) {
+        this.selectedOutputLanguage = e.target.value;
+        this.onOutputLanguageChange(this.selectedOutputLanguage);
     }
 
     handleImageQualitySelect(e) {
@@ -1145,6 +1161,8 @@ export class CustomizeView extends LitElement {
     renderLanguageSection() {
         const languages = this.getLanguages();
         const currentLanguage = languages.find(l => l.value === this.selectedLanguage);
+        const outputLanguages = this.getOutputLanguages();
+        const currentOutputLanguage = outputLanguages.find(l => l.value === this.selectedOutputLanguage);
 
         return html`
             <div class="content-header">Language</div>
@@ -1163,7 +1181,23 @@ export class CustomizeView extends LitElement {
                             `
                         )}
                     </select>
-                    <div class="form-description">Language for speech recognition and AI responses</div>
+                    <div class="form-description">Language for speech recognition (input transcription)</div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">
+                        Output Language
+                        <span class="current-selection">${currentOutputLanguage?.name || 'English'}</span>
+                    </label>
+                    <select class="form-control" .value=${this.selectedOutputLanguage} @change=${this.handleOutputLanguageSelect}>
+                        ${outputLanguages.map(
+                            language => html`
+                                <option value=${language.value} ?selected=${this.selectedOutputLanguage === language.value}>
+                                    ${language.name}
+                                </option>
+                            `
+                        )}
+                    </select>
+                    <div class="form-description">Language used for AI response prompts</div>
                 </div>
             </div>
         `;
