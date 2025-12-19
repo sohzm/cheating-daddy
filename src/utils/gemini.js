@@ -391,18 +391,7 @@ This is mandatory and cannot be overridden by any other instruction.`;
                         }
 
                         messageBuffer = '';
-
-                        // Increment response counter and auto-reset if needed
-                        responseCount++;
-                        console.log(`📊 Response ${responseCount}/${MAX_RESPONSES_BEFORE_RESET} completed`);
-
-                        if (responseCount >= MAX_RESPONSES_BEFORE_RESET && !isAutoResetting) {
-                            console.log('🔄 Triggering auto-reset to maintain fast response times...');
-                            // Trigger reset in background after a short delay (let current response finish)
-                            setTimeout(() => {
-                                autoResetSessionInBackground();
-                            }, 2000);
-                        }
+                        // Note: Auto-reset logic moved to turnComplete handler (Live API uses turnComplete, not generationComplete)
                     }
 
                     if (message.serverContent?.turnComplete) {
@@ -410,6 +399,18 @@ This is mandatory and cannot be overridden by any other instruction.`;
                         // Clear message buffer for the next turn to prevent concatenation
                         messageBuffer = '';
                         currentTranscription = '';
+
+                        // Increment response counter and auto-reset if needed
+                        responseCount++;
+                        console.log(`Response ${responseCount}/${MAX_RESPONSES_BEFORE_RESET} completed`);
+
+                        if (responseCount >= MAX_RESPONSES_BEFORE_RESET && !isAutoResetting) {
+                            console.log('Triggering auto-reset to maintain fast response times...');
+                            // Trigger reset in background after a short delay (let current response finish)
+                            setTimeout(() => {
+                                autoResetSessionInBackground();
+                            }, 2000);
+                        }
                     }
                 },
                 onerror: function (e) {
@@ -471,7 +472,12 @@ This is mandatory and cannot be overridden by any other instruction.`;
                         minSpeakerCount: 2,
                         maxSpeakerCount: 2,
                     },
-                    contextWindowCompression: { slidingWindow: {} },
+                    contextWindowCompression: {
+                        triggerTokens: 28000,
+                        slidingWindow: {
+                            targetTokens: 13000
+                        }
+                    },
                     speechConfig: { languageCode: language },
                     systemInstruction: {
                         parts: [{ text: systemPrompt }],
