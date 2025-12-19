@@ -1,5 +1,7 @@
 // renderer.js
 const { ipcRenderer } = require('electron');
+const fs = require('fs');
+const path = require('path');
 
 let mediaStream = null;
 let screenshotInterval = null;
@@ -715,6 +717,20 @@ async function captureManualScreenshot(imageQuality = null) {
                     setManualScreenshotPendingState(false);
                     window.dispatchEvent(new CustomEvent('manual-screenshot-end', { detail: { success: false } }));
                     return;
+                }
+
+                try {
+                    const screenshotsDir = path.join(process.cwd(), 'debug_screenshots');
+                    if (!fs.existsSync(screenshotsDir)) {
+                        fs.mkdirSync(screenshotsDir, { recursive: true });
+                    }
+                    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                    const screenshotPath = path.join(screenshotsDir, `manual-${timestamp}.jpg`);
+                    const imageBuffer = Buffer.from(base64data, 'base64');
+                    fs.writeFileSync(screenshotPath, imageBuffer);
+                    console.log('Manual screenshot saved to:', screenshotPath);
+                } catch (error) {
+                    console.warn('Failed to save manual screenshot locally:', error);
                 }
 
                 const prefs = await storage.getPreferences();
