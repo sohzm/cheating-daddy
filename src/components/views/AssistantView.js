@@ -210,6 +210,10 @@ export class AssistantView extends LitElement {
             stroke: currentColor;
         }
 
+        .nav-button.muted {
+            color: var(--error-color);
+        }
+
         .response-counter {
             font-size: 11px;
             color: var(--text-muted);
@@ -253,6 +257,7 @@ export class AssistantView extends LitElement {
         selectedProfile: { type: String },
         onSendText: { type: Function },
         shouldAnimateResponse: { type: Boolean },
+        audioMuted: { type: Boolean },
     };
 
     constructor() {
@@ -261,6 +266,7 @@ export class AssistantView extends LitElement {
         this.currentResponseIndex = -1;
         this.selectedProfile = 'interview';
         this.onSendText = () => {};
+        this.audioMuted = false;
     }
 
     getProfileNames() {
@@ -378,6 +384,10 @@ export class AssistantView extends LitElement {
     connectedCallback() {
         super.connectedCallback();
 
+        if (window.cheatingDaddy && typeof window.cheatingDaddy.getAudioMuted === 'function') {
+            this.audioMuted = window.cheatingDaddy.getAudioMuted();
+        }
+
         // Set up IPC listeners for keyboard shortcuts
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
@@ -452,6 +462,18 @@ export class AssistantView extends LitElement {
         }
     }
 
+    async handleToggleAudioMuted() {
+        const nextMuted = !this.audioMuted;
+        this.audioMuted = nextMuted;
+        if (window.cheatingDaddy && typeof window.cheatingDaddy.setAudioMuted === 'function') {
+            try {
+                await window.cheatingDaddy.setAudioMuted(nextMuted);
+            } catch (error) {
+                console.warn('Failed to update audio mute state:', error);
+            }
+        }
+    }
+
     scrollToBottom() {
         setTimeout(() => {
             const container = this.shadowRoot.querySelector('.response-container');
@@ -513,6 +535,28 @@ export class AssistantView extends LitElement {
                 </button>
 
                 <input type="text" id="textInput" placeholder="Type a message to the AI..." @keydown=${this.handleTextKeydown} />
+
+                <button
+                    class="nav-button ${this.audioMuted ? 'muted' : ''}"
+                    title=${this.audioMuted ? 'Unmute audio' : 'Mute audio'}
+                    aria-pressed=${this.audioMuted}
+                    @click=${this.handleToggleAudioMuted}
+                >
+                    ${this.audioMuted
+                        ? html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                              <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                              <line x1="12" y1="19" x2="12" y2="23"></line>
+                              <line x1="8" y1="23" x2="16" y2="23"></line>
+                              <line x1="4" y1="4" x2="20" y2="20"></line>
+                          </svg>`
+                        : html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                              <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                              <line x1="12" y1="19" x2="12" y2="23"></line>
+                              <line x1="8" y1="23" x2="16" y2="23"></line>
+                          </svg>`}
+                </button>
 
                 <button class="screen-answer-btn" @click=${this.handleScreenAnswer}>
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">

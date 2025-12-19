@@ -10,6 +10,7 @@ let audioBuffer = [];
 const SAMPLE_RATE = 24000;
 const AUDIO_CHUNK_DURATION = 0.1; // seconds
 const BUFFER_SIZE = 4096; // Increased buffer size for smoother audio
+let audioMuted = false;
 
 let hiddenVideo = null;
 let offscreenCanvas = null;
@@ -131,6 +132,18 @@ function arrayBufferToBase64(buffer) {
         binary += String.fromCharCode(bytes[i]);
     }
     return btoa(binary);
+}
+
+function setAudioMuted(muted) {
+    audioMuted = Boolean(muted);
+    ipcRenderer.invoke('set-audio-muted', audioMuted).catch(err => {
+        console.warn('Failed to update audio mute state:', err);
+    });
+    return audioMuted;
+}
+
+function getAudioMuted() {
+    return audioMuted;
 }
 
 async function initializeGemini(profile = 'interview', language = 'en-US', outputLanguage = 'en-US') {
@@ -332,6 +345,10 @@ function setupLinuxMicProcessing(micStream) {
     const samplesPerChunk = SAMPLE_RATE * AUDIO_CHUNK_DURATION;
 
     micProcessor.onaudioprocess = async e => {
+        if (audioMuted) {
+            audioBuffer = [];
+            return;
+        }
         const inputData = e.inputBuffer.getChannelData(0);
         audioBuffer.push(...inputData);
 
@@ -365,6 +382,10 @@ function setupLinuxSystemAudioProcessing() {
     const samplesPerChunk = SAMPLE_RATE * AUDIO_CHUNK_DURATION;
 
     audioProcessor.onaudioprocess = async e => {
+        if (audioMuted) {
+            audioBuffer = [];
+            return;
+        }
         const inputData = e.inputBuffer.getChannelData(0);
         audioBuffer.push(...inputData);
 
@@ -395,6 +416,10 @@ function setupWindowsLoopbackProcessing() {
     const samplesPerChunk = SAMPLE_RATE * AUDIO_CHUNK_DURATION;
 
     audioProcessor.onaudioprocess = async e => {
+        if (audioMuted) {
+            audioBuffer = [];
+            return;
+        }
         const inputData = e.inputBuffer.getChannelData(0);
         audioBuffer.push(...inputData);
 
@@ -940,6 +965,8 @@ const cheatingDaddy = {
     stopCapture,
     sendTextMessage,
     handleShortcut,
+    setAudioMuted,
+    getAudioMuted,
 
     // Storage API
     storage,

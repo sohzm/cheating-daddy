@@ -30,6 +30,7 @@ module.exports.formatSpeakerResults = formatSpeakerResults;
 // Audio capture variables
 let systemAudioProc = null;
 let messageBuffer = '';
+let audioMuted = false;
 
 // Reconnection variables
 let isUserClosing = false;
@@ -517,7 +518,7 @@ function stopMacOSAudioCapture() {
 }
 
 async function sendAudioToGemini(base64Data, geminiSessionRef) {
-    if (!geminiSessionRef.current) return;
+    if (!geminiSessionRef.current || audioMuted) return;
 
     try {
         process.stdout.write('.');
@@ -603,6 +604,7 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
 
     ipcMain.handle('send-audio-content', async (event, { data, mimeType }) => {
         if (!geminiSessionRef.current) return { success: false, error: 'No active Gemini session' };
+        if (audioMuted) return { success: true, muted: true };
         try {
             process.stdout.write('.');
             await geminiSessionRef.current.sendRealtimeInput({
@@ -618,6 +620,7 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
     // Handle microphone audio on a separate channel
     ipcMain.handle('send-mic-audio-content', async (event, { data, mimeType }) => {
         if (!geminiSessionRef.current) return { success: false, error: 'No active Gemini session' };
+        if (audioMuted) return { success: true, muted: true };
         try {
             process.stdout.write(',');
             await geminiSessionRef.current.sendRealtimeInput({
@@ -738,6 +741,11 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
             console.error('Error starting new session:', error);
             return { success: false, error: error.message };
         }
+    });
+
+    ipcMain.handle('set-audio-muted', async (event, muted) => {
+        audioMuted = Boolean(muted);
+        return { success: true, muted: audioMuted };
     });
 
     ipcMain.handle('update-google-search-setting', async (event, enabled) => {
