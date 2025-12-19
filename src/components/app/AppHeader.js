@@ -244,11 +244,10 @@ export class AppHeader extends LitElement {
 
         // Format model names for display
         const modelMap = {
-            'gemini-live-2.5-flash-preview': '2.5 Flash Live',
+            'gemini-2.0-flash-exp': '2.0 Flash Live',
             'gemini-2.5-flash-native-audio-preview-09-2025': '2.5 Flash Live',
             'gemini-2.5-flash': '2.5 Flash',
             'gemini-2.5-pro': '2.5 Pro',
-            'gemini-2.0-flash-exp': '2.0 Flash',
         };
 
         return modelMap[this.currentModel] || this.currentModel;

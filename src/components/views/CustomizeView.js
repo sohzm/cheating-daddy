@@ -1166,7 +1166,7 @@ export class CustomizeView extends LitElement {
                                         🎤 Interview Mode (Real-time Audio/Video)
                                     </div>
                                     <div class="form-description">
-                                        ${this.getProfileNames()[this.selectedProfile]} profile uses Interview mode with Gemini 2.5 Flash for real-time audio processing and live interactions.
+                                        ${this.getProfileNames()[this.selectedProfile]} profile uses Interview mode with Gemini 2.0 Flash Exp for real-time audio processing and live interactions.
                                     </div>
                                 </div>
                             </div>

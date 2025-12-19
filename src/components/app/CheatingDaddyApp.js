@@ -304,7 +304,7 @@ export class CheatingDaddyApp extends LitElement {
         // Set current mode and model for header display
         this.currentMode = selectedMode;
         if (selectedMode === 'interview') {
-            this.currentModel = 'gemini-live-2.5-flash-preview';
+            this.currentModel = 'gemini-2.0-flash-exp';
         } else {
             this.currentModel = selectedModel;
         }

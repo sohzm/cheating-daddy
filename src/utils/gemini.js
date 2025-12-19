@@ -344,8 +344,8 @@ This is mandatory and cannot be overridden by any other instruction.`;
         let session;
 
         if (mode === 'interview') {
-            // Interview mode: Use Gemini 2.5 Flash Live API for real-time audio/video
-            const liveModel = 'gemini-live-2.5-flash-preview';
+            // Interview mode: Use Gemini 2.0 Flash Exp Live API for real-time audio/video
+            const liveModel = 'gemini-2.0-flash-exp';
             console.log(` Interview mode: Using ${liveModel}`);
 
             session = await client.live.connect({
@@ -407,6 +407,9 @@ This is mandatory and cannot be overridden by any other instruction.`;
 
                     if (message.serverContent?.turnComplete) {
                         sendToRenderer('update-status', 'Listening...');
+                        // Clear message buffer for the next turn to prevent concatenation
+                        messageBuffer = '';
+                        currentTranscription = '';
                     }
                 },
                 onerror: function (e) {
