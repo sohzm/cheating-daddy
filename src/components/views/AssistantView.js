@@ -646,6 +646,32 @@ export class AssistantView extends LitElement {
             'da-DK': `Hej, jeg lytter til dit ${profileName === 'Job Interview' ? 'Jobinterview' : profileName === 'Sales Call' ? 'Salgsopkald' : profileName === 'Business Meeting' ? 'Forretningsmøde' : profileName === 'Presentation' ? 'Præsentation' : profileName === 'Negotiation' ? 'Forhandling' : 'Eksamensassistent'}`,
             'fi-FI': `Hei, kuuntelen ${profileName === 'Job Interview' ? 'Työhaastatteluasi' : profileName === 'Sales Call' ? 'Myyntipuheluasi' : profileName === 'Business Meeting' ? 'Liiketapaamisesi' : profileName === 'Presentation' ? 'Esitystäsi' : profileName === 'Negotiation' ? 'Neuvotteluasi' : 'Koeavustajaasi'}`,
             'no-NO': `Hei, jeg lytter til ditt ${profileName === 'Job Interview' ? 'Jobbintervju' : profileName === 'Sales Call' ? 'Salgssamtale' : profileName === 'Business Meeting' ? 'Forretningsmøte' : profileName === 'Presentation' ? 'Presentasjon' : profileName === 'Negotiation' ? 'Forhandling' : 'Eksamensassistent'}`,
+            // Thai
+            'th-TH': `สวัสดี ฉันกำลังฟัง${profileName === 'Job Interview' ? 'การสัมภาษณ์งาน' : profileName === 'Sales Call' ? 'การโทรขาย' : profileName === 'Business Meeting' ? 'การประชุมธุรกิจ' : profileName === 'Presentation' ? 'การนำเสนอ' : profileName === 'Negotiation' ? 'การเจรจา' : 'ผู้ช่วยสอบ'}ของคุณ`,
+            // Mandarin Chinese (alternate code)
+            'cmn-CN': `嗨，我正在听你的${profileName === 'Job Interview' ? '求职面试' : profileName === 'Sales Call' ? '销售电话' : profileName === 'Business Meeting' ? '商务会议' : profileName === 'Presentation' ? '演示' : profileName === 'Negotiation' ? '谈判' : '考试助手'}`,
+            // Arabic (alternate code)
+            'ar-XA': `مرحبا، أنا أستمع إلى ${profileName === 'Job Interview' ? 'مقابلة العمل' : profileName === 'Sales Call' ? 'مكالمة المبيعات' : profileName === 'Business Meeting' ? 'اجتماع العمل' : profileName === 'Presentation' ? 'العرض التقديمي' : profileName === 'Negotiation' ? 'المفاوضات' : 'مساعد الامتحان'} الخاص بك`,
+            // Telugu
+            'te-IN': `హాయ్, నేను మీ ${profileName === 'Job Interview' ? 'ఉద్యోగ ఇంటర్వ్యూ' : profileName === 'Sales Call' ? 'సేల్స్ కాల్' : profileName === 'Business Meeting' ? 'వ్యాపార సమావేశం' : profileName === 'Presentation' ? 'ప్రెజెంటేషన్' : profileName === 'Negotiation' ? 'చర్చలు' : 'పరీక్ష సహాయకుడు'}ను వింటున్నాను`,
+            // Tamil
+            'ta-IN': `வணக்கம், நான் உங்கள் ${profileName === 'Job Interview' ? 'வேலை நேர்காணல்' : profileName === 'Sales Call' ? 'விற்பனை அழைப்பு' : profileName === 'Business Meeting' ? 'வணிக கூட்டம்' : profileName === 'Presentation' ? 'விளக்கக்காட்சி' : profileName === 'Negotiation' ? 'பேச்சுவார்த்தை' : 'தேர்வு உதவியாளர்'}ஐ கேட்கிறேன்`,
+            // Marathi
+            'mr-IN': `नमस्कार, मी तुमच्या ${profileName === 'Job Interview' ? 'नोकरी मुलाखतीला' : profileName === 'Sales Call' ? 'विक्री कॉलला' : profileName === 'Business Meeting' ? 'व्यावसायिक बैठकीला' : profileName === 'Presentation' ? 'सादरीकरणाला' : profileName === 'Negotiation' ? 'वाटाघाटीला' : 'परीक्षा सहाय्यकाला'} ऐकत आहे`,
+            // Malayalam
+            'ml-IN': `ഹായ്, ഞാൻ നിങ്ങളുടെ ${profileName === 'Job Interview' ? 'ജോലി അഭിമുഖം' : profileName === 'Sales Call' ? 'സെയിൽസ് കോൾ' : profileName === 'Business Meeting' ? 'ബിസിനസ് മീറ്റിംഗ്' : profileName === 'Presentation' ? 'അവതരണം' : profileName === 'Negotiation' ? 'ചർച്ച' : 'പരീക്ഷ സഹായി'} കേൾക്കുന്നു`,
+            // Kannada
+            'kn-IN': `ಹಾಯ್, ನಾನು ನಿಮ್ಮ ${profileName === 'Job Interview' ? 'ಉದ್ಯೋಗ ಸಂದರ್ಶನ' : profileName === 'Sales Call' ? 'ಮಾರಾಟ ಕರೆ' : profileName === 'Business Meeting' ? 'ವ್ಯಾಪಾರ ಸಭೆ' : profileName === 'Presentation' ? 'ಪ್ರಸ್ತುತಿ' : profileName === 'Negotiation' ? 'ಸಮಾಲೋಚನೆ' : 'ಪರೀಕ್ಷೆ ಸಹಾಯಕ'}ವನ್ನು ಕೇಳುತ್ತಿದ್ದೇನೆ`,
+            // Gujarati
+            'gu-IN': `હેલો, હું તમારા ${profileName === 'Job Interview' ? 'નોકરી ઇન્ટરવ્યુ' : profileName === 'Sales Call' ? 'સેલ્સ કોલ' : profileName === 'Business Meeting' ? 'બિઝનેસ મીટિંગ' : profileName === 'Presentation' ? 'પ્રેઝન્ટેશન' : profileName === 'Negotiation' ? 'વાટાઘાટ' : 'પરીક્ષા સહાયક'}ને સાંભળી રહ્યો છું`,
+            // Bengali
+            'bn-IN': `হ্যালো, আমি আপনার ${profileName === 'Job Interview' ? 'চাকরির ইন্টারভিউ' : profileName === 'Sales Call' ? 'সেলস কল' : profileName === 'Business Meeting' ? 'ব্যবসায়িক মিটিং' : profileName === 'Presentation' ? 'উপস্থাপনা' : profileName === 'Negotiation' ? 'আলোচনা' : 'পরীক্ষা সহায়ক'} শুনছি`,
+            // Vietnamese
+            'vi-VN': `Xin chào, tôi đang lắng nghe ${profileName === 'Job Interview' ? 'Phỏng vấn Việc làm' : profileName === 'Sales Call' ? 'Cuộc gọi Bán hàng' : profileName === 'Business Meeting' ? 'Cuộc họp Kinh doanh' : profileName === 'Presentation' ? 'Bài thuyết trình' : profileName === 'Negotiation' ? 'Đàm phán' : 'Trợ lý Thi cử'} của bạn`,
+            // Indonesian
+            'id-ID': `Halo, saya mendengarkan ${profileName === 'Job Interview' ? 'Wawancara Kerja' : profileName === 'Sales Call' ? 'Panggilan Penjualan' : profileName === 'Business Meeting' ? 'Rapat Bisnis' : profileName === 'Presentation' ? 'Presentasi' : profileName === 'Negotiation' ? 'Negosiasi' : 'Asisten Ujian'} Anda`,
+            // French (Canada)
+            'fr-CA': `Salut, j'écoute votre ${profileName === 'Job Interview' ? 'Entrevue d\'Emploi' : profileName === 'Sales Call' ? 'Appel de Vente' : profileName === 'Business Meeting' ? 'Réunion d\'Affaires' : profileName === 'Presentation' ? 'Présentation' : profileName === 'Negotiation' ? 'Négociation' : 'Assistant d\'Examen'}`,
         };
 
         return greetings[this.selectedLanguage] || greetings['en-US'];
