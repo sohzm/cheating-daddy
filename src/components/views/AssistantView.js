@@ -387,6 +387,18 @@ export class AssistantView extends LitElement {
             background: var(--scrollbar-thumb-hover);
         }
 
+        /* KaTeX display math styling */
+        .response-container .katex-display {
+            display: block;
+            margin: 1em 0;
+            text-align: center;
+        }
+
+        .response-container .katex {
+            font-size: 1.05em;
+            font-weight: bold;
+        }
+
         .text-input-container {
             display: flex;
             gap: 10px;
@@ -675,6 +687,7 @@ export class AssistantView extends LitElement {
                     }
                 });
                 let rendered = window.marked.parse(content);
+                rendered = this.renderLaTeX(rendered);
                 rendered = this.wrapWordsInSpans(rendered);
                 rendered = this.enhanceCodeBlocks(rendered);
                 return rendered;
@@ -685,6 +698,109 @@ export class AssistantView extends LitElement {
         }
         console.log('Marked not available, using plain text');
         return content; // Fallback if marked is not available
+    }
+
+    renderLaTeX(html) {
+        // Check if KaTeX is available
+        if (typeof window === 'undefined' || !window.katex) {
+            return html;
+        }
+
+        try {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+
+            // Function to check if a node is inside a code element
+            function isInsideCode(node) {
+                let parent = node.parentElement;
+                while (parent) {
+                    if (parent.tagName === 'CODE' || parent.tagName === 'PRE') {
+                        return true;
+                    }
+                    parent = parent.parentElement;
+                }
+                return false;
+            }
+
+            // Function to process LaTeX in text nodes
+            function processTextNode(textNode) {
+                if (isInsideCode(textNode)) {
+                    return; // Skip processing if inside code
+                }
+
+                let text = textNode.textContent;
+                let hasLaTeX = false;
+
+                // Check for display math ($$...$$) or inline math ($...$)
+                if (/\$\$[\s\S]+?\$\$|\$[^\$\n]+?\$/.test(text)) {
+                    hasLaTeX = true;
+                }
+
+                if (!hasLaTeX) {
+                    return;
+                }
+
+                // Process display math first ($$...$$)
+                text = text.replace(/\$\$([^\$]+?)\$\$/g, (match, latex) => {
+                    try {
+                        const rendered = window.katex.renderToString(latex.trim(), {
+                            displayMode: true,
+                            throwOnError: false,
+                            output: 'html'
+                        });
+                        return `<span class="katex-display">${rendered}</span>`;
+                    } catch (err) {
+                        console.warn('Error rendering display LaTeX:', err);
+                        return match;
+                    }
+                });
+
+                // Process inline math ($...$)
+                text = text.replace(/\$([^\$\n]+?)\$/g, (match, latex) => {
+                    try {
+                        return window.katex.renderToString(latex.trim(), {
+                            displayMode: false,
+                            throwOnError: false,
+                            output: 'html'
+                        });
+                    } catch (err) {
+                        console.warn('Error rendering inline LaTeX:', err);
+                        return match;
+                    }
+                });
+
+                // Replace the text node with the processed HTML
+                if (text !== textNode.textContent) {
+                    const span = document.createElement('span');
+                    span.innerHTML = text;
+                    textNode.parentNode.replaceChild(span, textNode);
+                }
+            }
+
+            // Walk through all text nodes
+            const walker = document.createTreeWalker(
+                doc.body,
+                NodeFilter.SHOW_TEXT,
+                null,
+                false
+            );
+
+            const textNodes = [];
+            let node;
+            while (node = walker.nextNode()) {
+                if (node.textContent.trim()) {
+                    textNodes.push(node);
+                }
+            }
+
+            // Process each text node
+            textNodes.forEach(processTextNode);
+
+            return doc.body.innerHTML;
+        } catch (error) {
+            console.warn('Error processing LaTeX:', error);
+            return html;
+        }
     }
 
     wrapWordsInSpans(html) {
