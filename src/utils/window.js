@@ -68,9 +68,9 @@ function createWindow(sendToRenderer, geminiSessionRef) {
 
     // Center window at the top of the screen
     const primaryDisplay = screen.getPrimaryDisplay();
-    const { width: screenWidth } = primaryDisplay.workAreaSize;
+    const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
     const x = Math.floor((screenWidth - windowWidth) / 2);
-    const y = 0;
+    const y = Math.floor((screenHeight - windowHeight) / 2);
     mainWindow.setPosition(x, y);
 
     if (process.platform === 'win32') {
@@ -399,8 +399,9 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
                 // Re-center the window during animation
                 const primaryDisplay = screen.getPrimaryDisplay();
                 const { width: screenWidth } = primaryDisplay.workAreaSize;
+                const [, currentY] = mainWindow.getPosition();
                 const x = Math.floor((screenWidth - currentWidth) / 2);
-                const y = 0;
+                const y = currentY;
                 mainWindow.setPosition(x, y);
 
                 if (currentFrame >= totalFrames) {
@@ -414,8 +415,9 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
 
                         // Ensure final size is exact
                         mainWindow.setSize(targetWidth, targetHeight);
+                        const [, finalY] = mainWindow.getPosition();
                         const finalX = Math.floor((screenWidth - targetWidth) / 2);
-                        mainWindow.setPosition(finalX, 0);
+                        mainWindow.setPosition(finalX, finalY);
                     }
 
                     console.log(`Animation complete: ${targetWidth}x${targetHeight}`);

@@ -1036,6 +1036,121 @@ const theme = {
         const colors = this.get(themeName);
         this.current = themeName;
         const root = document.documentElement;
+        const codePalettes = {
+            dark: {
+                text: '#c9d1d9',
+                keyword: '#ff7b72',
+                title: '#d2a8ff',
+                literal: '#79c0ff',
+                string: '#a5d6ff',
+                builtIn: '#ffa657',
+                comment: '#8b949e',
+                name: '#7ee787',
+                section: '#1f6feb',
+                bullet: '#f2cc60',
+                addition: '#aff5b4',
+                additionBg: '#033a16',
+                deletion: '#ffdcd7',
+                deletionBg: '#67060c',
+            },
+            light: {
+                text: '#24292f',
+                keyword: '#cf222e',
+                title: '#8250df',
+                literal: '#0550ae',
+                string: '#0a3069',
+                builtIn: '#953800',
+                comment: '#6e7781',
+                name: '#116329',
+                section: '#0969da',
+                bullet: '#3d2c00',
+                addition: '#116329',
+                additionBg: '#dafbe1',
+                deletion: '#cf222e',
+                deletionBg: '#ffebe9',
+            },
+            midnight: {
+                text: '#c9d1d9',
+                keyword: '#ff7b72',
+                title: '#d2a8ff',
+                literal: '#79c0ff',
+                string: '#a5d6ff',
+                builtIn: '#ffa657',
+                comment: '#8b949e',
+                name: '#7ee787',
+                section: '#58a6ff',
+                bullet: '#f2cc60',
+                addition: '#aff5b4',
+                additionBg: '#033a16',
+                deletion: '#ffdcd7',
+                deletionBg: '#67060c',
+            },
+            sepia: {
+                text: '#5c4b37',
+                keyword: '#a63d2b',
+                title: '#7a4e2f',
+                literal: '#2f5f7a',
+                string: '#3f6b57',
+                builtIn: '#8b5a2b',
+                comment: '#8e7a61',
+                name: '#5b6b2a',
+                section: '#2f5f7a',
+                bullet: '#6b4f2a',
+                addition: '#2d5f3b',
+                additionBg: '#e9dcc4',
+                deletion: '#8b3a2b',
+                deletionBg: '#f3e2d3',
+            },
+            nord: {
+                text: '#eceff4',
+                keyword: '#bf616a',
+                title: '#b48ead',
+                literal: '#81a1c1',
+                string: '#88c0d0',
+                builtIn: '#d08770',
+                comment: '#616e88',
+                name: '#a3be8c',
+                section: '#5e81ac',
+                bullet: '#ebcb8b',
+                addition: '#a3be8c',
+                additionBg: '#2f3b2f',
+                deletion: '#bf616a',
+                deletionBg: '#3b2f2f',
+            },
+            dracula: {
+                text: '#f8f8f2',
+                keyword: '#ff79c6',
+                title: '#bd93f9',
+                literal: '#8be9fd',
+                string: '#f1fa8c',
+                builtIn: '#ffb86c',
+                comment: '#6272a4',
+                name: '#50fa7b',
+                section: '#8be9fd',
+                bullet: '#f1fa8c',
+                addition: '#50fa7b',
+                additionBg: '#273b2b',
+                deletion: '#ff5555',
+                deletionBg: '#3b2020',
+            },
+            abyss: {
+                text: '#d4d4d4',
+                keyword: '#c586c0',
+                title: '#4fc1ff',
+                literal: '#9cdcfe',
+                string: '#ce9178',
+                builtIn: '#dcdcaa',
+                comment: '#6a9955',
+                name: '#4ec9b0',
+                section: '#569cd6',
+                bullet: '#d7ba7d',
+                addition: '#b5cea8',
+                additionBg: '#1f3b1f',
+                deletion: '#f44747',
+                deletionBg: '#3b1f1f',
+            },
+        };
+        const codePalette = codePalettes[themeName] || codePalettes.dark;
 
         // Text colors
         root.style.setProperty('--text-color', colors.text);
@@ -1063,6 +1178,22 @@ const theme = {
         // Error color (stays constant)
         root.style.setProperty('--error-color', '#f14c4c');
         root.style.setProperty('--success-color', '#4caf50');
+        // Code highlight (theme-aware)
+        root.style.setProperty('--code-bg', 'var(--bg-secondary)');
+        root.style.setProperty('--code-text', codePalette.text);
+        root.style.setProperty('--code-keyword', codePalette.keyword);
+        root.style.setProperty('--code-title', codePalette.title);
+        root.style.setProperty('--code-literal', codePalette.literal);
+        root.style.setProperty('--code-string', codePalette.string);
+        root.style.setProperty('--code-built-in', codePalette.builtIn);
+        root.style.setProperty('--code-comment', codePalette.comment);
+        root.style.setProperty('--code-name', codePalette.name);
+        root.style.setProperty('--code-section', codePalette.section);
+        root.style.setProperty('--code-bullet', codePalette.bullet);
+        root.style.setProperty('--code-addition', codePalette.addition);
+        root.style.setProperty('--code-addition-bg', codePalette.additionBg);
+        root.style.setProperty('--code-deletion', codePalette.deletion);
+        root.style.setProperty('--code-deletion-bg', codePalette.deletionBg);
 
         // Also apply background colors from theme
         this.applyBackgrounds(colors.background, alpha);
