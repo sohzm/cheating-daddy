@@ -482,7 +482,7 @@ export class CustomizeView extends LitElement {
 
         // Mode and model selection defaults
         this.selectedMode = 'interview';
-        this.selectedModel = 'gemini-2.5-pro';
+        this.selectedModel = 'gemini-3-pro-preview';
 
         this.loadKeybinds();
         this.loadGoogleSearchSettings();
@@ -1037,7 +1037,7 @@ export class CustomizeView extends LitElement {
         const selectedModel = localStorage.getItem('selectedModel');
 
         this.selectedMode = selectedMode || 'interview';
-        this.selectedModel = selectedModel || 'gemini-2.5-pro';
+        this.selectedModel = selectedModel || 'gemini-3-pro-preview';
     }
 
     async handleModeChange(e) {
@@ -1050,11 +1050,11 @@ export class CustomizeView extends LitElement {
             this.selectedModel = 'gemini-2.5-flash';
         } else {
             // Keep current model selection for coding mode
-            if (this.selectedModel === 'gemini-2.5-flash' || this.selectedModel === 'gemini-2.5-pro') {
+            if (this.selectedModel === 'gemini-2.5-flash' || this.selectedModel === 'gemini-3-pro-preview') {
                 // Keep the selection
             } else {
                 // Default to pro for coding mode
-                this.selectedModel = 'gemini-2.5-pro';
+                this.selectedModel = 'gemini-3-pro-preview';
             }
         }
         localStorage.setItem('selectedModel', this.selectedModel);
@@ -1145,15 +1145,15 @@ export class CustomizeView extends LitElement {
                                     <custom-dropdown
                                         .value=${this.selectedModel}
                                         .options=${[
-                                            { value: 'gemini-2.5-flash', label: '⚡ Gemini 2.5 Flash (Faster, Balanced)' },
-                                            { value: 'gemini-2.5-pro', label: '🚀 Gemini 2.5 Pro (Slower, More Accurate)' }
+                                            { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (Faster, Balanced)', icon: './assets/models/500px-Google_Gemini_icon_2025.svg.png' },
+                                            { value: 'gemini-3-pro-preview', label: 'Gemini 3 Pro Preview (Slower, More Accurate)', icon: './assets/models/500px-Google_Gemini_icon_2025.svg.png' }
                                         ]}
                                         @change=${e => this.handleModelChange({ target: { value: e.detail.value } })}
                                     ></custom-dropdown>
                                     <div class="form-description">
                                         ${this.selectedModel === 'gemini-2.5-flash'
                                             ? 'Gemini 2.5 Flash: Faster responses, good for time-sensitive coding assessments.'
-                                            : 'Gemini 2.5 Pro: More accurate and detailed responses, better for complex problems.'}
+                                            : 'Gemini 3 Pro Preview: More accurate and detailed responses, better for complex problems.'}
                                     </div>
                                 </div>
                             </div>

@@ -109,6 +109,33 @@ export class CustomDropdown extends LitElement {
             font-weight: 500;
         }
 
+        .option-content {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .option-icon {
+            width: 12px;
+            height: 12px;
+            object-fit: contain;
+            flex-shrink: 0;
+        }
+
+        .selected-content {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            overflow: hidden;
+        }
+
+        .selected-icon {
+            width: 12px;
+            height: 12px;
+            object-fit: contain;
+            flex-shrink: 0;
+        }
+
         .dropdown-menu::-webkit-scrollbar {
             width: 8px;
         }
@@ -199,7 +226,10 @@ export class CustomDropdown extends LitElement {
                     ?disabled=${this.disabled}
                     aria-disabled="${this.disabled}"
                 >
-                    <span>${displayText}</span>
+                    <div class="selected-content">
+                        ${selectedOption?.icon ? html`<img src="${selectedOption.icon}" alt="" class="selected-icon" />` : ''}
+                        <span>${displayText}</span>
+                    </div>
                     <svg
                         class="dropdown-arrow"
                         fill="none"
@@ -222,7 +252,10 @@ export class CustomDropdown extends LitElement {
                                 class="dropdown-option ${this.value === option.value ? 'selected' : ''}"
                                 @click=${e => this.selectOption(option.value, e)}
                             >
-                                ${option.label}
+                                <div class="option-content">
+                                    ${option.icon ? html`<img src="${option.icon}" alt="" class="option-icon" />` : ''}
+                                    <span>${option.label}</span>
+                                </div>
                             </div>
                         `
                     )}

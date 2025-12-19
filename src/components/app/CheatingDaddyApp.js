@@ -297,7 +297,7 @@ export class CheatingDaddyApp extends LitElement {
         }
 
         // Get model from localStorage (only matters for coding mode)
-        const selectedModel = localStorage.getItem('selectedModel') || 'gemini-2.5-pro';
+        const selectedModel = localStorage.getItem('selectedModel') || 'gemini-3-pro-preview';
 
         await cheddar.initializeGemini(this.selectedProfile, this.selectedLanguage, selectedMode, selectedModel);
 
