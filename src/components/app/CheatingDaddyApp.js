@@ -112,6 +112,7 @@ export class CheatingDaddyApp extends LitElement {
         _awaitingNewResponse: { state: true },
         shouldAnimateResponse: { type: Boolean },
         _storageLoaded: { state: true },
+        isManualScreenshotPending: { type: Boolean },
     };
 
     constructor() {
@@ -137,6 +138,7 @@ export class CheatingDaddyApp extends LitElement {
         this._currentResponseIsComplete = true;
         this.shouldAnimateResponse = false;
         this._storageLoaded = false;
+        this.isManualScreenshotPending = false;
 
         // Load from storage
         this._loadFromStorage();
@@ -245,6 +247,15 @@ export class CheatingDaddyApp extends LitElement {
                 this.addNewResponse(data.message);
             });
         }
+
+        this.handleManualScreenshotStart = () => {
+            this.isManualScreenshotPending = true;
+        };
+        this.handleManualScreenshotEnd = () => {
+            this.isManualScreenshotPending = false;
+        };
+        window.addEventListener('manual-screenshot-start', this.handleManualScreenshotStart);
+        window.addEventListener('manual-screenshot-end', this.handleManualScreenshotEnd);
     }
 
     disconnectedCallback() {
@@ -256,6 +267,13 @@ export class CheatingDaddyApp extends LitElement {
             ipcRenderer.removeAllListeners('update-status');
             ipcRenderer.removeAllListeners('click-through-toggled');
             ipcRenderer.removeAllListeners('reconnect-failed');
+        }
+
+        if (this.handleManualScreenshotStart) {
+            window.removeEventListener('manual-screenshot-start', this.handleManualScreenshotStart);
+        }
+        if (this.handleManualScreenshotEnd) {
+            window.removeEventListener('manual-screenshot-end', this.handleManualScreenshotEnd);
         }
     }
 
@@ -541,6 +559,7 @@ export class CheatingDaddyApp extends LitElement {
                         .currentView=${this.currentView}
                         .statusText=${this.statusText}
                         .startTime=${this.startTime}
+                        .isManualScreenshotPending=${this.isManualScreenshotPending}
                         .onCustomizeClick=${() => this.handleCustomizeClick()}
                         .onHelpClick=${() => this.handleHelpClick()}
                         .onHistoryClick=${() => this.handleHistoryClick()}

@@ -120,6 +120,38 @@ export class AppHeader extends LitElement {
         .update-button:hover {
             background: rgba(241, 76, 76, 0.1);
         }
+
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            position: relative;
+            padding-left: 10px;
+        }
+
+        .status-indicator.is-pending::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            width: 6px;
+            height: 6px;
+            border-radius: 999px;
+            background: var(--success-color);
+            box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.6);
+            animation: status-pulse 1.2s ease-out infinite;
+        }
+
+        @keyframes status-pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.6);
+            }
+            70% {
+                box-shadow: 0 0 0 6px rgba(76, 175, 80, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 6px rgba(76, 175, 80, 0);
+            }
+        }
     `;
 
     static properties = {
@@ -134,6 +166,7 @@ export class AppHeader extends LitElement {
         onHideToggleClick: { type: Function },
         isClickThrough: { type: Boolean, reflect: true },
         updateAvailable: { type: Boolean },
+        isManualScreenshotPending: { type: Boolean },
     };
 
     constructor() {
@@ -149,6 +182,7 @@ export class AppHeader extends LitElement {
         this.onHideToggleClick = () => {};
         this.isClickThrough = false;
         this.updateAvailable = false;
+        this.isManualScreenshotPending = false;
         this._timerInterval = null;
     }
 
@@ -273,6 +307,7 @@ export class AppHeader extends LitElement {
 
     render() {
         const elapsedTime = this.getElapsedTime();
+        const statusLabel = this.isManualScreenshotPending ? 'Pending' : this.statusText;
 
         return html`
             <div class="header">
@@ -281,7 +316,7 @@ export class AppHeader extends LitElement {
                     ${this.currentView === 'assistant'
                         ? html`
                               <span>${elapsedTime}</span>
-                              <span>${this.statusText}</span>
+                              <span class="status-indicator ${this.isManualScreenshotPending ? 'is-pending' : ''}">${statusLabel}</span>
                               ${this.isClickThrough ? html`<span class="click-through-indicator">click-through</span>` : ''}
                           `
                         : ''}

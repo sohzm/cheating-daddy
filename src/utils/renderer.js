@@ -11,6 +11,7 @@ const SAMPLE_RATE = 24000;
 const AUDIO_CHUNK_DURATION = 0.1; // seconds
 const BUFFER_SIZE = 4096; // Increased buffer size for smoother audio
 let audioMuted = false;
+let manualScreenshotStatusBackup = null;
 
 let hiddenVideo = null;
 let offscreenCanvas = null;
@@ -555,12 +556,38 @@ const MANUAL_SCREENSHOT_PROMPT_ZH = programmingLanguage => `截图是题目(有�
 3. 新的时间复杂度: O(?), 中文解释,2句话就行,这里无须换行
 4. 新的空间复杂度: O(?), 中文解释,2句话就行,这里无须换行`;
 
+function setManualScreenshotPendingState(isPending) {
+    if (!window.cheatingDaddy?.element) return;
+    const app = window.cheatingDaddy.element();
+    if (!app) return;
+
+    app.isManualScreenshotPending = isPending;
+    app.requestUpdate();
+
+    if (isPending) {
+        if (manualScreenshotStatusBackup === null) {
+            manualScreenshotStatusBackup = app.statusText || '';
+        }
+        if (window.cheatingDaddy.setStatus) {
+            window.cheatingDaddy.setStatus('Analyzing screen...');
+        }
+    } else if (manualScreenshotStatusBackup !== null && window.cheatingDaddy.setStatus) {
+        window.cheatingDaddy.setStatus(manualScreenshotStatusBackup);
+        manualScreenshotStatusBackup = null;
+    }
+}
+
 async function captureManualScreenshot(imageQuality = null) {
     console.log('Manual screenshot triggered');
     const quality = imageQuality || currentImageQuality;
 
+    setManualScreenshotPendingState(true);
+    window.dispatchEvent(new CustomEvent('manual-screenshot-start'));
+
     if (!mediaStream) {
         console.error('No media stream available');
+        setManualScreenshotPendingState(false);
+        window.dispatchEvent(new CustomEvent('manual-screenshot-end', { detail: { success: false } }));
         return;
     }
 
@@ -587,6 +614,8 @@ async function captureManualScreenshot(imageQuality = null) {
     // Check if video is ready
     if (hiddenVideo.readyState < 2) {
         console.warn('Video not ready yet, skipping screenshot');
+        setManualScreenshotPendingState(false);
+        window.dispatchEvent(new CustomEvent('manual-screenshot-end', { detail: { success: false } }));
         return;
     }
 
@@ -611,6 +640,8 @@ async function captureManualScreenshot(imageQuality = null) {
         async blob => {
             if (!blob) {
                 console.error('Failed to create blob from canvas');
+                setManualScreenshotPendingState(false);
+                window.dispatchEvent(new CustomEvent('manual-screenshot-end', { detail: { success: false } }));
                 return;
             }
 
@@ -620,6 +651,8 @@ async function captureManualScreenshot(imageQuality = null) {
 
                 if (!base64data || base64data.length < 100) {
                     console.error('Invalid base64 data generated');
+                    setManualScreenshotPendingState(false);
+                    window.dispatchEvent(new CustomEvent('manual-screenshot-end', { detail: { success: false } }));
                     return;
                 }
 
@@ -645,6 +678,8 @@ async function captureManualScreenshot(imageQuality = null) {
                     console.error('Failed to get image response:', result.error);
                     cheatingDaddy.addNewResponse(`Error: ${result.error}`);
                 }
+                setManualScreenshotPendingState(false);
+                window.dispatchEvent(new CustomEvent('manual-screenshot-end', { detail: { success: result.success } }));
             };
             reader.readAsDataURL(blob);
         },
