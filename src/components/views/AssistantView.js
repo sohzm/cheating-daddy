@@ -9,44 +9,34 @@ export class AssistantView extends LitElement {
         }
 
         * {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             cursor: default;
         }
 
         .response-container {
-            height: calc(100% - 60px);
+            height: calc(100% - 50px);
             overflow-y: auto;
-            border-radius: 10px;
-            font-size: var(--response-font-size, 18px);
+            font-size: var(--response-font-size, 16px);
             line-height: 1.6;
-            background: var(--main-content-background);
-            padding: 16px;
+            background: var(--bg-primary);
+            padding: 12px;
             scroll-behavior: smooth;
             user-select: text;
             cursor: text;
         }
 
-        /* Allow text selection for all content within the response container */
         .response-container * {
             user-select: text;
             cursor: text;
         }
 
-        /* Restore default cursor for interactive elements */
         .response-container a {
             cursor: pointer;
         }
 
-        /* Animated word-by-word reveal */
+        /* Word display (no animation) */
         .response-container [data-word] {
-            opacity: 0;
-            filter: blur(10px);
             display: inline-block;
-            transition: opacity 0.5s, filter 0.5s;
-        }
-        .response-container [data-word].visible {
-            opacity: 1;
-            filter: blur(0px);
         }
 
         /* Markdown styling */
@@ -56,118 +46,95 @@ export class AssistantView extends LitElement {
         .response-container h4,
         .response-container h5,
         .response-container h6 {
-            margin: 1.2em 0 0.6em 0;
+            margin: 1em 0 0.5em 0;
             color: var(--text-color);
             font-weight: 600;
         }
 
-        .response-container h1 {
-            font-size: 1.8em;
-        }
-        .response-container h2 {
-            font-size: 1.5em;
-        }
-        .response-container h3 {
-            font-size: 1.3em;
-        }
-        .response-container h4 {
-            font-size: 1.1em;
-        }
-        .response-container h5 {
-            font-size: 1em;
-        }
-        .response-container h6 {
-            font-size: 0.9em;
-        }
+        .response-container h1 { font-size: 1.6em; }
+        .response-container h2 { font-size: 1.4em; }
+        .response-container h3 { font-size: 1.2em; }
+        .response-container h4 { font-size: 1.1em; }
+        .response-container h5 { font-size: 1em; }
+        .response-container h6 { font-size: 0.9em; }
 
         .response-container p {
-            margin: 0.8em 0;
+            margin: 0.6em 0;
             color: var(--text-color);
         }
 
         .response-container ul,
         .response-container ol {
-            margin: 0.8em 0;
-            padding-left: 2em;
+            margin: 0.6em 0;
+            padding-left: 1.5em;
             color: var(--text-color);
         }
 
         .response-container li {
-            margin: 0.4em 0;
+            margin: 0.3em 0;
         }
 
         .response-container blockquote {
-            margin: 1em 0;
+            margin: 0.8em 0;
             padding: 0.5em 1em;
-            border-left: 4px solid var(--focus-border-color);
-            background: rgba(0, 122, 255, 0.1);
-            font-style: italic;
+            border-left: 2px solid var(--border-default);
+            background: var(--bg-secondary);
         }
 
         .response-container code {
-            background: rgba(255, 255, 255, 0.1);
-            padding: 0.2em 0.4em;
+            background: var(--bg-tertiary);
+            padding: 0.15em 0.4em;
             border-radius: 3px;
-            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-family: 'SF Mono', Monaco, monospace;
             font-size: 0.85em;
         }
 
         .response-container pre {
-            background: var(--input-background);
-            border: 1px solid var(--button-border);
-            border-radius: 6px;
-            padding: 1em;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 3px;
+            padding: 12px;
             overflow-x: auto;
-            margin: 1em 0;
+            margin: 0.8em 0;
         }
 
         .response-container pre code {
             background: none;
             padding: 0;
-            border-radius: 0;
         }
 
         .response-container a {
-            color: var(--link-color);
-            text-decoration: none;
-        }
-
-        .response-container a:hover {
+            color: var(--text-color);
             text-decoration: underline;
+            text-underline-offset: 2px;
         }
 
         .response-container strong,
         .response-container b {
             font-weight: 600;
-            color: var(--text-color);
-        }
-
-        .response-container em,
-        .response-container i {
-            font-style: italic;
         }
 
         .response-container hr {
             border: none;
             border-top: 1px solid var(--border-color);
-            margin: 2em 0;
+            margin: 1.5em 0;
         }
 
         .response-container table {
             border-collapse: collapse;
             width: 100%;
-            margin: 1em 0;
+            margin: 0.8em 0;
         }
 
         .response-container th,
         .response-container td {
             border: 1px solid var(--border-color);
-            padding: 0.5em;
+            padding: 8px;
             text-align: left;
         }
 
         .response-container th {
-            background: var(--input-background);
+            background: var(--bg-secondary);
             font-weight: 600;
         }
 
@@ -176,8 +143,7 @@ export class AssistantView extends LitElement {
         }
 
         .response-container::-webkit-scrollbar-track {
-            background: var(--scrollbar-track);
-            border-radius: 4px;
+            background: transparent;
         }
 
         .response-container::-webkit-scrollbar-thumb {
@@ -191,60 +157,47 @@ export class AssistantView extends LitElement {
 
         .text-input-container {
             display: flex;
-            gap: 10px;
-            margin-top: 10px;
+            gap: 8px;
+            margin-top: 8px;
             align-items: center;
         }
 
         .text-input-container input {
             flex: 1;
-            background: var(--input-background);
+            background: transparent;
             color: var(--text-color);
-            border: 1px solid var(--button-border);
-            padding: 10px 14px;
-            border-radius: 8px;
-            font-size: 14px;
+            border: none;
+            border-bottom: 1px solid var(--border-color);
+            padding: 8px 4px;
+            border-radius: 0;
+            font-size: 13px;
         }
 
         .text-input-container input:focus {
             outline: none;
-            border-color: var(--focus-border-color);
-            box-shadow: 0 0 0 3px var(--focus-box-shadow);
-            background: var(--input-focus-background);
+            border-bottom-color: var(--text-color);
         }
 
         .text-input-container input::placeholder {
             color: var(--placeholder-color);
         }
 
-        .text-input-container button {
-            background: transparent;
-            color: var(--start-button-background);
-            border: none;
-            padding: 0;
-            border-radius: 100px;
-        }
-
-        .text-input-container button:hover {
-            background: var(--text-input-button-hover);
-        }
-
         .nav-button {
             background: transparent;
-            color: white;
+            color: var(--text-secondary);
             border: none;
-            padding: 4px;
-            border-radius: 50%;
+            padding: 6px;
+            border-radius: 3px;
             font-size: 12px;
             display: flex;
             align-items: center;
-            width: 36px;
-            height: 36px;
             justify-content: center;
+            transition: all 0.1s ease;
         }
 
         .nav-button:hover {
-            background: rgba(255, 255, 255, 0.1);
+            background: var(--hover-background);
+            color: var(--text-color);
         }
 
         .nav-button:disabled {
@@ -252,42 +205,114 @@ export class AssistantView extends LitElement {
         }
 
         .nav-button svg {
-            stroke: white !important;
+            width: 18px;
+            height: 18px;
+            stroke: currentColor;
         }
 
         .response-counter {
-            font-size: 12px;
-            color: var(--description-color);
+            font-size: 11px;
+            color: var(--text-muted);
             white-space: nowrap;
-            min-width: 60px;
+            min-width: 50px;
             text-align: center;
+            font-family: 'SF Mono', Monaco, monospace;
         }
 
-        .save-button {
-            background: transparent;
-            color: var(--start-button-background);
-            border: none;
-            padding: 4px;
-            border-radius: 50%;
-            font-size: 12px;
+        .screen-answer-btn {
             display: flex;
             align-items: center;
-            width: 36px;
-            height: 36px;
-            justify-content: center;
+            gap: 6px;
+            background: var(--btn-primary-bg, #ffffff);
+            color: var(--btn-primary-text, #000000);
+            border: none;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
             cursor: pointer;
+            transition: all 0.15s ease;
+            white-space: nowrap;
         }
 
-        .save-button:hover {
-            background: rgba(255, 255, 255, 0.1);
+        .screen-answer-btn:hover {
+            background: var(--btn-primary-hover, #f0f0f0);
         }
 
-        .save-button.saved {
-            color: #4caf50;
+        .screen-answer-btn svg {
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
         }
 
-        .save-button svg {
-            stroke: currentColor !important;
+        .screen-answer-btn .usage-count {
+            font-size: 11px;
+            opacity: 0.7;
+            font-family: 'SF Mono', Monaco, monospace;
+        }
+
+        .screen-answer-btn-wrapper {
+            position: relative;
+        }
+
+        .screen-answer-btn-wrapper .tooltip {
+            position: absolute;
+            bottom: 100%;
+            right: 0;
+            margin-bottom: 8px;
+            background: var(--tooltip-bg, #1a1a1a);
+            color: var(--tooltip-text, #ffffff);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 11px;
+            white-space: nowrap;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.15s ease, visibility 0.15s ease;
+            pointer-events: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 100;
+        }
+
+        .screen-answer-btn-wrapper .tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            right: 16px;
+            border: 6px solid transparent;
+            border-top-color: var(--tooltip-bg, #1a1a1a);
+        }
+
+        .screen-answer-btn-wrapper:hover .tooltip {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .tooltip-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 4px;
+        }
+
+        .tooltip-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .tooltip-label {
+            opacity: 0.7;
+        }
+
+        .tooltip-value {
+            font-family: 'SF Mono', Monaco, monospace;
+        }
+
+        .tooltip-note {
+            margin-top: 6px;
+            padding-top: 6px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            opacity: 0.5;
+            font-size: 10px;
         }
     `;
 
@@ -297,7 +322,8 @@ export class AssistantView extends LitElement {
         selectedProfile: { type: String },
         onSendText: { type: Function },
         shouldAnimateResponse: { type: Boolean },
-        savedResponses: { type: Array },
+        flashCount: { type: Number },
+        flashLiteCount: { type: Number },
     };
 
     constructor() {
@@ -306,13 +332,8 @@ export class AssistantView extends LitElement {
         this.currentResponseIndex = -1;
         this.selectedProfile = 'interview';
         this.onSendText = () => {};
-        this._lastAnimatedWordCount = 0;
-        // Load saved responses from localStorage
-        try {
-            this.savedResponses = JSON.parse(localStorage.getItem('savedResponses') || '[]');
-        } catch (e) {
-            this.savedResponses = [];
-        }
+        this.flashCount = 0;
+        this.flashLiteCount = 0;
     }
 
     getProfileNames() {
@@ -427,20 +448,11 @@ export class AssistantView extends LitElement {
         }
     }
 
-    loadFontSize() {
-        const fontSize = localStorage.getItem('fontSize');
-        if (fontSize !== null) {
-            const fontSizeValue = parseInt(fontSize, 10) || 20;
-            const root = document.documentElement;
-            root.style.setProperty('--response-font-size', `${fontSizeValue}px`);
-        }
-    }
-
     connectedCallback() {
         super.connectedCallback();
 
-        // Load and apply font size
-        this.loadFontSize();
+        // Load limits on mount
+        this.loadLimits();
 
         // Set up IPC listeners for keyboard shortcuts
         if (window.require) {
@@ -510,6 +522,30 @@ export class AssistantView extends LitElement {
         }
     }
 
+    async loadLimits() {
+        if (window.cheatingDaddy?.storage?.getTodayLimits) {
+            const limits = await window.cheatingDaddy.storage.getTodayLimits();
+            this.flashCount = limits.flash?.count || 0;
+            this.flashLiteCount = limits.flashLite?.count || 0;
+        }
+    }
+
+    getTotalUsed() {
+        return this.flashCount + this.flashLiteCount;
+    }
+
+    getTotalAvailable() {
+        return 40; // 20 flash + 20 flash-lite
+    }
+
+    async handleScreenAnswer() {
+        if (window.captureManualScreenshot) {
+            window.captureManualScreenshot();
+            // Reload limits after a short delay to catch the update
+            setTimeout(() => this.loadLimits(), 1000);
+        }
+    }
+
     scrollToBottom() {
         setTimeout(() => {
             const container = this.shadowRoot.querySelector('.response-container');
@@ -517,28 +553,6 @@ export class AssistantView extends LitElement {
                 container.scrollTop = container.scrollHeight;
             }
         }, 0);
-    }
-
-    saveCurrentResponse() {
-        const currentResponse = this.getCurrentResponse();
-        if (currentResponse && !this.isResponseSaved()) {
-            this.savedResponses = [
-                ...this.savedResponses,
-                {
-                    response: currentResponse,
-                    timestamp: new Date().toISOString(),
-                    profile: this.selectedProfile,
-                },
-            ];
-            // Save to localStorage for persistence
-            localStorage.setItem('savedResponses', JSON.stringify(this.savedResponses));
-            this.requestUpdate();
-        }
-    }
-
-    isResponseSaved() {
-        const currentResponse = this.getCurrentResponse();
-        return this.savedResponses.some(saved => saved.response === currentResponse);
     }
 
     firstUpdated() {
@@ -549,9 +563,6 @@ export class AssistantView extends LitElement {
     updated(changedProperties) {
         super.updated(changedProperties);
         if (changedProperties.has('responses') || changedProperties.has('currentResponseIndex')) {
-            if (changedProperties.has('currentResponseIndex')) {
-                this._lastAnimatedWordCount = 0;
-            }
             this.updateResponseContent();
         }
     }
@@ -565,24 +576,9 @@ export class AssistantView extends LitElement {
             const renderedResponse = this.renderMarkdown(currentResponse);
             console.log('Rendered response:', renderedResponse);
             container.innerHTML = renderedResponse;
-            const words = container.querySelectorAll('[data-word]');
+            // Show all words immediately (no animation)
             if (this.shouldAnimateResponse) {
-                for (let i = 0; i < this._lastAnimatedWordCount && i < words.length; i++) {
-                    words[i].classList.add('visible');
-                }
-                for (let i = this._lastAnimatedWordCount; i < words.length; i++) {
-                    words[i].classList.remove('visible');
-                    setTimeout(() => {
-                        words[i].classList.add('visible');
-                        if (i === words.length - 1) {
-                            this.dispatchEvent(new CustomEvent('response-animation-complete', { bubbles: true, composed: true }));
-                        }
-                    }, (i - this._lastAnimatedWordCount) * 100);
-                }
-                this._lastAnimatedWordCount = words.length;
-            } else {
-                words.forEach(word => word.classList.add('visible'));
-                this._lastAnimatedWordCount = words.length;
+                this.dispatchEvent(new CustomEvent('response-animation-complete', { bubbles: true, composed: true }));
             }
         } else {
             console.log('Response container not found');
@@ -590,70 +586,48 @@ export class AssistantView extends LitElement {
     }
 
     render() {
-        const currentResponse = this.getCurrentResponse();
         const responseCounter = this.getResponseCounter();
-        const isSaved = this.isResponseSaved();
 
         return html`
             <div class="response-container" id="responseContainer"></div>
 
             <div class="text-input-container">
                 <button class="nav-button" @click=${this.navigateToPreviousResponse} ?disabled=${this.currentResponseIndex <= 0}>
-                    <?xml version="1.0" encoding="UTF-8"?><svg
-                        width="24px"
-                        height="24px"
-                        stroke-width="1.7"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                        color="#ffffff"
-                    >
-                        <path d="M15 6L9 12L15 18" stroke="#ffffff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
+                    <svg width="24px" height="24px" stroke-width="1.7" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M15 6L9 12L15 18" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
                     </svg>
                 </button>
 
-                ${this.responses.length > 0 ? html` <span class="response-counter">${responseCounter}</span> ` : ''}
+                ${this.responses.length > 0 ? html`<span class="response-counter">${responseCounter}</span>` : ''}
 
-                <button
-                    class="save-button ${isSaved ? 'saved' : ''}"
-                    @click=${this.saveCurrentResponse}
-                    title="${isSaved ? 'Response saved' : 'Save this response'}"
-                >
-                    <?xml version="1.0" encoding="UTF-8"?><svg
-                        width="24px"
-                        height="24px"
-                        stroke-width="1.7"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                    >
-                        <path
-                            d="M5 20V5C5 3.89543 5.89543 3 7 3H16.1716C16.702 3 17.2107 3.21071 17.5858 3.58579L19.4142 5.41421C19.7893 5.78929 20 6.29799 20 6.82843V20C20 21.1046 19.1046 22 18 22H7C5.89543 22 5 21 5 20Z"
-                            stroke="currentColor"
-                            stroke-width="1.7"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                        ></path>
-                        <path d="M15 22V13H9V22" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
-                        <path d="M9 3V8H15" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
+                <button class="nav-button" @click=${this.navigateToNextResponse} ?disabled=${this.currentResponseIndex >= this.responses.length - 1}>
+                    <svg width="24px" height="24px" stroke-width="1.7" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M9 6L15 12L9 18" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
                     </svg>
                 </button>
 
                 <input type="text" id="textInput" placeholder="Type a message to the AI..." @keydown=${this.handleTextKeydown} />
 
-                <button class="nav-button" @click=${this.navigateToNextResponse} ?disabled=${this.currentResponseIndex >= this.responses.length - 1}>
-                    <?xml version="1.0" encoding="UTF-8"?><svg
-                        width="24px"
-                        height="24px"
-                        stroke-width="1.7"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                        color="#ffffff"
-                    >
-                        <path d="M9 6L15 12L9 18" stroke="#ffffff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
-                    </svg>
-                </button>
+                <div class="screen-answer-btn-wrapper">
+                    <div class="tooltip">
+                        <div class="tooltip-row">
+                            <span class="tooltip-label">Flash</span>
+                            <span class="tooltip-value">${this.flashCount}/20</span>
+                        </div>
+                        <div class="tooltip-row">
+                            <span class="tooltip-label">Flash Lite</span>
+                            <span class="tooltip-value">${this.flashLiteCount}/20</span>
+                        </div>
+                        <div class="tooltip-note">Resets every 24 hours</div>
+                    </div>
+                    <button class="screen-answer-btn" @click=${this.handleScreenAnswer}>
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M15.98 1.804a1 1 0 0 0-1.96 0l-.24 1.192a1 1 0 0 1-.784.785l-1.192.238a1 1 0 0 0 0 1.962l1.192.238a1 1 0 0 1 .785.785l.238 1.192a1 1 0 0 0 1.962 0l.238-1.192a1 1 0 0 1 .785-.785l1.192-.238a1 1 0 0 0 0-1.962l-1.192-.238a1 1 0 0 1-.785-.785l-.238-1.192ZM6.949 5.684a1 1 0 0 0-1.898 0l-.683 2.051a1 1 0 0 1-.633.633l-2.051.683a1 1 0 0 0 0 1.898l2.051.684a1 1 0 0 1 .633.632l.683 2.051a1 1 0 0 0 1.898 0l.683-2.051a1 1 0 0 1 .633-.633l2.051-.683a1 1 0 0 0 0-1.898l-2.051-.683a1 1 0 0 1-.633-.633L6.95 5.684ZM13.949 13.684a1 1 0 0 0-1.898 0l-.184.551a1 1 0 0 1-.632.633l-.551.183a1 1 0 0 0 0 1.898l.551.183a1 1 0 0 1 .633.633l.183.551a1 1 0 0 0 1.898 0l.184-.551a1 1 0 0 1 .632-.633l.551-.183a1 1 0 0 0 0-1.898l-.551-.184a1 1 0 0 1-.633-.632l-.183-.551Z" />
+                        </svg>
+                        <span>Analyze screen</span>
+                        <span class="usage-count">(${this.getTotalUsed()}/${this.getTotalAvailable()})</span>
+                    </button>
+                </div>
             </div>
         `;
     }

@@ -5,70 +5,101 @@
         <title>Screen and Audio Capture</title>
         <style>
             :root {
+                /* Backgrounds - with default 0.8 transparency */
                 --background-transparent: transparent;
-                --text-color: #e5e5e7;
-                --border-color: rgba(255, 255, 255, 0.2);
-                --header-background: rgba(0, 0, 0, 0.8);
-                --header-actions-color: rgba(255, 255, 255, 0.6);
-                --main-content-background: rgba(0, 0, 0, 0.8);
-                --button-background: rgba(0, 0, 0, 0.5);
-                --button-border: rgba(255, 255, 255, 0.1);
-                --icon-button-color: rgb(229, 229, 231);
-                --hover-background: rgba(255, 255, 255, 0.1);
-                --input-background: rgba(0, 0, 0, 0.3);
-                --placeholder-color: rgba(255, 255, 255, 0.4);
-                --focus-border-color: #007aff;
-                --focus-box-shadow: rgba(0, 122, 255, 0.2);
-                --input-focus-background: rgba(0, 0, 0, 0.5);
-                --scrollbar-track: rgba(0, 0, 0, 0.2);
-                --scrollbar-thumb: rgba(255, 255, 255, 0.2);
-                --scrollbar-thumb-hover: rgba(255, 255, 255, 0.3);
-                --preview-video-background: rgba(0, 0, 0, 0.9);
-                --preview-video-border: rgba(255, 255, 255, 0.15);
-                --option-label-color: rgba(255, 255, 255, 0.8);
-                --screen-option-background: rgba(0, 0, 0, 0.4);
-                --screen-option-hover-background: rgba(0, 0, 0, 0.6);
-                --screen-option-selected-background: rgba(0, 122, 255, 0.15);
-                --screen-option-text: rgba(255, 255, 255, 0.7);
-                --description-color: rgba(255, 255, 255, 0.6);
-                --start-button-background: white;
-                --start-button-color: black;
-                --start-button-border: white;
-                --start-button-hover-background: rgba(255, 255, 255, 0.8);
-                --start-button-hover-border: rgba(0, 0, 0, 0.2);
-                --text-input-button-background: #007aff;
-                --text-input-button-hover: #0056b3;
-                --link-color: #007aff;
-                --key-background: rgba(255, 255, 255, 0.1);
-                --scrollbar-background: rgba(0, 0, 0, 0.4);
+                --bg-primary: rgba(30, 30, 30, 0.8);
+                --bg-secondary: rgba(37, 37, 38, 0.8);
+                --bg-tertiary: rgba(45, 45, 45, 0.8);
+                --bg-hover: rgba(50, 50, 50, 0.8);
+
+                /* Text */
+                --text-color: #e5e5e5;
+                --text-secondary: #a0a0a0;
+                --text-muted: #6b6b6b;
+                --description-color: #a0a0a0;
+                --placeholder-color: #6b6b6b;
+
+                /* Borders */
+                --border-color: #3c3c3c;
+                --border-subtle: #3c3c3c;
+                --border-default: #4a4a4a;
+
+                /* Component backgrounds - with default 0.8 transparency */
+                --header-background: rgba(30, 30, 30, 0.8);
+                --header-actions-color: #a0a0a0;
+                --main-content-background: rgba(30, 30, 30, 0.8);
+                --button-background: transparent;
+                --button-border: #3c3c3c;
+                --icon-button-color: #a0a0a0;
+                --hover-background: rgba(50, 50, 50, 0.8);
+                --input-background: rgba(45, 45, 45, 0.8);
+                --input-focus-background: rgba(45, 45, 45, 0.8);
+
+                /* Focus states - neutral */
+                --focus-border-color: #4a4a4a;
+                --focus-box-shadow: transparent;
+
+                /* Scrollbar */
+                --scrollbar-track: #1e1e1e;
+                --scrollbar-thumb: #3c3c3c;
+                --scrollbar-thumb-hover: #4a4a4a;
+                --scrollbar-background: #1e1e1e;
+
+                /* Legacy/misc */
+                --preview-video-background: #1e1e1e;
+                --preview-video-border: #3c3c3c;
+                --option-label-color: #e5e5e5;
+                --screen-option-background: #252526;
+                --screen-option-hover-background: #2d2d2d;
+                --screen-option-selected-background: #323232;
+                --screen-option-text: #a0a0a0;
+
+                /* Buttons */
+                --start-button-background: #ffffff;
+                --start-button-color: #1e1e1e;
+                --start-button-border: #ffffff;
+                --start-button-hover-background: #e0e0e0;
+                --start-button-hover-border: #e0e0e0;
+                --text-input-button-background: #ffffff;
+                --text-input-button-hover: #e0e0e0;
+
+                /* Links - neutral */
+                --link-color: #e5e5e5;
+                --key-background: #2d2d2d;
+
+                /* Status colors */
+                --success-color: #4ec9b0;
+                --warning-color: #dcdcaa;
+                --error-color: #f14c4c;
+                --danger-color: #f14c4c;
 
                 /* Layout-specific variables */
-                --header-padding: 10px 20px;
-                --header-font-size: 16px;
-                --header-gap: 12px;
-                --header-button-padding: 8px 16px;
-                --header-icon-padding: 8px;
-                --header-font-size-small: 13px;
-                --main-content-padding: 20px;
-                --main-content-margin-top: 10px;
-                --icon-size: 24px;
-                --border-radius: 10px;
-                --content-border-radius: 10px;
+                --header-padding: 8px 16px;
+                --header-font-size: 14px;
+                --header-gap: 8px;
+                --header-button-padding: 6px 12px;
+                --header-icon-padding: 6px;
+                --header-font-size-small: 12px;
+                --main-content-padding: 16px;
+                --main-content-margin-top: 1px;
+                --icon-size: 18px;
+                --border-radius: 3px;
+                --content-border-radius: 0;
             }
 
             /* Compact layout styles */
             :root.compact-layout {
                 --header-padding: 6px 12px;
-                --header-font-size: 13px;
+                --header-font-size: 12px;
                 --header-gap: 6px;
                 --header-button-padding: 4px 8px;
                 --header-icon-padding: 4px;
                 --header-font-size-small: 10px;
-                --main-content-padding: 10px;
-                --main-content-margin-top: 2px;
+                --main-content-padding: 12px;
+                --main-content-margin-top: 1px;
                 --icon-size: 16px;
-                --border-radius: 4px;
-                --content-border-radius: 4px;
+                --border-radius: 3px;
+                --content-border-radius: 0;
             }
 
             html,
@@ -105,7 +136,7 @@
         <link rel="stylesheet" href="assets/highlight-vscode-dark.min.css" />
         <script type="module" src="components/app/CheatingDaddyApp.js"></script>
 
-        <cheating-daddy-app id="cheddar"></cheating-daddy-app>
+        <cheating-daddy-app id="cheatingDaddy"></cheating-daddy-app>
         <script src="script.js"></script>
         <script src="utils/renderer.js"></script>
     </body>

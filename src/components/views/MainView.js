@@ -4,22 +4,23 @@ import { resizeLayout } from '../../utils/windowResize.js';
 export class MainView extends LitElement {
     static styles = css`
         * {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             cursor: default;
             user-select: none;
         }
 
         .welcome {
-            font-size: 24px;
-            margin-bottom: 8px;
-            font-weight: 600;
+            font-size: 20px;
+            margin-bottom: 6px;
+            font-weight: 500;
+            color: var(--text-color);
             margin-top: auto;
         }
 
         .input-group {
             display: flex;
-            gap: 12px;
-            margin-bottom: 20px;
+            gap: 10px;
+            margin-bottom: 16px;
         }
 
         .input-group input {
@@ -29,19 +30,17 @@ export class MainView extends LitElement {
         input {
             background: var(--input-background);
             color: var(--text-color);
-            border: 1px solid var(--button-border);
-            padding: 10px 14px;
+            border: 1px solid var(--border-color);
+            padding: 10px 12px;
             width: 100%;
-            border-radius: 8px;
-            font-size: 14px;
-            transition: border-color 0.2s ease;
+            border-radius: 3px;
+            font-size: 13px;
+            transition: border-color 0.1s ease;
         }
 
         input:focus {
             outline: none;
-            border-color: var(--focus-border-color);
-            box-shadow: 0 0 0 3px var(--focus-box-shadow);
-            background: var(--input-focus-background);
+            border-color: var(--border-default);
         }
 
         input::placeholder {
@@ -50,88 +49,70 @@ export class MainView extends LitElement {
 
         /* Red blink animation for empty API key */
         input.api-key-error {
-            animation: blink-red 1s ease-in-out;
-            border-color: #ff4444;
+            animation: blink-red 0.6s ease-in-out;
+            border-color: var(--error-color);
         }
 
         @keyframes blink-red {
-            0%,
-            100% {
-                border-color: var(--button-border);
-                background: var(--input-background);
-            }
-            25%,
-            75% {
-                border-color: #ff4444;
-                background: rgba(255, 68, 68, 0.1);
+            0%, 100% {
+                border-color: var(--border-color);
             }
             50% {
-                border-color: #ff6666;
-                background: rgba(255, 68, 68, 0.15);
+                border-color: var(--error-color);
+                background: rgba(241, 76, 76, 0.1);
             }
         }
 
         .start-button {
             background: var(--start-button-background);
             color: var(--start-button-color);
-            border: 1px solid var(--start-button-border);
-            padding: 8px 16px;
-            border-radius: 8px;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 3px;
             font-size: 13px;
             font-weight: 500;
             white-space: nowrap;
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 8px;
+            transition: background 0.1s ease;
         }
 
         .start-button:hover {
             background: var(--start-button-hover-background);
-            border-color: var(--start-button-hover-border);
         }
 
         .start-button.initializing {
             opacity: 0.5;
+            cursor: not-allowed;
         }
 
         .start-button.initializing:hover {
             background: var(--start-button-background);
-            border-color: var(--start-button-border);
         }
 
-        .shortcut-icons {
-            display: flex;
-            align-items: center;
-            gap: 2px;
-            margin-left: 4px;
-        }
-
-        .shortcut-icons svg {
-            width: 14px;
-            height: 14px;
-        }
-
-        .shortcut-icons svg path {
-            stroke: currentColor;
+        .shortcut-hint {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-family: 'SF Mono', Monaco, monospace;
         }
 
         .description {
-            color: var(--description-color);
-            font-size: 14px;
-            margin-bottom: 24px;
+            color: var(--text-secondary);
+            font-size: 13px;
+            margin-bottom: 20px;
             line-height: 1.5;
         }
 
         .link {
-            color: var(--link-color);
+            color: var(--text-color);
             text-decoration: underline;
             cursor: pointer;
+            text-underline-offset: 2px;
         }
 
-        .shortcut-hint {
-            color: var(--description-color);
-            font-size: 11px;
-            opacity: 0.8;
+        .link:hover {
+            color: var(--text-color);
         }
 
         :host {
@@ -139,7 +120,7 @@ export class MainView extends LitElement {
             display: flex;
             flex-direction: column;
             width: 100%;
-            max-width: 500px;
+            max-width: 480px;
         }
     `;
 
@@ -159,6 +140,13 @@ export class MainView extends LitElement {
         this.onLayoutModeChange = () => {};
         this.showApiKeyError = false;
         this.boundKeydownHandler = this.handleKeydown.bind(this);
+        this.apiKey = '';
+        this._loadApiKey();
+    }
+
+    async _loadApiKey() {
+        this.apiKey = await cheatingDaddy.storage.getApiKey();
+        this.requestUpdate();
     }
 
     connectedCallback() {
@@ -170,8 +158,6 @@ export class MainView extends LitElement {
         // Add keyboard event listener for Ctrl+Enter (or Cmd+Enter on Mac)
         document.addEventListener('keydown', this.boundKeydownHandler);
 
-        // Load and apply layout mode on startup
-        this.loadLayoutMode();
         // Resize window for this view
         resizeLayout();
     }
@@ -193,8 +179,9 @@ export class MainView extends LitElement {
         }
     }
 
-    handleInput(e) {
-        localStorage.setItem('apiKey', e.target.value);
+    async handleInput(e) {
+        this.apiKey = e.target.value;
+        await cheatingDaddy.storage.setApiKey(e.target.value);
         // Clear error state when user starts typing
         if (this.showApiKeyError) {
             this.showApiKeyError = false;
@@ -212,20 +199,6 @@ export class MainView extends LitElement {
         this.onAPIKeyHelp();
     }
 
-    handleResetOnboarding() {
-        localStorage.removeItem('onboardingCompleted');
-        // Refresh the page to trigger onboarding
-        window.location.reload();
-    }
-
-    loadLayoutMode() {
-        const savedLayoutMode = localStorage.getItem('layoutMode');
-        if (savedLayoutMode && savedLayoutMode !== 'normal') {
-            // Notify parent component to apply the saved layout mode
-            this.onLayoutModeChange(savedLayoutMode);
-        }
-    }
-
     // Method to trigger the red blink animation
     triggerApiKeyError() {
         this.showApiKeyError = true;
@@ -237,48 +210,8 @@ export class MainView extends LitElement {
 
     getStartButtonText() {
         const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-
-        const cmdIcon = html`<svg width="14px" height="14px" viewBox="0 0 24 24" stroke-width="2" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M9 6V18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-            <path d="M15 6V18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-            <path
-                d="M9 6C9 4.34315 7.65685 3 6 3C4.34315 3 3 4.34315 3 6C3 7.65685 4.34315 9 6 9H18C19.6569 9 21 7.65685 21 6C21 4.34315 19.6569 3 18 3C16.3431 3 15 4.34315 15 6"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-            ></path>
-            <path
-                d="M9 18C9 19.6569 7.65685 21 6 21C4.34315 21 3 19.6569 3 18C3 16.3431 4.34315 15 6 15H18C19.6569 15 21 16.3431 21 18C21 19.6569 19.6569 21 18 21C16.3431 21 15 19.6569 15 18"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-            ></path>
-        </svg>`;
-
-        const enterIcon = html`<svg width="14px" height="14px" stroke-width="2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path
-                d="M10.25 19.25L6.75 15.75L10.25 12.25"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-            ></path>
-            <path
-                d="M6.75 15.75H12.75C14.9591 15.75 16.75 13.9591 16.75 11.75V4.75"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-            ></path>
-        </svg>`;
-
-        if (isMac) {
-            return html`Start Session <span class="shortcut-icons">${cmdIcon}${enterIcon}</span>`;
-        } else {
-            return html`Start Session <span class="shortcut-icons">Ctrl${enterIcon}</span>`;
-        }
+        const shortcut = isMac ? 'Cmd+Enter' : 'Ctrl+Enter';
+        return html`Start <span class="shortcut-hint">${shortcut}</span>`;
     }
 
     render() {
@@ -289,7 +222,7 @@ export class MainView extends LitElement {
                 <input
                     type="password"
                     placeholder="Enter your Gemini API Key"
-                    .value=${localStorage.getItem('apiKey') || ''}
+                    .value=${this.apiKey}
                     @input=${this.handleInput}
                     class="${this.showApiKeyError ? 'api-key-error' : ''}"
                 />

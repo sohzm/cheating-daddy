@@ -6,7 +6,6 @@ import { HelpView } from '../views/HelpView.js';
 import { HistoryView } from '../views/HistoryView.js';
 import { AssistantView } from '../views/AssistantView.js';
 import { OnboardingView } from '../views/OnboardingView.js';
-import { AdvancedView } from '../views/AdvancedView.js';
 
 export class CheatingDaddyApp extends LitElement {
     static styles = css`
@@ -29,8 +28,8 @@ export class CheatingDaddyApp extends LitElement {
 
         .window-container {
             height: 100vh;
-            border-radius: 7px;
             overflow: hidden;
+            background: var(--bg-primary);
         }
 
         .container {
@@ -43,52 +42,49 @@ export class CheatingDaddyApp extends LitElement {
             flex: 1;
             padding: var(--main-content-padding);
             overflow-y: auto;
-            margin-top: var(--main-content-margin-top);
-            border-radius: var(--content-border-radius);
-            transition: all 0.15s ease-out;
             background: var(--main-content-background);
         }
 
         .main-content.with-border {
-            border: 1px solid var(--border-color);
+            border-top: none;
         }
 
         .main-content.assistant-view {
-            padding: 10px;
-            border: none;
+            padding: 12px;
         }
 
         .main-content.onboarding-view {
             padding: 0;
-            border: none;
             background: transparent;
+        }
+
+        .main-content.settings-view,
+        .main-content.help-view,
+        .main-content.history-view {
+            padding: 0;
         }
 
         .view-container {
             opacity: 1;
-            transform: translateY(0);
-            transition: opacity 0.15s ease-out, transform 0.15s ease-out;
             height: 100%;
         }
 
         .view-container.entering {
             opacity: 0;
-            transform: translateY(10px);
         }
 
         ::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
+            width: 8px;
+            height: 8px;
         }
 
         ::-webkit-scrollbar-track {
-            background: var(--scrollbar-background);
-            border-radius: 3px;
+            background: transparent;
         }
 
         ::-webkit-scrollbar-thumb {
             background: var(--scrollbar-thumb);
-            border-radius: 3px;
+            border-radius: 4px;
         }
 
         ::-webkit-scrollbar-thumb:hover {
@@ -109,26 +105,26 @@ export class CheatingDaddyApp extends LitElement {
         selectedScreenshotInterval: { type: String },
         selectedImageQuality: { type: String },
         layoutMode: { type: String },
-        advancedMode: { type: Boolean },
         _viewInstances: { type: Object, state: true },
         _isClickThrough: { state: true },
         _awaitingNewResponse: { state: true },
         shouldAnimateResponse: { type: Boolean },
+        _storageLoaded: { state: true },
     };
 
     constructor() {
         super();
-        this.currentView = localStorage.getItem('onboardingCompleted') ? 'main' : 'onboarding';
+        // Set defaults - will be overwritten by storage
+        this.currentView = 'main'; // Will check onboarding after storage loads
         this.statusText = '';
         this.startTime = null;
         this.isRecording = false;
         this.sessionActive = false;
-        this.selectedProfile = localStorage.getItem('selectedProfile') || 'interview';
-        this.selectedLanguage = localStorage.getItem('selectedLanguage') || 'en-US';
-        this.selectedScreenshotInterval = localStorage.getItem('selectedScreenshotInterval') || '5';
-        this.selectedImageQuality = localStorage.getItem('selectedImageQuality') || 'medium';
-        this.layoutMode = localStorage.getItem('layoutMode') || 'normal';
-        this.advancedMode = localStorage.getItem('advancedMode') === 'true';
+        this.selectedProfile = 'interview';
+        this.selectedLanguage = 'en-US';
+        this.selectedScreenshotInterval = '5';
+        this.selectedImageQuality = 'medium';
+        this.layoutMode = 'normal';
         this.responses = [];
         this.currentResponseIndex = -1;
         this._viewInstances = new Map();
@@ -136,25 +132,111 @@ export class CheatingDaddyApp extends LitElement {
         this._awaitingNewResponse = false;
         this._currentResponseIsComplete = true;
         this.shouldAnimateResponse = false;
+        this._storageLoaded = false;
 
-        // Apply layout mode to document root
-        this.updateLayoutMode();
+        // Load from storage
+        this._loadFromStorage();
+    }
+
+    async _loadFromStorage() {
+        try {
+            const [config, prefs] = await Promise.all([
+                cheatingDaddy.storage.getConfig(),
+                cheatingDaddy.storage.getPreferences()
+            ]);
+
+            // Check onboarding status
+            this.currentView = config.onboarded ? 'main' : 'onboarding';
+
+            // Apply background appearance (color + transparency)
+            this.applyBackgroundAppearance(
+                prefs.backgroundColor ?? '#1e1e1e',
+                prefs.backgroundTransparency ?? 0.8
+            );
+
+            // Load preferences
+            this.selectedProfile = prefs.selectedProfile || 'interview';
+            this.selectedLanguage = prefs.selectedLanguage || 'en-US';
+            this.selectedScreenshotInterval = prefs.selectedScreenshotInterval || '5';
+            this.selectedImageQuality = prefs.selectedImageQuality || 'medium';
+            this.layoutMode = config.layout || 'normal';
+
+            this._storageLoaded = true;
+            this.updateLayoutMode();
+            this.requestUpdate();
+        } catch (error) {
+            console.error('Error loading from storage:', error);
+            this._storageLoaded = true;
+            this.requestUpdate();
+        }
+    }
+
+    hexToRgb(hex) {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? {
+            r: parseInt(result[1], 16),
+            g: parseInt(result[2], 16),
+            b: parseInt(result[3], 16)
+        } : { r: 30, g: 30, b: 30 };
+    }
+
+    lightenColor(rgb, amount) {
+        return {
+            r: Math.min(255, rgb.r + amount),
+            g: Math.min(255, rgb.g + amount),
+            b: Math.min(255, rgb.b + amount)
+        };
+    }
+
+    applyBackgroundAppearance(backgroundColor, alpha) {
+        const root = document.documentElement;
+        const baseRgb = this.hexToRgb(backgroundColor);
+
+        // Generate color variants based on the base color
+        const secondary = this.lightenColor(baseRgb, 7);
+        const tertiary = this.lightenColor(baseRgb, 15);
+        const hover = this.lightenColor(baseRgb, 20);
+
+        root.style.setProperty('--header-background', `rgba(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}, ${alpha})`);
+        root.style.setProperty('--main-content-background', `rgba(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}, ${alpha})`);
+        root.style.setProperty('--bg-primary', `rgba(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}, ${alpha})`);
+        root.style.setProperty('--bg-secondary', `rgba(${secondary.r}, ${secondary.g}, ${secondary.b}, ${alpha})`);
+        root.style.setProperty('--bg-tertiary', `rgba(${tertiary.r}, ${tertiary.g}, ${tertiary.b}, ${alpha})`);
+        root.style.setProperty('--bg-hover', `rgba(${hover.r}, ${hover.g}, ${hover.b}, ${alpha})`);
+        root.style.setProperty('--input-background', `rgba(${tertiary.r}, ${tertiary.g}, ${tertiary.b}, ${alpha})`);
+        root.style.setProperty('--input-focus-background', `rgba(${tertiary.r}, ${tertiary.g}, ${tertiary.b}, ${alpha})`);
+        root.style.setProperty('--hover-background', `rgba(${hover.r}, ${hover.g}, ${hover.b}, ${alpha})`);
+        root.style.setProperty('--scrollbar-background', `rgba(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}, ${alpha})`);
+    }
+
+    // Keep old function name for backwards compatibility
+    applyBackgroundTransparency(alpha) {
+        this.applyBackgroundAppearance('#1e1e1e', alpha);
     }
 
     connectedCallback() {
         super.connectedCallback();
 
+        // Apply layout mode to document root
+        this.updateLayoutMode();
+
         // Set up IPC listeners if needed
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
+            ipcRenderer.on('new-response', (_, response) => {
+                this.addNewResponse(response);
+            });
             ipcRenderer.on('update-response', (_, response) => {
-                this.setResponse(response);
+                this.updateCurrentResponse(response);
             });
             ipcRenderer.on('update-status', (_, status) => {
                 this.setStatus(status);
             });
             ipcRenderer.on('click-through-toggled', (_, isEnabled) => {
                 this._isClickThrough = isEnabled;
+            });
+            ipcRenderer.on('reconnect-failed', (_, data) => {
+                this.addNewResponse(data.message);
             });
         }
     }
@@ -163,15 +245,17 @@ export class CheatingDaddyApp extends LitElement {
         super.disconnectedCallback();
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
+            ipcRenderer.removeAllListeners('new-response');
             ipcRenderer.removeAllListeners('update-response');
             ipcRenderer.removeAllListeners('update-status');
             ipcRenderer.removeAllListeners('click-through-toggled');
+            ipcRenderer.removeAllListeners('reconnect-failed');
         }
     }
 
     setStatus(text) {
         this.statusText = text;
-        
+
         // Mark response as complete when we get certain status messages
         if (text.includes('Ready') || text.includes('Listening') || text.includes('Error')) {
             this._currentResponseIsComplete = true;
@@ -179,36 +263,24 @@ export class CheatingDaddyApp extends LitElement {
         }
     }
 
-    setResponse(response) {
-        // Check if this looks like a filler response (very short responses to hmm, ok, etc)
-        const isFillerResponse =
-            response.length < 30 &&
-            (response.toLowerCase().includes('hmm') ||
-                response.toLowerCase().includes('okay') ||
-                response.toLowerCase().includes('next') ||
-                response.toLowerCase().includes('go on') ||
-                response.toLowerCase().includes('continue'));
+    addNewResponse(response) {
+        // Add a new response entry (first word of a new AI response)
+        this.responses = [...this.responses, response];
+        this.currentResponseIndex = this.responses.length - 1;
+        this._awaitingNewResponse = false;
+        console.log('[addNewResponse] Added:', response);
+        this.requestUpdate();
+    }
 
-        if (this._awaitingNewResponse || this.responses.length === 0) {
-            // Always add as new response when explicitly waiting for one
-            this.responses = [...this.responses, response];
-            this.currentResponseIndex = this.responses.length - 1;
-            this._awaitingNewResponse = false;
-            this._currentResponseIsComplete = false;
-            console.log('[setResponse] Pushed new response:', response);
-        } else if (!this._currentResponseIsComplete && !isFillerResponse && this.responses.length > 0) {
-            // For substantial responses, update the last one (streaming behavior)
-            // Only update if the current response is not marked as complete
-            this.responses = [...this.responses.slice(0, this.responses.length - 1), response];
-            console.log('[setResponse] Updated last response:', response);
+    updateCurrentResponse(response) {
+        // Update the current response in place (streaming subsequent words)
+        if (this.responses.length > 0) {
+            this.responses = [...this.responses.slice(0, -1), response];
+            console.log('[updateCurrentResponse] Updated to:', response);
         } else {
-            // For filler responses or when current response is complete, add as new
-            this.responses = [...this.responses, response];
-            this.currentResponseIndex = this.responses.length - 1;
-            this._currentResponseIsComplete = false;
-            console.log('[setResponse] Added response as new:', response);
+            // Fallback: if no responses exist, add as new
+            this.addNewResponse(response);
         }
-        this.shouldAnimateResponse = true;
         this.requestUpdate();
     }
 
@@ -228,16 +300,11 @@ export class CheatingDaddyApp extends LitElement {
         this.requestUpdate();
     }
 
-    handleAdvancedClick() {
-        this.currentView = 'advanced';
-        this.requestUpdate();
-    }
-
-    async handleClose() {
+        async handleClose() {
         if (this.currentView === 'customize' || this.currentView === 'help' || this.currentView === 'history') {
             this.currentView = 'main';
         } else if (this.currentView === 'assistant') {
-            cheddar.stopCapture();
+            cheatingDaddy.stopCapture();
 
             // Close the session
             if (window.require) {
@@ -266,7 +333,7 @@ export class CheatingDaddyApp extends LitElement {
     // Main view event handlers
     async handleStart() {
         // check if api key is empty do nothing
-        const apiKey = localStorage.getItem('apiKey')?.trim();
+        const apiKey = await cheatingDaddy.storage.getApiKey();
         if (!apiKey || apiKey === '') {
             // Trigger the red blink animation on the API key input
             const mainView = this.shadowRoot.querySelector('main-view');
@@ -276,9 +343,9 @@ export class CheatingDaddyApp extends LitElement {
             return;
         }
 
-        await cheddar.initializeGemini(this.selectedProfile, this.selectedLanguage);
+        await cheatingDaddy.initializeGemini(this.selectedProfile, this.selectedLanguage);
         // Pass the screenshot interval as string (including 'manual' option)
-        cheddar.startCapture(this.selectedScreenshotInterval, this.selectedImageQuality);
+        cheatingDaddy.startCapture(this.selectedScreenshotInterval, this.selectedImageQuality);
         this.responses = [];
         this.currentResponseIndex = -1;
         this.startTime = Date.now();
@@ -293,26 +360,24 @@ export class CheatingDaddyApp extends LitElement {
     }
 
     // Customize view event handlers
-    handleProfileChange(profile) {
+    async handleProfileChange(profile) {
         this.selectedProfile = profile;
+        await cheatingDaddy.storage.updatePreference('selectedProfile', profile);
     }
 
-    handleLanguageChange(language) {
+    async handleLanguageChange(language) {
         this.selectedLanguage = language;
+        await cheatingDaddy.storage.updatePreference('selectedLanguage', language);
     }
 
-    handleScreenshotIntervalChange(interval) {
+    async handleScreenshotIntervalChange(interval) {
         this.selectedScreenshotInterval = interval;
+        await cheatingDaddy.storage.updatePreference('selectedScreenshotInterval', interval);
     }
 
-    handleImageQualityChange(quality) {
+    async handleImageQualityChange(quality) {
         this.selectedImageQuality = quality;
-        localStorage.setItem('selectedImageQuality', quality);
-    }
-
-    handleAdvancedModeChange(advancedMode) {
-        this.advancedMode = advancedMode;
-        localStorage.setItem('advancedMode', advancedMode.toString());
+        await cheatingDaddy.storage.updatePreference('selectedImageQuality', quality);
     }
 
     handleBackClick() {
@@ -330,7 +395,7 @@ export class CheatingDaddyApp extends LitElement {
 
     // Assistant view event handlers
     async handleSendText(message) {
-        const result = await window.cheddar.sendTextMessage(message);
+        const result = await window.cheatingDaddy.sendTextMessage(message);
 
         if (!result.success) {
             console.error('Failed to send message:', result.error);
@@ -370,24 +435,8 @@ export class CheatingDaddyApp extends LitElement {
             }
         }
 
-        // Only update localStorage when these specific properties change
-        if (changedProperties.has('selectedProfile')) {
-            localStorage.setItem('selectedProfile', this.selectedProfile);
-        }
-        if (changedProperties.has('selectedLanguage')) {
-            localStorage.setItem('selectedLanguage', this.selectedLanguage);
-        }
-        if (changedProperties.has('selectedScreenshotInterval')) {
-            localStorage.setItem('selectedScreenshotInterval', this.selectedScreenshotInterval);
-        }
-        if (changedProperties.has('selectedImageQuality')) {
-            localStorage.setItem('selectedImageQuality', this.selectedImageQuality);
-        }
         if (changedProperties.has('layoutMode')) {
             this.updateLayoutMode();
-        }
-        if (changedProperties.has('advancedMode')) {
-            localStorage.setItem('advancedMode', this.advancedMode.toString());
         }
     }
 
@@ -418,13 +467,11 @@ export class CheatingDaddyApp extends LitElement {
                         .selectedScreenshotInterval=${this.selectedScreenshotInterval}
                         .selectedImageQuality=${this.selectedImageQuality}
                         .layoutMode=${this.layoutMode}
-                        .advancedMode=${this.advancedMode}
                         .onProfileChange=${profile => this.handleProfileChange(profile)}
                         .onLanguageChange=${language => this.handleLanguageChange(language)}
                         .onScreenshotIntervalChange=${interval => this.handleScreenshotIntervalChange(interval)}
                         .onImageQualityChange=${quality => this.handleImageQualityChange(quality)}
                         .onLayoutModeChange=${layoutMode => this.handleLayoutModeChange(layoutMode)}
-                        .onAdvancedModeChange=${advancedMode => this.handleAdvancedModeChange(advancedMode)}
                     ></customize-view>
                 `;
 
@@ -433,9 +480,6 @@ export class CheatingDaddyApp extends LitElement {
 
             case 'history':
                 return html` <history-view></history-view> `;
-
-            case 'advanced':
-                return html` <advanced-view></advanced-view> `;
 
             case 'assistant':
                 return html`
@@ -461,9 +505,14 @@ export class CheatingDaddyApp extends LitElement {
     }
 
     render() {
-        const mainContentClass = `main-content ${
-            this.currentView === 'assistant' ? 'assistant-view' : this.currentView === 'onboarding' ? 'onboarding-view' : 'with-border'
-        }`;
+        const viewClassMap = {
+            'assistant': 'assistant-view',
+            'onboarding': 'onboarding-view',
+            'customize': 'settings-view',
+            'help': 'help-view',
+            'history': 'history-view',
+        };
+        const mainContentClass = `main-content ${viewClassMap[this.currentView] || 'with-border'}`;
 
         return html`
             <div class="window-container">
@@ -472,11 +521,9 @@ export class CheatingDaddyApp extends LitElement {
                         .currentView=${this.currentView}
                         .statusText=${this.statusText}
                         .startTime=${this.startTime}
-                        .advancedMode=${this.advancedMode}
                         .onCustomizeClick=${() => this.handleCustomizeClick()}
                         .onHelpClick=${() => this.handleHelpClick()}
                         .onHistoryClick=${() => this.handleHistoryClick()}
-                        .onAdvancedClick=${() => this.handleAdvancedClick()}
                         .onCloseClick=${() => this.handleClose()}
                         .onBackClick=${() => this.handleBackClick()}
                         .onHideToggleClick=${() => this.handleHideToggle()}
@@ -501,7 +548,7 @@ export class CheatingDaddyApp extends LitElement {
 
     async handleLayoutModeChange(layoutMode) {
         this.layoutMode = layoutMode;
-        localStorage.setItem('layoutMode', layoutMode);
+        await cheatingDaddy.storage.updateConfig('layout', layoutMode);
         this.updateLayoutMode();
 
         // Notify main process about layout change for window resizing

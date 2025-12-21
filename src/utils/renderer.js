@@ -1,21 +1,6 @@
 // renderer.js
 const { ipcRenderer } = require('electron');
 
-// Initialize random display name for UI components
-window.randomDisplayName = null;
-
-// Request random display name from main process
-ipcRenderer
-    .invoke('get-random-display-name')
-    .then(name => {
-        window.randomDisplayName = name;
-        console.log('Set random display name:', name);
-    })
-    .catch(err => {
-        console.warn('Could not get random display name:', err);
-        window.randomDisplayName = 'System Monitor';
-    });
-
 let mediaStream = null;
 let screenshotInterval = null;
 let audioContext = null;
@@ -34,100 +19,99 @@ let currentImageQuality = 'medium'; // Store current image quality for manual sc
 const isLinux = process.platform === 'linux';
 const isMacOS = process.platform === 'darwin';
 
-// Token tracking system for rate limiting
-let tokenTracker = {
-    tokens: [], // Array of {timestamp, count, type} objects
-    audioStartTime: null,
-
-    // Add tokens to the tracker
-    addTokens(count, type = 'image') {
-        const now = Date.now();
-        this.tokens.push({
-            timestamp: now,
-            count: count,
-            type: type,
-        });
-
-        // Clean old tokens (older than 1 minute)
-        this.cleanOldTokens();
+// ============ STORAGE API ============
+// Wrapper for IPC-based storage access
+const storage = {
+    // Config
+    async getConfig() {
+        const result = await ipcRenderer.invoke('storage:get-config');
+        return result.success ? result.data : {};
+    },
+    async setConfig(config) {
+        return ipcRenderer.invoke('storage:set-config', config);
+    },
+    async updateConfig(key, value) {
+        return ipcRenderer.invoke('storage:update-config', key, value);
     },
 
-    // Calculate image tokens based on Gemini 2.0 rules
-    calculateImageTokens(width, height) {
-        // Images ≤384px in both dimensions = 258 tokens
-        if (width <= 384 && height <= 384) {
-            return 258;
-        }
-
-        // Larger images are tiled into 768x768 chunks, each = 258 tokens
-        const tilesX = Math.ceil(width / 768);
-        const tilesY = Math.ceil(height / 768);
-        const totalTiles = tilesX * tilesY;
-
-        return totalTiles * 258;
+    // Credentials
+    async getCredentials() {
+        const result = await ipcRenderer.invoke('storage:get-credentials');
+        return result.success ? result.data : {};
+    },
+    async setCredentials(credentials) {
+        return ipcRenderer.invoke('storage:set-credentials', credentials);
+    },
+    async getApiKey() {
+        const result = await ipcRenderer.invoke('storage:get-api-key');
+        return result.success ? result.data : '';
+    },
+    async setApiKey(apiKey) {
+        return ipcRenderer.invoke('storage:set-api-key', apiKey);
     },
 
-    // Track audio tokens continuously
-    trackAudioTokens() {
-        if (!this.audioStartTime) {
-            this.audioStartTime = Date.now();
-            return;
-        }
-
-        const now = Date.now();
-        const elapsedSeconds = (now - this.audioStartTime) / 1000;
-
-        // Audio = 32 tokens per second
-        const audioTokens = Math.floor(elapsedSeconds * 32);
-
-        if (audioTokens > 0) {
-            this.addTokens(audioTokens, 'audio');
-            this.audioStartTime = now;
-        }
+    // Preferences
+    async getPreferences() {
+        const result = await ipcRenderer.invoke('storage:get-preferences');
+        return result.success ? result.data : {};
+    },
+    async setPreferences(preferences) {
+        return ipcRenderer.invoke('storage:set-preferences', preferences);
+    },
+    async updatePreference(key, value) {
+        return ipcRenderer.invoke('storage:update-preference', key, value);
     },
 
-    // Clean tokens older than 1 minute
-    cleanOldTokens() {
-        const oneMinuteAgo = Date.now() - 60 * 1000;
-        this.tokens = this.tokens.filter(token => token.timestamp > oneMinuteAgo);
+    // Keybinds
+    async getKeybinds() {
+        const result = await ipcRenderer.invoke('storage:get-keybinds');
+        return result.success ? result.data : null;
+    },
+    async setKeybinds(keybinds) {
+        return ipcRenderer.invoke('storage:set-keybinds', keybinds);
     },
 
-    // Get total tokens in the last minute
-    getTokensInLastMinute() {
-        this.cleanOldTokens();
-        return this.tokens.reduce((total, token) => total + token.count, 0);
+    // Sessions (History)
+    async getAllSessions() {
+        const result = await ipcRenderer.invoke('storage:get-all-sessions');
+        return result.success ? result.data : [];
+    },
+    async getSession(sessionId) {
+        const result = await ipcRenderer.invoke('storage:get-session', sessionId);
+        return result.success ? result.data : null;
+    },
+    async saveSession(sessionId, data) {
+        return ipcRenderer.invoke('storage:save-session', sessionId, data);
+    },
+    async deleteSession(sessionId) {
+        return ipcRenderer.invoke('storage:delete-session', sessionId);
+    },
+    async deleteAllSessions() {
+        return ipcRenderer.invoke('storage:delete-all-sessions');
     },
 
-    // Check if we should throttle based on settings
-    shouldThrottle() {
-        // Get rate limiting settings from localStorage
-        const throttleEnabled = localStorage.getItem('throttleTokens') === 'true';
-        if (!throttleEnabled) {
-            return false;
-        }
-
-        const maxTokensPerMin = parseInt(localStorage.getItem('maxTokensPerMin') || '1000000', 10);
-        const throttleAtPercent = parseInt(localStorage.getItem('throttleAtPercent') || '75', 10);
-
-        const currentTokens = this.getTokensInLastMinute();
-        const throttleThreshold = Math.floor((maxTokensPerMin * throttleAtPercent) / 100);
-
-        console.log(`Token check: ${currentTokens}/${maxTokensPerMin} (throttle at ${throttleThreshold})`);
-
-        return currentTokens >= throttleThreshold;
+    // Clear all
+    async clearAll() {
+        return ipcRenderer.invoke('storage:clear-all');
     },
 
-    // Reset the tracker
-    reset() {
-        this.tokens = [];
-        this.audioStartTime = null;
-    },
+    // Limits
+    async getTodayLimits() {
+        const result = await ipcRenderer.invoke('storage:get-today-limits');
+        return result.success ? result.data : { flash: { count: 0 }, flashLite: { count: 0 } };
+    }
 };
 
-// Track audio tokens every few seconds
-setInterval(() => {
-    tokenTracker.trackAudioTokens();
-}, 2000);
+// Cache for preferences to avoid async calls in hot paths
+let preferencesCache = null;
+
+async function loadPreferencesCache() {
+    preferencesCache = await storage.getPreferences();
+    return preferencesCache;
+}
+
+// Initialize preferences cache
+loadPreferencesCache();
 
 function convertFloat32ToInt16(float32Array) {
     const int16Array = new Int16Array(float32Array.length);
@@ -150,13 +134,14 @@ function arrayBufferToBase64(buffer) {
 }
 
 async function initializeGemini(profile = 'interview', language = 'en-US') {
-    const apiKey = localStorage.getItem('apiKey')?.trim();
+    const apiKey = await storage.getApiKey();
     if (apiKey) {
-        const success = await ipcRenderer.invoke('initialize-gemini', apiKey, localStorage.getItem('customPrompt') || '', profile, language);
+        const prefs = await storage.getPreferences();
+        const success = await ipcRenderer.invoke('initialize-gemini', apiKey, prefs.customPrompt || '', profile, language);
         if (success) {
-            cheddar.setStatus('Live');
+            cheatingDaddy.setStatus('Live');
         } else {
-            cheddar.setStatus('error');
+            cheatingDaddy.setStatus('error');
         }
     }
 }
@@ -164,25 +149,16 @@ async function initializeGemini(profile = 'interview', language = 'en-US') {
 // Listen for status updates
 ipcRenderer.on('update-status', (event, status) => {
     console.log('Status update:', status);
-    cheddar.setStatus(status);
+    cheatingDaddy.setStatus(status);
 });
-
-// Listen for responses - REMOVED: This is handled in CheatingDaddyApp.js to avoid duplicates
-// ipcRenderer.on('update-response', (event, response) => {
-//     console.log('Gemini response:', response);
-//     cheddar.e().setResponse(response);
-//     // You can add UI elements to display the response if needed
-// });
 
 async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'medium') {
     // Store the image quality for manual screenshots
     currentImageQuality = imageQuality;
 
-    // Reset token tracker when starting new capture session
-    tokenTracker.reset();
-    console.log('🎯 Token tracker reset for new capture session');
-
-    const audioMode = localStorage.getItem('audioMode') || 'speaker_only';
+    // Refresh preferences cache
+    await loadPreferencesCache();
+    const audioMode = preferencesCache.audioMode || 'speaker_only';
 
     try {
         if (isMacOS) {
@@ -338,20 +314,11 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
             videoTrack: mediaStream.getVideoTracks()[0]?.getSettings(),
         });
 
-        // Start capturing screenshots - check if manual mode
-        if (screenshotIntervalSeconds === 'manual' || screenshotIntervalSeconds === 'Manual') {
-            console.log('Manual mode enabled - screenshots will be captured on demand only');
-            // Don't start automatic capture in manual mode
-        } else {
-            const intervalMilliseconds = parseInt(screenshotIntervalSeconds) * 1000;
-            screenshotInterval = setInterval(() => captureScreenshot(imageQuality), intervalMilliseconds);
-
-            // Capture first screenshot immediately
-            setTimeout(() => captureScreenshot(imageQuality), 100);
-        }
+        // Manual mode only - screenshots captured on demand via shortcut
+        console.log('Manual mode enabled - screenshots will be captured on demand only');
     } catch (err) {
         console.error('Error starting capture:', err);
-        cheddar.setStatus('error');
+        cheatingDaddy.setStatus('error');
     }
 }
 
@@ -452,12 +419,6 @@ async function captureScreenshot(imageQuality = 'medium', isManual = false) {
     console.log(`Capturing ${isManual ? 'manual' : 'automated'} screenshot...`);
     if (!mediaStream) return;
 
-    // Check rate limiting for automated screenshots only
-    if (!isManual && tokenTracker.shouldThrottle()) {
-        console.log('⚠️ Automated screenshot skipped due to rate limiting');
-        return;
-    }
-
     // Lazy init of video element
     if (!hiddenVideo) {
         hiddenVideo = document.createElement('video');
@@ -534,10 +495,7 @@ async function captureScreenshot(imageQuality = 'medium', isManual = false) {
                 });
 
                 if (result.success) {
-                    // Track image tokens after successful send
-                    const imageTokens = tokenTracker.calculateImageTokens(offscreenCanvas.width, offscreenCanvas.height);
-                    tokenTracker.addTokens(imageTokens, 'image');
-                    console.log(`📊 Image sent successfully - ${imageTokens} tokens used (${offscreenCanvas.width}x${offscreenCanvas.height})`);
+                    console.log(`Image sent successfully (${offscreenCanvas.width}x${offscreenCanvas.height})`);
                 } else {
                     console.error('Failed to send image:', result.error);
                 }
@@ -549,16 +507,98 @@ async function captureScreenshot(imageQuality = 'medium', isManual = false) {
     );
 }
 
+const MANUAL_SCREENSHOT_PROMPT = `Help me on this page, give me the answer no bs, complete answer.
+So if its a code question, give me the approach in few bullet points, then the entire code. Also if theres anything else i need to know, tell me.
+If its a question about the website, give me the answer no bs, complete answer.
+If its a mcq question, give me the answer no bs, complete answer.`;
+
 async function captureManualScreenshot(imageQuality = null) {
     console.log('Manual screenshot triggered');
     const quality = imageQuality || currentImageQuality;
-    await captureScreenshot(quality, true); // Pass true for isManual
-    await new Promise(resolve => setTimeout(resolve, 2000)); // TODO shitty hack
-    await sendTextMessage(`Help me on this page, give me the answer no bs, complete answer.
-        So if its a code question, give me the approach in few bullet points, then the entire code. Also if theres anything else i need to know, tell me.
-        If its a question about the website, give me the answer no bs, complete answer.
-        If its a mcq question, give me the answer no bs, complete answer.
-        `);
+
+    if (!mediaStream) {
+        console.error('No media stream available');
+        return;
+    }
+
+    // Lazy init of video element
+    if (!hiddenVideo) {
+        hiddenVideo = document.createElement('video');
+        hiddenVideo.srcObject = mediaStream;
+        hiddenVideo.muted = true;
+        hiddenVideo.playsInline = true;
+        await hiddenVideo.play();
+
+        await new Promise(resolve => {
+            if (hiddenVideo.readyState >= 2) return resolve();
+            hiddenVideo.onloadedmetadata = () => resolve();
+        });
+
+        // Lazy init of canvas based on video dimensions
+        offscreenCanvas = document.createElement('canvas');
+        offscreenCanvas.width = hiddenVideo.videoWidth;
+        offscreenCanvas.height = hiddenVideo.videoHeight;
+        offscreenContext = offscreenCanvas.getContext('2d');
+    }
+
+    // Check if video is ready
+    if (hiddenVideo.readyState < 2) {
+        console.warn('Video not ready yet, skipping screenshot');
+        return;
+    }
+
+    offscreenContext.drawImage(hiddenVideo, 0, 0, offscreenCanvas.width, offscreenCanvas.height);
+
+    let qualityValue;
+    switch (quality) {
+        case 'high':
+            qualityValue = 0.9;
+            break;
+        case 'medium':
+            qualityValue = 0.7;
+            break;
+        case 'low':
+            qualityValue = 0.5;
+            break;
+        default:
+            qualityValue = 0.7;
+    }
+
+    offscreenCanvas.toBlob(
+        async blob => {
+            if (!blob) {
+                console.error('Failed to create blob from canvas');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onloadend = async () => {
+                const base64data = reader.result.split(',')[1];
+
+                if (!base64data || base64data.length < 100) {
+                    console.error('Invalid base64 data generated');
+                    return;
+                }
+
+                // Send image with prompt to HTTP API (response streams via IPC events)
+                const result = await ipcRenderer.invoke('send-image-content', {
+                    data: base64data,
+                    prompt: MANUAL_SCREENSHOT_PROMPT,
+                });
+
+                if (result.success) {
+                    console.log(`Image response completed from ${result.model}`);
+                    // Response already displayed via streaming events (new-response/update-response)
+                } else {
+                    console.error('Failed to get image response:', result.error);
+                    cheatingDaddy.addNewResponse(`Error: ${result.error}`);
+                }
+            };
+            reader.readAsDataURL(blob);
+        },
+        'image/jpeg',
+        qualityValue
+    );
 }
 
 // Expose functions to global scope for external access
@@ -629,116 +669,56 @@ async function sendTextMessage(text) {
     }
 }
 
-// Conversation storage functions using IndexedDB
-let conversationDB = null;
-
-async function initConversationStorage() {
-    return new Promise((resolve, reject) => {
-        const request = indexedDB.open('ConversationHistory', 1);
-
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => {
-            conversationDB = request.result;
-            resolve(conversationDB);
-        };
-
-        request.onupgradeneeded = event => {
-            const db = event.target.result;
-
-            // Create sessions store
-            if (!db.objectStoreNames.contains('sessions')) {
-                const sessionStore = db.createObjectStore('sessions', { keyPath: 'sessionId' });
-                sessionStore.createIndex('timestamp', 'timestamp', { unique: false });
-            }
-        };
-    });
-}
-
-async function saveConversationSession(sessionId, conversationHistory) {
-    if (!conversationDB) {
-        await initConversationStorage();
-    }
-
-    const transaction = conversationDB.transaction(['sessions'], 'readwrite');
-    const store = transaction.objectStore('sessions');
-
-    const sessionData = {
-        sessionId: sessionId,
-        timestamp: parseInt(sessionId),
-        conversationHistory: conversationHistory,
-        lastUpdated: Date.now(),
-    };
-
-    return new Promise((resolve, reject) => {
-        const request = store.put(sessionData);
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => resolve(request.result);
-    });
-}
-
-async function getConversationSession(sessionId) {
-    if (!conversationDB) {
-        await initConversationStorage();
-    }
-
-    const transaction = conversationDB.transaction(['sessions'], 'readonly');
-    const store = transaction.objectStore('sessions');
-
-    return new Promise((resolve, reject) => {
-        const request = store.get(sessionId);
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => resolve(request.result);
-    });
-}
-
-async function getAllConversationSessions() {
-    if (!conversationDB) {
-        await initConversationStorage();
-    }
-
-    const transaction = conversationDB.transaction(['sessions'], 'readonly');
-    const store = transaction.objectStore('sessions');
-    const index = store.index('timestamp');
-
-    return new Promise((resolve, reject) => {
-        const request = index.getAll();
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => {
-            // Sort by timestamp descending (newest first)
-            const sessions = request.result.sort((a, b) => b.timestamp - a.timestamp);
-            resolve(sessions);
-        };
-    });
-}
-
-// Listen for conversation data from main process
+// Listen for conversation data from main process and save to storage
 ipcRenderer.on('save-conversation-turn', async (event, data) => {
     try {
-        await saveConversationSession(data.sessionId, data.fullHistory);
+        await storage.saveSession(data.sessionId, { conversationHistory: data.fullHistory });
         console.log('Conversation session saved:', data.sessionId);
     } catch (error) {
         console.error('Error saving conversation session:', error);
     }
 });
 
-// Initialize conversation storage when renderer loads
-initConversationStorage().catch(console.error);
+// Listen for session context (profile info) when session starts
+ipcRenderer.on('save-session-context', async (event, data) => {
+    try {
+        await storage.saveSession(data.sessionId, {
+            profile: data.profile,
+            customPrompt: data.customPrompt
+        });
+        console.log('Session context saved:', data.sessionId, 'profile:', data.profile);
+    } catch (error) {
+        console.error('Error saving session context:', error);
+    }
+});
+
+// Listen for screen analysis responses (from ctrl+enter)
+ipcRenderer.on('save-screen-analysis', async (event, data) => {
+    try {
+        await storage.saveSession(data.sessionId, {
+            screenAnalysisHistory: data.fullHistory,
+            profile: data.profile,
+            customPrompt: data.customPrompt
+        });
+        console.log('Screen analysis saved:', data.sessionId);
+    } catch (error) {
+        console.error('Error saving screen analysis:', error);
+    }
+});
 
 // Listen for emergency erase command from main process
-ipcRenderer.on('clear-sensitive-data', () => {
-    console.log('Clearing renderer-side sensitive data...');
-    localStorage.removeItem('apiKey');
-    localStorage.removeItem('customPrompt');
-    // Consider clearing IndexedDB as well for full erasure
+ipcRenderer.on('clear-sensitive-data', async () => {
+    console.log('Clearing all data...');
+    await storage.clearAll();
 });
 
 // Handle shortcuts based on current view
 function handleShortcut(shortcutKey) {
-    const currentView = cheddar.getCurrentView();
+    const currentView = cheatingDaddy.getCurrentView();
 
     if (shortcutKey === 'ctrl+enter' || shortcutKey === 'cmd+enter') {
         if (currentView === 'main') {
-            cheddar.element().handleStart();
+            cheatingDaddy.element().handleStart();
         } else {
             captureManualScreenshot();
         }
@@ -748,8 +728,199 @@ function handleShortcut(shortcutKey) {
 // Create reference to the main app element
 const cheatingDaddyApp = document.querySelector('cheating-daddy-app');
 
-// Consolidated cheddar object - all functions in one place
-const cheddar = {
+// ============ THEME SYSTEM ============
+const theme = {
+    themes: {
+        dark: {
+            background: '#1e1e1e',
+            text: '#e0e0e0', textSecondary: '#a0a0a0', textMuted: '#6b6b6b',
+            border: '#333333', accent: '#ffffff',
+            btnPrimaryBg: '#ffffff', btnPrimaryText: '#000000', btnPrimaryHover: '#e0e0e0',
+            tooltipBg: '#1a1a1a', tooltipText: '#ffffff',
+            keyBg: 'rgba(255,255,255,0.1)'
+        },
+        light: {
+            background: '#ffffff',
+            text: '#1a1a1a', textSecondary: '#555555', textMuted: '#888888',
+            border: '#e0e0e0', accent: '#000000',
+            btnPrimaryBg: '#1a1a1a', btnPrimaryText: '#ffffff', btnPrimaryHover: '#333333',
+            tooltipBg: '#1a1a1a', tooltipText: '#ffffff',
+            keyBg: 'rgba(0,0,0,0.1)'
+        },
+        midnight: {
+            background: '#0d1117',
+            text: '#c9d1d9', textSecondary: '#8b949e', textMuted: '#6e7681',
+            border: '#30363d', accent: '#58a6ff',
+            btnPrimaryBg: '#58a6ff', btnPrimaryText: '#0d1117', btnPrimaryHover: '#79b8ff',
+            tooltipBg: '#161b22', tooltipText: '#c9d1d9',
+            keyBg: 'rgba(88,166,255,0.15)'
+        },
+        sepia: {
+            background: '#f4ecd8',
+            text: '#5c4b37', textSecondary: '#7a6a56', textMuted: '#998875',
+            border: '#d4c8b0', accent: '#8b4513',
+            btnPrimaryBg: '#5c4b37', btnPrimaryText: '#f4ecd8', btnPrimaryHover: '#7a6a56',
+            tooltipBg: '#5c4b37', tooltipText: '#f4ecd8',
+            keyBg: 'rgba(92,75,55,0.15)'
+        },
+        nord: {
+            background: '#2e3440',
+            text: '#eceff4', textSecondary: '#d8dee9', textMuted: '#4c566a',
+            border: '#3b4252', accent: '#88c0d0',
+            btnPrimaryBg: '#88c0d0', btnPrimaryText: '#2e3440', btnPrimaryHover: '#8fbcbb',
+            tooltipBg: '#3b4252', tooltipText: '#eceff4',
+            keyBg: 'rgba(136,192,208,0.15)'
+        },
+        dracula: {
+            background: '#282a36',
+            text: '#f8f8f2', textSecondary: '#bd93f9', textMuted: '#6272a4',
+            border: '#44475a', accent: '#ff79c6',
+            btnPrimaryBg: '#ff79c6', btnPrimaryText: '#282a36', btnPrimaryHover: '#ff92d0',
+            tooltipBg: '#44475a', tooltipText: '#f8f8f2',
+            keyBg: 'rgba(255,121,198,0.15)'
+        },
+        abyss: {
+            background: '#0a0a0a',
+            text: '#d4d4d4', textSecondary: '#808080', textMuted: '#505050',
+            border: '#1a1a1a', accent: '#ffffff',
+            btnPrimaryBg: '#ffffff', btnPrimaryText: '#0a0a0a', btnPrimaryHover: '#d4d4d4',
+            tooltipBg: '#141414', tooltipText: '#d4d4d4',
+            keyBg: 'rgba(255,255,255,0.08)'
+        }
+    },
+
+    current: 'dark',
+
+    get(name) {
+        return this.themes[name] || this.themes.dark;
+    },
+
+    getAll() {
+        const names = {
+            dark: 'Dark',
+            light: 'Light',
+            midnight: 'Midnight Blue',
+            sepia: 'Sepia',
+            nord: 'Nord',
+            dracula: 'Dracula',
+            abyss: 'Abyss'
+        };
+        return Object.keys(this.themes).map(key => ({
+            value: key,
+            name: names[key] || key,
+            colors: this.themes[key]
+        }));
+    },
+
+    hexToRgb(hex) {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? {
+            r: parseInt(result[1], 16),
+            g: parseInt(result[2], 16),
+            b: parseInt(result[3], 16)
+        } : { r: 30, g: 30, b: 30 };
+    },
+
+    lightenColor(rgb, amount) {
+        return {
+            r: Math.min(255, rgb.r + amount),
+            g: Math.min(255, rgb.g + amount),
+            b: Math.min(255, rgb.b + amount)
+        };
+    },
+
+    darkenColor(rgb, amount) {
+        return {
+            r: Math.max(0, rgb.r - amount),
+            g: Math.max(0, rgb.g - amount),
+            b: Math.max(0, rgb.b - amount)
+        };
+    },
+
+    applyBackgrounds(backgroundColor, alpha = 0.8) {
+        const root = document.documentElement;
+        const baseRgb = this.hexToRgb(backgroundColor);
+
+        // For light themes, darken; for dark themes, lighten
+        const isLight = (baseRgb.r + baseRgb.g + baseRgb.b) / 3 > 128;
+        const adjust = isLight ? this.darkenColor.bind(this) : this.lightenColor.bind(this);
+
+        const secondary = adjust(baseRgb, 7);
+        const tertiary = adjust(baseRgb, 15);
+        const hover = adjust(baseRgb, 20);
+
+        root.style.setProperty('--header-background', `rgba(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}, ${alpha})`);
+        root.style.setProperty('--main-content-background', `rgba(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}, ${alpha})`);
+        root.style.setProperty('--bg-primary', `rgba(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}, ${alpha})`);
+        root.style.setProperty('--bg-secondary', `rgba(${secondary.r}, ${secondary.g}, ${secondary.b}, ${alpha})`);
+        root.style.setProperty('--bg-tertiary', `rgba(${tertiary.r}, ${tertiary.g}, ${tertiary.b}, ${alpha})`);
+        root.style.setProperty('--bg-hover', `rgba(${hover.r}, ${hover.g}, ${hover.b}, ${alpha})`);
+        root.style.setProperty('--input-background', `rgba(${tertiary.r}, ${tertiary.g}, ${tertiary.b}, ${alpha})`);
+        root.style.setProperty('--input-focus-background', `rgba(${tertiary.r}, ${tertiary.g}, ${tertiary.b}, ${alpha})`);
+        root.style.setProperty('--hover-background', `rgba(${hover.r}, ${hover.g}, ${hover.b}, ${alpha})`);
+        root.style.setProperty('--scrollbar-background', `rgba(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}, ${alpha})`);
+    },
+
+    apply(themeName, alpha = 0.8) {
+        const colors = this.get(themeName);
+        this.current = themeName;
+        const root = document.documentElement;
+
+        // Text colors
+        root.style.setProperty('--text-color', colors.text);
+        root.style.setProperty('--text-secondary', colors.textSecondary);
+        root.style.setProperty('--text-muted', colors.textMuted);
+        // Border colors
+        root.style.setProperty('--border-color', colors.border);
+        root.style.setProperty('--border-default', colors.accent);
+        // Misc
+        root.style.setProperty('--placeholder-color', colors.textMuted);
+        root.style.setProperty('--scrollbar-thumb', colors.border);
+        root.style.setProperty('--scrollbar-thumb-hover', colors.textMuted);
+        root.style.setProperty('--key-background', colors.keyBg);
+        // Primary button
+        root.style.setProperty('--btn-primary-bg', colors.btnPrimaryBg);
+        root.style.setProperty('--btn-primary-text', colors.btnPrimaryText);
+        root.style.setProperty('--btn-primary-hover', colors.btnPrimaryHover);
+        // Start button (same as primary)
+        root.style.setProperty('--start-button-background', colors.btnPrimaryBg);
+        root.style.setProperty('--start-button-color', colors.btnPrimaryText);
+        root.style.setProperty('--start-button-hover-background', colors.btnPrimaryHover);
+        // Tooltip
+        root.style.setProperty('--tooltip-bg', colors.tooltipBg);
+        root.style.setProperty('--tooltip-text', colors.tooltipText);
+        // Error color (stays constant)
+        root.style.setProperty('--error-color', '#f14c4c');
+        root.style.setProperty('--success-color', '#4caf50');
+
+        // Also apply background colors from theme
+        this.applyBackgrounds(colors.background, alpha);
+    },
+
+    async load() {
+        try {
+            const prefs = await storage.getPreferences();
+            const themeName = prefs.theme || 'dark';
+            const alpha = prefs.backgroundTransparency ?? 0.8;
+            this.apply(themeName, alpha);
+            return themeName;
+        } catch (err) {
+            this.apply('dark');
+            return 'dark';
+        }
+    },
+
+    async save(themeName) {
+        await storage.updatePreference('theme', themeName);
+        this.apply(themeName);
+    }
+};
+
+// Consolidated cheatingDaddy object - all functions in one place
+const cheatingDaddy = {
+    // App version
+    getVersion: async () => ipcRenderer.invoke('get-app-version'),
+
     // Element access
     element: () => cheatingDaddyApp,
     e: () => cheatingDaddyApp,
@@ -760,7 +931,8 @@ const cheddar = {
 
     // Status and response functions
     setStatus: text => cheatingDaddyApp.setStatus(text),
-    setResponse: response => cheatingDaddyApp.setResponse(response),
+    addNewResponse: response => cheatingDaddyApp.addNewResponse(response),
+    updateCurrentResponse: response => cheatingDaddyApp.updateCurrentResponse(response),
 
     // Core functionality
     initializeGemini,
@@ -769,16 +941,14 @@ const cheddar = {
     sendTextMessage,
     handleShortcut,
 
-    // Conversation history functions
-    getAllConversationSessions,
-    getConversationSession,
-    initConversationStorage,
+    // Storage API
+    storage,
 
-    // Content protection function
-    getContentProtection: () => {
-        const contentProtection = localStorage.getItem('contentProtection');
-        return contentProtection !== null ? contentProtection === 'true' : true;
-    },
+    // Theme API
+    theme,
+
+    // Refresh preferences cache (call after updating preferences)
+    refreshPreferencesCache: loadPreferencesCache,
 
     // Platform detection
     isLinux: isLinux,
@@ -786,4 +956,11 @@ const cheddar = {
 };
 
 // Make it globally available
-window.cheddar = cheddar;
+window.cheatingDaddy = cheatingDaddy;
+
+// Load theme after DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => theme.load());
+} else {
+    theme.load();
+}
