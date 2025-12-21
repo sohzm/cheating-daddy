@@ -115,6 +115,124 @@ export class MainView extends LitElement {
             color: var(--text-color);
         }
 
+        /* API Key Popup Styles */
+        .api-key-popup-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .api-key-popup-overlay.show {
+            opacity: 1;
+        }
+
+        .api-key-popup {
+            background: var(--input-background);
+            border: 1px solid var(--button-border);
+            border-radius: 12px;
+            padding: 24px;
+            min-width: 280px;
+            max-width: 400px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            transform: scale(0.9);
+            transition: transform 0.2s ease;
+        }
+
+        .api-key-popup-overlay.show .api-key-popup {
+            transform: scale(1);
+        }
+
+        .api-key-popup-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-color);
+            margin-bottom: 16px;
+            text-align: center;
+        }
+
+        .api-key-popup-content {
+            font-size: 14px;
+            color: var(--description-color);
+            margin-bottom: 16px;
+            line-height: 1.5;
+        }
+
+        .api-key-display {
+            background: var(--input-background);
+            border: 1px solid var(--button-border);
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+            font-family: monospace;
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-color);
+            margin-bottom: 16px;
+            letter-spacing: 2px;
+        }
+
+        .api-key-info {
+            font-size: 12px;
+            color: var(--description-color);
+            opacity: 0.8;
+            text-align: center;
+            margin-top: 8px;
+        }
+
+        .api-key-popup-bottom {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-top: 20px;
+        }
+
+        .api-key-button {
+            background: var(--start-button-background);
+            color: var(--start-button-color);
+            border: 1px solid var(--start-button-border);
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+            align-self: flex-end;
+            margin-left: auto;
+        }
+
+        .api-key-button:hover {
+            background: var(--start-button-hover-background);
+            border-color: var(--start-button-hover-border);
+        }
+
+        .show-key-button {
+            background: var(--start-button-background);
+            color: var(--start-button-color);
+            border: 1px solid var(--start-button-border);
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .show-key-button:hover {
+            background: var(--start-button-hover-background);
+            border-color: var(--start-button-hover-border);
+        }
+
         :host {
             height: 100%;
             display: flex;
@@ -130,6 +248,7 @@ export class MainView extends LitElement {
         isInitializing: { type: Boolean },
         onLayoutModeChange: { type: Function },
         showApiKeyError: { type: Boolean },
+        showApiKeyPopup: { type: Boolean },
     };
 
     constructor() {
@@ -139,6 +258,7 @@ export class MainView extends LitElement {
         this.isInitializing = false;
         this.onLayoutModeChange = () => {};
         this.showApiKeyError = false;
+        this.showApiKeyPopup = false;
         this.boundKeydownHandler = this.handleKeydown.bind(this);
         this.apiKey = '';
         this._loadApiKey();
@@ -199,6 +319,36 @@ export class MainView extends LitElement {
         this.onAPIKeyHelp();
     }
 
+    handleResetOnboarding() {
+        localStorage.removeItem('onboardingCompleted');
+        // Refresh the page to trigger onboarding
+        window.location.reload();
+    }
+
+    handleApiKeyButtonClick() {
+        this.showApiKeyPopup = true;
+    }
+
+    handleCloseApiKeyPopup() {
+        this.showApiKeyPopup = false;
+    }
+
+    getLastFourLetters() {
+        const apiKey = localStorage.getItem('apiKey');
+        if (!apiKey || apiKey.length < 4) {
+            return 'None';
+        }
+        return apiKey.slice(-4);
+    }
+
+    loadLayoutMode() {
+        const savedLayoutMode = localStorage.getItem('layoutMode');
+        if (savedLayoutMode && savedLayoutMode !== 'normal') {
+            // Notify parent component to apply the saved layout mode
+            this.onLayoutModeChange(savedLayoutMode);
+        }
+    }
+
     // Method to trigger the red blink animation
     triggerApiKeyError() {
         this.showApiKeyError = true;
@@ -226,6 +376,9 @@ export class MainView extends LitElement {
                     @input=${this.handleInput}
                     class="${this.showApiKeyError ? 'api-key-error' : ''}"
                 />
+                <button @click=${this.handleApiKeyButtonClick} class="show-key-button" title="Show the last 4 letters of the API key">
+                    👁️
+                </button>
                 <button @click=${this.handleStartClick} class="start-button ${this.isInitializing ? 'initializing' : ''}">
                     ${this.getStartButtonText()}
                 </button>
@@ -234,6 +387,29 @@ export class MainView extends LitElement {
                 dont have an api key?
                 <span @click=${this.handleAPIKeyHelpClick} class="link">get one here</span>
             </p>
+
+            <!-- API Key Popup -->
+            ${this.showApiKeyPopup ? html`
+                <div class="api-key-popup-overlay show" @click=${this.handleCloseApiKeyPopup}>
+                    <div class="api-key-popup" @click=${(e) => e.stopPropagation()}>
+                        <div class="api-key-popup-title">API Key Identifier</div>
+                        <div class="api-key-popup-content">
+                            Last 4 letters of your API key to help identify which Google account you're using:
+                        </div>
+                        <div class="api-key-display">
+                            ${this.getLastFourLetters()}
+                        </div>
+                        <div class="api-key-popup-bottom">
+                            <div class="api-key-info">
+                                This only shows the last 4 letters for identification purposes
+                            </div>
+                            <button @click=${this.handleCloseApiKeyPopup} class="api-key-button">
+                                Got it
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            ` : ''}
         `;
     }
 }
