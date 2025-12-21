@@ -35,6 +35,35 @@ export class OnboardingView extends LitElement {
             overflow: hidden;
         }
 
+        .close-button {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            z-index: 10;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .close-button:hover {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(255, 255, 255, 0.2);
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        .close-button svg {
+            width: 16px;
+            height: 16px;
+        }
+
         .gradient-canvas {
             position: absolute;
             top: 0;
@@ -426,11 +455,18 @@ export class OnboardingView extends LitElement {
         this.contextText = e.target.value;
     }
 
-    completeOnboarding() {
-        if (this.contextText.trim()) {
-            localStorage.setItem('customPrompt', this.contextText.trim());
+    async handleClose() {
+        if (window.require) {
+            const { ipcRenderer } = window.require('electron');
+            await ipcRenderer.invoke('quit-application');
         }
-        localStorage.setItem('onboardingCompleted', 'true');
+    }
+
+    async completeOnboarding() {
+        if (this.contextText.trim()) {
+            await cheatingDaddy.storage.updatePreference('customPrompt', this.contextText.trim());
+        }
+        await cheatingDaddy.storage.updateConfig('onboarded', true);
         this.onComplete();
     }
 
@@ -474,6 +510,11 @@ export class OnboardingView extends LitElement {
 
         return html`
             <div class="onboarding-container">
+                <button class="close-button" @click=${this.handleClose} title="Close">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+                    </svg>
+                </button>
                 <canvas class="gradient-canvas"></canvas>
 
                 <div class="content-wrapper">
@@ -495,15 +536,15 @@ export class OnboardingView extends LitElement {
                         ? html`
                               <div class="feature-list">
                                   <div class="feature-item">
-                                      <span class="feature-icon">🎨</span>
+                                      <span class="feature-icon">-</span>
                                       Customize AI behavior and responses
                                   </div>
                                   <div class="feature-item">
-                                      <span class="feature-icon">📚</span>
+                                      <span class="feature-icon">-</span>
                                       Review conversation history
                                   </div>
                                   <div class="feature-item">
-                                      <span class="feature-icon">🔧</span>
+                                      <span class="feature-icon">-</span>
                                       Adjust capture settings and intervals
                                   </div>
                               </div>

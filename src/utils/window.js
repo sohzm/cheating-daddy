@@ -2,30 +2,14 @@ const { BrowserWindow, globalShortcut, ipcMain, screen } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const os = require('os');
-const { applyStealthMeasures, startTitleRandomization } = require('./stealthFeatures');
+const storage = require('../storage');
 
 let mouseEventsIgnored = false;
 let windowResizing = false;
 let resizeAnimation = null;
 const RESIZE_ANIMATION_DURATION = 500; // milliseconds
 
-function ensureDataDirectories() {
-    const homeDir = os.homedir();
-    const cheddarDir = path.join(homeDir, 'cheddar');
-    const dataDir = path.join(cheddarDir, 'data');
-    const imageDir = path.join(dataDir, 'image');
-    const audioDir = path.join(dataDir, 'audio');
-
-    [cheddarDir, dataDir, imageDir, audioDir].forEach(dir => {
-        if (!fs.existsSync(dir)) {
-            fs.mkdirSync(dir, { recursive: true });
-        }
-    });
-
-    return { imageDir, audioDir };
-}
-
-function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
+function createWindow(sendToRenderer, geminiSessionRef) {
     // Get layout preference (default to 'normal')
     let windowWidth = 1100;
     let windowHeight = 800;
@@ -37,8 +21,6 @@ function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
         transparent: true,
         hasShadow: false,
         alwaysOnTop: true,
-        skipTaskbar: true,
-        hiddenInMissionControl: true,
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false, // TODO: change to true
@@ -64,6 +46,26 @@ function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
     mainWindow.setContentProtection(true);
     mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 
+    // Hide from Windows taskbar
+    if (process.platform === 'win32') {
+        try {
+            mainWindow.setSkipTaskbar(true);
+            console.log('Hidden from Windows taskbar');
+        } catch (error) {
+            console.warn('Could not hide from taskbar:', error.message);
+        }
+    }
+
+    // Hide from Mission Control on macOS
+    if (process.platform === 'darwin') {
+        try {
+            mainWindow.setHiddenInMissionControl(true);
+            console.log('Hidden from macOS Mission Control');
+        } catch (error) {
+            console.warn('Could not hide from Mission Control:', error.message);
+        }
+    }
+
     // Center window at the top of the screen
     const primaryDisplay = screen.getPrimaryDisplay();
     const { width: screenWidth } = primaryDisplay.workAreaSize;
@@ -77,60 +79,19 @@ function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
 
     mainWindow.loadFile(path.join(__dirname, '../index.html'));
 
-    // Set window title to random name if provided
-    if (randomNames && randomNames.windowTitle) {
-        mainWindow.setTitle(randomNames.windowTitle);
-        console.log(`Set window title to: ${randomNames.windowTitle}`);
-    }
-
-    // Apply stealth measures
-    applyStealthMeasures(mainWindow);
-
-    // Start periodic title randomization for additional stealth
-    startTitleRandomization(mainWindow);
-
-    // After window is created, check for layout preference and resize if needed
+    // After window is created, initialize keybinds
     mainWindow.webContents.once('dom-ready', () => {
         setTimeout(() => {
             const defaultKeybinds = getDefaultKeybinds();
             let keybinds = defaultKeybinds;
 
-            mainWindow.webContents
-                .executeJavaScript(
-                    `
-                try {
-                    const savedKeybinds = localStorage.getItem('customKeybinds');
-                    
-                    return {
-                        keybinds: savedKeybinds ? JSON.parse(savedKeybinds) : null
-                    };
-                } catch (e) {
-                    return { keybinds: null };
-                }
-            `
-                )
-                .then(async savedSettings => {
-                    if (savedSettings.keybinds) {
-                        keybinds = { ...defaultKeybinds, ...savedSettings.keybinds };
-                    }
+            // Load keybinds from storage
+            const savedKeybinds = storage.getKeybinds();
+            if (savedKeybinds) {
+                keybinds = { ...defaultKeybinds, ...savedKeybinds };
+            }
 
-                    // Apply content protection setting via IPC handler
-                    try {
-                        const contentProtection = await mainWindow.webContents.executeJavaScript('cheddar.getContentProtection()');
-                        mainWindow.setContentProtection(contentProtection);
-                        console.log('Content protection loaded from settings:', contentProtection);
-                    } catch (error) {
-                        console.error('Error loading content protection:', error);
-                        mainWindow.setContentProtection(true);
-                    }
-
-                    updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessionRef);
-                })
-                .catch(() => {
-                    // Default to content protection enabled
-                    mainWindow.setContentProtection(true);
-                    updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessionRef);
-                });
+            updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessionRef);
         }, 150);
     });
 
@@ -252,7 +213,7 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
 
                     // Use the new handleShortcut function
                     mainWindow.webContents.executeJavaScript(`
-                        cheddar.handleShortcut('${shortcutKey}');
+                        cheatingDaddy.handleShortcut('${shortcutKey}');
                     `);
                 } catch (error) {
                     console.error('Error handling next step shortcut:', error);
@@ -473,8 +434,8 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
             // Get current view and layout mode from renderer
             let viewName, layoutMode;
             try {
-                viewName = await event.sender.executeJavaScript('cheddar.getCurrentView()');
-                layoutMode = await event.sender.executeJavaScript('cheddar.getLayoutMode()');
+                viewName = await event.sender.executeJavaScript('cheatingDaddy.getCurrentView()');
+                layoutMode = await event.sender.executeJavaScript('cheatingDaddy.getLayoutMode()');
             } catch (error) {
                 console.warn('Failed to get view/layout from renderer, using defaults:', error);
                 viewName = 'main';
@@ -491,6 +452,10 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
 
             // Adjust height based on view
             switch (viewName) {
+                case 'main':
+                    targetWidth = baseWidth;
+                    targetHeight = layoutMode === 'compact' ? 320 : 400;
+                    break;
                 case 'customize':
                 case 'settings':
                     targetWidth = baseWidth;
@@ -504,11 +469,6 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
                     targetWidth = baseWidth;
                     targetHeight = layoutMode === 'compact' ? 650 : 750;
                     break;
-                case 'advanced':
-                    targetWidth = baseWidth;
-                    targetHeight = layoutMode === 'compact' ? 600 : 700;
-                    break;
-                case 'main':
                 case 'assistant':
                 case 'onboarding':
                 default:
@@ -536,7 +496,6 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
 }
 
 module.exports = {
-    ensureDataDirectories,
     createWindow,
     getDefaultKeybinds,
     updateGlobalShortcuts,

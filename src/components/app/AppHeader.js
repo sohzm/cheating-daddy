@@ -3,7 +3,7 @@ import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
 export class AppHeader extends LitElement {
     static styles = css`
         * {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             cursor: default;
             user-select: none;
         }
@@ -13,15 +13,15 @@ export class AppHeader extends LitElement {
             display: flex;
             align-items: center;
             padding: var(--header-padding);
-            border: 1px solid var(--border-color);
             background: var(--header-background);
-            border-radius: var(--border-radius);
+            border-bottom: 1px solid var(--border-color);
         }
 
         .header-title {
             flex: 1;
             font-size: var(--header-font-size);
-            font-weight: 600;
+            font-weight: 500;
+            color: var(--text-color);
             -webkit-app-region: drag;
         }
 
@@ -34,30 +34,36 @@ export class AppHeader extends LitElement {
 
         .header-actions span {
             font-size: var(--header-font-size-small);
-            color: var(--header-actions-color);
+            color: var(--text-secondary);
         }
 
         .button {
-            background: var(--button-background);
+            background: transparent;
             color: var(--text-color);
-            border: 1px solid var(--button-border);
+            border: 1px solid var(--border-color);
             padding: var(--header-button-padding);
-            border-radius: 8px;
+            border-radius: 3px;
             font-size: var(--header-font-size-small);
             font-weight: 500;
+            transition: background 0.1s ease;
+        }
+
+        .button:hover {
+            background: var(--hover-background);
         }
 
         .icon-button {
-            background: none;
-            color: var(--icon-button-color);
+            background: transparent;
+            color: var(--text-secondary);
             border: none;
             padding: var(--header-icon-padding);
-            border-radius: 8px;
+            border-radius: 3px;
             font-size: var(--header-font-size-small);
             font-weight: 500;
             display: flex;
-            opacity: 0.6;
-            transition: opacity 0.2s ease;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.1s ease;
         }
 
         .icon-button svg {
@@ -67,11 +73,7 @@ export class AppHeader extends LitElement {
 
         .icon-button:hover {
             background: var(--hover-background);
-            opacity: 1;
-        }
-
-        .button:hover {
-            background: var(--hover-background);
+            color: var(--text-color);
         }
 
         :host([isclickthrough]) .button:hover,
@@ -82,9 +84,41 @@ export class AppHeader extends LitElement {
         .key {
             background: var(--key-background);
             padding: 2px 6px;
-            border-radius: 4px;
-            font-size: 12px;
-            margin: 0px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-family: 'SF Mono', Monaco, monospace;
+        }
+
+        .click-through-indicator {
+            font-size: 10px;
+            color: var(--text-muted);
+            background: var(--key-background);
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'SF Mono', Monaco, monospace;
+        }
+
+        .update-button {
+            background: transparent;
+            color: #f14c4c;
+            border: 1px solid #f14c4c;
+            padding: var(--header-button-padding);
+            border-radius: 3px;
+            font-size: var(--header-font-size-small);
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.1s ease;
+        }
+
+        .update-button svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        .update-button:hover {
+            background: rgba(241, 76, 76, 0.1);
         }
     `;
 
@@ -99,8 +133,7 @@ export class AppHeader extends LitElement {
         onBackClick: { type: Function },
         onHideToggleClick: { type: Function },
         isClickThrough: { type: Boolean, reflect: true },
-        advancedMode: { type: Boolean },
-        onAdvancedClick: { type: Function },
+        updateAvailable: { type: Boolean },
     };
 
     constructor() {
@@ -115,14 +148,49 @@ export class AppHeader extends LitElement {
         this.onBackClick = () => {};
         this.onHideToggleClick = () => {};
         this.isClickThrough = false;
-        this.advancedMode = false;
-        this.onAdvancedClick = () => {};
+        this.updateAvailable = false;
         this._timerInterval = null;
     }
 
     connectedCallback() {
         super.connectedCallback();
         this._startTimer();
+        this._checkForUpdates();
+    }
+
+    async _checkForUpdates() {
+        try {
+            const currentVersion = await cheatingDaddy.getVersion();
+            const response = await fetch('https://raw.githubusercontent.com/sohzm/cheating-daddy/refs/heads/master/package.json');
+            if (!response.ok) return;
+
+            const remotePackage = await response.json();
+            const remoteVersion = remotePackage.version;
+
+            if (this._isNewerVersion(remoteVersion, currentVersion)) {
+                this.updateAvailable = true;
+            }
+        } catch (err) {
+            console.log('Update check failed:', err.message);
+        }
+    }
+
+    _isNewerVersion(remote, current) {
+        const remoteParts = remote.split('.').map(Number);
+        const currentParts = current.split('.').map(Number);
+
+        for (let i = 0; i < Math.max(remoteParts.length, currentParts.length); i++) {
+            const r = remoteParts[i] || 0;
+            const c = currentParts[i] || 0;
+            if (r > c) return true;
+            if (r < c) return false;
+        }
+        return false;
+    }
+
+    async _openUpdatePage() {
+        const { ipcRenderer } = require('electron');
+        await ipcRenderer.invoke('open-external', 'https://cheatingdaddy.com');
     }
 
     disconnectedCallback() {
@@ -188,6 +256,11 @@ export class AppHeader extends LitElement {
     getElapsedTime() {
         if (this.currentView === 'assistant' && this.startTime) {
             const elapsed = Math.floor((Date.now() - this.startTime) / 1000);
+            if (elapsed >= 60) {
+                const minutes = Math.floor(elapsed / 60);
+                const seconds = elapsed % 60;
+                return `${minutes}m ${seconds}s`;
+            }
             return `${elapsed}s`;
         }
         return '';
@@ -209,152 +282,32 @@ export class AppHeader extends LitElement {
                         ? html`
                               <span>${elapsedTime}</span>
                               <span>${this.statusText}</span>
+                              ${this.isClickThrough ? html`<span class="click-through-indicator">click-through</span>` : ''}
                           `
                         : ''}
                     ${this.currentView === 'main'
                         ? html`
+                              ${this.updateAvailable ? html`
+                                  <button class="update-button" @click=${this._openUpdatePage}>
+                                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor">
+                                          <path fill-rule="evenodd" d="M13.836 2.477a.75.75 0 0 1 .75.75v3.182a.75.75 0 0 1-.75.75h-3.182a.75.75 0 0 1 0-1.5h1.37l-.84-.841a4.5 4.5 0 0 0-7.08.932.75.75 0 0 1-1.3-.75 6 6 0 0 1 9.44-1.242l.842.84V3.227a.75.75 0 0 1 .75-.75Zm-.911 7.5A.75.75 0 0 1 13.199 11a6 6 0 0 1-9.44 1.241l-.84-.84v1.371a.75.75 0 0 1-1.5 0V9.591a.75.75 0 0 1 .75-.75H5.35a.75.75 0 0 1 0 1.5H3.98l.841.841a4.5 4.5 0 0 0 7.08-.932.75.75 0 0 1 1.025-.273Z" clip-rule="evenodd" />
+                                      </svg>
+                                      Update available
+                                  </button>
+                              ` : ''}
                               <button class="icon-button" @click=${this.onHistoryClick}>
-                                  <?xml version="1.0" encoding="UTF-8"?><svg
-                                      width="24px"
-                                      height="24px"
-                                      stroke-width="1.7"
-                                      viewBox="0 0 24 24"
-                                      fill="none"
-                                      xmlns="http://www.w3.org/2000/svg"
-                                      color="currentColor"
-                                  >
-                                      <path
-                                          d="M12 21V7C12 5.89543 12.8954 5 14 5H21.4C21.7314 5 22 5.26863 22 5.6V18.7143"
-                                          stroke="currentColor"
-                                          stroke-width="1.7"
-                                          stroke-linecap="round"
-                                      ></path>
-                                      <path
-                                          d="M12 21V7C12 5.89543 11.1046 5 10 5H2.6C2.26863 5 2 5.26863 2 5.6V18.7143"
-                                          stroke="currentColor"
-                                          stroke-width="1.7"
-                                          stroke-linecap="round"
-                                      ></path>
-                                      <path d="M14 19L22 19" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path>
-                                      <path d="M10 19L2 19" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path>
-                                      <path
-                                          d="M12 21C12 19.8954 12.8954 19 14 19"
-                                          stroke="currentColor"
-                                          stroke-width="1.7"
-                                          stroke-linecap="round"
-                                          stroke-linejoin="round"
-                                      ></path>
-                                      <path
-                                          d="M12 21C12 19.8954 11.1046 19 10 19"
-                                          stroke="currentColor"
-                                          stroke-width="1.7"
-                                          stroke-linecap="round"
-                                          stroke-linejoin="round"
-                                      ></path>
+                                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                      <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm.75-13a.75.75 0 0 0-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 0 0 0-1.5h-3.25V5Z" clip-rule="evenodd" />
                                   </svg>
                               </button>
-                              ${this.advancedMode
-                                  ? html`
-                                        <button class="icon-button" @click=${this.onAdvancedClick} title="Advanced Tools">
-                                            <?xml version="1.0" encoding="UTF-8"?><svg
-                                                width="24px"
-                                                stroke-width="1.7"
-                                                height="24px"
-                                                viewBox="0 0 24 24"
-                                                fill="none"
-                                                xmlns="http://www.w3.org/2000/svg"
-                                                color="currentColor"
-                                            >
-                                                <path d="M18.5 15L5.5 15" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"></path>
-                                                <path
-                                                    d="M16 4L8 4"
-                                                    stroke="currentColor"
-                                                    stroke-width="1.7"
-                                                    stroke-linecap="round"
-                                                    stroke-linejoin="round"
-                                                ></path>
-                                                <path
-                                                    d="M9 4.5L9 10.2602C9 10.7376 8.82922 11.1992 8.51851 11.5617L3.48149 17.4383C3.17078 17.8008 3 18.2624 3 18.7398V19C3 20.1046 3.89543 21 5 21L19 21C20.1046 21 21 20.1046 21 19V18.7398C21 18.2624 20.8292 17.8008 20.5185 17.4383L15.4815 11.5617C15.1708 11.1992 15 10.7376 15 10.2602L15 4.5"
-                                                    stroke="currentColor"
-                                                    stroke-width="1.7"
-                                                    stroke-linecap="round"
-                                                    stroke-linejoin="round"
-                                                ></path>
-                                                <path
-                                                    d="M12 9.01L12.01 8.99889"
-                                                    stroke="currentColor"
-                                                    stroke-width="1.7"
-                                                    stroke-linecap="round"
-                                                    stroke-linejoin="round"
-                                                ></path>
-                                                <path
-                                                    d="M11 2.01L11.01 1.99889"
-                                                    stroke="currentColor"
-                                                    stroke-width="1.7"
-                                                    stroke-linecap="round"
-                                                    stroke-linejoin="round"
-                                                ></path>
-                                            </svg>
-                                        </button>
-                                    `
-                                  : ''}
                               <button class="icon-button" @click=${this.onCustomizeClick}>
-                                  <?xml version="1.0" encoding="UTF-8"?><svg
-                                      width="24px"
-                                      height="24px"
-                                      stroke-width="1.7"
-                                      viewBox="0 0 24 24"
-                                      fill="none"
-                                      xmlns="http://www.w3.org/2000/svg"
-                                      color="currentColor"
-                                  >
-                                      <path
-                                          d="M12 15C13.6569 15 15 13.6569 15 12C15 10.3431 13.6569 9 12 9C10.3431 9 9 10.3431 9 12C9 13.6569 10.3431 15 12 15Z"
-                                          stroke="currentColor"
-                                          stroke-width="1.7"
-                                          stroke-linecap="round"
-                                          stroke-linejoin="round"
-                                      ></path>
-                                      <path
-                                          d="M19.6224 10.3954L18.5247 7.7448L20 6L18 4L16.2647 5.48295L13.5578 4.36974L12.9353 2H10.981L10.3491 4.40113L7.70441 5.51596L6 4L4 6L5.45337 7.78885L4.3725 10.4463L2 11V13L4.40111 13.6555L5.51575 16.2997L4 18L6 20L7.79116 18.5403L10.397 19.6123L11 22H13L13.6045 19.6132L16.2551 18.5155C16.6969 18.8313 18 20 18 20L20 18L18.5159 16.2494L19.6139 13.598L21.9999 12.9772L22 11L19.6224 10.3954Z"
-                                          stroke="currentColor"
-                                          stroke-width="1.7"
-                                          stroke-linecap="round"
-                                          stroke-linejoin="round"
-                                      ></path>
+                                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                      <path fill-rule="evenodd" d="M7.84 1.804A1 1 0 0 1 8.82 1h2.36a1 1 0 0 1 .98.804l.331 1.652a6.993 6.993 0 0 1 1.929 1.115l1.598-.54a1 1 0 0 1 1.186.447l1.18 2.044a1 1 0 0 1-.205 1.251l-1.267 1.113a7.047 7.047 0 0 1 0 2.228l1.267 1.113a1 1 0 0 1 .206 1.25l-1.18 2.045a1 1 0 0 1-1.187.447l-1.598-.54a6.993 6.993 0 0 1-1.929 1.115l-.33 1.652a1 1 0 0 1-.98.804H8.82a1 1 0 0 1-.98-.804l-.331-1.652a6.993 6.993 0 0 1-1.929-1.115l-1.598.54a1 1 0 0 1-1.186-.447l-1.18-2.044a1 1 0 0 1 .205-1.251l1.267-1.114a7.05 7.05 0 0 1 0-2.227L1.821 7.773a1 1 0 0 1-.206-1.25l1.18-2.045a1 1 0 0 1 1.187-.447l1.598.54A6.992 6.992 0 0 1 7.51 3.456l.33-1.652ZM10 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" clip-rule="evenodd" />
                                   </svg>
                               </button>
                               <button class="icon-button" @click=${this.onHelpClick}>
-                                  <?xml version="1.0" encoding="UTF-8"?><svg
-                                      width="24px"
-                                      height="24px"
-                                      stroke-width="1.7"
-                                      viewBox="0 0 24 24"
-                                      fill="none"
-                                      xmlns="http://www.w3.org/2000/svg"
-                                      color="currentColor"
-                                  >
-                                      <path
-                                          d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z"
-                                          stroke="currentColor"
-                                          stroke-width="1.7"
-                                          stroke-linecap="round"
-                                          stroke-linejoin="round"
-                                      ></path>
-                                      <path
-                                          d="M9 9C9 5.49997 14.5 5.5 14.5 9C14.5 11.5 12 10.9999 12 13.9999"
-                                          stroke="currentColor"
-                                          stroke-width="1.7"
-                                          stroke-linecap="round"
-                                          stroke-linejoin="round"
-                                      ></path>
-                                      <path
-                                          d="M12 18.01L12.01 17.9989"
-                                          stroke="currentColor"
-                                          stroke-width="1.7"
-                                          stroke-linecap="round"
-                                          stroke-linejoin="round"
-                                      ></path>
+                                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                      <path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0ZM8.94 6.94a.75.75 0 1 1-1.061-1.061 3 3 0 1 1 2.871 5.026v.345a.75.75 0 0 1-1.5 0v-.5c0-.72.57-1.172 1.081-1.287A1.5 1.5 0 1 0 8.94 6.94ZM10 15a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd" />
                                   </svg>
                               </button>
                           `
@@ -362,47 +315,19 @@ export class AppHeader extends LitElement {
                     ${this.currentView === 'assistant'
                         ? html`
                               <button @click=${this.onHideToggleClick} class="button">
-                                  Hide&nbsp;&nbsp;<span class="key" style="pointer-events: none;">${cheddar.isMacOS ? 'Cmd' : 'Ctrl'}</span
+                                  Hide&nbsp;&nbsp;<span class="key" style="pointer-events: none;">${cheatingDaddy.isMacOS ? 'Cmd' : 'Ctrl'}</span
                                   >&nbsp;&nbsp;<span class="key">&bsol;</span>
                               </button>
                               <button @click=${this.onCloseClick} class="icon-button window-close">
-                                  <?xml version="1.0" encoding="UTF-8"?><svg
-                                      width="24px"
-                                      height="24px"
-                                      stroke-width="1.7"
-                                      viewBox="0 0 24 24"
-                                      fill="none"
-                                      xmlns="http://www.w3.org/2000/svg"
-                                      color="currentColor"
-                                  >
-                                      <path
-                                          d="M6.75827 17.2426L12.0009 12M17.2435 6.75736L12.0009 12M12.0009 12L6.75827 6.75736M12.0009 12L17.2435 17.2426"
-                                          stroke="currentColor"
-                                          stroke-width="1.7"
-                                          stroke-linecap="round"
-                                          stroke-linejoin="round"
-                                      ></path>
+                                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                      <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
                                   </svg>
                               </button>
                           `
                         : html`
                               <button @click=${this.isNavigationView() ? this.onBackClick : this.onCloseClick} class="icon-button window-close">
-                                  <?xml version="1.0" encoding="UTF-8"?><svg
-                                      width="24px"
-                                      height="24px"
-                                      stroke-width="1.7"
-                                      viewBox="0 0 24 24"
-                                      fill="none"
-                                      xmlns="http://www.w3.org/2000/svg"
-                                      color="currentColor"
-                                  >
-                                      <path
-                                          d="M6.75827 17.2426L12.0009 12M17.2435 6.75736L12.0009 12M12.0009 12L6.75827 6.75736M12.0009 12L17.2435 17.2426"
-                                          stroke="currentColor"
-                                          stroke-width="1.7"
-                                          stroke-linecap="round"
-                                          stroke-linejoin="round"
-                                      ></path>
+                                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                      <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
                                   </svg>
                               </button>
                           `}
