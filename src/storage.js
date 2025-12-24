@@ -8,11 +8,11 @@ const CONFIG_VERSION = 1;
 const DEFAULT_CONFIG = {
     configVersion: CONFIG_VERSION,
     onboarded: false,
-    layout: 'normal'
+    layout: 'normal',
 };
 
 const DEFAULT_CREDENTIALS = {
-    apiKey: ''
+    apiKey: '',
 };
 
 const DEFAULT_PREFERENCES = {
@@ -25,13 +25,24 @@ const DEFAULT_PREFERENCES = {
     audioMode: 'speaker_only',
     fontSize: 'medium',
     backgroundTransparency: 0.8,
-    googleSearchEnabled: false
+    googleSearchEnabled: false,
+    selectedModel: 'gemini-2.5-flash-native-audio-preview-12-2025',
 };
+
+// Available Live API models for dropdown
+// Updated Dec 2025: gemini-2.0-flash-live-001 and gemini-live-2.5-flash-preview were shut down on Dec 9, 2025
+const AVAILABLE_MODELS = [
+    {
+        id: 'gemini-2.5-flash-native-audio-preview-12-2025',
+        name: 'Gemini 2.5 Flash Native Audio (Dec 2025)',
+        description: 'Latest native audio model with improved function calling',
+    },
+];
 
 const DEFAULT_KEYBINDS = null; // null means use system defaults
 
 const DEFAULT_LIMITS = {
-    data: [] // Array of { date: 'YYYY-MM-DD', flash: { count: 0 }, flashLite: { count: 0 } }
+    data: [], // Array of { date: 'YYYY-MM-DD', flash: { count: 0 }, flashLite: { count: 0 } }
 };
 
 // Get the config directory path based on OS
@@ -252,7 +263,7 @@ function getTodayLimits() {
     const newEntry = {
         date: today,
         flash: { count: 0 },
-        flashLite: { count: 0 }
+        flashLite: { count: 0 },
     };
     limits.data.push(newEntry);
     setLimits(limits);
@@ -273,7 +284,7 @@ function incrementLimitCount(model) {
         todayEntry = {
             date: today,
             flash: { count: 0 },
-            flashLite: { count: 0 }
+            flashLite: { count: 0 },
         };
         limits.data.push(todayEntry);
     } else {
@@ -327,7 +338,7 @@ function saveSession(sessionId, data) {
         customPrompt: data.customPrompt || existingSession?.customPrompt || null,
         // Conversation data
         conversationHistory: data.conversationHistory || existingSession?.conversationHistory || [],
-        screenAnalysisHistory: data.screenAnalysisHistory || existingSession?.screenAnalysisHistory || []
+        screenAnalysisHistory: data.screenAnalysisHistory || existingSession?.screenAnalysisHistory || [],
     };
     return writeJsonFile(sessionPath, sessionData);
 }
@@ -344,7 +355,8 @@ function getAllSessions() {
             return [];
         }
 
-        const files = fs.readdirSync(historyDir)
+        const files = fs
+            .readdirSync(historyDir)
             .filter(f => f.endsWith('.json'))
             .sort((a, b) => {
                 // Sort by timestamp descending (newest first)
@@ -353,22 +365,24 @@ function getAllSessions() {
                 return tsB - tsA;
             });
 
-        return files.map(file => {
-            const sessionId = file.replace('.json', '');
-            const data = readJsonFile(path.join(historyDir, file), null);
-            if (data) {
-                return {
-                    sessionId,
-                    createdAt: data.createdAt,
-                    lastUpdated: data.lastUpdated,
-                    messageCount: data.conversationHistory?.length || 0,
-                    screenAnalysisCount: data.screenAnalysisHistory?.length || 0,
-                    profile: data.profile || null,
-                    customPrompt: data.customPrompt || null
-                };
-            }
-            return null;
-        }).filter(Boolean);
+        return files
+            .map(file => {
+                const sessionId = file.replace('.json', '');
+                const data = readJsonFile(path.join(historyDir, file), null);
+                if (data) {
+                    return {
+                        sessionId,
+                        createdAt: data.createdAt,
+                        lastUpdated: data.lastUpdated,
+                        messageCount: data.conversationHistory?.length || 0,
+                        screenAnalysisCount: data.screenAnalysisHistory?.length || 0,
+                        profile: data.profile || null,
+                        customPrompt: data.customPrompt || null,
+                    };
+                }
+                return null;
+            })
+            .filter(Boolean);
     } catch (error) {
         console.error('Error reading sessions:', error.message);
         return [];
@@ -443,6 +457,10 @@ module.exports = {
     incrementLimitCount,
     getAvailableModel,
 
+    // Models
+    getAvailableModels: () => AVAILABLE_MODELS,
+    getSelectedModel: () => getPreferences().selectedModel || DEFAULT_PREFERENCES.selectedModel,
+
     // History
     saveSession,
     getSession,
@@ -451,5 +469,5 @@ module.exports = {
     deleteAllSessions,
 
     // Clear all
-    clearAllData
+    clearAllData,
 };

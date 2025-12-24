@@ -1,9 +1,9 @@
-const { GoogleGenAI, Modality } = require('@google/genai');
+const { GoogleGenAI, Modality, StartSensitivity, EndSensitivity } = require('@google/genai');
 const { BrowserWindow, ipcMain } = require('electron');
 const { spawn } = require('child_process');
 const { saveDebugAudio } = require('../audioUtils');
 const { getSystemPrompt } = require('./prompts');
-const { getAvailableModel, incrementLimitCount, getApiKey } = require('../storage');
+const { getAvailableModel, incrementLimitCount, getApiKey, getSelectedModel } = require('../storage');
 
 // Conversation tracking variables
 let currentSessionId = null;
@@ -52,9 +52,7 @@ function buildContextMessage() {
 
     if (validTurns.length === 0) return null;
 
-    const contextLines = validTurns.map(turn =>
-        `[Interviewer]: ${turn.transcription.trim()}\n[Your answer]: ${turn.ai_response.trim()}`
-    );
+    const contextLines = validTurns.map(turn => `[Interviewer]: ${turn.transcription.trim()}\n[Your answer]: ${turn.ai_response.trim()}`);
 
     return `Session reconnected. Here's the conversation so far:\n\n${contextLines.join('\n\n')}\n\nContinue from here.`;
 }
@@ -74,7 +72,7 @@ function initializeNewSession(profile = null, customPrompt = null) {
         sendToRenderer('save-session-context', {
             sessionId: currentSessionId,
             profile: profile,
-            customPrompt: customPrompt || ''
+            customPrompt: customPrompt || '',
         });
     }
 }
@@ -110,7 +108,7 @@ function saveScreenAnalysis(prompt, response, model) {
         timestamp: Date.now(),
         prompt: prompt,
         response: response.trim(),
-        model: model
+        model: model,
     };
 
     screenAnalysisHistory.push(analysisEntry);
@@ -122,7 +120,7 @@ function saveScreenAnalysis(prompt, response, model) {
         analysis: analysisEntry,
         fullHistory: screenAnalysisHistory,
         profile: currentProfile,
-        customPrompt: currentCustomPrompt
+        customPrompt: currentCustomPrompt,
     });
 }
 
@@ -217,15 +215,24 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
         initializeNewSession(profile, customPrompt);
     }
 
+    // Get selected model from preferences (default to latest if not set)
+    const selectedModel = getSelectedModel();
+    console.log('Using Gemini model:', selectedModel);
+
     try {
         const session = await client.live.connect({
-            model: 'gemini-2.5-flash-native-audio-preview-09-2025',
+            model: selectedModel,
             callbacks: {
                 onopen: function () {
+                    console.log('[Gemini] Session connected');
                     sendToRenderer('update-status', 'Live session connected');
                 },
                 onmessage: function (message) {
-                    console.log('----------------', message);
+                    // Minimal logging for performance - only log important events
+                    if (message.setupComplete) {
+                        console.log('[Gemini] Setup complete');
+                        return;
+                    }
 
                     // Handle input transcription (what was spoken)
                     if (message.serverContent?.inputTranscription?.results) {
@@ -234,13 +241,15 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                         const text = message.serverContent.inputTranscription.text;
                         if (text.trim() !== '') {
                             currentTranscription += text;
+                            // Send live transcription to UI for real-time display
+                            sendToRenderer('input-transcription', currentTranscription);
                         }
                     }
 
                     // Handle AI model response via output transcription (native audio model)
                     if (message.serverContent?.outputTranscription?.text) {
                         const text = message.serverContent.outputTranscription.text;
-                        if (text.trim() === '') return; // Ignore empty transcriptions
+                        if (text.trim() === '') return;
                         const isNewResponse = messageBuffer === '';
                         messageBuffer += text;
                         sendToRenderer(isNewResponse ? 'new-response' : 'update-response', messageBuffer);
@@ -250,6 +259,7 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                         // Only send/save if there's actual content
                         if (messageBuffer.trim() !== '') {
                             sendToRenderer('update-response', messageBuffer);
+                            console.log('[Gemini] Response complete:', messageBuffer.substring(0, 50) + '...');
 
                             // Save conversation turn when we have both transcription and AI response
                             if (currentTranscription) {
@@ -263,10 +273,32 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                     if (message.serverContent?.turnComplete) {
                         sendToRenderer('update-status', 'Listening...');
                     }
+
+                    // Handle interruption
+                    if (message.serverContent?.interrupted) {
+                        console.log('[Gemini] User interrupted');
+                        messageBuffer = '';
+                    }
                 },
                 onerror: function (e) {
-                    console.log('Session error:', e.message);
-                    sendToRenderer('update-status', 'Error: ' + e.message);
+                    console.error('Session error:', e.message, e);
+
+                    // Parse and provide user-friendly error messages
+                    let userMessage = 'Error: ' + e.message;
+
+                    if (e.message?.includes('not found') || e.message?.includes('NOT_FOUND')) {
+                        userMessage = 'Model not available. Try updating the app or check API access.';
+                    } else if (e.message?.includes('RESOURCE_EXHAUSTED') || e.message?.includes('quota')) {
+                        userMessage = 'API rate limit reached. Wait a few minutes or upgrade your API plan.';
+                    } else if (e.message?.includes('INVALID_ARGUMENT') || e.message?.includes('API key')) {
+                        userMessage = 'Invalid API key. Please check your Gemini API key in settings.';
+                    } else if (e.message?.includes('PERMISSION_DENIED')) {
+                        userMessage = 'API permission denied. Ensure your API key has access to the Live API.';
+                    } else if (e.message?.includes('UNAVAILABLE') || e.message?.includes('network')) {
+                        userMessage = 'Connection lost. Check your internet connection.';
+                    }
+
+                    sendToRenderer('update-status', userMessage);
                 },
                 onclose: function (e) {
                     console.log('Session closed:', e.reason);
@@ -287,22 +319,111 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                 },
             },
             config: {
+                // ═══════════════════════════════════════════════════════════
+                // ULTIMATE INTERVIEW CONFIG - Fast, Accurate, Never Fails
+                // ═══════════════════════════════════════════════════════════
+
+                // Audio response (required for native audio model)
                 responseModalities: [Modality.AUDIO],
-                proactivity: { proactiveAudio: true },
+
+                // Transcriptions - see what interviewer said + your answer
                 outputAudioTranscription: {},
+                inputAudioTranscription: {},
+
+                // Tools - only if user enabled (Google Search adds latency)
                 tools: enabledTools,
-                // Enable speaker diarization
-                inputAudioTranscription: {
-                    enableSpeakerDiarization: true,
-                    minSpeakerCount: 2,
-                    maxSpeakerCount: 2,
+
+                // VAD - MAXIMUM SPEED CONFIG
+                realtimeInputConfig: {
+                    automaticActivityDetection: {
+                        disabled: false,
+                        // HIGH = detect speech start instantly
+                        startOfSpeechSensitivity: StartSensitivity.START_SENSITIVITY_HIGH,
+                        // HIGH = detect end of speech aggressively
+                        endOfSpeechSensitivity: EndSensitivity.END_SENSITIVITY_HIGH,
+                        // Minimum prefix padding
+                        prefixPaddingMs: 50,
+                        // 100ms silence = respond immediately
+                        silenceDurationMs: 100,
+                    },
+                    // Only include actual speech, not silence
+                    turnCoverage: 'TURN_INCLUDES_ONLY_ACTIVITY',
                 },
-                contextWindowCompression: { slidingWindow: {} },
-                speechConfig: { languageCode: language },
+
+                // Long interview support - compress old context
+                contextWindowCompression: {
+                    slidingWindow: {},
+                },
+
+                // System instruction
                 systemInstruction: {
                     parts: [{ text: systemPrompt }],
                 },
             },
+
+                 // config: {
+            //     // ============ OPTIMIZED FOR INTERVIEW + SPEAKER ONLY MODE ============
+            //     //
+            //     // USE CASE: User in interview on Windows, capturing interviewer's
+            //     // questions via loopback. Need CORRECT text answers to read silently.
+            //     //
+            //     // PRIORITY: Correctness > Speed (but both matter)
+            //     // TEXT ONLY: User reads answers, interviewer hears nothing
+
+            //     responseModalities: [Modality.AUDIO],
+
+            //     // Proactive - Gemini decides when to respond
+            //     // Won't interrupt mid-sentence, waits for silence
+            //     proactivity: { proactiveAudio: true },
+
+            //     // Input transcription - see what Gemini heard from interviewer
+            //     // (outputAudioTranscription not needed since we use TEXT response)
+            //     outputAudioTranscription: {},
+            //     inputAudioTranscription: {},
+
+            //     // Tools (Google Search if enabled)
+            //     tools: enabledTools,
+
+            //     // ============ VAD SETTINGS FOR INTERVIEW SCENARIOS ============
+            //     //
+            //     // SCENARIO: Interviewer asks "Tell me about... [pause] ...your experience"
+            //     // We need to capture the FULL question, not respond during pause.
+            //     //
+            //     realtimeInputConfig: {
+            //         automaticActivityDetection: {
+            //             disabled: false,
+
+            //             // HIGH = quick to detect speech start (don't miss first word)
+            //             startOfSpeechSensitivity: StartSensitivity.START_SENSITIVITY_HIGH,
+
+            //             // LOW = less aggressive on detecting end of speech
+            //             // This prevents cutting off during natural pauses in questions
+            //             // HIGH ends speech more often (bad for interviews)
+            //             // LOW ends speech less often (captures complete questions)
+            //             endOfSpeechSensitivity: EndSensitivity.END_SENSITIVITY_LOW,
+
+            //             // Capture 100ms of audio before speech detected
+            //             // Helps catch the beginning of words
+            //             prefixPaddingMs: 100,
+
+            //             // 800ms silence = speaker finished talking
+            //             // Optimized for SPEAKER-ONLY mode (no mic, just interviewer)
+            //             // Why 800ms:
+            //             // - Too short (500ms): Cuts off "What's your strength... and weakness?"
+            //             // - Too long (1200ms+): Feels slow
+            //             // - 800ms: Safe for complete questions, still responsive
+            //             silenceDurationMs: 800,
+            //         },
+            //     },
+
+            //     // Context window compression for long interviews
+            //     contextWindowCompression: { slidingWindow: {} },
+
+            //     // System instruction
+            //     systemInstruction: {
+            //         parts: [{ text: systemPrompt }],
+            //     },
+            // },
         });
 
         isInitializingSession = false;
@@ -316,6 +437,26 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
         if (!isReconnect) {
             sendToRenderer('session-initializing', false);
         }
+
+        // Provide detailed error feedback
+        let errorMessage = 'Failed to connect: ';
+        const errorStr = error?.message || String(error);
+
+        if (errorStr.includes('not found') || errorStr.includes('NOT_FOUND')) {
+            errorMessage += 'Model not available. The API model may have been deprecated or your account may not have access.';
+        } else if (errorStr.includes('RESOURCE_EXHAUSTED') || errorStr.includes('quota') || errorStr.includes('429')) {
+            errorMessage += 'Rate limit exceeded. Free tier limits: ~20 requests/day. Wait or upgrade your plan.';
+        } else if (errorStr.includes('INVALID_ARGUMENT') || errorStr.includes('API_KEY_INVALID')) {
+            errorMessage += 'Invalid API key. Check your Gemini API key in settings.';
+        } else if (errorStr.includes('PERMISSION_DENIED') || errorStr.includes('403')) {
+            errorMessage += 'Permission denied. Ensure your API key has Live API access enabled.';
+        } else if (errorStr.includes('UNAVAILABLE') || errorStr.includes('ENOTFOUND') || errorStr.includes('network')) {
+            errorMessage += 'Network error. Check your internet connection.';
+        } else {
+            errorMessage += errorStr;
+        }
+
+        sendToRenderer('update-status', errorMessage);
         return null;
     }
 }
@@ -448,7 +589,8 @@ async function startMacOSAudioCapture(geminiSessionRef) {
     console.log('SystemAudioDump started with PID:', systemAudioProc.pid);
 
     const CHUNK_DURATION = 0.1;
-    const SAMPLE_RATE = 24000;
+    // Audio input to Gemini Live API must be PCM 16-bit, 16kHz, mono
+    const SAMPLE_RATE = 16000;
     const BYTES_PER_SAMPLE = 2;
     const CHANNELS = 2;
     const CHUNK_SIZE = SAMPLE_RATE * BYTES_PER_SAMPLE * CHANNELS * CHUNK_DURATION;
@@ -519,15 +661,17 @@ async function sendAudioToGemini(base64Data, geminiSessionRef) {
     if (!geminiSessionRef.current) return;
 
     try {
-        process.stdout.write('.');
         await geminiSessionRef.current.sendRealtimeInput({
             audio: {
                 data: base64Data,
-                mimeType: 'audio/pcm;rate=24000',
+                mimeType: 'audio/pcm;rate=16000',
             },
         });
     } catch (error) {
-        console.error('Error sending audio to Gemini:', error);
+        // Only log actual errors, not routine issues
+        if (!error.message?.includes('closed') && !error.message?.includes('CANCELLED')) {
+            console.error('[Gemini] Audio send error:', error.message);
+        }
     }
 }
 
@@ -600,31 +744,33 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
         return false;
     });
 
-    ipcMain.handle('send-audio-content', async (event, { data, mimeType }) => {
+    ipcMain.handle('send-audio-content', async (_event, { data, mimeType }) => {
         if (!geminiSessionRef.current) return { success: false, error: 'No active Gemini session' };
         try {
-            process.stdout.write('.');
             await geminiSessionRef.current.sendRealtimeInput({
                 audio: { data: data, mimeType: mimeType },
             });
             return { success: true };
         } catch (error) {
-            console.error('Error sending system audio:', error);
+            if (!error.message?.includes('closed')) {
+                console.error('[Gemini] System audio error:', error.message);
+            }
             return { success: false, error: error.message };
         }
     });
 
     // Handle microphone audio on a separate channel
-    ipcMain.handle('send-mic-audio-content', async (event, { data, mimeType }) => {
+    ipcMain.handle('send-mic-audio-content', async (_event, { data, mimeType }) => {
         if (!geminiSessionRef.current) return { success: false, error: 'No active Gemini session' };
         try {
-            process.stdout.write(',');
             await geminiSessionRef.current.sendRealtimeInput({
                 audio: { data: data, mimeType: mimeType },
             });
             return { success: true };
         } catch (error) {
-            console.error('Error sending mic audio:', error);
+            if (!error.message?.includes('closed')) {
+                console.error('[Gemini] Mic audio error:', error.message);
+            }
             return { success: false, error: error.message };
         }
     });
@@ -639,22 +785,20 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
             const buffer = Buffer.from(data, 'base64');
 
             if (buffer.length < 1000) {
-                console.error(`Image buffer too small: ${buffer.length} bytes`);
+                console.error('[Gemini] Image buffer too small:', buffer.length, 'bytes');
                 return { success: false, error: 'Image buffer too small' };
             }
-
-            process.stdout.write('!');
 
             // Use HTTP API instead of realtime session
             const result = await sendImageToGeminiHttp(data, prompt);
             return result;
         } catch (error) {
-            console.error('Error sending image:', error);
+            console.error('[Gemini] Image send error:', error.message);
             return { success: false, error: error.message };
         }
     });
 
-    ipcMain.handle('send-text-message', async (event, text) => {
+    ipcMain.handle('send-text-message', async (_event, text) => {
         if (!geminiSessionRef.current) return { success: false, error: 'No active Gemini session' };
 
         try {
@@ -662,11 +806,11 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
                 return { success: false, error: 'Invalid text message' };
             }
 
-            console.log('Sending text message:', text);
+            console.log('[Gemini] Sending text:', text.substring(0, 50));
             await geminiSessionRef.current.sendRealtimeInput({ text: text.trim() });
             return { success: true };
         } catch (error) {
-            console.error('Error sending text:', error);
+            console.error('[Gemini] Text send error:', error.message);
             return { success: false, error: error.message };
         }
     });
