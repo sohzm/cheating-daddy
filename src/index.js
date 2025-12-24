@@ -221,6 +221,25 @@ function setupStorageIpcHandlers() {
         }
     });
 
+    // ============ MODELS ============
+    ipcMain.handle('storage:get-available-models', async () => {
+        try {
+            return { success: true, data: storage.getAvailableModels() };
+        } catch (error) {
+            console.error('Error getting available models:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('storage:get-selected-model', async () => {
+        try {
+            return { success: true, data: storage.getSelectedModel() };
+        } catch (error) {
+            console.error('Error getting selected model:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
     // ============ CLEAR ALL ============
     ipcMain.handle('storage:clear-all', async () => {
         try {
