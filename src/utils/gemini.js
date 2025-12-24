@@ -361,69 +361,7 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                 },
             },
 
-                 // config: {
-            //     // ============ OPTIMIZED FOR INTERVIEW + SPEAKER ONLY MODE ============
-            //     //
-            //     // USE CASE: User in interview on Windows, capturing interviewer's
-            //     // questions via loopback. Need CORRECT text answers to read silently.
-            //     //
-            //     // PRIORITY: Correctness > Speed (but both matter)
-            //     // TEXT ONLY: User reads answers, interviewer hears nothing
-
-            //     responseModalities: [Modality.AUDIO],
-
-            //     // Proactive - Gemini decides when to respond
-            //     // Won't interrupt mid-sentence, waits for silence
-            //     proactivity: { proactiveAudio: true },
-
-            //     // Input transcription - see what Gemini heard from interviewer
-            //     // (outputAudioTranscription not needed since we use TEXT response)
-            //     outputAudioTranscription: {},
-            //     inputAudioTranscription: {},
-
-            //     // Tools (Google Search if enabled)
-            //     tools: enabledTools,
-
-            //     // ============ VAD SETTINGS FOR INTERVIEW SCENARIOS ============
-            //     //
-            //     // SCENARIO: Interviewer asks "Tell me about... [pause] ...your experience"
-            //     // We need to capture the FULL question, not respond during pause.
-            //     //
-            //     realtimeInputConfig: {
-            //         automaticActivityDetection: {
-            //             disabled: false,
-
-            //             // HIGH = quick to detect speech start (don't miss first word)
-            //             startOfSpeechSensitivity: StartSensitivity.START_SENSITIVITY_HIGH,
-
-            //             // LOW = less aggressive on detecting end of speech
-            //             // This prevents cutting off during natural pauses in questions
-            //             // HIGH ends speech more often (bad for interviews)
-            //             // LOW ends speech less often (captures complete questions)
-            //             endOfSpeechSensitivity: EndSensitivity.END_SENSITIVITY_LOW,
-
-            //             // Capture 100ms of audio before speech detected
-            //             // Helps catch the beginning of words
-            //             prefixPaddingMs: 100,
-
-            //             // 800ms silence = speaker finished talking
-            //             // Optimized for SPEAKER-ONLY mode (no mic, just interviewer)
-            //             // Why 800ms:
-            //             // - Too short (500ms): Cuts off "What's your strength... and weakness?"
-            //             // - Too long (1200ms+): Feels slow
-            //             // - 800ms: Safe for complete questions, still responsive
-            //             silenceDurationMs: 800,
-            //         },
-            //     },
-
-            //     // Context window compression for long interviews
-            //     contextWindowCompression: { slidingWindow: {} },
-
-            //     // System instruction
-            //     systemInstruction: {
-            //         parts: [{ text: systemPrompt }],
-            //     },
-            // },
+            
         });
 
         isInitializingSession = false;
