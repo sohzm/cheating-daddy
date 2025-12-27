@@ -102,6 +102,19 @@ window.api = {
         ipcRenderer.invoke('update-google-search-setting', enabled),
     
     // ========================================================================
+    // OLLAMA CHAT PROVIDER METHODS
+    // ========================================================================
+    
+    testOllamaConnection: () => 
+        ipcRenderer.invoke('test-ollama-connection'),
+    
+    setChatProvider: (provider) => 
+        ipcRenderer.invoke('set-chat-provider', provider),
+    
+    getChatProvider: () => 
+        ipcRenderer.invoke('get-chat-provider'),
+    
+    // ========================================================================
     // APPLICATION METHODS
     // ========================================================================
     

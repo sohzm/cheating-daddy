@@ -700,7 +700,16 @@ async function sendTextMessage(text) {
     }
 
     try {
-        // Capture screenshot and get base64 data
+        // Check if we're using Ollama - if so, send text-only message directly
+        const chatProvider = localStorage.getItem('chatProvider') || 'gemini';
+        if (chatProvider === 'ollama') {
+            console.log('Sending text-only message to Ollama...');
+            // Use the IPC handler directly for text-only messages with Ollama
+            const result = await ipcRenderer.invoke('send-text-message', text.trim());
+            return result;
+        }
+
+        // Capture screenshot and get base64 data (for Gemini mode)
         console.log('Capturing screenshot with text message...');
 
         if (!mediaStream) {

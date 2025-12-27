@@ -434,6 +434,9 @@ export class CustomizeView extends LitElement {
         layoutMode: { type: String },
         keybinds: { type: Object },
         googleSearchEnabled: { type: Boolean },
+        chatProvider: { type: String },
+        ollamaModel: { type: String },
+        ollamaTestResult: { type: String },
         vadEnabled: { type: Boolean },
         vadMode: { type: String },
         backgroundTransparency: { type: Number },
@@ -467,6 +470,11 @@ export class CustomizeView extends LitElement {
         // Google Search default
         this.googleSearchEnabled = true;
 
+        // Chat provider settings
+        this.chatProvider = 'gemini'; // 'gemini' or 'ollama'
+        this.ollamaModel = null;
+        this.ollamaTestResult = null;
+
         // Advanced mode default
         this.advancedMode = false;
 
@@ -486,6 +494,7 @@ export class CustomizeView extends LitElement {
 
         this.loadKeybinds();
         this.loadGoogleSearchSettings();
+        this.loadChatProviderSettings();
         this.loadAdvancedModeSettings();
         this.loadVADSettings();
         this.loadBackgroundTransparency();
@@ -898,6 +907,83 @@ export class CustomizeView extends LitElement {
             } catch (error) {
                 console.error('Failed to notify main process:', error);
             }
+        }
+
+        this.requestUpdate();
+    }
+
+    loadChatProviderSettings() {
+        const savedProvider = localStorage.getItem('chatProvider');
+        if (savedProvider && (savedProvider === 'gemini' || savedProvider === 'ollama')) {
+            this.chatProvider = savedProvider;
+        }
+    }
+
+    async handleChatProviderSelect(e) {
+        const newProvider = e.target.value;
+        console.log('[Settings] Switching chat provider to:', newProvider);
+
+        if (newProvider === 'ollama') {
+            // Test Ollama connection before switching
+            this.ollamaTestResult = 'testing';
+            this.requestUpdate();
+
+            try {
+                const result = await window.api.testOllamaConnection();
+                
+                if (result.success) {
+                    this.chatProvider = 'ollama';
+                    this.ollamaModel = result.model;
+                    this.ollamaTestResult = 'success';
+                    localStorage.setItem('chatProvider', 'ollama');
+                    
+                    // Set provider in main process
+                    await window.api.setChatProvider('ollama');
+                    console.log('[Settings] Switched to Ollama:', result.model);
+                } else {
+                    this.ollamaTestResult = result.error || 'Connection failed';
+                    console.error('[Settings] Ollama test failed:', result.error);
+                    // Keep Gemini as provider, reset dropdown
+                    this.chatProvider = 'gemini';
+                }
+            } catch (error) {
+                this.ollamaTestResult = error.message;
+                console.error('[Settings] Error testing Ollama:', error);
+                this.chatProvider = 'gemini';
+            }
+        } else {
+            // Switch to Gemini
+            this.chatProvider = 'gemini';
+            this.ollamaModel = null;
+            this.ollamaTestResult = null;
+            localStorage.setItem('chatProvider', 'gemini');
+            
+            await window.api.setChatProvider('gemini');
+            console.log('[Settings] Switched to Gemini');
+        }
+
+        this.requestUpdate();
+    }
+
+    async handleTestOllamaConnection() {
+        console.log('[Settings] Testing Ollama connection...');
+        this.ollamaTestResult = 'testing';
+        this.requestUpdate();
+
+        try {
+            const result = await window.api.testOllamaConnection();
+            
+            if (result.success) {
+                this.ollamaTestResult = 'success';
+                this.ollamaModel = result.model;
+                console.log('[Settings] Ollama test successful:', result.model);
+            } else {
+                this.ollamaTestResult = result.error || 'Connection failed';
+                console.error('[Settings] Ollama test failed:', result.error);
+            }
+        } catch (error) {
+            this.ollamaTestResult = error.message;
+            console.error('[Settings] Error testing Ollama:', error);
         }
 
         this.requestUpdate();
@@ -1485,6 +1571,85 @@ export class CustomizeView extends LitElement {
                             Allow the AI to search Google for up-to-date information and facts during conversations
                             <br /><strong>Note:</strong> Changes take effect when starting a new AI session
                         </div>
+                    </div>
+                </div>
+
+                <!-- Chat Provider Section -->
+                <div class="settings-section">
+                    <div class="section-title">
+                        <span>Chat Provider</span>
+                    </div>
+
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label class="form-label">
+                                Provider
+                                <span class="current-selection">${this.chatProvider === 'ollama' ? 'Ollama (Local)' : 'Gemini (Default)'}</span>
+                            </label>
+                            <select
+                                class="form-control"
+                                .value=${this.chatProvider}
+                                @change=${this.handleChatProviderSelect}
+                            >
+                                <option value="gemini">Gemini (Default)</option>
+                                <option value="ollama">Ollama (Local)</option>
+                            </select>
+                            <div class="form-description">
+                                Choose between Gemini API (default) or local Ollama for chat messages.
+                                <br /><strong>Note:</strong> Ollama is chat-only. All other features use Gemini.
+                            </div>
+                        </div>
+
+                        ${this.chatProvider === 'ollama'
+                            ? html`
+                                  <div class="form-group full-width">
+                                      <div class="warning-box">
+                                          <span class="warning-icon">⚠️</span>
+                                          <div>
+                                              <strong>Ollama Limitations:</strong>
+                                              <br />• <strong>Chat messages only</strong> - Text-based conversations work
+                                              <br />• <strong>No screenshot analysis</strong> - Cannot process images (Ctrl+Enter won't work)
+                                              <br />• <strong>No audio processing</strong> - Cannot analyze speech or audio
+                                              <br />• <strong>All other features use Gemini</strong> - Live API, advanced mode, etc.
+                                              <br /><br />
+                                              💡 <strong>Best for:</strong> Offline chat when internet is available but you want to reduce Gemini API token usage
+                                          </div>
+                                      </div>
+                                  </div>
+
+                                  <div class="form-group">
+                                      <label class="form-label">Ollama Status</label>
+                                      <div style="display: flex; gap: 8px; align-items: center;">
+                                          <button
+                                              @click=${this.handleTestOllamaConnection}
+                                              class="reset-keybinds-button"
+                                              style="flex-shrink: 0;"
+                                          >
+                                              Test Connection
+                                          </button>
+                                          ${this.ollamaTestResult === 'testing'
+                                              ? html`<span style="color: var(--description-color); font-size: 12px;"
+                                                    >Testing...</span
+                                                >`
+                                              : this.ollamaTestResult === 'success'
+                                                ? html`<span style="color: var(--success-color); font-size: 12px;"
+                                                      >✓ Connected: ${this.ollamaModel}</span
+                                                  >`
+                                                : this.ollamaTestResult
+                                                  ? html`<span style="color: #ef4444; font-size: 12px;"
+                                                        >✗ ${this.ollamaTestResult}</span
+                                                    >`
+                                                  : html`<span style="color: var(--description-color); font-size: 12px;"
+                                                        >Click to test</span
+                                                    >`}
+                                      </div>
+                                      <div class="form-description">
+                                          Verify Ollama is running and accessible. Model is auto-detected.
+                                          <br /><strong>Install Ollama:</strong> <a href="#" @click=${e => { e.preventDefault(); window.api.openExternal('https://ollama.ai/download'); }} style="color: var(--link-color);">ollama.ai/download</a>
+                                      </div>
+                                  </div>
+                              `
+                            : ''}
                     </div>
                 </div>
 

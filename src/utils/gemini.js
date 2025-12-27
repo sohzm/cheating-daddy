@@ -6,6 +6,7 @@ const { saveDebugAudio } = require('../audioUtils');
 const { getSystemPrompt } = require('./prompts');
 const { VADProcessor } = require('./vad');
 const { PseudoLiveOrchestrator } = require('./pseudoLiveOrchestrator');
+const { testOllamaConnection, sendChatMessage: sendOllamaChatMessage, detectActiveModel } = require('./ollama');
 
 // Conversation tracking variables
 let currentSessionId = null;
@@ -48,6 +49,11 @@ let macVADProcessor = null;
 let macVADEnabled = false;
 let macVADMode = 'automatic';
 let macMicrophoneEnabled = false;
+
+// Ollama chat provider variables
+let useOllama = false; // Flag to use Ollama instead of Gemini for chat
+let ollamaModel = null; // Active Ollama model name
+const OLLAMA_URL = 'http://localhost:11434'; // Default Ollama URL
 
 // Pseudo-Live Orchestrator (production-grade STT + VAD pipeline)
 let pseudoLiveOrchestrator = null;
@@ -1394,18 +1400,47 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
     });
 
     ipcMain.handle('send-text-message', async (event, text) => {
-        if (!geminiSessionRef.current) return { success: false, error: 'No active Gemini session' };
-
         try {
             if (!text || typeof text !== 'string' || text.trim().length === 0) {
                 return { success: false, error: 'Invalid text message' };
             }
 
             console.log('Sending text message:', text);
-            await geminiSessionRef.current.sendRealtimeInput({ text: text.trim() });
-            return { success: true };
+
+            // Route to appropriate provider
+            if (useOllama) {
+                // Use Ollama for chat
+                if (!ollamaModel) {
+                    // Auto-detect model if not set
+                    ollamaModel = await detectActiveModel(OLLAMA_URL);
+                    if (!ollamaModel) {
+                        return { success: false, error: 'No Ollama model available' };
+                    }
+                }
+
+                console.log(`📤 [Ollama] Sending to ${ollamaModel}...`);
+                sendToRenderer('update-status', 'Thinking...');
+
+                const response = await sendOllamaChatMessage(text.trim(), ollamaModel, OLLAMA_URL);
+
+                // Send response to renderer
+                sendToRenderer('update-response', response);
+                sendToRenderer('update-status', 'Ready');
+
+                console.log(`✅ [Ollama] Response sent (${response.length} chars)`);
+                return { success: true };
+            } else {
+                // Use Gemini
+                if (!geminiSessionRef.current) {
+                    return { success: false, error: 'No active Gemini session' };
+                }
+
+                await geminiSessionRef.current.sendRealtimeInput({ text: text.trim() });
+                return { success: true };
+            }
         } catch (error) {
             console.error('Error sending text:', error);
+            sendToRenderer('update-status', 'Error');
             return { success: false, error: error.message };
         }
     });
@@ -1740,6 +1775,67 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
             return { success: true, enabled };
         } catch (error) {
             console.error('❌ [IPC] Error toggling microphone:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    // ========================================================================
+    // OLLAMA CHAT PROVIDER HANDLERS
+    // ========================================================================
+
+    ipcMain.handle('test-ollama-connection', async (event) => {
+        try {
+            console.log('🔍 [Ollama] Testing connection...');
+            const result = await testOllamaConnection(OLLAMA_URL);
+            console.log('✅ [Ollama] Test result:', result);
+            return result;
+        } catch (error) {
+            console.error('❌ [Ollama] Connection test error:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('set-chat-provider', async (event, provider) => {
+        try {
+            console.log(`🔄 [Chat] Switching provider to: ${provider}`);
+
+            if (provider === 'ollama') {
+                // Verify Ollama is available before switching
+                const testResult = await testOllamaConnection(OLLAMA_URL);
+                if (!testResult.success) {
+                    return {
+                        success: false,
+                        error: testResult.error || 'Ollama not available',
+                    };
+                }
+
+                // Set Ollama as active provider
+                useOllama = true;
+                ollamaModel = testResult.model;
+                console.log(`✅ [Chat] Switched to Ollama (model: ${ollamaModel})`);
+            } else {
+                // Switch back to Gemini
+                useOllama = false;
+                ollamaModel = null;
+                console.log('✅ [Chat] Switched to Gemini');
+            }
+
+            return { success: true, provider, model: ollamaModel };
+        } catch (error) {
+            console.error('❌ [Chat] Error switching provider:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('get-chat-provider', async (event) => {
+        try {
+            return {
+                success: true,
+                provider: useOllama ? 'ollama' : 'gemini',
+                model: useOllama ? ollamaModel : null,
+            };
+        } catch (error) {
+            console.error('❌ [Chat] Error getting provider:', error);
             return { success: false, error: error.message };
         }
     });

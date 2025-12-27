@@ -547,6 +547,33 @@ export class AssistantView extends LitElement {
         .mic-toggle-button.inactive svg {
             stroke: #ff3b30 !important;
         }
+
+        .provider-indicator {
+            background: var(--input-background);
+            color: var(--text-color);
+            border: 1px solid var(--button-border);
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 500;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: default;
+        }
+
+        .provider-indicator.ollama {
+            background: rgba(52, 211, 153, 0.1);
+            border-color: rgba(52, 211, 153, 0.3);
+            color: #34d399;
+        }
+
+        .provider-indicator.gemini {
+            background: rgba(0, 122, 255, 0.1);
+            border-color: rgba(0, 122, 255, 0.3);
+            color: #007aff;
+        }
     `;
 
     static properties = {
@@ -560,6 +587,7 @@ export class AssistantView extends LitElement {
         copiedFeedback: { type: Boolean },
         micEnabled: { type: Boolean },
         vadMode: { type: String },
+        chatProvider: { type: String },
     };
 
     constructor() {
@@ -581,6 +609,8 @@ export class AssistantView extends LitElement {
         } catch (e) {
             this.savedResponses = [];
         }
+        // Load chat provider from localStorage
+        this.chatProvider = localStorage.getItem('chatProvider') || 'gemini';
 
         // Listen for VAD mode changes
         this.setupVADModeListener();
@@ -602,6 +632,43 @@ export class AssistantView extends LitElement {
                 this.requestUpdate();
             }
         });
+    }
+
+    setupChatProviderListener() {
+        // Listen for localStorage changes for chat provider (from other windows/tabs)
+        window.addEventListener('storage', (e) => {
+            if (e.key === 'chatProvider') {
+                this.chatProvider = e.newValue || 'gemini';
+                this.requestUpdate();
+            }
+        });
+        
+        // Also check periodically to catch direct localStorage changes in same window
+        this._providerCheckInterval = setInterval(() => {
+            const currentProvider = localStorage.getItem('chatProvider') || 'gemini';
+            if (currentProvider !== this.chatProvider) {
+                this.chatProvider = currentProvider;
+                this.requestUpdate();
+            }
+        }, 1000);
+    }
+
+    async handleProviderToggle() {
+        const newProvider = this.chatProvider === 'ollama' ? 'gemini' : 'ollama';
+        if (window.api && window.api.setChatProvider) {
+            try {
+                const result = await window.api.setChatProvider(newProvider);
+                if (result.success) {
+                    this.chatProvider = newProvider;
+                    localStorage.setItem('chatProvider', newProvider);
+                    this.requestUpdate();
+                } else {
+                    console.error('Failed to switch provider:', result.error);
+                }
+            } catch (error) {
+                console.error('Error switching provider:', error);
+            }
+        }
     }
 
     getProfileNames() {
@@ -945,6 +1012,12 @@ export class AssistantView extends LitElement {
 
         // Load and apply font size
         this.loadFontSize();
+        
+        // Load chat provider from localStorage
+        this.chatProvider = localStorage.getItem('chatProvider') || 'gemini';
+        
+        // Listen for chat provider changes
+        this.setupChatProviderListener();
 
         // Set up IPC listeners for keyboard shortcuts
         if (window.require) {
@@ -1170,6 +1243,14 @@ export class AssistantView extends LitElement {
             <div class="response-container" id="responseContainer"></div>
 
             <div class="text-input-container">
+                <button 
+                    class="provider-indicator ${this.chatProvider === 'ollama' ? 'ollama' : 'gemini'}" 
+                    @click=${this.handleProviderToggle}
+                    title="Current chat provider: ${this.chatProvider === 'ollama' ? 'Ollama' : 'Gemini'}. Click to switch."
+                >
+                    ${this.chatProvider === 'ollama' ? 'Ollama' : 'Gemini'}
+                </button>
+
                 <button class="nav-button" @click=${this.navigateToPreviousResponse} ?disabled=${this.currentResponseIndex <= 0}>
                     <?xml version="1.0" encoding="UTF-8"?><svg
                         width="24px"

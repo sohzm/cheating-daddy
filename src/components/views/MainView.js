@@ -134,6 +134,37 @@ export class MainView extends LitElement {
             opacity: 0.8;
         }
 
+        .ollama-button {
+            background: var(--input-background);
+            color: var(--text-color);
+            border: 1px solid var(--button-border);
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: default;
+            transition: all 0.2s ease;
+        }
+
+        .ollama-button:hover {
+            background: var(--input-hover-background, rgba(0, 0, 0, 0.35));
+            border-color: var(--input-hover-border, rgba(255, 255, 255, 0.2));
+        }
+
+        .button-group {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        .button-group .start-button {
+            margin-bottom: 0;
+        }
+
         :host {
             height: 100%;
             display: flex;
@@ -150,6 +181,7 @@ export class MainView extends LitElement {
         onLayoutModeChange: { type: Function },
         showApiKeyError: { type: Boolean },
         onClearAndRestart: { type: Function },
+        onOllamaChat: { type: Function },
     };
 
     constructor() {
@@ -160,6 +192,7 @@ export class MainView extends LitElement {
         this.onLayoutModeChange = () => {};
         this.showApiKeyError = false;
         this.onClearAndRestart = () => {};
+        this.onOllamaChat = () => {};
         this.boundKeydownHandler = this.handleKeydown.bind(this);
     }
 
@@ -216,6 +249,10 @@ export class MainView extends LitElement {
 
     handleClearAndRestart() {
         this.onClearAndRestart();
+    }
+
+    handleOllamaChatClick() {
+        this.onOllamaChat();
     }
 
     handleResetOnboarding() {
@@ -301,6 +338,11 @@ export class MainView extends LitElement {
                 />
                 <button @click=${this.handleStartClick} class="start-button ${this.isInitializing ? 'initializing' : ''}">
                     ${this.getStartButtonText()}
+                </button>
+            </div>
+            <div class="button-group">
+                <button @click=${this.handleOllamaChatClick} class="ollama-button">
+                    Chat with Ollama
                 </button>
             </div>
             <p class="description">

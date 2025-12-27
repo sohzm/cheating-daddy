@@ -331,6 +331,38 @@ export class CheatingDaddyApp extends LitElement {
         }
     }
 
+    async handleStartOllamaChat() {
+        try {
+            // Set chat provider to Ollama
+            if (window.api && window.api.setChatProvider) {
+                const result = await window.api.setChatProvider('ollama');
+                if (!result.success) {
+                    this.setStatus(`Error: ${result.error || 'Failed to connect to Ollama'}`);
+                    return;
+                }
+            }
+            
+            // Set in localStorage
+            localStorage.setItem('chatProvider', 'ollama');
+            
+            // Initialize responses and state for Ollama chat session
+            this.responses = [];
+            this.currentResponseIndex = -1;
+            this.startTime = Date.now();
+            
+            // Set status to indicate Ollama mode
+            this.setStatus('Ready - Ollama Chat');
+            
+            // Open AssistantView directly (no Gemini initialization needed)
+            this.currentView = 'assistant';
+            
+            console.log('✅ Started Ollama chat session');
+        } catch (error) {
+            console.error('Error starting Ollama chat:', error);
+            this.setStatus(`Error: ${error.message || 'Failed to start Ollama chat'}`);
+        }
+    }
+
         handleClearAndRestart() {
         // Clear the current session and responses
         this.responses = [];
@@ -486,6 +518,7 @@ export class CheatingDaddyApp extends LitElement {
                         .onAPIKeyHelp=${() => this.handleAPIKeyHelp()}
                         .onLayoutModeChange=${layoutMode => this.handleLayoutModeChange(layoutMode)}
                         .onClearAndRestart=${() => this.handleClearAndRestart()}
+                        .onOllamaChat=${() => this.handleStartOllamaChat()}
                     ></main-view>
                 `;
 
