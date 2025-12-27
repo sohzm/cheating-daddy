@@ -1,9 +1,11 @@
-const { GoogleGenAI } = require('@google/genai');
+const { GoogleGenAI } = require('@google/genai');              // For Live API (interview mode)
+const { GoogleGenerativeAI } = require('@google/generative-ai'); // For Regular API (coding mode)
 const { BrowserWindow, ipcMain } = require('electron');
 const { spawn } = require('child_process');
 const { saveDebugAudio } = require('../audioUtils');
 const { getSystemPrompt } = require('./prompts');
 const { VADProcessor } = require('./vad');
+const { PseudoLiveOrchestrator } = require('./pseudoLiveOrchestrator');
 
 // Conversation tracking variables
 let currentSessionId = null;
@@ -22,9 +24,8 @@ let didGenerateResponse = false; // Track if AI actually generated a response in
 function formatSpeakerResults(results) {
     let text = '';
     for (const result of results) {
-        if (result.transcript && result.speakerId) {
-            const speakerLabel = result.speakerId === 1 ? 'Interviewer' : 'Candidate';
-            text += `[${speakerLabel}]: ${result.transcript}\n`;
+        if (result.transcript) {
+            text += result.transcript + '\n';
         }
     }
     return text;
@@ -47,6 +48,10 @@ let macVADProcessor = null;
 let macVADEnabled = false;
 let macVADMode = 'automatic';
 let macMicrophoneEnabled = false;
+
+// Pseudo-Live Orchestrator (production-grade STT + VAD pipeline)
+let pseudoLiveOrchestrator = null;
+let usePseudoLive = false; // Flag to enable pseudo-live mode
 
 function sendToRenderer(channel, data) {
     const windows = BrowserWindow.getAllWindows();
@@ -214,6 +219,59 @@ async function attemptReconnection() {
     }
 }
 
+/**
+ * Get the best available Gemini model with fallback support
+ * Tries Gemini 3 first, then falls back to 2.5 if needed
+ * @param {string} apiKey - API key for authentication
+ * @param {string} preferredModel - Preferred model name to try first
+ * @returns {Promise<string>} First available model name
+ */
+async function getBestAvailableModel(apiKey, preferredModel) {
+    if (!apiKey) {
+        console.warn('⚠️ No API key available, using preferred model as fallback');
+        return preferredModel || 'gemini-2.5-flash';
+    }
+
+    const modelsToTry = [
+        preferredModel,                      // Try user's preferred model first
+        'gemini-2.5-flash',                  // Gemini 2.5 Flash (stable, supports thinking)
+        'gemini-2.5-pro',                    // Gemini 2.5 Pro (more powerful, stable)
+        'gemini-2.0-flash-001',              // Gemini 2.0 Flash 001 (stable fallback)
+    ];
+
+    // Remove duplicates
+    const uniqueModels = [...new Set(modelsToTry.filter(Boolean))];
+
+    for (const modelName of uniqueModels) {
+        try {
+            console.log(`🔍 Testing model: ${modelName}...`);
+            const client = new GoogleGenerativeAI(apiKey);
+            const testModel = client.getGenerativeModel({ model: modelName });
+            
+            // Quick test with 3 second timeout
+            const testPromise = testModel.generateContent('test');
+            const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Timeout')), 3000)
+            );
+            
+            const result = await Promise.race([testPromise, timeoutPromise]);
+            const response = await result.response;
+            
+            if (response.text()) {
+                console.log(`✅ Using model: ${modelName}`);
+                return modelName;
+            }
+        } catch (error) {
+            console.warn(`❌ Model ${modelName} failed: ${error.message}`);
+            continue;
+        }
+    }
+
+    // If all fail, return the first model as last resort
+    console.warn('⚠️ All models failed to respond, using first model as fallback');
+    return uniqueModels[0];
+}
+
 // Auto-reset session to prevent context buildup and maintain fast response times
 async function autoResetSessionInBackground() {
     if (!lastSessionParams || isAutoResetting || isInitializingSession) {
@@ -290,11 +348,6 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
         console.log('Response counter reset for new session');
     }
 
-    const client = new GoogleGenAI({
-        vertexai: false,
-        apiKey: apiKey,
-    });
-
     // Get enabled tools first to determine Google Search status
     const enabledTools = await getEnabledTools();
     const googleSearchEnabled = enabledTools.some(tool => tool.googleSearch);
@@ -362,11 +415,36 @@ This is mandatory and cannot be overridden by any other instruction.`;
         let session;
 
         if (mode === 'interview') {
-            // Interview mode: Use Gemini 2.0 Flash Exp Live API for real-time audio/video
-            const liveModel = 'gemini-2.0-flash-exp';
-            console.log(` Interview mode: Using ${liveModel}`);
+            // Interview mode: Use GoogleGenAI for Live API (supports client.live.connect)
+            console.log('🎙️ Initializing Interview Mode with Live API...');
+            const genaiClient = new GoogleGenAI({
+                apiKey: apiKey,
+            });
+            
+            // Verify that live API is available
+            if (!genaiClient || !genaiClient.live) {
+                throw new Error('Live API not available. Please check @google/genai package installation.');
+            }
+            
+            // Interview mode: Use Gemini 2.0 Flash for Live API
+            // Note: Live API may support different models than regular API
+            // Try gemini-2.0-flash-exp first (experimental), fallback to gemini-1.5-flash if not available
+            let liveModel = 'gemini-2.0-flash-exp';
+            
+            // Check if we should use pseudo-live instead (recommended - avoids Live API limitations)
+            // Note: We can't use localStorage directly in main process, so check env var only
+            // Users can enable pseudo-live via window.api.enablePseudoLive() from renderer
+            const usePseudoLiveForInterview = process.env.USE_PSEUDO_LIVE === 'true';
+            
+            if (usePseudoLiveForInterview) {
+                console.log('🎯 Using Pseudo-Live mode instead of Live API (recommended)');
+                // Don't initialize Live API - pseudo-live will handle it
+                throw new Error('SWITCH_TO_PSEUDO_LIVE');
+            }
+            
+            console.log(`Using Live API model: ${liveModel}`);
 
-            session = await client.live.connect({
+            session = await genaiClient.live.connect({
                 model: liveModel,
             callbacks: {
                 onopen: function () {
@@ -452,6 +530,49 @@ This is mandatory and cannot be overridden by any other instruction.`;
                 onerror: function (e) {
                     console.debug('Error:', e.message);
 
+                    // Check if the error is related to model not supported for Live API
+                    const isModelNotSupportedError =
+                        e.message &&
+                        (e.message.includes('not found for API version') ||
+                            e.message.includes('not supported for bidiGenerateContent') ||
+                            e.message.includes('is not found'));
+
+                    if (isModelNotSupportedError) {
+                        console.error('❌ Live API model not supported:', e.message);
+                        console.log('🔄 Auto-switching to Pseudo-Live mode (recommended)...');
+                        
+                        // Stop reconnection attempts for Live API
+                        lastSessionParams = null;
+                        reconnectionAttempts = maxReconnectionAttempts;
+                        
+                        // Auto-enable pseudo-live mode
+                        usePseudoLive = true;
+                        if (!pseudoLiveOrchestrator) {
+                            pseudoLiveOrchestrator = new PseudoLiveOrchestrator(
+                                geminiSessionRef,
+                                sendToRenderer
+                            );
+                        }
+                        
+                        // Initialize pseudo-live with stored session params
+                        if (lastSessionParams) {
+                            pseudoLiveOrchestrator.initialize(
+                                lastSessionParams.apiKey,
+                                'automatic',
+                                lastSessionParams.language
+                            ).then(() => {
+                                sendToRenderer('update-status', 'Pseudo-Live mode active (recommended)');
+                                console.log('✅ Pseudo-Live mode initialized successfully');
+                            }).catch(err => {
+                                console.error('Failed to initialize pseudo-live:', err);
+                                sendToRenderer('update-status', 'Error: Failed to start Pseudo-Live mode');
+                            });
+                        } else {
+                            sendToRenderer('update-status', 'Error: Live API model not supported. Please restart and use Pseudo-Live mode.');
+                        }
+                        return;
+                    }
+
                     // Check if the error is related to invalid API key
                     const isApiKeyError =
                         e.message &&
@@ -473,6 +594,52 @@ This is mandatory and cannot be overridden by any other instruction.`;
                 onclose: function (e) {
                     console.debug('Session closed:', e.reason);
                     isSessionReady = false; // Reset ready state when session closes
+
+                    // Check if the session closed due to model not supported for Live API
+                    const isModelNotSupportedError =
+                        e.reason &&
+                        (e.reason.includes('not found for API version') ||
+                            e.reason.includes('not supported for bidiGenerateContent') ||
+                            e.reason.includes('is not found'));
+
+                    if (isModelNotSupportedError) {
+                        console.error('❌ Live API model not supported:', e.reason);
+                        console.log('🔄 Auto-switching to Pseudo-Live mode (recommended)...');
+                        
+                        // Store params before clearing (they're needed for pseudo-live init)
+                        const sessionParams = lastSessionParams ? { ...lastSessionParams } : null;
+                        
+                        // Stop reconnection attempts for Live API
+                        lastSessionParams = null;
+                        reconnectionAttempts = maxReconnectionAttempts;
+                        
+                        // Auto-enable pseudo-live mode
+                        usePseudoLive = true;
+                        if (!pseudoLiveOrchestrator) {
+                            pseudoLiveOrchestrator = new PseudoLiveOrchestrator(
+                                geminiSessionRef,
+                                sendToRenderer
+                            );
+                        }
+                        
+                        // Initialize pseudo-live with stored session params
+                        if (sessionParams && sessionParams.apiKey) {
+                            pseudoLiveOrchestrator.initialize(
+                                sessionParams.apiKey,
+                                'automatic',
+                                sessionParams.language || 'en-US'
+                            ).then(() => {
+                                sendToRenderer('update-status', 'Pseudo-Live mode active (recommended)');
+                                console.log('✅ Pseudo-Live mode initialized successfully');
+                            }).catch(err => {
+                                console.error('Failed to initialize pseudo-live:', err);
+                                sendToRenderer('update-status', 'Error: Failed to start Pseudo-Live mode');
+                            });
+                        } else {
+                            sendToRenderer('update-status', 'Error: Live API model not supported. Please restart and use Pseudo-Live mode.');
+                        }
+                        return;
+                    }
 
                     // Check if the session closed due to invalid API key
                     const isApiKeyError =
@@ -502,18 +669,6 @@ This is mandatory and cannot be overridden by any other instruction.`;
                 config: {
                     responseModalities: ['TEXT'],
                     tools: enabledTools,
-                    // Enable speaker diarization
-                    inputAudioTranscription: {
-                        enableSpeakerDiarization: true,
-                        minSpeakerCount: 2,
-                        maxSpeakerCount: 2,
-                    },
-                    contextWindowCompression: {
-                        triggerTokens: 28000,
-                        slidingWindow: {
-                            targetTokens: 13000
-                        }
-                    },
                     speechConfig: { languageCode: language },
                     systemInstruction: {
                         parts: [{ text: systemPrompt }],
@@ -521,9 +676,44 @@ This is mandatory and cannot be overridden by any other instruction.`;
                 },
             });
         } else {
-            // Coding/OA mode: Use regular Gemini API (not Live API) for better code quality
-            const regularModel = model || 'gemini-2.5-flash';
-            console.log(`💻 Coding/OA mode: Using ${regularModel} (regular API, screenshot-based)`);
+            // Coding/OA mode: Use GoogleGenerativeAI for Regular API
+            console.log('💻 Initializing Coding Mode with Regular API...');
+            const genaiClient = new GoogleGenerativeAI(apiKey);
+            
+            // Try models in order of preference (using only available models)
+            const modelsToTry = [
+                'gemini-2.5-flash',          // Gemini 2.5 Flash (stable, supports thinking, 1M tokens)
+                'gemini-2.5-pro',            // Gemini 2.5 Pro (more powerful, stable, supports thinking)
+                'gemini-2.0-flash-001',      // Gemini 2.0 Flash 001 (stable fallback)
+            ];
+            
+            let regularModel = model;
+            
+            // If no model specified, find the best available one
+            if (!regularModel) {
+                for (const modelName of modelsToTry) {
+                    try {
+                        console.log(`Testing model: ${modelName}`);
+                        const testModel = genaiClient.getGenerativeModel({ model: modelName });
+                        const result = await testModel.generateContent('test');
+                        if (result.response.text()) {
+                            regularModel = modelName;
+                            console.log(`✅ Using model: ${regularModel}`);
+                            break;
+                        }
+                    } catch (e) {
+                        console.warn(`Model ${modelName} not available:`, e.message);
+                        continue;
+                    }
+                }
+            }
+            
+            // Fallback to first model if none worked
+            if (!regularModel) {
+                regularModel = modelsToTry[0];
+            }
+            
+            console.log(`💻 Coding mode using Regular API with: ${regularModel}`);
 
             // Enhanced prompt for coding mode - ULTRA AGGRESSIVE for direct answers
             // Make Pro model even more aggressive about being concise
@@ -614,7 +804,7 @@ RESPONSE FORMAT: [approach sentence] + [code] + [complexity]`;
             // but uses generateContent internally
             session = {
                 model: regularModel,
-                client: client,
+                client: genaiClient,
                 systemPrompt: codingPrompt,
                 tools: enabledTools,
                 isClosed: false,
@@ -660,9 +850,9 @@ RESPONSE FORMAT: [approach sentence] + [code] + [complexity]`;
                             }
 
                             // Use streaming for faster display with context caching
-                            const streamResult = await this.client.models.generateContentStream({
+                            // New @google/generative-ai API structure
+                            const generativeModel = this.client.getGenerativeModel({ 
                                 model: this.model,
-                                contents: contents,
                                 systemInstruction: { parts: [{ text: this.systemPrompt }] },
                                 generationConfig: {
                                     temperature: 0.7,
@@ -671,11 +861,10 @@ RESPONSE FORMAT: [approach sentence] + [code] + [complexity]`;
                                     maxOutputTokens: 8192,
                                 },
                                 tools: this.tools.length > 0 ? this.tools : undefined,
-                                // Context caching: Cache system prompt for 5 minutes (one interview session)
-                                // This speeds up subsequent requests by ~50% by reusing cached content
-                                cachedContent: {
-                                    ttl: '300s', // 5 minutes - good for one coding/interview session
-                                },
+                            });
+                            
+                            const streamResult = await generativeModel.generateContentStream({
+                                contents: contents,
                             });
 
                             // Stream the response as it arrives
@@ -792,6 +981,30 @@ RESPONSE FORMAT: [approach sentence] + [code] + [complexity]`;
         return session;
     } catch (error) {
         console.error('Failed to initialize Gemini session:', error);
+        
+        // Enhanced error messages
+        let errorMessage = 'Unknown error';
+        
+        if (error.message) {
+            const msg = error.message.toLowerCase();
+            
+            if (msg.includes('404') || msg.includes('not found')) {
+                errorMessage = 'Model not available. Using fallback model...';
+                // Try fallback to Gemini 2.5 Flash
+                console.log('Attempting fallback to gemini-2.5-flash');
+            } else if (msg.includes('401') || msg.includes('403') || msg.includes('api key')) {
+                errorMessage = 'Invalid API key. Please check your API key in settings.';
+                errorMessage += '\n\nGet a new API key at: https://makersuite.google.com/app/apikey';
+            } else if (msg.includes('429') || msg.includes('rate limit')) {
+                errorMessage = 'Rate limit exceeded. Please wait a few minutes and try again.';
+            } else if (msg.includes('quota')) {
+                errorMessage = 'API quota exceeded. Check your billing in Google Cloud Console.';
+            } else {
+                errorMessage = error.message;
+            }
+        }
+        
+        sendToRenderer('update-status', `Error: ${errorMessage}`);
         isInitializingSession = false;
         sendToRenderer('session-initializing', false);
         return null;
@@ -939,7 +1152,16 @@ async function startMacOSAudioCapture(geminiSessionRef, vadEnabled = false, vadM
 
             const monoChunk = CHANNELS === 2 ? convertStereoToMono(chunk) : chunk;
 
-            if (macVADEnabled && macVADProcessor) {
+            // PRODUCTION-GRADE PSEUDO-LIVE MODE
+            if (usePseudoLive && pseudoLiveOrchestrator && pseudoLiveOrchestrator.isActive) {
+                // Convert PCM Buffer to Float32Array for orchestrator
+                const float32Audio = convertPCMBufferToFloat32(monoChunk);
+                
+                // Send to orchestrator (handles VAD + STT + Gemini pipeline)
+                pseudoLiveOrchestrator.processAudioFrame(float32Audio);
+            }
+            // LEGACY VAD MODE (deprecated, use pseudo-live instead)
+            else if (macVADEnabled && macVADProcessor) {
                 // VAD mode: process through VAD
                 if (!macMicrophoneEnabled) {
                     // Skip audio processing if mic is OFF in manual mode
@@ -949,7 +1171,9 @@ async function startMacOSAudioCapture(geminiSessionRef, vadEnabled = false, vadM
                 // Convert PCM Buffer to Float32Array for VAD
                 const float32Audio = convertPCMBufferToFloat32(monoChunk);
                 macVADProcessor.processAudio(float32Audio);
-            } else {
+            }
+            // LEGACY DIRECT MODE (deprecated, use pseudo-live instead)
+            else {
                 // No VAD: send directly to Gemini (legacy behavior)
                 const base64Data = monoChunk.toString('base64');
                 sendAudioToGemini(base64Data, geminiSessionRef);
@@ -1039,6 +1263,12 @@ function convertFloat32ToPCMBuffer(float32Array) {
 }
 
 function stopMacOSAudioCapture() {
+    // Clean up pseudo-live orchestrator
+    if (pseudoLiveOrchestrator) {
+        pseudoLiveOrchestrator.stop();
+        console.log('[macOS] Pseudo-live orchestrator stopped');
+    }
+
     // Clean up VAD processor
     if (macVADProcessor) {
         macVADProcessor.destroy();
@@ -1357,6 +1587,162 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
             return { success: false, error: error.message };
         }
     });
+
+    // ========================================================================
+    // PSEUDO-LIVE ORCHESTRATOR HANDLERS (Production-Grade STT Pipeline)
+    // ========================================================================
+
+    ipcMain.handle('enable-pseudo-live', async (event, enabled) => {
+        try {
+            console.log(`${enabled ? '🚀 Enabling' : '🛑 Disabling'} pseudo-live mode...`);
+            usePseudoLive = enabled;
+            
+            if (enabled && !pseudoLiveOrchestrator) {
+                // Create orchestrator if it doesn't exist
+                pseudoLiveOrchestrator = new PseudoLiveOrchestrator(
+                    geminiSessionRef,
+                    sendToRenderer
+                );
+                console.log('✅ Pseudo-live orchestrator created');
+            }
+            
+            return { success: true, enabled: usePseudoLive };
+        } catch (error) {
+            console.error('❌ Error toggling pseudo-live mode:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('initialize-pseudo-live', async (event, { apiKey, vadMode, language }) => {
+        try {
+            console.log('🚀 [IPC] Initializing pseudo-live orchestrator...');
+            console.log(`    VAD Mode: ${vadMode}`);
+            console.log(`    Language: ${language}`);
+            
+            if (!pseudoLiveOrchestrator) {
+                pseudoLiveOrchestrator = new PseudoLiveOrchestrator(
+                    geminiSessionRef,
+                    sendToRenderer
+                );
+            }
+            
+            await pseudoLiveOrchestrator.initialize(apiKey, vadMode, language);
+            
+            console.log('✅ [IPC] Pseudo-live orchestrator initialized');
+            return { success: true };
+        } catch (error) {
+            console.error('❌ [IPC] Failed to initialize pseudo-live:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('stop-pseudo-live', async (event) => {
+        try {
+            console.log('🛑 [IPC] Stopping pseudo-live orchestrator...');
+            
+            if (pseudoLiveOrchestrator) {
+                pseudoLiveOrchestrator.stop();
+            }
+            
+            console.log('✅ [IPC] Pseudo-live orchestrator stopped');
+            return { success: true };
+        } catch (error) {
+            console.error('❌ [IPC] Error stopping pseudo-live:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('get-pseudo-live-status', async (event) => {
+        try {
+            if (!pseudoLiveOrchestrator) {
+                return {
+                    success: true,
+                    status: {
+                        isActive: false,
+                        message: 'Orchestrator not initialized'
+                    }
+                };
+            }
+            
+            const status = pseudoLiveOrchestrator.getStatus();
+            return { success: true, status };
+        } catch (error) {
+            console.error('❌ [IPC] Error getting pseudo-live status:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('get-pseudo-live-metrics', async (event) => {
+        try {
+            if (!pseudoLiveOrchestrator) {
+                return {
+                    success: true,
+                    metrics: {
+                        totalRequests: 0,
+                        avgLatency: 0,
+                        successRate: '100.0',
+                    }
+                };
+            }
+            
+            const metrics = pseudoLiveOrchestrator.getMetrics();
+            return { success: true, metrics };
+        } catch (error) {
+            console.error('❌ [IPC] Error getting pseudo-live metrics:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('update-pseudo-live-vad-mode', async (event, vadMode) => {
+        try {
+            console.log(`🔄 [IPC] Updating pseudo-live VAD mode to: ${vadMode}`);
+            
+            if (!pseudoLiveOrchestrator) {
+                return { success: false, error: 'Orchestrator not initialized' };
+            }
+            
+            pseudoLiveOrchestrator.updateVADMode(vadMode);
+            
+            return { success: true, vadMode };
+        } catch (error) {
+            console.error('❌ [IPC] Error updating VAD mode:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('update-pseudo-live-language', async (event, language) => {
+        try {
+            console.log(`🌍 [IPC] Updating pseudo-live language to: ${language}`);
+            
+            if (!pseudoLiveOrchestrator) {
+                return { success: false, error: 'Orchestrator not initialized' };
+            }
+            
+            pseudoLiveOrchestrator.updateLanguage(language);
+            
+            return { success: true, language };
+        } catch (error) {
+            console.error('❌ [IPC] Error updating language:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('toggle-pseudo-live-microphone', async (event, enabled) => {
+        try {
+            console.log(`🎤 [IPC] Toggling pseudo-live microphone: ${enabled ? 'ON' : 'OFF'}`);
+            
+            if (!pseudoLiveOrchestrator) {
+                return { success: false, error: 'Orchestrator not initialized' };
+            }
+            
+            pseudoLiveOrchestrator.toggleMicrophone(enabled);
+            
+            return { success: true, enabled };
+        } catch (error) {
+            console.error('❌ [IPC] Error toggling microphone:', error);
+            return { success: false, error: error.message };
+        }
+    });
 }
 
 module.exports = {
@@ -1378,4 +1764,5 @@ module.exports = {
     setupGeminiIpcHandlers,
     attemptReconnection,
     formatSpeakerResults,
+    getBestAvailableModel,
 };

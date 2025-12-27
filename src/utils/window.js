@@ -53,6 +53,7 @@ function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
             enableBlinkFeatures: 'GetDisplayMedia',
             webSecurity: true,
             allowRunningInsecureContent: false,
+            preload: path.join(__dirname, '../preload.js'),
         },
         backgroundColor: '#00000000',
     };
