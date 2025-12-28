@@ -25,6 +25,9 @@ const DEFAULT_PREFERENCES = {
     audioMode: 'speaker_only',
     fontSize: 'medium',
     backgroundTransparency: 0.8,
+    responseViewMode: 'paged',
+    autoScroll: true,
+    showSidebar: true,
     googleSearchEnabled: false
 };
 

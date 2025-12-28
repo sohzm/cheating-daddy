@@ -205,7 +205,7 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
         apiKey: apiKey,
         httpOptions: { apiVersion: 'v1alpha' },
     });
-    const prefs = getPreferences();
+    const prefs = await getPreferences();
 
     const googleSearchEnabled = prefs.googleSearchEnabled !== false;
     const enabledTools = googleSearchEnabled ? [{ googleSearch: {} }] : [];
@@ -242,7 +242,11 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                             if (part.text && part.text.trim() !== '') {
                                 const isNewResponse = messageBuffer === '';
                                 messageBuffer += part.text;
-                                sendToRenderer(isNewResponse ? 'new-response' : 'update-response', messageBuffer);
+                                sendToRenderer(isNewResponse ? 'new-response' : 'update-response', {
+                                    text: messageBuffer,
+                                    type: 'live',
+                                    question: isNewResponse ? currentTranscription : undefined
+                                });
                             }
                         }
                     }
@@ -253,14 +257,21 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                         if (text.trim() !== '') {
                             const isNewResponse = messageBuffer === '';
                             messageBuffer += text;
-                            sendToRenderer(isNewResponse ? 'new-response' : 'update-response', messageBuffer);
+                            sendToRenderer(isNewResponse ? 'new-response' : 'update-response', {
+                                text: messageBuffer,
+                                type: 'live',
+                                question: isNewResponse ? currentTranscription : undefined
+                            });
                         }
                     }
 
                     if (message.serverContent?.generationComplete) {
                         // Only send/save if there's actual content
                         if (messageBuffer.trim() !== '') {
-                            sendToRenderer('update-response', messageBuffer);
+                            sendToRenderer('update-response', {
+                                text: messageBuffer,
+                                type: 'live'
+                            });
 
                             // Save conversation turn when we have both transcription and AI response
                             if (currentTranscription) {
@@ -269,6 +280,26 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                             }
                         }
                         messageBuffer = '';
+                    }
+
+                    if (message.serverContent?.interrupted) {
+                        console.log('Session interrupted');
+                        sendToRenderer('update-status', 'Interrupted');
+                        // Treat as turn complete if we have content
+                        if (messageBuffer.trim() !== '') {
+                            // Mark as interrupted in the text
+                            messageBuffer += '...';
+                            sendToRenderer('update-response', {
+                                text: messageBuffer,
+                                type: 'live'
+                            });
+
+                            if (currentTranscription) {
+                                saveConversationTurn(currentTranscription, messageBuffer);
+                                currentTranscription = '';
+                            }
+                            messageBuffer = ''; // Reset buffer
+                        }
                     }
 
                     if (message.serverContent?.turnComplete) {
@@ -303,11 +334,23 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                 proactivity: { proactiveAudio: true },
                 outputAudioTranscription: {},
                 inputAudioTranscription: {},
+                // Use NO_INTERRUPTION to prevent "Session interrupted" from background noise/echo
+                // This ensures the model finishes its response even if audio is detected.
+                // The new input is still processed (queued), addressing the user's question.
+                realtimeInputConfig: {
+                    activityHandling: 'NO_INTERRUPTION'
+                },
                 tools: enabledTools,
                 thinkingConfig: { thinkingBudget: 0 },
                 contextWindowCompression: { slidingWindow: {} },
-                speechConfig: { languageCode: language },
+                speechConfig: {
+                    languageCode: language,
+                    voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Aoede' } }
+                },
                 systemInstruction: { parts: [{ text: systemPrompt }] },
+            },
+            generationConfig: {
+                maxOutputTokens: 4000,
             },
         });
 
@@ -575,8 +618,11 @@ async function sendImageToGeminiHttp(base64Data, prompt) {
             const chunkText = chunk.text;
             if (chunkText) {
                 fullText += chunkText;
-                // Send to renderer - new response for first chunk, update for subsequent
-                sendToRenderer(isFirst ? 'new-response' : 'update-response', fullText);
+                sendToRenderer(isFirst ? 'new-response' : 'update-response', {
+                    text: fullText,
+                    type: 'screen',
+                    question: isFirst ? prompt : undefined
+                });
                 isFirst = false;
             }
         }
@@ -674,7 +720,7 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
             const ai = new GoogleGenAI({ apiKey: apiKey });
             const model = getAvailableModel();
 
-            const prefs = getPreferences();
+            const prefs = await getPreferences();
             const profile = prefs.selectedProfile || 'interview';
             const detailedAnswers = prefs.detailedAnswers === true;
             const customPrompt = prefs.customPrompt || '';
@@ -694,7 +740,11 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
                 const chunkText = chunk.text;
                 if (chunkText) {
                     fullText += chunkText;
-                    sendToRenderer(isFirst ? 'new-response' : 'update-response', fullText);
+                    sendToRenderer(isFirst ? 'new-response' : 'update-response', {
+                        text: fullText,
+                        type: 'text',
+                        question: isFirst ? text : undefined
+                    });
                     isFirst = false;
                 }
             }

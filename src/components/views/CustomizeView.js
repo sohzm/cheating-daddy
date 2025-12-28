@@ -544,12 +544,16 @@ export class CustomizeView extends LitElement {
         googleSearchEnabled: { type: Boolean },
         detailedAnswers: { type: Boolean },
         backgroundTransparency: { type: Number },
+        responseViewMode: { type: String },
+        autoScroll: { type: Boolean },
+        showSidebar: { type: Boolean },
         fontSize: { type: Number },
         theme: { type: String },
         onProfileChange: { type: Function },
         onLanguageChange: { type: Function },
         onImageQualityChange: { type: Function },
         onLayoutModeChange: { type: Function },
+        onResponseViewModeChange: { type: Function },
         activeSection: { type: String },
         isClearing: { type: Boolean },
         clearStatusMessage: { type: String },
@@ -567,6 +571,7 @@ export class CustomizeView extends LitElement {
         this.onLanguageChange = () => { };
         this.onImageQualityChange = () => { };
         this.onLayoutModeChange = () => { };
+        this.onResponseViewModeChange = () => { };
 
         // Google Search default
         this.googleSearchEnabled = true;
@@ -581,6 +586,11 @@ export class CustomizeView extends LitElement {
 
         // Background transparency default
         this.backgroundTransparency = 0.8;
+
+        // Response view mode default
+        this.responseViewMode = 'paged';
+        this.autoScroll = true;
+        this.showSidebar = true;
 
         // Font size default (in pixels)
         this.fontSize = 20;
@@ -682,6 +692,9 @@ export class CustomizeView extends LitElement {
             this.googleSearchEnabled = prefs.googleSearchEnabled ?? true;
             this.detailedAnswers = prefs.detailedAnswers ?? false;
             this.backgroundTransparency = prefs.backgroundTransparency ?? 0.8;
+            this.responseViewMode = prefs.responseViewMode ?? 'paged';
+            this.autoScroll = prefs.autoScroll ?? true;
+            this.showSidebar = prefs.showSidebar ?? true;
             this.fontSize = prefs.fontSize ?? 20;
             this.audioMode = prefs.audioMode ?? 'speaker_only';
             this.customPrompt = prefs.customPrompt ?? '';
@@ -794,6 +807,11 @@ export class CustomizeView extends LitElement {
     handleLanguageSelect(e) {
         this.selectedLanguage = e.target.value;
         this.onLanguageChange(this.selectedLanguage);
+    }
+
+    handleResponseViewModeSelect(e) {
+        this.responseViewMode = e.target.value;
+        this.onResponseViewModeChange(this.responseViewMode);
     }
 
     handleImageQualitySelect(e) {
@@ -1131,6 +1149,8 @@ export class CustomizeView extends LitElement {
                         </div>
                     </div>
 
+
+
                     <div class="form-group expand">
                         <label class="form-label">Custom AI Instructions</label>
                         <textarea
@@ -1239,6 +1259,49 @@ export class CustomizeView extends LitElement {
                 </div>
 
                 <div class="form-group">
+                    <label class="form-label">View Mode</label>
+                    <div class="form-description">Choose how responses are displayed</div>
+                    <select class="form-control" .value=${this.responseViewMode} @change=${this.handleResponseViewModeSelect}>
+                        <option value="paged">Paged (One at a time)</option>
+                        <option value="continuous">Continuous (Scrollable list)</option>
+                    </select>
+                </div>
+
+                ${this.responseViewMode === 'continuous' ? html`
+                    <div class="form-group" style="padding-left: 12px; border-left: 2px solid var(--border-color);">
+                        <div class="checkbox-group">
+                            <input
+                                type="checkbox"
+                                id="autoScroll"
+                                class="checkbox-input"
+                                .checked=${this.autoScroll}
+                                @change=${this.handleAutoScrollChange}
+                            />
+                            <label class="checkbox-label" for="autoScroll">Auto-scroll to New Responses</label>
+                        </div>
+                        <div class="form-description">
+                            Automatically scroll to the bottom when a new response arrives
+                        </div>
+                    </div>
+                ` : ''}
+
+                <div class="form-group">
+                    <div class="checkbox-group">
+                        <input
+                            type="checkbox"
+                            id="showSidebar"
+                            class="checkbox-input"
+                            .checked=${this.showSidebar}
+                            @change=${this.handleShowSidebarChange}
+                        />
+                        <label class="checkbox-label" for="showSidebar">Show Response Navigator</label>
+                    </div>
+                    <div class="form-description">
+                        Display a sidebar to navigate between responses
+                    </div>
+                </div>
+
+                <div class="form-group">
                     <div class="slider-container">
                         <div class="slider-header">
                             <label class="form-label">Background Transparency</label>
@@ -1281,13 +1344,13 @@ export class CustomizeView extends LitElement {
                         </div>
                     </div>
                 </div>
-            </div>
-        `;
+            </div >
+    `;
     }
 
     renderCaptureSection() {
         return html`
-            <div class="content-header">Screen Capture</div>
+    < div class="content-header" > Screen Capture</div >
             <div class="form-grid">
                 <div class="form-group">
                     <label class="form-label">
@@ -1298,33 +1361,33 @@ export class CustomizeView extends LitElement {
                         <option value="high" ?selected=${this.selectedImageQuality === 'high'}>High Quality</option>
                         <option value="medium" ?selected=${this.selectedImageQuality === 'medium'}>Medium Quality</option>
                         <option value="low" ?selected=${this.selectedImageQuality === 'low'}>Low Quality</option>
-                    </select>
-                    <div class="form-description">
-                        ${this.selectedImageQuality === 'high'
+                    </select >
+    <div class="form-description">
+        ${this.selectedImageQuality === 'high'
                 ? 'Best quality, uses more tokens'
                 : this.selectedImageQuality === 'medium'
                     ? 'Balanced quality and token usage'
                     : 'Lower quality, uses fewer tokens'
             }
-                    </div>
-                </div>
-            </div>
-        `;
+    </div>
+                </div >
+            </div >
+    `;
     }
 
     renderKeyboardSection() {
         return html`
-            <div class="content-header">Keyboard Shortcuts</div>
-            <div class="form-grid">
-                <table class="keybinds-table">
-                    <thead>
-                        <tr>
-                            <th>Action</th>
-                            <th>Shortcut</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${this.getKeybindActions().map(
+    < div class="content-header" > Keyboard Shortcuts</div >
+        <div class="form-grid">
+            <table class="keybinds-table">
+                <thead>
+                    <tr>
+                        <th>Action</th>
+                        <th>Shortcut</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${this.getKeybindActions().map(
             action => html`
                                 <tr>
                                     <td>
@@ -1346,63 +1409,63 @@ export class CustomizeView extends LitElement {
                                 </tr>
                             `
         )}
-                        <tr class="table-reset-row">
-                            <td colspan="2">
-                                <button class="reset-keybinds-button" @click=${this.resetKeybinds}>Reset to Defaults</button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        `;
+                    <tr class="table-reset-row">
+                        <td colspan="2">
+                            <button class="reset-keybinds-button" @click=${this.resetKeybinds}>Reset to Defaults</button>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+            </div >
+    `;
     }
 
     renderSearchSection() {
         return html`
-            <div class="content-header">Search</div>
-            <div class="form-grid">
-                <div class="checkbox-group">
-                    <input
-                        type="checkbox"
-                        class="checkbox-input"
-                        id="google-search-enabled"
+    < div class="content-header" > Search</div >
+        <div class="form-grid">
+            <div class="checkbox-group">
+                <input
+                    type="checkbox"
+                    class="checkbox-input"
+                    id="google-search-enabled"
                         .checked=${this.googleSearchEnabled}
-                        @change=${this.handleGoogleSearchChange}
+                @change=${this.handleGoogleSearchChange}
                     />
-                    <label for="google-search-enabled" class="checkbox-label">Enable Google Search</label>
-                </div>
-                <div class="form-description" style="margin-left: 24px; margin-top: -8px;">
-                    Allow the AI to search Google for up-to-date information during conversations.
-                    <br /><strong>Note:</strong> Changes take effect when starting a new AI session.
-                </div>
+                <label for="google-search-enabled" class="checkbox-label">Enable Google Search</label>
             </div>
-        `;
+            <div class="form-description" style="margin-left: 24px; margin-top: -8px;">
+                Allow the AI to search Google for up-to-date information during conversations.
+                <br /><strong>Note:</strong> Changes take effect when starting a new AI session.
+            </div>
+        </div>
+`;
     }
 
     renderAdvancedSection() {
         return html`
-            <div class="content-header" style="color: var(--error-color);">Advanced</div>
-            <div class="form-grid">
-                <div class="form-group">
-                    <label class="form-label" style="color: var(--error-color);">Data Management</label>
-                    <div class="form-description" style="margin-bottom: 12px;">
-                        <strong>Warning:</strong> This action will permanently delete all local data including API keys, preferences, and session history. This cannot be undone.
-                    </div>
-                    <button
-                        class="danger-button"
+    < div class="content-header" style = "color: var(--error-color);" > Advanced</div >
+        <div class="form-grid">
+            <div class="form-group">
+                <label class="form-label" style="color: var(--error-color);">Data Management</label>
+                <div class="form-description" style="margin-bottom: 12px;">
+                    <strong>Warning:</strong> This action will permanently delete all local data including API keys, preferences, and session history. This cannot be undone.
+                </div>
+                <button
+                    class="danger-button"
                         @click=${this.clearLocalData}
-                        ?disabled=${this.isClearing}
+                ?disabled=${this.isClearing}
                     >
-                        ${this.isClearing ? 'Clearing...' : 'Clear All Local Data'}
-                    </button>
-                    ${this.clearStatusMessage ? html`
+                ${this.isClearing ? 'Clearing...' : 'Clear All Local Data'}
+            </button>
+            ${this.clearStatusMessage ? html`
                         <div class="status-message ${this.clearStatusType === 'success' ? 'status-success' : 'status-error'}">
                             ${this.clearStatusMessage}
                         </div>
                     ` : ''}
-                </div>
-            </div>
-        `;
+        </div>
+            </div >
+    `;
     }
 
     renderSectionContent() {
@@ -1426,6 +1489,18 @@ export class CustomizeView extends LitElement {
             default:
                 return this.renderProfileSection();
         }
+    }
+
+    async handleAutoScrollChange(e) {
+        this.autoScroll = e.target.checked;
+        await cheatingDaddy.storage.updatePreference('autoScroll', this.autoScroll);
+        this.requestUpdate();
+    }
+
+    async handleShowSidebarChange(e) {
+        this.showSidebar = e.target.checked;
+        await cheatingDaddy.storage.updatePreference('showSidebar', this.showSidebar);
+        this.requestUpdate();
     }
 
     render() {

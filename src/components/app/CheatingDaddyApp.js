@@ -104,6 +104,9 @@ export class CheatingDaddyApp extends LitElement {
         currentResponseIndex: { type: Number },
         selectedScreenshotInterval: { type: String },
         selectedImageQuality: { type: String },
+        responseViewMode: { type: String },
+        autoScroll: { type: Boolean },
+        showSidebar: { type: Boolean },
         layoutMode: { type: String },
         _viewInstances: { type: Object, state: true },
         _isClickThrough: { state: true },
@@ -124,6 +127,9 @@ export class CheatingDaddyApp extends LitElement {
         this.selectedLanguage = 'en-US';
         this.selectedScreenshotInterval = '5';
         this.selectedImageQuality = 'medium';
+        this.responseViewMode = 'paged';
+        this.autoScroll = true;
+        this.showSidebar = true;
         this.layoutMode = 'normal';
         this.responses = [];
         this.currentResponseIndex = -1;
@@ -159,6 +165,9 @@ export class CheatingDaddyApp extends LitElement {
             this.selectedLanguage = prefs.selectedLanguage || 'en-US';
             this.selectedScreenshotInterval = prefs.selectedScreenshotInterval || '5';
             this.selectedImageQuality = prefs.selectedImageQuality || 'medium';
+            this.responseViewMode = prefs.responseViewMode || 'paged';
+            this.autoScroll = prefs.autoScroll ?? true;
+            this.showSidebar = prefs.showSidebar ?? true;
             this.layoutMode = config.layout || 'normal';
 
             this._storageLoaded = true;
@@ -273,12 +282,16 @@ export class CheatingDaddyApp extends LitElement {
     }
 
     updateCurrentResponse(response) {
-        // Update the current response in place (streaming subsequent words)
         if (this.responses.length > 0) {
-            this.responses = [...this.responses.slice(0, -1), response];
-            console.log('[updateCurrentResponse] Updated to:', response);
+            const current = this.responses[this.responses.length - 1];
+            let responseToMerge = typeof response === 'string' ? { text: response } : { ...response };
+
+            Object.keys(responseToMerge).forEach(key => responseToMerge[key] === undefined && delete responseToMerge[key]);
+
+            const updated = { ...current, ...responseToMerge };
+            this.responses = [...this.responses.slice(0, -1), updated];
+            console.log('[updateCurrentResponse] Updated response');
         } else {
-            // Fallback: if no responses exist, add as new
             this.addNewResponse(response);
         }
         this.requestUpdate();
@@ -300,7 +313,7 @@ export class CheatingDaddyApp extends LitElement {
         this.requestUpdate();
     }
 
-        async handleClose() {
+    async handleClose() {
         if (this.currentView === 'customize' || this.currentView === 'help' || this.currentView === 'history') {
             this.currentView = 'main';
         } else if (this.currentView === 'assistant') {
@@ -378,6 +391,11 @@ export class CheatingDaddyApp extends LitElement {
     async handleImageQualityChange(quality) {
         this.selectedImageQuality = quality;
         await cheatingDaddy.storage.updatePreference('selectedImageQuality', quality);
+    }
+
+    async handleResponseViewModeChange(mode) {
+        this.responseViewMode = mode;
+        await cheatingDaddy.storage.updatePreference('responseViewMode', mode);
     }
 
     handleBackClick() {
@@ -471,6 +489,7 @@ export class CheatingDaddyApp extends LitElement {
                         .onLanguageChange=${language => this.handleLanguageChange(language)}
                         .onScreenshotIntervalChange=${interval => this.handleScreenshotIntervalChange(interval)}
                         .onImageQualityChange=${quality => this.handleImageQualityChange(quality)}
+                        .onResponseViewModeChange=${mode => this.handleResponseViewModeChange(mode)}
                         .onLayoutModeChange=${layoutMode => this.handleLayoutModeChange(layoutMode)}
                     ></customize-view>
                 `;
@@ -487,15 +506,18 @@ export class CheatingDaddyApp extends LitElement {
                         .responses=${this.responses}
                         .currentResponseIndex=${this.currentResponseIndex}
                         .selectedProfile=${this.selectedProfile}
+                        .viewMode=${this.responseViewMode}
+                        .autoScroll=${this.autoScroll}
+                        .showSidebar=${this.showSidebar}
                         .onSendText=${message => this.handleSendText(message)}
                         .shouldAnimateResponse=${this.shouldAnimateResponse}
                         @response-index-changed=${this.handleResponseIndexChanged}
                         @response-animation-complete=${() => {
-                            this.shouldAnimateResponse = false;
-                            this._currentResponseIsComplete = true;
-                            console.log('[response-animation-complete] Marked current response as complete');
-                            this.requestUpdate();
-                        }}
+                        this.shouldAnimateResponse = false;
+                        this._currentResponseIsComplete = true;
+                        console.log('[response-animation-complete] Marked current response as complete');
+                        this.requestUpdate();
+                    }}
                     ></assistant-view>
                 `;
 
