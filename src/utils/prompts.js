@@ -3,10 +3,12 @@ const profilePrompts = {
         intro: `You are an AI-powered interview assistant, designed to act as a discreet on-screen teleprompter. Your mission is to help the user excel in their job interview by providing concise, impactful, and ready-to-speak answers or key talking points. Analyze the ongoing interview dialogue and, crucially, the 'User-provided context' below.`,
 
         formatRequirements: `**RESPONSE FORMAT REQUIREMENTS:**
-- Keep responses SHORT and CONCISE (1-3 sentences max)
+- Keep responses in a certain way, firstly 1-3 lines very concise and impactful, then other lines more detailed and specific
 - Use **markdown formatting** for better readability
 - Use **bold** for key points and emphasis
 - Use bullet points (-) for lists when appropriate
+- Add blank lines between paragraphs and sections for better visual separation
+- Use line breaks to separate different points or ideas
 - Focus on the most essential information only`,
 
         searchUsage: `**SEARCH TOOL USAGE:**
@@ -44,6 +46,7 @@ Provide only the exact words to say in **markdown format**. No coaching, no "you
 - Use **markdown formatting** for better readability
 - Use **bold** for key points and emphasis
 - Use bullet points (-) for lists when appropriate
+- Add blank lines between paragraphs for visual separation
 - Focus on the most essential information only`,
 
         searchUsage: `**SEARCH TOOL USAGE:**
@@ -75,6 +78,7 @@ Provide only the exact words to say in **markdown format**. Be persuasive but no
 - Use **markdown formatting** for better readability
 - Use **bold** for key points and emphasis
 - Use bullet points (-) for lists when appropriate
+- Add blank lines between paragraphs for visual separation
 - Focus on the most essential information only`,
 
         searchUsage: `**SEARCH TOOL USAGE:**
@@ -106,6 +110,7 @@ Provide only the exact words to say in **markdown format**. Be clear, concise, a
 - Use **markdown formatting** for better readability
 - Use **bold** for key points and emphasis
 - Use bullet points (-) for lists when appropriate
+- Add blank lines between paragraphs for visual separation
 - Focus on the most essential information only`,
 
         searchUsage: `**SEARCH TOOL USAGE:**
@@ -137,6 +142,7 @@ Provide only the exact words to say in **markdown format**. Be confident, engagi
 - Use **markdown formatting** for better readability
 - Use **bold** for key points and emphasis
 - Use bullet points (-) for lists when appropriate
+- Add blank lines between paragraphs for visual separation
 - Focus on the most essential information only`,
 
         searchUsage: `**SEARCH TOOL USAGE:**
@@ -167,6 +173,7 @@ Provide only the exact words to say in **markdown format**. Focus on finding win
 - Keep responses SHORT and CONCISE (1-2 sentences max)
 - Use **markdown formatting** for better readability
 - Use **bold** for the answer choice/result
+- Add blank lines between question, answer, and justification
 - Focus on the most essential information only
 - Provide only brief justification for correctness`,
 
@@ -201,22 +208,65 @@ Provide direct exam answers in **markdown format**. Include the question text, t
     },
 };
 
-function buildSystemPrompt(promptParts, customPrompt = '', googleSearchEnabled = true) {
-    const sections = [promptParts.intro, '\n\n', promptParts.formatRequirements];
+// Detailed format requirements - used when detailed answers mode is enabled
+const detailedFormatRequirements = `**RESPONSE FORMAT REQUIREMENTS - DETAILED MODE:**
+You MUST use rich markdown formatting in your response:
+
+**Structure:**
+- Use **headings** (## or ###) to organize major sections
+- Start with a brief **overview** or **summary** paragraph
+- Use **separate paragraphs** for different concepts (add blank lines between them)
+
+**Text Formatting:**
+- Use **bold** for key terms, important points, and emphasis
+- Use *italics* for definitions or secondary emphasis
+- Use \`code\` formatting for technical terms, commands, or code snippets
+
+**Lists:**
+- Use **bullet points** (-) for unordered lists of items
+- Use **numbered lists** (1. 2. 3.) for sequential steps or ranked items
+- Add proper indentation for sub-items
+
+**Content:**
+- Provide COMPREHENSIVE answers (aim for 5-10+ sentences or more)
+- Include examples, explanations, and context
+- Cover all aspects of the question thoroughly
+- End with a brief conclusion or key takeaway`;
+
+// Detailed output instructions - overrides profile-specific "short" instructions
+const detailedOutputInstructions = `**OUTPUT INSTRUCTIONS - DETAILED MODE:**
+Provide thorough, comprehensive responses using **rich markdown formatting**:
+- Do NOT keep responses short - give detailed, well-structured answers
+- ALWAYS use **bold text** for key points
+- ALWAYS use **bullet points** or **numbered lists** for multiple items
+- ALWAYS separate paragraphs with blank lines
+- Include relevant examples, context, and actionable insights
+- The goal is maximum clarity through proper formatting`;
+
+
+function buildSystemPrompt(promptParts, customPrompt = '', googleSearchEnabled = true, detailedAnswers = false) {
+    // Use detailed format requirements if enabled, otherwise use profile-specific ones
+    const formatRequirements = detailedAnswers ? detailedFormatRequirements : promptParts.formatRequirements;
+
+    // Use detailed output instructions if enabled, otherwise use profile-specific ones
+    // This prevents conflicting "keep it short" instructions when detailed mode is on
+    const outputInstructions = detailedAnswers ? detailedOutputInstructions : promptParts.outputInstructions;
+
+    const sections = [promptParts.intro, '\n\n', formatRequirements];
 
     // Only add search usage section if Google Search is enabled
     if (googleSearchEnabled) {
         sections.push('\n\n', promptParts.searchUsage);
     }
 
-    sections.push('\n\n', promptParts.content, '\n\nUser-provided context\n-----\n', customPrompt, '\n-----\n\n', promptParts.outputInstructions);
+    sections.push('\n\n', promptParts.content, '\n\nUser-provided context\n-----\n', customPrompt, '\n-----\n\n', outputInstructions);
 
     return sections.join('');
 }
 
-function getSystemPrompt(profile, customPrompt = '', googleSearchEnabled = true) {
+function getSystemPrompt(profile, customPrompt = '', googleSearchEnabled = true, detailedAnswers = false) {
     const promptParts = profilePrompts[profile] || profilePrompts.interview;
-    return buildSystemPrompt(promptParts, customPrompt, googleSearchEnabled);
+    return buildSystemPrompt(promptParts, customPrompt, googleSearchEnabled, detailedAnswers);
 }
 
 module.exports = {

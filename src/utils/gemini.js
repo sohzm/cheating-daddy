@@ -3,7 +3,7 @@ const { BrowserWindow, ipcMain } = require('electron');
 const { spawn } = require('child_process');
 const { saveDebugAudio } = require('../audioUtils');
 const { getSystemPrompt } = require('./prompts');
-const { getAvailableModel, incrementLimitCount, getApiKey } = require('../storage');
+const { getAvailableModel, incrementLimitCount, getApiKey, getPreferences } = require('../storage');
 
 // Conversation tracking variables
 let currentSessionId = null;
@@ -205,12 +205,12 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
         apiKey: apiKey,
         httpOptions: { apiVersion: 'v1alpha' },
     });
+    const prefs = getPreferences();
 
-    // Get enabled tools first to determine Google Search status
-    const enabledTools = await getEnabledTools();
-    const googleSearchEnabled = enabledTools.some(tool => tool.googleSearch);
-
-    const systemPrompt = getSystemPrompt(profile, customPrompt, googleSearchEnabled);
+    const googleSearchEnabled = prefs.googleSearchEnabled !== false;
+    const enabledTools = googleSearchEnabled ? [{ googleSearch: {} }] : [];
+    const detailedAnswers = prefs.detailedAnswers === true;
+    const systemPrompt = getSystemPrompt(profile, customPrompt, googleSearchEnabled, detailedAnswers);
 
     // Initialize new conversation session only on first connect
     if (!isReconnect) {
@@ -219,13 +219,12 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
 
     try {
         const session = await client.live.connect({
-            model: 'gemini-2.5-flash-native-audio-preview-09-2025',
+            model: 'gemini-2.5-flash-native-audio-preview-12-2025',
             callbacks: {
                 onopen: function () {
                     sendToRenderer('update-status', 'Live session connected');
                 },
                 onmessage: function (message) {
-                    console.log('----------------', message);
 
                     // Handle input transcription (what was spoken)
                     if (message.serverContent?.inputTranscription?.results) {
@@ -237,13 +236,25 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                         }
                     }
 
-                    // Handle AI model response via output transcription (native audio model)
+                    // Handle AI response from modelTurn.parts or outputTranscription
+                    if (message.serverContent?.modelTurn?.parts) {
+                        for (const part of message.serverContent.modelTurn.parts) {
+                            if (part.text && part.text.trim() !== '') {
+                                const isNewResponse = messageBuffer === '';
+                                messageBuffer += part.text;
+                                sendToRenderer(isNewResponse ? 'new-response' : 'update-response', messageBuffer);
+                            }
+                        }
+                    }
+
+
                     if (message.serverContent?.outputTranscription?.text) {
                         const text = message.serverContent.outputTranscription.text;
-                        if (text.trim() === '') return; // Ignore empty transcriptions
-                        const isNewResponse = messageBuffer === '';
-                        messageBuffer += text;
-                        sendToRenderer(isNewResponse ? 'new-response' : 'update-response', messageBuffer);
+                        if (text.trim() !== '') {
+                            const isNewResponse = messageBuffer === '';
+                            messageBuffer += text;
+                            sendToRenderer(isNewResponse ? 'new-response' : 'update-response', messageBuffer);
+                        }
                     }
 
                     if (message.serverContent?.generationComplete) {
@@ -288,20 +299,15 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
             },
             config: {
                 responseModalities: [Modality.AUDIO],
+                enableAffectiveDialog: true,
                 proactivity: { proactiveAudio: true },
                 outputAudioTranscription: {},
+                inputAudioTranscription: {},
                 tools: enabledTools,
-                // Enable speaker diarization
-                inputAudioTranscription: {
-                    enableSpeakerDiarization: true,
-                    minSpeakerCount: 2,
-                    maxSpeakerCount: 2,
-                },
+                thinkingConfig: { thinkingBudget: 0 },
                 contextWindowCompression: { slidingWindow: {} },
                 speechConfig: { languageCode: language },
-                systemInstruction: {
-                    parts: [{ text: systemPrompt }],
-                },
+                systemInstruction: { parts: [{ text: systemPrompt }] },
             },
         });
 
@@ -655,16 +661,45 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
     });
 
     ipcMain.handle('send-text-message', async (event, text) => {
-        if (!geminiSessionRef.current) return { success: false, error: 'No active Gemini session' };
-
         try {
             if (!text || typeof text !== 'string' || text.trim().length === 0) {
                 return { success: false, error: 'Invalid text message' };
             }
 
-            console.log('Sending text message:', text);
-            await geminiSessionRef.current.sendRealtimeInput({ text: text.trim() });
-            return { success: true };
+            const apiKey = getApiKey();
+            if (!apiKey) {
+                return { success: false, error: 'No API key configured' };
+            }
+
+            const ai = new GoogleGenAI({ apiKey: apiKey });
+            const model = getAvailableModel();
+
+            const prefs = getPreferences();
+            const profile = prefs.selectedProfile || 'interview';
+            const detailedAnswers = prefs.detailedAnswers === true;
+            const customPrompt = prefs.customPrompt || '';
+            const systemPrompt = getSystemPrompt(profile, customPrompt, true, detailedAnswers);
+
+            const response = await ai.models.generateContentStream({
+                model: model,
+                contents: [{ role: 'user', parts: [{ text: text.trim() }] }],
+                systemInstruction: systemPrompt,
+            });
+
+            incrementLimitCount(model);
+
+            let fullText = '';
+            let isFirst = true;
+            for await (const chunk of response) {
+                const chunkText = chunk.text;
+                if (chunkText) {
+                    fullText += chunkText;
+                    sendToRenderer(isFirst ? 'new-response' : 'update-response', fullText);
+                    isFirst = false;
+                }
+            }
+
+            return { success: true, text: fullText, model: model };
         } catch (error) {
             console.error('Error sending text:', error);
             return { success: false, error: error.message };

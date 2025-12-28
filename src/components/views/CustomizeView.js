@@ -542,6 +542,7 @@ export class CustomizeView extends LitElement {
         layoutMode: { type: String },
         keybinds: { type: Object },
         googleSearchEnabled: { type: Boolean },
+        detailedAnswers: { type: Boolean },
         backgroundTransparency: { type: Number },
         fontSize: { type: Number },
         theme: { type: String },
@@ -562,13 +563,16 @@ export class CustomizeView extends LitElement {
         this.selectedImageQuality = 'medium';
         this.layoutMode = 'normal';
         this.keybinds = this.getDefaultKeybinds();
-        this.onProfileChange = () => {};
-        this.onLanguageChange = () => {};
-        this.onImageQualityChange = () => {};
-        this.onLayoutModeChange = () => {};
+        this.onProfileChange = () => { };
+        this.onLanguageChange = () => { };
+        this.onImageQualityChange = () => { };
+        this.onLayoutModeChange = () => { };
 
         // Google Search default
         this.googleSearchEnabled = true;
+
+        // Detailed answers mode default
+        this.detailedAnswers = false;
 
         // Clear data state
         this.isClearing = false;
@@ -676,6 +680,7 @@ export class CustomizeView extends LitElement {
             ]);
 
             this.googleSearchEnabled = prefs.googleSearchEnabled ?? true;
+            this.detailedAnswers = prefs.detailedAnswers ?? false;
             this.backgroundTransparency = prefs.backgroundTransparency ?? 0.8;
             this.fontSize = prefs.fontSize ?? 20;
             this.audioMode = prefs.audioMode ?? 'speaker_only';
@@ -1013,6 +1018,12 @@ export class CustomizeView extends LitElement {
         this.requestUpdate();
     }
 
+    async handleDetailedAnswersChange(e) {
+        this.detailedAnswers = e.target.checked;
+        await cheatingDaddy.storage.updatePreference('detailedAnswers', this.detailedAnswers);
+        this.requestUpdate();
+    }
+
     async clearLocalData() {
         if (this.isClearing) return;
 
@@ -1095,22 +1106,37 @@ export class CustomizeView extends LitElement {
                         </label>
                         <select class="form-control" .value=${this.selectedProfile} @change=${this.handleProfileSelect}>
                             ${profiles.map(
-                                profile => html`
+            profile => html`
                                     <option value=${profile.value} ?selected=${this.selectedProfile === profile.value}>
                                         ${profile.name}
                                     </option>
                                 `
-                            )}
+        )}
                         </select>
+                    </div>
+
+                    <div class="form-group">
+                        <div class="checkbox-group">
+                            <input
+                                type="checkbox"
+                                id="detailedAnswers"
+                                class="checkbox-input"
+                                .checked=${this.detailedAnswers}
+                                @change=${this.handleDetailedAnswersChange}
+                            />
+                            <label class="checkbox-label" for="detailedAnswers">Detailed Answers Mode</label>
+                        </div>
+                        <div class="form-description">
+                            When enabled, AI provides comprehensive, in-depth responses instead of concise answers
+                        </div>
                     </div>
 
                     <div class="form-group expand">
                         <label class="form-label">Custom AI Instructions</label>
                         <textarea
                             class="form-control"
-                            placeholder="Add specific instructions for how you want the AI to behave during ${
-                                profileNames[this.selectedProfile] || 'this interaction'
-                            }..."
+                            placeholder="Add specific instructions for how you want the AI to behave during ${profileNames[this.selectedProfile] || 'this interaction'
+            }..."
                             .value=${this.customPrompt}
                             @input=${this.handleCustomPromptInput}
                         ></textarea>
@@ -1156,12 +1182,12 @@ export class CustomizeView extends LitElement {
                     </label>
                     <select class="form-control" .value=${this.selectedLanguage} @change=${this.handleLanguageSelect}>
                         ${languages.map(
-                            language => html`
+            language => html`
                                 <option value=${language.value} ?selected=${this.selectedLanguage === language.value}>
                                     ${language.name}
                                 </option>
                             `
-                        )}
+        )}
                     </select>
                     <div class="form-description">Language for speech recognition and AI responses</div>
                 </div>
@@ -1183,12 +1209,12 @@ export class CustomizeView extends LitElement {
                     </label>
                     <select class="form-control" .value=${this.theme} @change=${this.handleThemeChange}>
                         ${themes.map(
-                            theme => html`
+            theme => html`
                                 <option value=${theme.value} ?selected=${this.theme === theme.value}>
                                     ${theme.name}
                                 </option>
                             `
-                        )}
+        )}
                     </select>
                     <div class="form-description">
                         Choose a color theme for the interface
@@ -1206,9 +1232,9 @@ export class CustomizeView extends LitElement {
                     </select>
                     <div class="form-description">
                         ${this.layoutMode === 'compact'
-                            ? 'Smaller window with reduced padding'
-                            : 'Standard layout with comfortable spacing'
-                        }
+                ? 'Smaller window with reduced padding'
+                : 'Standard layout with comfortable spacing'
+            }
                     </div>
                 </div>
 
@@ -1275,11 +1301,11 @@ export class CustomizeView extends LitElement {
                     </select>
                     <div class="form-description">
                         ${this.selectedImageQuality === 'high'
-                            ? 'Best quality, uses more tokens'
-                            : this.selectedImageQuality === 'medium'
-                              ? 'Balanced quality and token usage'
-                              : 'Lower quality, uses fewer tokens'
-                        }
+                ? 'Best quality, uses more tokens'
+                : this.selectedImageQuality === 'medium'
+                    ? 'Balanced quality and token usage'
+                    : 'Lower quality, uses fewer tokens'
+            }
                     </div>
                 </div>
             </div>
@@ -1299,7 +1325,7 @@ export class CustomizeView extends LitElement {
                     </thead>
                     <tbody>
                         ${this.getKeybindActions().map(
-                            action => html`
+            action => html`
                                 <tr>
                                     <td>
                                         <div class="action-name">${action.name}</div>
@@ -1319,7 +1345,7 @@ export class CustomizeView extends LitElement {
                                     </td>
                                 </tr>
                             `
-                        )}
+        )}
                         <tr class="table-reset-row">
                             <td colspan="2">
                                 <button class="reset-keybinds-button" @click=${this.resetKeybinds}>Reset to Defaults</button>
@@ -1409,7 +1435,7 @@ export class CustomizeView extends LitElement {
             <div class="settings-layout">
                 <nav class="settings-sidebar">
                     ${sections.map(
-                        section => html`
+            section => html`
                             <button
                                 class="sidebar-item ${this.activeSection === section.id ? 'active' : ''} ${section.danger ? 'danger' : ''}"
                                 @click=${() => this.setActiveSection(section.id)}
@@ -1418,7 +1444,7 @@ export class CustomizeView extends LitElement {
                                 <span>${section.name}</span>
                             </button>
                         `
-                    )}
+        )}
                 </nav>
                 <div class="settings-content">
                     ${this.renderSectionContent()}
