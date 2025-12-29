@@ -1350,7 +1350,7 @@ export class CustomizeView extends LitElement {
 
     renderCaptureSection() {
         return html`
-    < div class="content-header" > Screen Capture</div >
+    <div class="content-header">Screen Capture</div>
             <div class="form-grid">
                 <div class="form-group">
                     <label class="form-label">
@@ -1377,7 +1377,7 @@ export class CustomizeView extends LitElement {
 
     renderKeyboardSection() {
         return html`
-    < div class="content-header" > Keyboard Shortcuts</div >
+    <div class="content-header">Keyboard Shortcuts</div>
         <div class="form-grid">
             <table class="keybinds-table">
                 <thead>
@@ -1422,7 +1422,7 @@ export class CustomizeView extends LitElement {
 
     renderSearchSection() {
         return html`
-    < div class="content-header" > Search</div >
+    <div class="content-header">Search</div>
         <div class="form-grid">
             <div class="checkbox-group">
                 <input
@@ -1444,7 +1444,7 @@ export class CustomizeView extends LitElement {
 
     renderAdvancedSection() {
         return html`
-    < div class="content-header" style = "color: var(--error-color);" > Advanced</div >
+    <div class="content-header" style="color: var(--error-color);">Advanced</div>
         <div class="form-grid">
             <div class="form-group">
                 <label class="form-label" style="color: var(--error-color);">Data Management</label>
