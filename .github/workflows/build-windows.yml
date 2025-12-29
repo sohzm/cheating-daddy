@@ -1,0 +1,37 @@
+name: Build Electron App (Windows)
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Make Electron app (Windows Squirrel)
+        run: npm run make
+
+      - name: Upload Squirrel artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-squirrel
+          path: out/make/squirrel.windows/x64/*.exe
+
+      - name: Upload ZIP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-zip
+          path: out/make/**/*.zip
