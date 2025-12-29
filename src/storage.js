@@ -407,6 +407,39 @@ function deleteAllSessions() {
     }
 }
 
+// ============ CUSTOM PROFILES ============
+
+function getCustomProfilesPath() {
+    return path.join(getConfigDir(), 'customProfiles.json');
+}
+
+function getCustomProfiles() {
+    return readJsonFile(getCustomProfilesPath(), []);
+}
+
+function setCustomProfiles(profiles) {
+    return writeJsonFile(getCustomProfilesPath(), profiles);
+}
+
+function saveCustomProfile(profile) {
+    const profiles = getCustomProfiles();
+    const existingIndex = profiles.findIndex(p => p.id === profile.id);
+
+    if (existingIndex >= 0) {
+        profiles[existingIndex] = profile;
+    } else {
+        profiles.push(profile);
+    }
+
+    return setCustomProfiles(profiles);
+}
+
+function deleteCustomProfile(profileId) {
+    const profiles = getCustomProfiles();
+    const filtered = profiles.filter(p => p.id !== profileId);
+    return setCustomProfiles(filtered);
+}
+
 // ============ CLEAR ALL DATA ============
 
 function clearAllData() {
@@ -434,6 +467,12 @@ module.exports = {
     getPreferences,
     setPreferences,
     updatePreference,
+
+    // Custom Profiles
+    getCustomProfiles,
+    setCustomProfiles,
+    saveCustomProfile,
+    deleteCustomProfile,
 
     // Keybinds
     getKeybinds,

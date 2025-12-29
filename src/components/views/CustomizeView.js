@@ -558,6 +558,9 @@ export class CustomizeView extends LitElement {
         isClearing: { type: Boolean },
         clearStatusMessage: { type: String },
         clearStatusType: { type: String },
+        customProfiles: { type: Array },
+        isEditingProfile: { type: Boolean },
+        editingProfileData: { type: Object },
     };
 
     constructor() {
@@ -606,6 +609,15 @@ export class CustomizeView extends LitElement {
 
         // Theme default
         this.theme = 'dark';
+
+        // Custom Profiles State
+        this.customProfiles = [];
+        this.isEditingProfile = false;
+        this.editingProfileData = {
+            id: '',
+            name: '',
+            settings: { persona: 'interview', length: 'concise', format: 'teleprompter' }
+        };
 
         this._loadFromStorage();
     }
@@ -684,9 +696,10 @@ export class CustomizeView extends LitElement {
 
     async _loadFromStorage() {
         try {
-            const [prefs, keybinds] = await Promise.all([
+            const [prefs, keybinds, customProfiles] = await Promise.all([
                 cheatingDaddy.storage.getPreferences(),
-                cheatingDaddy.storage.getKeybinds()
+                cheatingDaddy.storage.getKeybinds(),
+                cheatingDaddy.storage.getCustomProfiles()
             ]);
 
             this.googleSearchEnabled = prefs.googleSearchEnabled ?? true;
@@ -704,6 +717,8 @@ export class CustomizeView extends LitElement {
                 this.keybinds = { ...this.getDefaultKeybinds(), ...keybinds };
             }
 
+            this.customProfiles = customProfiles || [];
+
             this.updateBackgroundTransparency();
             this.updateFontSize();
             this.requestUpdate();
@@ -719,7 +734,7 @@ export class CustomizeView extends LitElement {
     }
 
     getProfiles() {
-        return [
+        const builtIn = [
             {
                 value: 'interview',
                 name: 'Job Interview',
@@ -751,6 +766,67 @@ export class CustomizeView extends LitElement {
                 description: 'Academic assistance for test-taking and exam questions',
             },
         ];
+
+        const custom = (this.customProfiles || []).map(p => ({
+            value: p.id,
+            name: p.name,
+            description: `Custom: ${p.settings.persona} • ${p.settings.length} • ${p.settings.format}`,
+            isCustom: true
+        }));
+
+        return [...builtIn, ...custom];
+    }
+
+    getLanguages() {
+        return [
+            { value: 'en-US', name: 'English (US)' },
+            { value: 'en-GB', name: 'English (UK)' },
+            { value: 'en-AU', name: 'English (Australia)' },
+            { value: 'en-IN', name: 'English (India)' },
+            { value: 'de-DE', name: 'German (Germany)' },
+            { value: 'es-US', name: 'Spanish (United States)' },
+            { value: 'es-ES', name: 'Spanish (Spain)' },
+            { value: 'fr-FR', name: 'French (France)' },
+            { value: 'fr-CA', name: 'French (Canada)' },
+            { value: 'hi-IN', name: 'Hindi (India)' },
+            { value: 'pt-BR', name: 'Portuguese (Brazil)' },
+            { value: 'ar-XA', name: 'Arabic (Generic)' },
+            { value: 'id-ID', name: 'Indonesian (Indonesia)' },
+            { value: 'it-IT', name: 'Italian (Italy)' },
+            { value: 'ja-JP', name: 'Japanese (Japan)' },
+            { value: 'tr-TR', name: 'Turkish (Turkey)' },
+            { value: 'vi-VN', name: 'Vietnamese (Vietnam)' },
+            { value: 'bn-IN', name: 'Bengali (India)' },
+            { value: 'gu-IN', name: 'Gujarati (India)' },
+            { value: 'kn-IN', name: 'Kannada (India)' },
+            { value: 'ml-IN', name: 'Malayalam (India)' },
+            { value: 'mr-IN', name: 'Marathi (India)' },
+            { value: 'ta-IN', name: 'Tamil (India)' },
+            { value: 'te-IN', name: 'Telugu (India)' },
+            { value: 'nl-NL', name: 'Dutch (Netherlands)' },
+            { value: 'ko-KR', name: 'Korean (South Korea)' },
+            { value: 'cmn-CN', name: 'Mandarin Chinese (China)' },
+            { value: 'pl-PL', name: 'Polish (Poland)' },
+            { value: 'ru-RU', name: 'Russian (Russia)' },
+            { value: 'th-TH', name: 'Thai (Thailand)' },
+        ];
+    }
+
+    getProfileNames() {
+        const names = {
+            interview: 'Job Interview',
+            sales: 'Sales Call',
+            meeting: 'Business Meeting',
+            presentation: 'Presentation',
+            negotiation: 'Negotiation',
+            exam: 'Exam Assistant',
+        };
+
+        (this.customProfiles || []).forEach(p => {
+            names[p.id] = p.name;
+        });
+
+        return names;
     }
 
     getLanguages() {
@@ -1108,10 +1184,324 @@ export class CustomizeView extends LitElement {
         root.style.setProperty('--response-font-size', `${this.fontSize}px`);
     }
 
+    // ============ PROFILE MANAGEMENT ============
+
+    handleCreateProfile() {
+        // Initialize with deep copies of default templates
+        const deepCopy = (obj) => {
+            const copy = JSON.parse(JSON.stringify(obj));
+            if (copy && copy.name && !copy.name.startsWith('Custom ')) {
+                copy.name = `Custom ${copy.name}`;
+            }
+            return copy;
+        };
+
+        const defaults = window.cheatingDaddy?.prompts || { PERSONAS: {}, LENGTHS: {}, FORMATS: {} };
+        const p = defaults.PERSONAS?.interview || { name: 'Interview' };
+        const l = defaults.LENGTHS?.concise || { name: 'Concise' };
+        const f = defaults.FORMATS?.teleprompter || { name: 'Teleprompter' };
+
+        this.editingProfileData = {
+            id: '',
+            name: '',
+            settings: {
+                persona: deepCopy(p),
+                length: deepCopy(l),
+                format: deepCopy(f)
+            }
+        };
+        // Add template trackers to dropdowns
+        this.editingProfileTemplates = {
+            persona: 'interview',
+            length: 'concise',
+            format: 'teleprompter'
+        };
+
+        this.isEditingProfile = true;
+        this.requestUpdate();
+    }
+
+    handleEditProfile(profile) {
+        // Find the profile data from customProfiles
+        const data = this.customProfiles.find(p => p.id === profile.value);
+        if (data) {
+            this.editingProfileData = JSON.parse(JSON.stringify(data)); // Deep copy
+
+            // Try to guess templates or default to 'custom'
+            this.editingProfileTemplates = {
+                persona: 'custom',
+                length: 'custom',
+                format: 'custom'
+            };
+
+            this.isEditingProfile = true;
+            this.requestUpdate();
+        }
+    }
+
+    async handleDeleteProfile(profileId) {
+        if (confirm('Are you sure you want to delete this profile?')) {
+            await cheatingDaddy.storage.deleteCustomProfile(profileId);
+            const profiles = await cheatingDaddy.storage.getCustomProfiles();
+            this.customProfiles = profiles || [];
+
+            // Allow time for state update
+            this.selectedProfile = 'interview';
+            this.onProfileChange('interview');
+
+            this.requestUpdate();
+        }
+    }
+
+    updateEditingProfile(field, value) {
+        this.editingProfileData = { ...this.editingProfileData, [field]: value };
+        this.requestUpdate();
+    }
+
+    // Helper to update a specific property inside a component (e.g., settings.persona.intro)
+    updateComponentProperty(component, property, value) {
+        this.editingProfileData = {
+            ...this.editingProfileData,
+            settings: {
+                ...this.editingProfileData.settings,
+                [component]: {
+                    ...this.editingProfileData.settings[component],
+                    [property]: value
+                }
+            }
+        };
+        this.requestUpdate();
+    }
+
+    // When template dropdown changes, load that template's data
+    updateComponentTemplate(component, templateKey) {
+        this.editingProfileTemplates = {
+            ...this.editingProfileTemplates,
+            [component]: templateKey
+        };
+
+        const defaults = window.cheatingDaddy?.prompts || { PERSONAS: {}, LENGTHS: {}, FORMATS: {} };
+
+        if (templateKey !== 'custom') {
+            let templateData;
+            switch (component) {
+                case 'persona':
+                    templateData = defaults.PERSONAS[templateKey];
+                    break;
+                case 'length':
+                    templateData = defaults.LENGTHS[templateKey];
+                    break;
+                case 'format':
+                    templateData = defaults.FORMATS[templateKey];
+                    break;
+            }
+
+            if (templateData) {
+                const copy = JSON.parse(JSON.stringify(templateData));
+                if (copy && copy.name && !copy.name.startsWith('Custom ')) {
+                    copy.name = `Custom ${copy.name}`;
+                }
+
+                this.editingProfileData = {
+                    ...this.editingProfileData,
+                    settings: {
+                        ...this.editingProfileData.settings,
+                        [component]: copy
+                    }
+                };
+            }
+        }
+        this.requestUpdate();
+    }
+
+    async saveProfile() {
+        if (!this.editingProfileData.name) {
+            alert('Please enter a profile name');
+            return;
+        }
+
+        const profileToSave = {
+            ...this.editingProfileData,
+            id: this.editingProfileData.id || crypto.randomUUID()
+        };
+
+        await cheatingDaddy.storage.saveCustomProfile(profileToSave);
+
+        // Refresh list
+        const profiles = await cheatingDaddy.storage.getCustomProfiles();
+        this.customProfiles = profiles || [];
+
+        // Select the new profile
+        this.selectedProfile = profileToSave.id;
+        this.onProfileChange(profileToSave.id);
+
+        this.isEditingProfile = false;
+        this.requestUpdate();
+    }
+
+    renderProfileEditor() {
+        // Access prompts definitions - ensure they are available
+        // We'll need to expose them from main process or have them in renderer? 
+        // For now, assuming they are available via cheatingDaddy.prompts which we'll add
+        const PROMPTS = window.cheatingDaddy?.prompts || { PERSONAS: {}, LENGTHS: {}, FORMATS: {} };
+
+        const renderTextArea = (label, value, onChange, placeholder, rows = 3) => html`
+            <div class="form-group" style="margin-top: 8px;">
+                <label class="form-label" style="font-size: 11px; color: var(--text-secondary);">${label}</label>
+                <textarea 
+                    class="form-control" 
+                    style="font-family: monospace; font-size: 12px; line-height: 1.4;"
+                    rows="${rows}"
+                    .value=${value || ''}
+                    placeholder="${placeholder}"
+                    @input=${onChange}
+                ></textarea>
+            </div>
+        `;
+
+        return html`
+            <div class="profile-section">
+                <div class="content-header" style="display: flex; align-items: center; gap: 10px;">
+                    <button class="reset-keybinds-button" @click=${() => { this.isEditingProfile = false; this.requestUpdate(); }}>
+                        &larr; Back
+                    </button>
+                    <span>${this.editingProfileData.id ? 'Edit Profile' : 'New Profile'}</span>
+                </div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Profile Name</label>
+                        <input type="text" class="form-control" .value=${this.editingProfileData.name} 
+                            @input=${(e) => this.updateEditingProfile('name', e.target.value)} 
+                            placeholder="e.g. Technical Interview" />
+                    </div>
+
+                    <!-- PERSONA EDITOR -->
+                    <div class="form-group" style="border: 1px solid var(--border-color); padding: 12px; border-radius: 6px;">
+                        <label class="form-label" style="margin-bottom: 8px;">Persona Configuration</label>
+                        
+                        <div class="form-group">
+                            <label class="form-label" style="font-size: 12px;">Base Template</label>
+                            <select class="form-control" 
+                                .value=${this.editingProfileTemplates?.persona || 'interview'}
+                                @change=${(e) => this.updateComponentTemplate('persona', e.target.value)}>
+                                ${Object.entries(PROMPTS.PERSONAS).map(([key, p]) => html`
+                                    <option value="${key}">${p.name}</option>
+                                `)}
+                                <option value="custom">Custom (Edited)</option>
+                            </select>
+                        </div>
+
+                        <details>
+                            <summary style="cursor: pointer; font-size: 12px; color: var(--accent-color); margin: 8px 0;">Advanced: Edit Prompt Instructions</summary>
+                            ${renderTextArea(
+            'Intro Instruction',
+            this.editingProfileData.settings.persona.intro,
+            (e) => {
+                this.updateComponentProperty('persona', 'intro', e.target.value);
+                this.editingProfileTemplates.persona = 'custom';
+            },
+            'Who is the AI?'
+        )}
+                            ${renderTextArea(
+            'Context Instruction',
+            this.editingProfileData.settings.persona.contextInstruction,
+            (e) => {
+                this.updateComponentProperty('persona', 'contextInstruction', e.target.value);
+                this.editingProfileTemplates.persona = 'custom';
+            },
+            'How should user context be used?'
+        )}
+                            ${renderTextArea(
+            'Search Rules',
+            this.editingProfileData.settings.persona.searchFocus,
+            (e) => {
+                this.updateComponentProperty('persona', 'searchFocus', e.target.value);
+                this.editingProfileTemplates.persona = 'custom';
+            },
+            'When should it search?'
+        )}
+                        </details>
+                    </div>
+
+                    <!-- LENGTH EDITOR -->
+                    <div class="form-group" style="border: 1px solid var(--border-color); padding: 12px; border-radius: 6px;">
+                        <label class="form-label" style="margin-bottom: 8px;">Length Configuration</label>
+                        
+                        <div class="form-group">
+                            <label class="form-label" style="font-size: 12px;">Base Template</label>
+                            <select class="form-control" 
+                                .value=${this.editingProfileTemplates?.length || 'concise'}
+                                @change=${(e) => this.updateComponentTemplate('length', e.target.value)}>
+                                ${Object.entries(PROMPTS.LENGTHS).map(([key, l]) => html`
+                                    <option value="${key}">${l.name}</option>
+                                `)}
+                                <option value="custom">Custom (Edited)</option>
+                            </select>
+                        </div>
+                        
+                        <details>
+                            <summary style="cursor: pointer; font-size: 12px; color: var(--accent-color); margin: 8px 0;">Advanced: Edit Length Rules</summary>
+                            ${renderTextArea(
+            'Length Instruction',
+            this.editingProfileData.settings.length.instruction,
+            (e) => {
+                this.updateComponentProperty('length', 'instruction', e.target.value);
+                this.editingProfileTemplates.length = 'custom';
+            },
+            'How long should responses be?'
+        )}
+                        </details>
+                    </div>
+
+                    <!-- FORMAT EDITOR -->
+                    <div class="form-group" style="border: 1px solid var(--border-color); padding: 12px; border-radius: 6px;">
+                        <label class="form-label" style="margin-bottom: 8px;">Format Configuration</label>
+                        
+                        <div class="form-group">
+                            <label class="form-label" style="font-size: 12px;">Base Template</label>
+                            <select class="form-control" 
+                                .value=${this.editingProfileTemplates?.format || 'teleprompter'}
+                                @change=${(e) => this.updateComponentTemplate('format', e.target.value)}>
+                                ${Object.entries(PROMPTS.FORMATS).map(([key, f]) => html`
+                                    <option value="${key}">${f.name}</option>
+                                `)}
+                                <option value="custom">Custom (Edited)</option>
+                            </select>
+                        </div>
+                        
+                        <details>
+                            <summary style="cursor: pointer; font-size: 12px; color: var(--accent-color); margin: 8px 0;">Advanced: Edit Formatting Rules</summary>
+                            ${renderTextArea(
+            'Format Instruction',
+            this.editingProfileData.settings.format.instruction,
+            (e) => {
+                this.updateComponentProperty('format', 'instruction', e.target.value);
+                this.editingProfileTemplates.format = 'custom';
+            },
+            'How should text be styled?'
+        )}
+                        </details>
+                    </div>
+
+                    <div class="form-group" style="margin-top: 20px;">
+                        <button class="reset-keybinds-button" style="width: 100%; background: var(--btn-primary-bg); color: var(--btn-primary-text); text-align: center; padding: 10px; font-weight: bold; border: none;" @click=${this.saveProfile}>
+                            Save Custom Profile
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
     renderProfileSection() {
+        if (this.isEditingProfile) {
+            return this.renderProfileEditor();
+        }
+
         const profiles = this.getProfiles();
         const profileNames = this.getProfileNames();
         const currentProfile = profiles.find(p => p.value === this.selectedProfile);
+        const isCustomProfile = currentProfile?.isCustom;
 
         return html`
             <div class="profile-section">
@@ -1122,17 +1512,33 @@ export class CustomizeView extends LitElement {
                             Profile Type
                             <span class="current-selection">${currentProfile?.name || 'Unknown'}</span>
                         </label>
-                        <select class="form-control" .value=${this.selectedProfile} @change=${this.handleProfileSelect}>
-                            ${profiles.map(
+                        <div style="display: flex; gap: 8px;">
+                            <select class="form-control" style="flex: 1;" .value=${this.selectedProfile} @change=${this.handleProfileSelect}>
+                                ${profiles.map(
             profile => html`
-                                    <option value=${profile.value} ?selected=${this.selectedProfile === profile.value}>
-                                        ${profile.name}
-                                    </option>
-                                `
+                                        <option value=${profile.value} ?selected=${this.selectedProfile === profile.value}>
+                                            ${profile.name}
+                                        </option>
+                                    `
         )}
-                        </select>
+                            </select>
+                            
+                            <button class="reset-keybinds-button" @click=${this.handleCreateProfile} title="Create New Profile">
+                                +
+                            </button>
+                            
+                            ${isCustomProfile ? html`
+                                <button class="reset-keybinds-button" @click=${() => this.handleEditProfile(currentProfile)} title="Edit Profile">
+                                    Edit
+                                </button>
+                                <button class="danger-button" @click=${() => this.handleDeleteProfile(currentProfile.value)} style="padding: 6px 10px;" title="Delete Profile">
+                                    X
+                                </button>
+                            ` : ''}
+                        </div>
                     </div>
 
+                    ${!isCustomProfile ? html`
                     <div class="form-group">
                         <div class="checkbox-group">
                             <input
@@ -1148,20 +1554,18 @@ export class CustomizeView extends LitElement {
                             When enabled, AI provides comprehensive, in-depth responses instead of concise answers
                         </div>
                     </div>
-
-
+                    ` : ''}
 
                     <div class="form-group expand">
-                        <label class="form-label">Custom AI Instructions</label>
+                        <label class="form-label">User Context / Background Info</label>
                         <textarea
                             class="form-control"
-                            placeholder="Add specific instructions for how you want the AI to behave during ${profileNames[this.selectedProfile] || 'this interaction'
-            }..."
+                            placeholder="Add specific details about you, your role, or the situation (e.g., 'I am a Senior Dev', 'This is a technical interview')..."
                             .value=${this.customPrompt}
                             @input=${this.handleCustomPromptInput}
                         ></textarea>
                         <div class="form-description">
-                            Personalize the AI's behavior with specific instructions
+                            This context is appended to the system prompt to help the AI understand your specific situation.
                         </div>
                     </div>
                 </div>
@@ -1421,25 +1825,42 @@ export class CustomizeView extends LitElement {
     }
 
     renderSearchSection() {
+        const profiles = this.getProfiles();
+        const currentProfile = profiles.find(p => p.value === this.selectedProfile);
+        const isCustomProfile = currentProfile?.isCustom;
+
+        if (isCustomProfile) {
+            return html`
+                <div class="content-header">Search</div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <div class="form-description">
+                            Search behavior for this profile is configured in the <strong>Persona > Advanced</strong> settings.
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
         return html`
-    <div class="content-header">Search</div>
-        <div class="form-grid">
-            <div class="checkbox-group">
-                <input
-                    type="checkbox"
-                    class="checkbox-input"
-                    id="google-search-enabled"
+            <div class="content-header">Search</div>
+            <div class="form-grid">
+                <div class="checkbox-group">
+                    <input
+                        type="checkbox"
+                        class="checkbox-input"
+                        id="google-search-enabled"
                         .checked=${this.googleSearchEnabled}
-                @change=${this.handleGoogleSearchChange}
+                        @change=${this.handleGoogleSearchChange}
                     />
-                <label for="google-search-enabled" class="checkbox-label">Enable Google Search</label>
+                    <label for="google-search-enabled" class="checkbox-label">Enable Google Search</label>
+                </div>
+                <div class="form-description" style="margin-left: 24px; margin-top: -8px;">
+                    Allow the AI to search Google for up-to-date information during conversations.
+                    <br /><strong>Note:</strong> Changes take effect when starting a new AI session.
+                </div>
             </div>
-            <div class="form-description" style="margin-left: 24px; margin-top: -8px;">
-                Allow the AI to search Google for up-to-date information during conversations.
-                <br /><strong>Note:</strong> Changes take effect when starting a new AI session.
-            </div>
-        </div>
-`;
+        `;
     }
 
     renderAdvancedSection() {

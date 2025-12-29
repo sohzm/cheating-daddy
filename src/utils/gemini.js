@@ -2,8 +2,8 @@ const { GoogleGenAI, Modality } = require('@google/genai');
 const { BrowserWindow, ipcMain } = require('electron');
 const { spawn } = require('child_process');
 const { saveDebugAudio } = require('../audioUtils');
-const { getSystemPrompt } = require('./prompts');
-const { getAvailableModel, incrementLimitCount, getApiKey, getPreferences } = require('../storage');
+const { getSystemPrompt, buildSystemPrompt } = require('./prompts');
+const { getAvailableModel, incrementLimitCount, getApiKey, getPreferences, getCustomProfiles } = require('../storage');
 
 // Conversation tracking variables
 let currentSessionId = null;
@@ -206,11 +206,29 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
         httpOptions: { apiVersion: 'v1alpha' },
     });
     const prefs = await getPreferences();
+    const customProfiles = getCustomProfiles();
 
     const googleSearchEnabled = prefs.googleSearchEnabled !== false;
     const enabledTools = googleSearchEnabled ? [{ googleSearch: {} }] : [];
-    const detailedAnswers = prefs.detailedAnswers === true;
-    const systemPrompt = getSystemPrompt(profile, customPrompt, googleSearchEnabled, detailedAnswers);
+
+    // Check if selected profile is a custom one
+    const customProfileModel = customProfiles.find(p => p.id === profile);
+    let systemPrompt;
+
+    if (customProfileModel) {
+        console.log('Using Custom Profile:', customProfileModel.name);
+        systemPrompt = buildSystemPrompt({
+            persona: customProfileModel.settings.persona,
+            length: customProfileModel.settings.length,
+            format: customProfileModel.settings.format,
+            context: customPrompt,
+            googleSearch: googleSearchEnabled
+        });
+    } else {
+        // Default/Legacy handling
+        const detailedAnswers = prefs.detailedAnswers === true;
+        systemPrompt = getSystemPrompt(profile, customPrompt, googleSearchEnabled, detailedAnswers);
+    }
 
     // Initialize new conversation session only on first connect
     if (!isReconnect) {
@@ -721,10 +739,27 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
             const model = getAvailableModel();
 
             const prefs = await getPreferences();
+            const customProfiles = getCustomProfiles();
+
             const profile = prefs.selectedProfile || 'interview';
-            const detailedAnswers = prefs.detailedAnswers === true;
             const customPrompt = prefs.customPrompt || '';
-            const systemPrompt = getSystemPrompt(profile, customPrompt, true, detailedAnswers);
+
+            // Check if selected profile is a custom one
+            const customProfileModel = customProfiles.find(p => p.id === profile);
+            let systemPrompt;
+
+            if (customProfileModel) {
+                systemPrompt = buildSystemPrompt({
+                    persona: customProfileModel.settings.persona,
+                    length: customProfileModel.settings.length,
+                    format: customProfileModel.settings.format,
+                    context: customPrompt,
+                    googleSearch: true
+                });
+            } else {
+                const detailedAnswers = prefs.detailedAnswers === true;
+                systemPrompt = getSystemPrompt(profile, customPrompt, true, detailedAnswers);
+            }
 
             const response = await ai.models.generateContentStream({
                 model: model,

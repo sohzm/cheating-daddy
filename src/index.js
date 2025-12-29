@@ -142,6 +142,36 @@ function setupStorageIpcHandlers() {
         }
     });
 
+    // ============ CUSTOM PROFILES ============
+    ipcMain.handle('storage:get-custom-profiles', async () => {
+        try {
+            return { success: true, data: storage.getCustomProfiles() };
+        } catch (error) {
+            console.error('Error getting custom profiles:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('storage:save-custom-profile', async (event, profile) => {
+        try {
+            storage.saveCustomProfile(profile);
+            return { success: true };
+        } catch (error) {
+            console.error('Error saving custom profile:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('storage:delete-custom-profile', async (event, profileId) => {
+        try {
+            storage.deleteCustomProfile(profileId);
+            return { success: true };
+        } catch (error) {
+            console.error('Error deleting custom profile:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
     // ============ KEYBINDS ============
     ipcMain.handle('storage:get-keybinds', async () => {
         try {
