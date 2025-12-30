@@ -58,3 +58,18 @@ A real-time AI assistant that provides contextual help during video calls, inter
 - Gemini API key
 - Screen recording permissions
 - Microphone/audio permissions
+
+---
+
+## Latest Major Update (v0.5.4)
+
+**Modified by:**
+*   **Name**: Shashank Jain
+*   **GitHub**: [sus-qodes](https://github.com/sus-qodes)
+*   **Version**: v0.5.4
+
+### Key Changes
+*   **Multi-Provider AI Engine**: Integrated **Groq** (Llama 3, Whisper) alongside **Gemini** (Live, Flash) for task-specific optimization.
+*   **Advanced Audio Pipeline**: Added **Audio-to-Text Mode** (Whisper+LLM) with VAD & manual triggers (`Ctrl+/`), complementing the existing **Live Conversation Mode**.
+*   **Intelligent Robustness**: Implemented proactive **Rate Limit Management** with automatic provider fallbacks and a new **Toast Notification System**.
+*   **Enhanced UX**: Deep profile customization, "Response Navigator" sidebar for transcriptions, and refined UI aesthetics.

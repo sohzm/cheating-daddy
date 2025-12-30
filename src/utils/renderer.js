@@ -141,12 +141,22 @@ const storage = {
     async setCredentials(credentials) {
         return ipcRenderer.invoke('storage:set-credentials', credentials);
     },
-    async getApiKey() {
-        const result = await ipcRenderer.invoke('storage:get-api-key');
+    async getApiKey(provider = null) {
+        const result = await ipcRenderer.invoke('storage:get-api-key', provider);
         return result.success ? result.data : '';
     },
-    async setApiKey(apiKey) {
-        return ipcRenderer.invoke('storage:set-api-key', apiKey);
+    async setApiKey(apiKey, provider = null) {
+        return ipcRenderer.invoke('storage:set-api-key', apiKey, provider);
+    },
+
+    // Usage stats
+    async getUsageStats() {
+        const result = await ipcRenderer.invoke('storage:get-usage-stats');
+        return result.success ? result.data : { groq: [], gemini: [] };
+    },
+    async getUsageResetTime() {
+        const result = await ipcRenderer.invoke('storage:get-usage-reset-time');
+        return result.success ? result.data : { hours: 0, minutes: 0 };
     },
 
     // Preferences

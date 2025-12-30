@@ -12,7 +12,9 @@ const DEFAULT_CONFIG = {
 };
 
 const DEFAULT_CREDENTIALS = {
-    apiKey: ''
+    apiKey: '',  // Legacy - kept for backwards compatibility
+    gemini: '',  // Gemini API key
+    groq: ''     // Groq API key
 };
 
 const DEFAULT_PREFERENCES = {
@@ -28,7 +30,30 @@ const DEFAULT_PREFERENCES = {
     responseViewMode: 'paged',
     autoScroll: true,
     showSidebar: true,
-    googleSearchEnabled: false
+    googleSearchEnabled: false,
+    // Multi-provider model preferences
+    textMessage: {
+        primaryProvider: 'groq',
+        primaryModel: 'llama-3.3-70b-versatile',
+        fallbackProvider: 'groq',
+        fallbackModel: 'llama-3.1-8b-instant'
+    },
+    screenAnalysis: {
+        primaryProvider: 'groq',
+        primaryModel: 'meta-llama/llama-4-maverick-17b-128e-instruct',
+        fallbackProvider: 'gemini',
+        fallbackModel: 'gemini-2.5-flash'
+    },
+    liveAudio: {
+        provider: 'gemini',
+        model: 'gemini-2.5-flash-native-audio-preview-12-2025'
+    },
+    audioToText: {
+        primaryProvider: 'gemini',
+        primaryModel: 'gemini-2.5-flash',
+        fallbackProvider: 'groq',
+        fallbackModel: 'meta-llama/llama-4-maverick-17b-128e-instruct'
+    }
 };
 
 const DEFAULT_KEYBINDS = null; // null means use system defaults
@@ -187,12 +212,25 @@ function setCredentials(credentials) {
     return writeJsonFile(getCredentialsPath(), updated);
 }
 
-function getApiKey() {
-    return getCredentials().apiKey || '';
+function getApiKey(provider = null) {
+    const creds = getCredentials();
+    if (provider === 'groq') {
+        return creds.groq || '';
+    } else if (provider === 'gemini') {
+        return creds.gemini || creds.apiKey || ''; // Fallback to legacy apiKey
+    }
+    // Legacy: return gemini key by default
+    return creds.gemini || creds.apiKey || '';
 }
 
-function setApiKey(apiKey) {
-    return setCredentials({ apiKey });
+function setApiKey(apiKey, provider = null) {
+    if (provider === 'groq') {
+        return setCredentials({ groq: apiKey });
+    } else if (provider === 'gemini') {
+        return setCredentials({ gemini: apiKey, apiKey: apiKey }); // Also set legacy for compatibility
+    }
+    // Legacy
+    return setCredentials({ apiKey, gemini: apiKey });
 }
 
 // ============ PREFERENCES ============

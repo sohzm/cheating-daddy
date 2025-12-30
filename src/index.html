@@ -1,143 +1,170 @@
 <!doctype html>
 <html>
-    <head>
-        <meta http-equiv="content-security-policy" content="script-src 'self' 'unsafe-inline'" />
-        <title>Screen and Audio Capture</title>
-        <style>
-            :root {
-                /* Backgrounds - with default 0.8 transparency */
-                --background-transparent: transparent;
-                --bg-primary: rgba(30, 30, 30, 0.8);
-                --bg-secondary: rgba(37, 37, 38, 0.8);
-                --bg-tertiary: rgba(45, 45, 45, 0.8);
-                --bg-hover: rgba(50, 50, 50, 0.8);
 
-                /* Text */
-                --text-color: #e5e5e5;
-                --text-secondary: #a0a0a0;
-                --text-muted: #6b6b6b;
-                --description-color: #a0a0a0;
-                --placeholder-color: #6b6b6b;
+<head>
+    <meta http-equiv="content-security-policy" content="script-src 'self' 'unsafe-inline'" />
+    <title>Screen and Audio Capture</title>
+    <style>
+        :root {
+            /* Backgrounds - with default 0.8 transparency */
+            --background-transparent: transparent;
+            --bg-primary: rgba(30, 30, 30, 0.8);
+            --bg-secondary: rgba(37, 37, 38, 0.8);
+            --bg-tertiary: rgba(45, 45, 45, 0.8);
+            --bg-hover: rgba(50, 50, 50, 0.8);
 
-                /* Borders */
-                --border-color: #3c3c3c;
-                --border-subtle: #3c3c3c;
-                --border-default: #4a4a4a;
+            /* Text */
+            --text-color: #e5e5e5;
+            --text-secondary: #a0a0a0;
+            --text-muted: #6b6b6b;
+            --description-color: #a0a0a0;
+            --placeholder-color: #6b6b6b;
 
-                /* Component backgrounds - with default 0.8 transparency */
-                --header-background: rgba(30, 30, 30, 0.8);
-                --header-actions-color: #a0a0a0;
-                --main-content-background: rgba(30, 30, 30, 0.8);
-                --button-background: transparent;
-                --button-border: #3c3c3c;
-                --icon-button-color: #a0a0a0;
-                --hover-background: rgba(50, 50, 50, 0.8);
-                --input-background: rgba(45, 45, 45, 0.8);
-                --input-focus-background: rgba(45, 45, 45, 0.8);
+            /* Borders */
+            --border-color: #3c3c3c;
+            --border-subtle: #3c3c3c;
+            --border-default: #4a4a4a;
 
-                /* Focus states - neutral */
-                --focus-border-color: #4a4a4a;
-                --focus-box-shadow: transparent;
+            /* Component backgrounds - with default 0.8 transparency */
+            --header-background: rgba(30, 30, 30, 0.8);
+            --header-actions-color: #a0a0a0;
+            --main-content-background: rgba(30, 30, 30, 0.8);
+            --button-background: transparent;
+            --button-border: #3c3c3c;
+            --icon-button-color: #a0a0a0;
+            --hover-background: rgba(50, 50, 50, 0.8);
+            --input-background: rgba(45, 45, 45, 0.8);
+            --input-focus-background: rgba(45, 45, 45, 0.8);
 
-                /* Scrollbar */
-                --scrollbar-track: #1e1e1e;
-                --scrollbar-thumb: #3c3c3c;
-                --scrollbar-thumb-hover: #4a4a4a;
-                --scrollbar-background: #1e1e1e;
+            /* Focus states - neutral */
+            --focus-border-color: #4a4a4a;
+            --focus-box-shadow: transparent;
 
-                /* Legacy/misc */
-                --preview-video-background: #1e1e1e;
-                --preview-video-border: #3c3c3c;
-                --option-label-color: #e5e5e5;
-                --screen-option-background: #252526;
-                --screen-option-hover-background: #2d2d2d;
-                --screen-option-selected-background: #323232;
-                --screen-option-text: #a0a0a0;
+            /* Scrollbar */
+            --scrollbar-track: #1e1e1e;
+            --scrollbar-thumb: #3c3c3c;
+            --scrollbar-thumb-hover: #4a4a4a;
+            --scrollbar-background: #1e1e1e;
 
-                /* Buttons */
-                --start-button-background: #ffffff;
-                --start-button-color: #1e1e1e;
-                --start-button-border: #ffffff;
-                --start-button-hover-background: #e0e0e0;
-                --start-button-hover-border: #e0e0e0;
-                --text-input-button-background: #ffffff;
-                --text-input-button-hover: #e0e0e0;
+            /* Legacy/misc */
+            --preview-video-background: #1e1e1e;
+            --preview-video-border: #3c3c3c;
+            --option-label-color: #e5e5e5;
+            --screen-option-background: #252526;
+            --screen-option-hover-background: #2d2d2d;
+            --screen-option-selected-background: #323232;
+            --screen-option-text: #a0a0a0;
 
-                /* Links - neutral */
-                --link-color: #e5e5e5;
-                --key-background: #2d2d2d;
+            /* Buttons */
+            --start-button-background: #ffffff;
+            --start-button-color: #1e1e1e;
+            --start-button-border: #ffffff;
+            --start-button-hover-background: #e0e0e0;
+            --start-button-hover-border: #e0e0e0;
+            --text-input-button-background: #ffffff;
+            --text-input-button-hover: #e0e0e0;
 
-                /* Status colors */
-                --success-color: #4ec9b0;
-                --warning-color: #dcdcaa;
-                --error-color: #f14c4c;
-                --danger-color: #f14c4c;
+            /* Links - neutral */
+            --link-color: #e5e5e5;
+            --key-background: #2d2d2d;
 
-                /* Layout-specific variables */
-                --header-padding: 8px 16px;
-                --header-font-size: 14px;
-                --header-gap: 8px;
-                --header-button-padding: 6px 12px;
-                --header-icon-padding: 6px;
-                --header-font-size-small: 12px;
-                --main-content-padding: 16px;
-                --main-content-margin-top: 1px;
-                --icon-size: 18px;
-                --border-radius: 3px;
-                --content-border-radius: 0;
-            }
+            /* Status colors */
+            --success-color: #4ec9b0;
+            --warning-color: #dcdcaa;
+            --error-color: #f14c4c;
+            --danger-color: #f14c4c;
 
-            /* Compact layout styles */
-            :root.compact-layout {
-                --header-padding: 6px 12px;
-                --header-font-size: 12px;
-                --header-gap: 6px;
-                --header-button-padding: 4px 8px;
-                --header-icon-padding: 4px;
-                --header-font-size-small: 10px;
-                --main-content-padding: 12px;
-                --main-content-margin-top: 1px;
-                --icon-size: 16px;
-                --border-radius: 3px;
-                --content-border-radius: 0;
-            }
+            /* Layout-specific variables */
+            --header-padding: 8px 16px;
+            --header-font-size: 14px;
+            --header-gap: 8px;
+            --header-button-padding: 6px 12px;
+            --header-icon-padding: 6px;
+            --header-font-size-small: 12px;
+            --main-content-padding: 16px;
+            --main-content-margin-top: 1px;
+            --icon-size: 18px;
+            --border-radius: 3px;
+            --content-border-radius: 0;
+        }
 
-            html,
-            body {
-                margin: 0;
-                padding: 0;
-                height: 100%;
-                overflow: hidden;
-                background: transparent;
-            }
+        /* Compact layout styles */
+        :root.compact-layout {
+            --header-padding: 6px 12px;
+            --header-font-size: 12px;
+            --header-gap: 6px;
+            --header-button-padding: 4px 8px;
+            --header-icon-padding: 4px;
+            --header-font-size-small: 10px;
+            --main-content-padding: 12px;
+            --main-content-margin-top: 1px;
+            --icon-size: 16px;
+            --border-radius: 3px;
+            --content-border-radius: 0;
+        }
 
-            body {
-                font-family:
-                    'Inter',
-                    -apple-system,
-                    BlinkMacSystemFont,
-                    sans-serif;
-            }
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+            background: transparent;
+        }
 
-            * {
-                box-sizing: border-box;
-            }
+        body {
+            font-family:
+                'Inter',
+                -apple-system,
+                BlinkMacSystemFont,
+                sans-serif;
+        }
 
-            cheating-daddy-app {
-                display: block;
-                width: 100%;
-                height: 100%;
-            }
-        </style>
-    </head>
-    <body>
-        <script src="assets/marked-4.3.0.min.js"></script>
-        <script src="assets/highlight-11.9.0.min.js"></script>
-        <link rel="stylesheet" href="assets/highlight-vscode-dark.min.css" />
-        <script type="module" src="components/app/CheatingDaddyApp.js"></script>
+        * {
+            box-sizing: border-box;
+        }
 
-        <cheating-daddy-app id="cheatingDaddy"></cheating-daddy-app>
-        <script src="script.js"></script>
-        <script src="utils/renderer.js"></script>
-    </body>
+        cheating-daddy-app {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .branding-footer {
+            position: fixed;
+            bottom: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255, 255, 255, 0.9);
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            pointer-events: none;
+            z-index: 9999;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.6), 0 0 20px rgba(0, 255, 255, 0.4);
+            opacity: 0.9;
+            white-space: nowrap;
+            border-top: 1px solid rgba(0, 255, 255, 0.3);
+            padding-top: 5px;
+            background: linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.05), transparent);
+            width: 100%;
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+    <script src="assets/marked-4.3.0.min.js"></script>
+    <script src="assets/highlight-11.9.0.min.js"></script>
+    <link rel="stylesheet" href="assets/highlight-vscode-dark.min.css" />
+    <script type="module" src="components/app/CheatingDaddyApp.js"></script>
+
+    <cheating-daddy-app id="cheatingDaddy"></cheating-daddy-app>
+
+    <script src="script.js"></script>
+    <script src="utils/renderer.js"></script>
+</body>
+
 </html>

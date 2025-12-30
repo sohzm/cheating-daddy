@@ -282,6 +282,22 @@ export class CustomizeView extends LitElement {
             background: var(--hover-background);
         }
 
+        .toggle-btn {
+            background: transparent;
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            padding: 8px 10px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.1s ease;
+        }
+
+        .toggle-btn:hover {
+            background: var(--hover-background);
+        }
+
         .keybinds-table {
             width: 100%;
             border-collapse: collapse;
@@ -533,6 +549,170 @@ export class CustomizeView extends LitElement {
             color: var(--error-color);
             border-left: 2px solid var(--error-color);
         }
+
+        /* API Keys toggle button */
+        .toggle-btn {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 6px 10px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .toggle-btn:hover {
+            background: var(--hover-background);
+        }
+
+        /* Status indicator */
+        .status-indicator {
+            font-size: 11px;
+            margin-top: 6px;
+            opacity: 0.8;
+        }
+
+        .status-indicator.valid {
+            color: var(--success-color);
+        }
+
+        .status-indicator.invalid {
+            color: var(--error-color);
+        }
+
+        .status-indicator.checking {
+            color: var(--text-secondary);
+        }
+
+        .status-indicator.notset {
+            color: var(--warning-color, #fbbf24);
+        }
+
+        /* Usage bars */
+        .usage-container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .usage-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .usage-model {
+            flex: 0 0 140px;
+            font-size: 11px;
+            opacity: 0.8;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .usage-bar {
+            flex: 1;
+            height: 8px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .usage-bar-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+
+        .usage-bar-fill.green {
+            background: #4ade80;
+        }
+
+        .usage-bar-fill.yellow {
+            background: #fbbf24;
+        }
+
+        .usage-bar-fill.red {
+            background: #ef4444;
+        }
+
+        .usage-count {
+            flex: 0 0 70px;
+            font-size: 11px;
+            text-align: right;
+            opacity: 0.7;
+        }
+
+        /* Secondary button */
+        .secondary-button {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.15s ease;
+        }
+
+        .secondary-button:hover {
+            background: var(--hover-background);
+        }
+
+        /* Radio card for audio mode selection */
+        .radio-card {
+            display: flex;
+            gap: 12px;
+            padding: 12px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .radio-card:hover {
+            background: var(--hover-background);
+        }
+
+        .radio-card.selected {
+            border-color: var(--accent-primary);
+            background: rgba(var(--accent-primary-rgb, 99, 102, 241), 0.1);
+        }
+
+        .radio-card input[type="radio"] {
+            margin-top: 2px;
+            accent-color: var(--accent-primary);
+        }
+
+        .radio-content {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .radio-content strong {
+            font-size: 13px;
+        }
+
+        .radio-description {
+            font-size: 11px;
+            opacity: 0.7;
+            line-height: 1.4;
+        }
+
+        .radio-badge {
+            display: inline-block;
+            font-size: 10px;
+            padding: 2px 6px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 3px;
+            margin-top: 4px;
+            width: fit-content;
+        }
+
+        .radio-badge.green {
+            background: rgba(74, 222, 128, 0.2);
+            color: #4ade80;
+        }
     `;
 
     static properties = {
@@ -561,6 +741,21 @@ export class CustomizeView extends LitElement {
         customProfiles: { type: Array },
         isEditingProfile: { type: Boolean },
         editingProfileData: { type: Object },
+        // API Keys
+        geminiApiKey: { type: String },
+        groqApiKey: { type: String },
+        showGeminiKey: { type: Boolean },
+        showGroqKey: { type: Boolean },
+        geminiKeyStatus: { type: String },
+        groqKeyStatus: { type: String },
+        // Model preferences
+        modelPrefs: { type: Object },
+        // Usage stats
+        usageStats: { type: Object },
+        usageResetTime: { type: String },
+        // Audio processing mode
+        audioProcessingMode: { type: String },
+        audioTriggerMethod: { type: String },
     };
 
     constructor() {
@@ -619,6 +814,25 @@ export class CustomizeView extends LitElement {
             settings: { persona: 'interview', length: 'concise', format: 'teleprompter' }
         };
 
+        // API Keys state
+        this.geminiApiKey = '';
+        this.groqApiKey = '';
+        this.showGeminiKey = false;
+        this.showGroqKey = false;
+        this.geminiKeyStatus = 'notset';
+        this.groqKeyStatus = 'notset';
+
+        // Model preferences state
+        this.modelPrefs = {};
+
+        // Usage stats state
+        this.usageStats = { groq: [], gemini: [] };
+        this.usageResetTime = '';
+
+        // Audio Processing defaults
+        this.audioProcessingMode = 'live-conversation';
+        this.audioTriggerMethod = 'vad';
+
         this._loadFromStorage();
     }
 
@@ -634,6 +848,9 @@ export class CustomizeView extends LitElement {
     getSidebarSections() {
         return [
             { id: 'profile', name: 'Profile', icon: 'user' },
+            { id: 'apikeys', name: 'API Keys', icon: 'key' },
+            { id: 'aimodels', name: 'AI Models', icon: 'brain' },
+            { id: 'usage', name: 'Usage', icon: 'chart' },
             { id: 'appearance', name: 'Appearance', icon: 'display' },
             { id: 'audio', name: 'Audio', icon: 'mic' },
             { id: 'language', name: 'Language', icon: 'globe' },
@@ -690,16 +907,29 @@ export class CustomizeView extends LitElement {
                 <line x1="12" y1="9" x2="12" y2="13"></line>
                 <line x1="12" y1="17" x2="12.01" y2="17"></line>
             </svg>`,
+            key: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
+            </svg>`,
+            brain: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 4.44-2.04z"></path>
+                <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-4.44-2.04z"></path>
+            </svg>`,
+            chart: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="20" x2="18" y2="10"></line>
+                <line x1="12" y1="20" x2="12" y2="4"></line>
+                <line x1="6" y1="20" x2="6" y2="14"></line>
+            </svg>`,
         };
         return icons[icon] || '';
     }
 
     async _loadFromStorage() {
         try {
-            const [prefs, keybinds, customProfiles] = await Promise.all([
+            const [prefs, keybinds, customProfiles, credentials] = await Promise.all([
                 cheatingDaddy.storage.getPreferences(),
                 cheatingDaddy.storage.getKeybinds(),
-                cheatingDaddy.storage.getCustomProfiles()
+                cheatingDaddy.storage.getCustomProfiles(),
+                cheatingDaddy.storage.getCredentials()
             ]);
 
             this.googleSearchEnabled = prefs.googleSearchEnabled ?? true;
@@ -713,6 +943,39 @@ export class CustomizeView extends LitElement {
             this.customPrompt = prefs.customPrompt ?? '';
             this.theme = prefs.theme ?? 'dark';
 
+            // Load API keys
+            this.geminiApiKey = credentials?.gemini || credentials?.apiKey || '';
+            this.groqApiKey = credentials?.groq || '';
+            this.geminiKeyStatus = this.geminiApiKey ? 'valid' : 'notset';
+            this.groqKeyStatus = this.groqApiKey ? 'valid' : 'notset';
+
+            // Load model preferences
+            this.modelPrefs = {
+                textMessage: prefs.textMessage || {
+                    primaryProvider: 'groq',
+                    primaryModel: 'llama-3.3-70b-versatile',
+                    fallbackProvider: 'groq',
+                    fallbackModel: 'llama-3.1-8b-instant'
+                },
+                screenAnalysis: prefs.screenAnalysis || {
+                    primaryProvider: 'groq',
+                    primaryModel: 'meta-llama/llama-4-maverick-17b-128e-instruct',
+                    fallbackProvider: 'gemini',
+                    fallbackModel: 'gemini-2.5-flash'
+                },
+                liveAudio: prefs.liveAudio || {
+                    provider: 'gemini',
+                    model: 'gemini-2.5-flash-native-audio-preview-12-2025'
+                }
+            };
+
+            // Load audio processing settings
+            this.audioProcessingMode = prefs.audioProcessingMode ?? 'live-conversation';
+            this.audioTriggerMethod = prefs.audioTriggerMethod ?? 'vad';
+
+            // Load usage stats
+            this.loadUsageStats();
+
             if (keybinds) {
                 this.keybinds = { ...this.getDefaultKeybinds(), ...keybinds };
             }
@@ -725,6 +988,108 @@ export class CustomizeView extends LitElement {
         } catch (error) {
             console.error('Error loading settings:', error);
         }
+    }
+
+    // API Key handlers
+    async handleApiKeyChange(provider, value) {
+        if (provider === 'gemini') {
+            this.geminiApiKey = value;
+            if (value) {
+                this.geminiKeyStatus = 'checking';
+                this.requestUpdate();
+                await cheatingDaddy.storage.setApiKey(value, 'gemini');
+                this.geminiKeyStatus = 'valid';
+            } else {
+                this.geminiKeyStatus = 'notset';
+            }
+        } else if (provider === 'groq') {
+            this.groqApiKey = value;
+            if (value) {
+                this.groqKeyStatus = 'checking';
+                this.requestUpdate();
+                await cheatingDaddy.storage.setApiKey(value, 'groq');
+                this.groqKeyStatus = 'valid';
+            } else {
+                this.groqKeyStatus = 'notset';
+            }
+        }
+        this.requestUpdate();
+    }
+
+    // Model preference handlers
+    async handleModelChange(mode, type, value) {
+        const [provider, model] = value === 'none' ? [null, null] : value.split(':');
+
+        if (!this.modelPrefs[mode]) {
+            this.modelPrefs[mode] = {};
+        }
+
+        if (type === 'primary') {
+            this.modelPrefs[mode].primaryProvider = provider;
+            this.modelPrefs[mode].primaryModel = model;
+        } else {
+            this.modelPrefs[mode].fallbackProvider = provider;
+            this.modelPrefs[mode].fallbackModel = model;
+        }
+
+        await cheatingDaddy.storage.updatePreference(mode, this.modelPrefs[mode]);
+        this.requestUpdate();
+    }
+
+    isModelSelected(mode, type, value) {
+        const prefs = this.modelPrefs[mode];
+        if (!prefs) return false;
+
+        if (type === 'primary') {
+            return value === `${prefs.primaryProvider}:${prefs.primaryModel}`;
+        } else {
+            if (!prefs.fallbackProvider) return value === 'none';
+            return value === `${prefs.fallbackProvider}:${prefs.fallbackModel}`;
+        }
+    }
+
+    async resetModelPreferences() {
+        this.modelPrefs = {
+            textMessage: {
+                primaryProvider: 'groq',
+                primaryModel: 'llama-3.3-70b-versatile',
+                fallbackProvider: 'groq',
+                fallbackModel: 'llama-3.1-8b-instant'
+            },
+            screenAnalysis: {
+                primaryProvider: 'groq',
+                primaryModel: 'meta-llama/llama-4-maverick-17b-128e-instruct',
+                fallbackProvider: 'gemini',
+                fallbackModel: 'gemini-2.5-flash'
+            },
+            liveAudio: {
+                provider: 'gemini',
+                model: 'gemini-2.5-flash-native-audio-preview-12-2025'
+            }
+        };
+
+        await cheatingDaddy.storage.updatePreference('textMessage', this.modelPrefs.textMessage);
+        await cheatingDaddy.storage.updatePreference('screenAnalysis', this.modelPrefs.screenAnalysis);
+        await cheatingDaddy.storage.updatePreference('liveAudio', this.modelPrefs.liveAudio);
+        this.requestUpdate();
+    }
+
+    // Usage stats handlers
+    async loadUsageStats() {
+        try {
+            const stats = await cheatingDaddy.storage.getUsageStats?.() || { groq: [], gemini: [] };
+            this.usageStats = stats;
+
+            const resetTime = await cheatingDaddy.storage.getUsageResetTime?.() || { hours: 0, minutes: 0 };
+            this.usageResetTime = `${resetTime.hours}h ${resetTime.minutes}m remaining`;
+        } catch (error) {
+            console.error('Error loading usage stats:', error);
+        }
+        this.requestUpdate();
+    }
+
+    async refreshUsageStats() {
+        await this.loadUsageStats();
     }
 
     connectedCallback() {
@@ -911,6 +1276,18 @@ export class CustomizeView extends LitElement {
         this.requestUpdate();
     }
 
+    async handleAudioProcessingModeChange(mode) {
+        this.audioProcessingMode = mode;
+        await cheatingDaddy.storage.updatePreference('audioProcessingMode', mode);
+        this.requestUpdate();
+    }
+
+    async handleAudioTriggerChange(e) {
+        this.audioTriggerMethod = e.target.value;
+        await cheatingDaddy.storage.updatePreference('audioTriggerMethod', e.target.value);
+        this.requestUpdate();
+    }
+
     async handleThemeChange(e) {
         this.theme = e.target.value;
         await cheatingDaddy.theme.save(this.theme);
@@ -932,6 +1309,7 @@ export class CustomizeView extends LitElement {
             nextResponse: isMac ? 'Cmd+]' : 'Ctrl+]',
             scrollUp: isMac ? 'Cmd+Shift+Up' : 'Ctrl+Shift+Up',
             scrollDown: isMac ? 'Cmd+Shift+Down' : 'Ctrl+Shift+Down',
+            manualTrigger: 'Ctrl+/',
         };
     }
 
@@ -1016,6 +1394,11 @@ export class CustomizeView extends LitElement {
                 key: 'scrollDown',
                 name: 'Scroll Response Down',
                 description: 'Scroll the AI response content down',
+            },
+            {
+                key: 'manualTrigger',
+                name: 'Manual Audio Trigger',
+                description: 'Toggle manual audio recording',
             },
         ];
     }
@@ -1576,17 +1959,15 @@ export class CustomizeView extends LitElement {
     renderAudioSection() {
         return html`
             <div class="content-header">Audio Settings</div>
+            
             <div class="form-grid">
                 <div class="form-group">
-                    <label class="form-label">Audio Mode</label>
+                    <label class="form-label">Audio Source</label>
                     <select class="form-control" .value=${this.audioMode} @change=${this.handleAudioModeSelect}>
-                        <option value="speaker_only">Speaker Only (Interviewer)</option>
-                        <option value="mic_only">Microphone Only (Me)</option>
-                        <option value="both">Both Speaker & Microphone</option>
+                        <option value="mic_only">Microphone Only</option>
+                        <option value="both">Mic & Speaker (System)</option>
+                        <option value="speaker_only">Speaker Only</option>
                     </select>
-                    <div class="form-description">
-                        Choose which audio sources to capture for the AI.
-                    </div>
                 </div>
             </div>
         `;
@@ -1863,6 +2244,275 @@ export class CustomizeView extends LitElement {
         `;
     }
 
+    renderApiKeysSection() {
+        return html`
+            <div class="content-header">API Keys</div>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label class="form-label">Gemini API Key</label>
+                    <div class="form-description">Required for Live Audio mode. Get free key at <a href="https://aistudio.google.com" target="_blank" style="color: var(--accent-primary);">aistudio.google.com</a></div>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <input
+                            type="${this.showGeminiKey ? 'text' : 'password'}"
+                            class="form-control"
+                            .value=${this.geminiApiKey || ''}
+                            @input=${(e) => this.handleApiKeyChange('gemini', e.target.value)}
+                            placeholder="Enter Gemini API key..."
+                            style="flex: 1;"
+                        />
+                        <button class="toggle-btn" @click=${() => { this.showGeminiKey = !this.showGeminiKey; this.requestUpdate(); }}>
+                            ${this.showGeminiKey ? 'Hide' : 'Show'}
+                        </button>
+                    </div>
+                    <div class="status-indicator ${this.geminiKeyStatus}">
+                        ${this.geminiKeyStatus === 'valid' ? 'Connected' :
+                this.geminiKeyStatus === 'invalid' ? 'Invalid key' :
+                    this.geminiKeyStatus === 'checking' ? 'Checking...' : 'Not set'}
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Groq API Key</label>
+                    <div class="form-description">Recommended for Text & Vision. Get free key at <a href="https://console.groq.com" target="_blank" style="color: var(--accent-primary);">console.groq.com</a></div>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <input
+                            type="${this.showGroqKey ? 'text' : 'password'}"
+                            class="form-control"
+                            .value=${this.groqApiKey || ''}
+                            @input=${(e) => this.handleApiKeyChange('groq', e.target.value)}
+                            placeholder="Enter Groq API key..."
+                            style="flex: 1;"
+                        />
+                        <button class="toggle-btn" @click=${() => { this.showGroqKey = !this.showGroqKey; this.requestUpdate(); }}>
+                            ${this.showGroqKey ? 'Hide' : 'Show'}
+                        </button>
+                    </div>
+                    <div class="status-indicator ${this.groqKeyStatus}">
+                        ${this.groqKeyStatus === 'valid' ? 'Connected' :
+                this.groqKeyStatus === 'invalid' ? 'Invalid key' :
+                    this.groqKeyStatus === 'checking' ? 'Checking...' : 'Not set'}
+                    </div>
+                </div>
+
+                <div class="form-description" style="margin-top: 12px; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 8px;">
+                    <strong>Tip:</strong> Both keys are recommended. Groq has 50x more daily requests (1,000 vs 20), while Gemini is required for Live Audio mode.
+                </div>
+            </div>
+        `;
+    }
+
+    renderAiModelsSection() {
+        const textModels = [
+            { value: 'groq:llama-3.3-70b-versatile', label: 'Groq: llama-3.3-70b (1K/day)', recommended: true },
+            { value: 'groq:llama-3.1-8b-instant', label: 'Groq: llama-3.1-8b (14K/day)' },
+            { value: 'gemini:gemini-2.5-flash', label: 'Gemini: 2.5-flash (20/day)' },
+            { value: 'none', label: 'None (No fallback)' }
+        ];
+
+        const visionModels = [
+            { value: 'groq:meta-llama/llama-4-maverick-17b-128e-instruct', label: 'Groq: llama-4-maverick (1K/day)', recommended: true },
+            { value: 'groq:meta-llama/llama-4-scout-17b-16e-instruct', label: 'Groq: llama-4-scout (1K/day)' },
+            { value: 'gemini:gemini-2.5-flash', label: 'Gemini: 2.5-flash (20/day)' },
+            { value: 'none', label: 'None (No fallback)' }
+        ];
+
+        return html`
+            <div class="content-header">AI Models</div>
+            <div class="form-grid">
+                
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label class="form-label">Audio Processing Mode</label>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <label class="radio-card ${this.audioProcessingMode === 'live-conversation' ? 'selected' : ''}"
+                            @click=${() => this.handleAudioProcessingModeChange('live-conversation')}>
+                            <input type="radio" name="audioProcessingMode" value="live-conversation"
+                                ?checked=${this.audioProcessingMode === 'live-conversation'} />
+                            <div class="radio-content">
+                                <strong>Live Conversation</strong>
+                                <span class="radio-description">Real-time bidirectional audio</span>
+                            </div>
+                        </label>
+                        <label class="radio-card ${this.audioProcessingMode === 'audio-to-text' ? 'selected' : ''}"
+                            @click=${() => this.handleAudioProcessingModeChange('audio-to-text')}>
+                            <input type="radio" name="audioProcessingMode" value="audio-to-text"
+                                ?checked=${this.audioProcessingMode === 'audio-to-text'} />
+                            <div class="radio-content">
+                                <strong>Audio → Text</strong>
+                                <span class="radio-description">Discrete requests & responses</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                ${this.audioProcessingMode === 'audio-to-text' ? html`
+                    <div class="form-group">
+                        <label class="form-label">Audio Model</label>
+                        <select class="form-control" 
+                            .value=${this.modelPrefs?.audioToText?.primaryModel || 'groq:meta-llama/llama-4-maverick-17b-128e-instruct'} 
+                            @change=${(e) => this.handleModelChange('audioToText', 'primary', e.target.value)}>
+                            <optgroup label="Groq">
+                                <option value="groq:meta-llama/llama-4-maverick-17b-128e-instruct">Llama 4 Maverick</option>
+                                <option value="groq:meta-llama/llama-4-scout-7b-128k-instruct">Llama 4 Scout</option>
+                            </optgroup>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Evaluation Mode</label>
+                        <select class="form-control" .value=${this.audioTriggerMethod} @change=${this.handleAudioTriggerChange}>
+                            <option value="vad">Auto (Voice Activity)</option>
+                            <option value="manual">Manual Trigger</option>
+                        </select>
+                         ${this.audioTriggerMethod === 'manual' ? html`
+                            <div class="form-description" style="margin-top: 5px; color: var(--accent-color);">
+                                <strong>Shortcut:</strong> Ctrl + Shift + ? (Toggle Rec/Stop)
+                            </div>
+                        ` : ''}
+                    </div>
+                ` : html`
+                     <div class="form-group">
+                        <label class="form-label">Live Audio</label>
+                        <div class="form-description">Real-time conversation mode</div>
+                        <div style="padding: 12px; background: rgba(255,255,255,0.05); border-radius: 8px;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="opacity: 0.7;">Provider:</span>
+                                <span style="color: var(--accent-primary);">Gemini</span>
+                                <span style="font-size: 10px; opacity: 0.5;">Only option</span>
+                            </div>
+                            <div style="margin-top: 8px; font-size: 12px; opacity: 0.7;">
+                                Model: gemini-2.5-flash-native-audio
+                            </div>
+                            <div style="margin-top: 8px; font-size: 11px; color: var(--success-color);">
+                                Unlimited requests • Real-time • Speaker ID
+                            </div>
+                        </div>
+                    </div>
+                `}
+
+                <div class="form-group">
+                    <label class="form-label">Text Messages</label>
+                    <div class="form-description">Models for chat responses</div>
+                    <div style="display: grid; gap: 8px;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="width: 70px; font-size: 12px; opacity: 0.7;">Primary:</span>
+                            <select class="form-control" style="flex: 1;" 
+                                @change=${(e) => this.handleModelChange('textMessage', 'primary', e.target.value)}
+                                .value=${this.modelPrefs?.textMessage?.primaryProvider + ':' + this.modelPrefs?.textMessage?.primaryModel}>
+                                ${textModels.filter(m => m.value !== 'none').map(m => html`
+                                    <option value="${m.value}" ?selected=${this.isModelSelected('textMessage', 'primary', m.value)}>
+                                        ${m.label}${m.recommended ? ' (Rec)' : ''}
+                                    </option>
+                                `)}
+                            </select>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="width: 70px; font-size: 12px; opacity: 0.7;">Fallback:</span>
+                            <select class="form-control" style="flex: 1;"
+                                @change=${(e) => this.handleModelChange('textMessage', 'fallback', e.target.value)}
+                                .value=${this.modelPrefs?.textMessage?.fallbackProvider + ':' + this.modelPrefs?.textMessage?.fallbackModel}>
+                                ${textModels.map(m => html`
+                                    <option value="${m.value}" ?selected=${this.isModelSelected('textMessage', 'fallback', m.value)}>
+                                        ${m.label}
+                                    </option>
+                                `)}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Screen Analysis</label>
+                    <div class="form-description">Vision models for screenshots</div>
+                    <div style="display: grid; gap: 8px;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="width: 70px; font-size: 12px; opacity: 0.7;">Primary:</span>
+                            <select class="form-control" style="flex: 1;"
+                                @change=${(e) => this.handleModelChange('screenAnalysis', 'primary', e.target.value)}
+                                .value=${this.modelPrefs?.screenAnalysis?.primaryProvider + ':' + this.modelPrefs?.screenAnalysis?.primaryModel}>
+                                ${visionModels.filter(m => m.value !== 'none').map(m => html`
+                                    <option value="${m.value}" ?selected=${this.isModelSelected('screenAnalysis', 'primary', m.value)}>
+                                        ${m.label}${m.recommended ? ' (Rec)' : ''}
+                                    </option>
+                                `)}
+                            </select>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="width: 70px; font-size: 12px; opacity: 0.7;">Fallback:</span>
+                            <select class="form-control" style="flex: 1;"
+                                @change=${(e) => this.handleModelChange('screenAnalysis', 'fallback', e.target.value)}
+                                .value=${this.modelPrefs?.screenAnalysis?.fallbackProvider + ':' + this.modelPrefs?.screenAnalysis?.fallbackModel}>
+                                ${visionModels.map(m => html`
+                                    <option value="${m.value}" ?selected=${this.isModelSelected('screenAnalysis', 'fallback', m.value)}>
+                                        ${m.label}
+                                    </option>
+                                `)}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="secondary-button" @click=${this.resetModelPreferences} style="margin-top: 12px;">
+                    Reset to Defaults
+                </button>
+            </div>
+        `;
+    }
+
+    renderUsageSection() {
+        return html`
+            <div class="content-header">Usage Today</div>
+            <div class="form-grid">
+                <div class="form-description" style="margin-bottom: 12px;">
+                    Resets at midnight UTC • ${this.usageResetTime || 'Loading...'}
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">GROQ</label>
+                    <div class="usage-container">
+                        ${(this.usageStats?.groq || []).map(stat => html`
+                            <div class="usage-row">
+                                <span class="usage-model">${stat.model.split('/').pop()}</span>
+                                <div class="usage-bar">
+                                    <div class="usage-bar-fill ${stat.percentage >= 90 ? 'red' : stat.percentage >= 50 ? 'yellow' : 'green'}"
+                                        style="width: ${Math.min(stat.percentage, 100)}%"></div>
+                                </div>
+                                <span class="usage-count">${stat.count}/${stat.limit === Infinity ? 'Unlim' : stat.limit}</span>
+                            </div>
+                        `)}
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">GEMINI</label>
+                    <div class="usage-container">
+                        ${(this.usageStats?.gemini || []).map(stat => html`
+                            <div class="usage-row">
+                                <span class="usage-model">${stat.model.replace('gemini-', '')}</span>
+                                <div class="usage-bar">
+                                    ${stat.limit === Infinity ? html`
+                                        <span style="font-size: 11px; opacity: 0.7;">Unlimited</span>
+                                    ` : html`
+                                        <div class="usage-bar-fill ${stat.percentage >= 90 ? 'red' : stat.percentage >= 50 ? 'yellow' : 'green'}"
+                                            style="width: ${Math.min(stat.percentage, 100)}%"></div>
+                                    `}
+                                </div>
+                                <span class="usage-count">${stat.limit === Infinity ? 'Unlim' : `${stat.count}/${stat.limit}`}</span>
+                            </div>
+                        `)}
+                    </div>
+                </div>
+
+                <div class="form-description" style="margin-top: 12px; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 8px;">
+                     Groq has 50x more daily requests than Gemini Flash models
+                </div>
+
+                <button class="secondary-button" @click=${this.refreshUsageStats} style="margin-top: 12px;">
+                    Refresh Usage
+                </button>
+            </div>
+        `;
+    }
+
     renderAdvancedSection() {
         return html`
     <div class="content-header" style="color: var(--error-color);">Advanced</div>
@@ -1893,6 +2543,12 @@ export class CustomizeView extends LitElement {
         switch (this.activeSection) {
             case 'profile':
                 return this.renderProfileSection();
+            case 'apikeys':
+                return this.renderApiKeysSection();
+            case 'aimodels':
+                return this.renderAiModelsSection();
+            case 'usage':
+                return this.renderUsageSection();
             case 'appearance':
                 return this.renderAppearanceSection();
             case 'audio':

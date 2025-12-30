@@ -19,48 +19,8 @@ export class MainView extends LitElement {
 
         .input-group {
             display: flex;
-            gap: 10px;
             margin-bottom: 16px;
-        }
-
-        .input-group input {
-            flex: 1;
-        }
-
-        input {
-            background: var(--input-background);
-            color: var(--text-color);
-            border: 1px solid var(--border-color);
-            padding: 10px 12px;
             width: 100%;
-            border-radius: 3px;
-            font-size: 13px;
-            transition: border-color 0.1s ease;
-        }
-
-        input:focus {
-            outline: none;
-            border-color: var(--border-default);
-        }
-
-        input::placeholder {
-            color: var(--placeholder-color);
-        }
-
-        /* Red blink animation for empty API key */
-        input.api-key-error {
-            animation: blink-red 0.6s ease-in-out;
-            border-color: var(--error-color);
-        }
-
-        @keyframes blink-red {
-            0%, 100% {
-                border-color: var(--border-color);
-            }
-            50% {
-                border-color: var(--error-color);
-                background: rgba(241, 76, 76, 0.1);
-            }
         }
 
         .start-button {
@@ -74,8 +34,11 @@ export class MainView extends LitElement {
             white-space: nowrap;
             display: flex;
             align-items: center;
+            justify-content: center;
             gap: 8px;
             transition: background 0.1s ease;
+            width: 100%;
+            cursor: pointer;
         }
 
         .start-button:hover {
@@ -129,24 +92,15 @@ export class MainView extends LitElement {
         onAPIKeyHelp: { type: Function },
         isInitializing: { type: Boolean },
         onLayoutModeChange: { type: Function },
-        showApiKeyError: { type: Boolean },
     };
 
     constructor() {
         super();
-        this.onStart = () => {};
-        this.onAPIKeyHelp = () => {};
+        this.onStart = () => { };
+        this.onAPIKeyHelp = () => { };
         this.isInitializing = false;
-        this.onLayoutModeChange = () => {};
-        this.showApiKeyError = false;
+        this.onLayoutModeChange = () => { };
         this.boundKeydownHandler = this.handleKeydown.bind(this);
-        this.apiKey = '';
-        this._loadApiKey();
-    }
-
-    async _loadApiKey() {
-        this.apiKey = await cheatingDaddy.storage.getApiKey();
-        this.requestUpdate();
     }
 
     connectedCallback() {
@@ -179,15 +133,6 @@ export class MainView extends LitElement {
         }
     }
 
-    async handleInput(e) {
-        this.apiKey = e.target.value;
-        await cheatingDaddy.storage.setApiKey(e.target.value);
-        // Clear error state when user starts typing
-        if (this.showApiKeyError) {
-            this.showApiKeyError = false;
-        }
-    }
-
     handleStartClick() {
         if (this.isInitializing) {
             return;
@@ -197,15 +142,6 @@ export class MainView extends LitElement {
 
     handleAPIKeyHelpClick() {
         this.onAPIKeyHelp();
-    }
-
-    // Method to trigger the red blink animation
-    triggerApiKeyError() {
-        this.showApiKeyError = true;
-        // Remove the error class after 1 second
-        setTimeout(() => {
-            this.showApiKeyError = false;
-        }, 1000);
     }
 
     getStartButtonText() {
@@ -219,20 +155,13 @@ export class MainView extends LitElement {
             <div class="welcome">Welcome</div>
 
             <div class="input-group">
-                <input
-                    type="password"
-                    placeholder="Enter your Gemini API Key"
-                    .value=${this.apiKey}
-                    @input=${this.handleInput}
-                    class="${this.showApiKeyError ? 'api-key-error' : ''}"
-                />
                 <button @click=${this.handleStartClick} class="start-button ${this.isInitializing ? 'initializing' : ''}">
                     ${this.getStartButtonText()}
                 </button>
             </div>
             <p class="description">
-                dont have an api key?
-                <span @click=${this.handleAPIKeyHelpClick} class="link">get one here</span>
+                Press Start to begin.
+                <span @click=${this.handleAPIKeyHelpClick} class="link">Need help?</span>
             </p>
         `;
     }

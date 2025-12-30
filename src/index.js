@@ -2,9 +2,9 @@ if (require('electron-squirrel-startup')) {
     process.exit(0);
 }
 
-const { app, BrowserWindow, shell, ipcMain } = require('electron');
+const { app, BrowserWindow, shell, ipcMain, globalShortcut } = require('electron');
 const { createWindow, updateGlobalShortcuts } = require('./utils/window');
-const { setupGeminiIpcHandlers, stopMacOSAudioCapture, sendToRenderer } = require('./utils/gemini');
+const { setupAssistantIpcHandlers, stopMacOSAudioCapture, sendToRenderer, toggleManualRecording } = require('./utils/core/assistantManager');
 const storage = require('./storage');
 
 const geminiSessionRef = { current: null };
@@ -20,7 +20,7 @@ app.whenReady().then(async () => {
     storage.initializeStorage();
 
     createMainWindow();
-    setupGeminiIpcHandlers(geminiSessionRef);
+    setupAssistantIpcHandlers(geminiSessionRef);
     setupStorageIpcHandlers();
     setupGeneralIpcHandlers();
 });
@@ -93,21 +93,42 @@ function setupStorageIpcHandlers() {
         }
     });
 
-    ipcMain.handle('storage:get-api-key', async () => {
+    ipcMain.handle('storage:get-api-key', async (event, provider) => {
         try {
-            return { success: true, data: storage.getApiKey() };
+            return { success: true, data: storage.getApiKey(provider) };
         } catch (error) {
             console.error('Error getting API key:', error);
             return { success: false, error: error.message };
         }
     });
 
-    ipcMain.handle('storage:set-api-key', async (event, apiKey) => {
+    ipcMain.handle('storage:set-api-key', async (event, apiKey, provider) => {
         try {
-            storage.setApiKey(apiKey);
+            storage.setApiKey(apiKey, provider);
             return { success: true };
         } catch (error) {
             console.error('Error setting API key:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    // ============ USAGE STATS ============
+    ipcMain.handle('storage:get-usage-stats', async () => {
+        try {
+            const rateLimitManager = require('./utils/rateLimitManager');
+            return { success: true, data: rateLimitManager.getAllUsageStats() };
+        } catch (error) {
+            console.error('Error getting usage stats:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('storage:get-usage-reset-time', async () => {
+        try {
+            const rateLimitManager = require('./utils/rateLimitManager');
+            return { success: true, data: rateLimitManager.getTimeUntilReset() };
+        } catch (error) {
+            console.error('Error getting usage reset time:', error);
             return { success: false, error: error.message };
         }
     });

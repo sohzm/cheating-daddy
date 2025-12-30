@@ -1,7 +1,7 @@
 {
     "name": "cheating-daddy",
     "productName": "cheating-daddy",
-    "version": "0.5.2",
+    "version": "0.5.4",
     "description": "cheating daddy",
     "main": "src/index.js",
     "scripts": {
@@ -26,13 +26,14 @@
         {
             "name": "suss-qodes",
             "github": "https://github.com/sus-qodes",
-            "version": "v0.5.2"
+            "version": "v0.5.4"
         }
     ],
     "license": "GPL-3.0",
     "dependencies": {
         "@google/genai": "^1.34.0",
-        "electron-squirrel-startup": "^1.0.1"
+        "electron-squirrel-startup": "^1.0.1",
+        "groq-sdk": "^0.37.0"
     },
     "devDependencies": {
         "@electron-forge/cli": "^7.8.1",

@@ -3,6 +3,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const os = require('os');
 const storage = require('../storage');
+const { toggleManualRecording } = require('./core/assistantManager');
 
 let mouseEventsIgnored = false;
 let windowResizing = false;
@@ -115,6 +116,7 @@ function getDefaultKeybinds() {
         scrollUp: isMac ? 'Cmd+Shift+Up' : 'Ctrl+Shift+Up',
         scrollDown: isMac ? 'Cmd+Shift+Down' : 'Ctrl+Shift+Down',
         emergencyErase: isMac ? 'Cmd+Shift+E' : 'Ctrl+Shift+E',
+        manualTrigger: isMac ? 'Cmd+/' : 'Ctrl+/',
     };
 }
 
@@ -301,6 +303,19 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
             console.log(`Registered emergencyErase: ${keybinds.emergencyErase}`);
         } catch (error) {
             console.error(`Failed to register emergencyErase (${keybinds.emergencyErase}):`, error);
+        }
+    }
+
+    // Register Manual Audio Trigger
+    if (keybinds.manualTrigger) {
+        try {
+            globalShortcut.register(keybinds.manualTrigger, () => {
+                console.log('Manual Audio Trigger shortcut active');
+                toggleManualRecording();
+            });
+            console.log(`Registered manualTrigger: ${keybinds.manualTrigger}`);
+        } catch (error) {
+            console.error(`Failed to register manualTrigger (${keybinds.manualTrigger}):`, error);
         }
     }
 }

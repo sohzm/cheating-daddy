@@ -213,7 +213,7 @@ export class HelpView extends LitElement {
 
     constructor() {
         super();
-        this.onExternalLinkClick = () => {};
+        this.onExternalLinkClick = () => { };
         this.keybinds = this.getDefaultKeybinds();
         this._loadKeybinds();
     }
@@ -250,6 +250,7 @@ export class HelpView extends LitElement {
             nextResponse: isMac ? 'Cmd+]' : 'Ctrl+]',
             scrollUp: isMac ? 'Cmd+Shift+Up' : 'Ctrl+Shift+Up',
             scrollDown: isMac ? 'Cmd+Shift+Down' : 'Ctrl+Shift+Down',
+            manualTrigger: 'Ctrl+Shift+/',
         };
     }
 
@@ -342,7 +343,12 @@ export class HelpView extends LitElement {
                                 <span class="shortcut-description">Take screenshot and ask for next step</span>
                                 <div class="shortcut-keys">${this.formatKeybind(this.keybinds.nextStep)}</div>
                             </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-description">Toggle manual audio recording</span>
+                                <div class="shortcut-keys">${this.formatKeybind(this.keybinds.manualTrigger)}</div>
+                            </div>
                         </div>
+
 
                         <div class="keyboard-group">
                             <div class="keyboard-group-title">Response Navigation</div>
