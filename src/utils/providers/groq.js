@@ -5,6 +5,10 @@
 
 const Groq = require('groq-sdk');
 const rateLimitManager = require('../rateLimitManager');
+const { createWavHeader } = require('../../audioUtils');
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
 
 class GroqProvider {
     constructor(apiKey) {
@@ -90,53 +94,21 @@ class GroqProvider {
      */
     async processAudio(model, base64Audio, prompt, options = {}) {
         this.initialize();
-        const fs = require('fs');
-        const path = require('path');
-        const os = require('os');
-        const { promisify } = require('util');
-        const writeFile = promisify(fs.writeFile);
-        const unlink = promisify(fs.unlink);
 
-        // 1. Create temp file for audio
-        const tempFilePath = path.join(os.tmpdir(), `audio_${Date.now()}.wav`);
 
-        // Add WAV header to raw PCM data to ensure it's a valid media file
+        // Helper to add WAV header
         // Input: 24kHz, Mono, 16-bit PCM (from gemini.js audio capture)
         const pcmData = Buffer.from(base64Audio, 'base64');
-        const wavHeader = Buffer.alloc(44);
 
-        const sampleRate = 24000;
-        const numChannels = 1;
-        const bitsPerSample = 16;
-        const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
-        const blockAlign = numChannels * (bitsPerSample / 8);
-        const dataSize = pcmData.length;
-        const totalSize = 36 + dataSize;
-        const durationSeconds = dataSize / byteRate;
-
-        // RIFF chunk descriptor
-        wavHeader.write('RIFF', 0);
-        wavHeader.writeUInt32LE(totalSize, 4);
-        wavHeader.write('WAVE', 8);
-
-        // fmt sub-chunk
-        wavHeader.write('fmt ', 12);
-        wavHeader.writeUInt32LE(16, 16); // Subchunk1Size (16 for PCM)
-        wavHeader.writeUInt16LE(1, 20);  // AudioFormat (1 for PCM)
-        wavHeader.writeUInt16LE(numChannels, 22);
-        wavHeader.writeUInt32LE(sampleRate, 24);
-        wavHeader.writeUInt32LE(byteRate, 28);
-        wavHeader.writeUInt16LE(blockAlign, 32);
-        wavHeader.writeUInt16LE(bitsPerSample, 34);
-
-        // data sub-chunk
-        wavHeader.write('data', 36);
-        wavHeader.writeUInt32LE(dataSize, 40);
-
+        // Use shared helper for WAV header
+        const wavHeader = createWavHeader(pcmData.length, 24000, 1, 16);
         const wavBuffer = Buffer.concat([wavHeader, pcmData]);
 
+        // Calculate duration for rate limiting (24kHz, 1 channel, 16-bit = 2 bytes/sample)
+        const durationSeconds = pcmData.length / (24000 * 2);
+
         try {
-            // 1. Prepare buffer (skip disk write) - faster
+            // 1. Prepare buffer (in-memory)
             const file = await Groq.toFile(wavBuffer, `audio_${Date.now()}.wav`, { type: 'audio/wav' });
 
             // 2. Transcribe using Groq's Whisper model (turbo)
@@ -169,11 +141,11 @@ class GroqProvider {
             if (!transcribedText || isInvalid) {
                 console.log('[Groq] Ignored invalid transcription:', transcribedText);
                 return {
-                    [Symbol.asyncIterator]: async function* () {
-                        // Yield empty or special token logic?
-                        // Better to yield nothing or a status message that UI can ignore
+                    stream: (async function* () {
+                        // Yield empty to satisfy stream interface
                         yield { choices: [{ delta: { content: "" } }] };
-                    }
+                    })(),
+                    transcription: ''
                 };
             }
 
@@ -192,13 +164,13 @@ class GroqProvider {
                 max_tokens: options.maxTokens || 2048
             });
 
-            stream.transcription = transcribedText;
-            return stream;
+            return {
+                stream,
+                transcription: transcribedText
+            };
 
         } catch (error) {
-            if (fs.existsSync(tempFilePath)) {
-                await unlink(tempFilePath).catch(() => { });
-            }
+
             throw error;
         }
     }

@@ -1042,6 +1042,13 @@ const cheatingDaddy = {
     // App version
     getVersion: async () => ipcRenderer.invoke('get-app-version'),
 
+    // Assistant API
+    assistant: {
+        validateApiKey: async (provider, apiKey) => {
+            return ipcRenderer.invoke('assistant:validate-api-key', provider, apiKey);
+        }
+    },
+
     // Element access
     element: () => cheatingDaddyApp,
     e: () => cheatingDaddyApp,

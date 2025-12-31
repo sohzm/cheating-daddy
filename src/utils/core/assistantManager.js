@@ -357,8 +357,8 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                 outputAudioTranscription: {}, // Request text transcription of the response
                 inputAudioTranscription: {},
                 // Use NO_INTERRUPTION to prevent "Session interrupted" from background noise/echo
-                // This ensures the model finishes its response even if audio is detected.
-                // The new input is still processed (queued), addressing the user's question.
+                // NOTE: This setting may not be reliably respected by gemini-2.5-flash-native-audio-preview-12-2025.
+                // Theoretically, it ensures the model finishes its response even if audio is detected.
                 realtimeInputConfig: {
                     activityHandling: 'NO_INTERRUPTION'
                 },
@@ -671,8 +671,58 @@ function setupAssistantIpcHandlers(geminiSessionRef) {
 
     // Handle microphone audio on a separate channel
     ipcMain.handle('send-mic-audio-content', async (event, { data, mimeType }) => {
-        if (!geminiSessionRef.current) return { success: false, error: 'No active Gemini session' };
         try {
+            const prefs = await getPreferences();
+
+            // Audio -> Text Mode
+            if (prefs.audioProcessingMode === 'audio-to-text') {
+                const chunk = Buffer.from(data, 'base64');
+
+                // Simple Energy-based VAD (Root Mean Square)
+                let sum = 0;
+                // Process 16-bit samples
+                for (let i = 0; i < chunk.length; i += 2) {
+                    const sample = chunk.readInt16LE(i);
+                    sum += sample * sample;
+                }
+                const rms = Math.sqrt(sum / (chunk.length / 2));
+
+                // Threshold for silence
+                // Mic tends to be noisier, so maybe keep 800 or adjust? 
+                // Using same threshold as system audio for consistency
+                const VAD_THRESHOLD = 800;
+
+                if (rms > VAD_THRESHOLD) {
+                    // Speech detected
+                    audioTextBuffer = Buffer.concat([audioTextBuffer, chunk]);
+                    lastAudioProcessTime = Date.now(); // Reset timer on speech
+                }
+
+                // Process logic
+                const method = prefs.audioTriggerMethod || 'vad';
+
+                if (method === 'manual') {
+                    if (manualRecordingActive) {
+                        audioTextBuffer = Buffer.concat([audioTextBuffer, chunk]);
+                    }
+                    return { success: true };
+                }
+
+                // VAD Logic (only if not manual)
+                const MIN_BUFFER_SIZE = 24000 * 2 * 2; // 2 seconds
+
+                if (audioTextBuffer.length >= MIN_BUFFER_SIZE) {
+                    processBufferedAudio(prefs);
+                } else if (audioTextBuffer.length > 0 && Date.now() - lastAudioProcessTime > 1500) {
+                    // Flush older buffer if silence follows speech
+                    processBufferedAudio(prefs);
+                }
+
+                return { success: true };
+            }
+
+            // Live Conversation Mode (Legacy)
+            if (!geminiSessionRef.current) return { success: false, error: 'No active Gemini session' };
             process.stdout.write(',');
             await geminiSessionRef.current.sendRealtimeInput({
                 audio: { data: data, mimeType: mimeType },

@@ -869,7 +869,6 @@ export class AssistantView extends LitElement {
                                             ${index > 0 ? html`<div class="response-checkpoint">Response ${index + 1}</div>` : ''}
                                             <div class="response-item ${index === this.currentResponseIndex ? 'active-item' : ''}" 
                                                  id="response-item-${index}">
-                                                ${index === 0 && this.responses.length === 0 ? html`<div .innerHTML=${this.renderMarkdown(placeholder)}></div>` : ''}
                                                 <div .innerHTML=${this.renderMarkdown(response)}></div>
                                             </div>
                                           `)

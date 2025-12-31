@@ -50,21 +50,31 @@ function getDefaultRateLimits() {
     };
 }
 
-// Read rate limits from file
+// In-memory cache
+let limitsCache = null;
+
+// Read rate limits from file (with caching)
 function getRateLimits() {
+    if (limitsCache) return limitsCache;
+
     try {
         const filePath = getRateLimitsPath();
         if (fs.existsSync(filePath)) {
-            return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+            limitsCache = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+            return limitsCache;
         }
     } catch (error) {
         console.error('Error reading rate limits:', error);
     }
-    return getDefaultRateLimits();
+
+    limitsCache = getDefaultRateLimits();
+    return limitsCache;
 }
 
-// Write rate limits to file
+// Write rate limits to file (and update cache)
 function setRateLimits(limits) {
+    limitsCache = limits; // Update cache immediately
+
     try {
         const filePath = getRateLimitsPath();
         const dir = path.dirname(filePath);
@@ -193,10 +203,7 @@ function incrementUsage(provider, model, tokens = 0, audioSeconds = 0) {
 
     const limits = getRateLimits();
     if (!limits[provider]) limits[provider] = {};
-    // Ensure structure exists (should be handled by checkAndReset, but safe guard)
-    if (!limits[provider][model]) {
-        checkAndResetIfNeeded(provider, model); // Initialize
-    }
+    // Structure is guaranteed by checkAndResetIfNeeded called above
 
     const data = limits[provider][model];
     data.count++;
@@ -252,19 +259,8 @@ function getAllUsageStats() {
             let limit = modelLimits.rpd;
             let percentage = 0;
 
-            if (isAudioModel) {
-                // For audio models, show the most constrained limit (likely daily seconds/requests)
-                // For simplicity in UI, we might stick to requests or seconds. 
-                // Let's stick to requests for consistency with UI, or modify UI to show seconds?
-                // The UI expects "count" and "limit". 
-                // Let's just pass request count for now to avoid breaking UI changes, 
-                // unless we want to show "X seconds / Y seconds".
-                // Given the request, RPD 2K is the main "count". 
-                // I will stick to RPD for display unless it's exhausted by ASD.
-                percentage = modelLimits.rpd === Infinity ? 0 : Math.round((usage.count / modelLimits.rpd) * 100);
-            } else {
-                percentage = modelLimits.rpd === Infinity ? 0 : Math.round((usage.count / modelLimits.rpd) * 100);
-            }
+            // Calculate percentage based on requests per day
+            percentage = modelLimits.rpd === Infinity ? 0 : Math.round((usage.count / modelLimits.rpd) * 100);
 
             stats[provider].push({
                 model,
@@ -278,7 +274,7 @@ function getAllUsageStats() {
     return stats;
 }
 
-// ... (rest of functions)
+
 
 // Get time until reset
 function getTimeUntilReset() {

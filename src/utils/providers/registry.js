@@ -7,6 +7,7 @@ const GroqProvider = require('./groq');
 const GeminiProvider = require('./gemini');
 const { getNextAvailableModel, incrementUsage } = require('../rateLimitManager');
 const { RATE_LIMIT_EXCEEDED } = require('../core/errors');
+const { getCredentials, getPreferences } = require('../../storage');
 
 // Provider instances (lazy initialized)
 const providers = {
@@ -17,7 +18,6 @@ const providers = {
 // Get API keys from storage
 function getApiKeys() {
     try {
-        const { getCredentials } = require('../../storage');
         return getCredentials();
     } catch (error) {
         console.error('Error getting credentials:', error);
@@ -28,7 +28,6 @@ function getApiKeys() {
 // Get preferences from storage
 function getPreferencesForMode(mode) {
     try {
-        const { getPreferences } = require('../../storage');
         const prefs = getPreferences();
         return prefs[mode] || {};
     } catch (error) {
@@ -199,11 +198,11 @@ async function processAudio(base64Audio, prompt, options = {}) {
     const providerInstance = getProvider(provider);
 
     try {
-        const response = await providerInstance.processAudio(model, base64Audio, prompt, options);
+        const result = await providerInstance.processAudio(model, base64Audio, prompt, options);
         incrementUsage(provider, model);
         return {
-            response: normalizeStream(response, provider),
-            transcription: response.transcription,
+            response: normalizeStream(result.stream, provider),
+            transcription: result.transcription,
             provider,
             model
         };
@@ -211,12 +210,13 @@ async function processAudio(base64Audio, prompt, options = {}) {
         // Try fallback
         if (provider === prefs.primaryProvider && prefs.fallbackProvider) {
             const fallbackProvider = getProvider(prefs.fallbackProvider);
-            const fallbackResponse = await fallbackProvider.processAudio(
+            const fallbackResult = await fallbackProvider.processAudio(
                 prefs.fallbackModel, base64Audio, prompt, options
             );
             incrementUsage(prefs.fallbackProvider, prefs.fallbackModel);
             return {
-                response: normalizeStream(fallbackResponse, prefs.fallbackProvider),
+                response: normalizeStream(fallbackResult.stream, prefs.fallbackProvider),
+                transcription: fallbackResult.transcription,
                 provider: prefs.fallbackProvider,
                 model: prefs.fallbackModel
             };

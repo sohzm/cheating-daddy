@@ -756,6 +756,7 @@ export class CustomizeView extends LitElement {
         // Audio processing mode
         audioProcessingMode: { type: String },
         audioTriggerMethod: { type: String },
+        validationError: { type: String },
     };
 
     constructor() {
@@ -798,6 +799,9 @@ export class CustomizeView extends LitElement {
 
         // Custom prompt
         this.customPrompt = '';
+
+        // Validation state
+        this.validationError = null;
 
         // Active section for sidebar navigation
         this.activeSection = 'profile';
@@ -946,8 +950,13 @@ export class CustomizeView extends LitElement {
             // Load API keys
             this.geminiApiKey = credentials?.gemini || credentials?.apiKey || '';
             this.groqApiKey = credentials?.groq || '';
-            this.geminiKeyStatus = this.geminiApiKey ? 'valid' : 'notset';
-            this.groqKeyStatus = this.groqApiKey ? 'valid' : 'notset';
+
+            // Set initial status based on presence, then validate async
+            this.geminiKeyStatus = this.geminiApiKey ? 'checking' : 'notset';
+            this.groqKeyStatus = this.groqApiKey ? 'checking' : 'notset';
+
+            if (this.geminiApiKey) this.validateStoredKey('gemini', this.geminiApiKey);
+            if (this.groqApiKey) this.validateStoredKey('groq', this.groqApiKey);
 
             // Load model preferences
             this.modelPrefs = {
@@ -990,6 +999,24 @@ export class CustomizeView extends LitElement {
         }
     }
 
+    // Helper for validating stored keys on load
+    async validateStoredKey(provider, key) {
+        try {
+            const result = await cheatingDaddy.assistant.validateApiKey(provider, key);
+            if (provider === 'gemini') {
+                this.geminiKeyStatus = result.valid ? 'valid' : 'invalid';
+            } else {
+                this.groqKeyStatus = result.valid ? 'valid' : 'invalid';
+            }
+            this.requestUpdate();
+        } catch (e) {
+            console.error(`Error validating stored ${provider} key:`, e);
+            if (provider === 'gemini') this.geminiKeyStatus = 'error';
+            else this.groqKeyStatus = 'error';
+            this.requestUpdate();
+        }
+    }
+
     // API Key handlers
     async handleApiKeyChange(provider, value) {
         if (provider === 'gemini') {
@@ -997,20 +1024,46 @@ export class CustomizeView extends LitElement {
             if (value) {
                 this.geminiKeyStatus = 'checking';
                 this.requestUpdate();
-                await cheatingDaddy.storage.setApiKey(value, 'gemini');
-                this.geminiKeyStatus = 'valid';
+
+                try {
+                    const result = await cheatingDaddy.assistant.validateApiKey('gemini', value);
+                    if (result.valid) {
+                        await cheatingDaddy.storage.setApiKey(value, 'gemini');
+                        this.geminiKeyStatus = 'valid';
+                    } else {
+                        this.geminiKeyStatus = 'invalid';
+                        // Ideally we don't save invalid keys, or we allow saving but mark as invalid?
+                        // User request said "do not persist the key" if invalid.
+                    }
+                } catch (error) {
+                    console.error('Error validating Gemini key:', error);
+                    this.geminiKeyStatus = 'error';
+                }
             } else {
                 this.geminiKeyStatus = 'notset';
+                await cheatingDaddy.storage.setApiKey('', 'gemini'); // Clear it
             }
         } else if (provider === 'groq') {
             this.groqApiKey = value;
             if (value) {
                 this.groqKeyStatus = 'checking';
                 this.requestUpdate();
-                await cheatingDaddy.storage.setApiKey(value, 'groq');
-                this.groqKeyStatus = 'valid';
+
+                try {
+                    const result = await cheatingDaddy.assistant.validateApiKey('groq', value);
+                    if (result.valid) {
+                        await cheatingDaddy.storage.setApiKey(value, 'groq');
+                        this.groqKeyStatus = 'valid';
+                    } else {
+                        this.groqKeyStatus = 'invalid';
+                    }
+                } catch (error) {
+                    console.error('Error validating Groq key:', error);
+                    this.groqKeyStatus = 'error';
+                }
             } else {
                 this.groqKeyStatus = 'notset';
+                await cheatingDaddy.storage.setApiKey('', 'groq'); // Clear it
             }
         }
         this.requestUpdate();
@@ -1018,6 +1071,10 @@ export class CustomizeView extends LitElement {
 
     // Model preference handlers
     async handleModelChange(mode, type, value) {
+        if (value !== 'none' && !value.includes(':')) {
+            console.error('Invalid model value format:', value);
+            return;
+        }
         const [provider, model] = value === 'none' ? [null, null] : value.split(':');
 
         if (!this.modelPrefs[mode]) {
@@ -1194,51 +1251,7 @@ export class CustomizeView extends LitElement {
         return names;
     }
 
-    getLanguages() {
-        return [
-            { value: 'en-US', name: 'English (US)' },
-            { value: 'en-GB', name: 'English (UK)' },
-            { value: 'en-AU', name: 'English (Australia)' },
-            { value: 'en-IN', name: 'English (India)' },
-            { value: 'de-DE', name: 'German (Germany)' },
-            { value: 'es-US', name: 'Spanish (United States)' },
-            { value: 'es-ES', name: 'Spanish (Spain)' },
-            { value: 'fr-FR', name: 'French (France)' },
-            { value: 'fr-CA', name: 'French (Canada)' },
-            { value: 'hi-IN', name: 'Hindi (India)' },
-            { value: 'pt-BR', name: 'Portuguese (Brazil)' },
-            { value: 'ar-XA', name: 'Arabic (Generic)' },
-            { value: 'id-ID', name: 'Indonesian (Indonesia)' },
-            { value: 'it-IT', name: 'Italian (Italy)' },
-            { value: 'ja-JP', name: 'Japanese (Japan)' },
-            { value: 'tr-TR', name: 'Turkish (Turkey)' },
-            { value: 'vi-VN', name: 'Vietnamese (Vietnam)' },
-            { value: 'bn-IN', name: 'Bengali (India)' },
-            { value: 'gu-IN', name: 'Gujarati (India)' },
-            { value: 'kn-IN', name: 'Kannada (India)' },
-            { value: 'ml-IN', name: 'Malayalam (India)' },
-            { value: 'mr-IN', name: 'Marathi (India)' },
-            { value: 'ta-IN', name: 'Tamil (India)' },
-            { value: 'te-IN', name: 'Telugu (India)' },
-            { value: 'nl-NL', name: 'Dutch (Netherlands)' },
-            { value: 'ko-KR', name: 'Korean (South Korea)' },
-            { value: 'cmn-CN', name: 'Mandarin Chinese (China)' },
-            { value: 'pl-PL', name: 'Polish (Poland)' },
-            { value: 'ru-RU', name: 'Russian (Russia)' },
-            { value: 'th-TH', name: 'Thai (Thailand)' },
-        ];
-    }
 
-    getProfileNames() {
-        return {
-            interview: 'Job Interview',
-            sales: 'Sales Call',
-            meeting: 'Business Meeting',
-            presentation: 'Presentation',
-            negotiation: 'Negotiation',
-            exam: 'Exam Assistant',
-        };
-    }
 
     handleProfileSelect(e) {
         this.selectedProfile = e.target.value;
@@ -1250,9 +1263,11 @@ export class CustomizeView extends LitElement {
         this.onLanguageChange(this.selectedLanguage);
     }
 
-    handleResponseViewModeSelect(e) {
+    async handleResponseViewModeSelect(e) {
         this.responseViewMode = e.target.value;
+        await cheatingDaddy.storage.updatePreference('responseViewMode', this.responseViewMode);
         this.onResponseViewModeChange(this.responseViewMode);
+        this.requestUpdate();
     }
 
     handleImageQualitySelect(e) {
@@ -1309,7 +1324,7 @@ export class CustomizeView extends LitElement {
             nextResponse: isMac ? 'Cmd+]' : 'Ctrl+]',
             scrollUp: isMac ? 'Cmd+Shift+Up' : 'Ctrl+Shift+Up',
             scrollDown: isMac ? 'Cmd+Shift+Down' : 'Ctrl+Shift+Down',
-            manualTrigger: 'Ctrl+/',
+            manualTrigger: isMac ? 'Cmd+/' : 'Ctrl+/',
         };
     }
 
@@ -1699,7 +1714,9 @@ export class CustomizeView extends LitElement {
 
     async saveProfile() {
         if (!this.editingProfileData.name) {
-            alert('Please enter a profile name');
+            // Show non-blocking validation message
+            this.validationError = 'Please enter a profile name';
+            this.requestUpdate();
             return;
         }
 
@@ -1708,7 +1725,14 @@ export class CustomizeView extends LitElement {
             id: this.editingProfileData.id || crypto.randomUUID()
         };
 
-        await cheatingDaddy.storage.saveCustomProfile(profileToSave);
+        try {
+            await cheatingDaddy.storage.saveCustomProfile(profileToSave);
+        } catch (error) {
+            console.error('Failed to save profile:', error);
+            this.validationError = 'Failed to save profile. Please try again.';
+            this.requestUpdate();
+            return;
+        }
 
         // Refresh list
         const profiles = await cheatingDaddy.storage.getCustomProfiles();
@@ -1719,6 +1743,7 @@ export class CustomizeView extends LitElement {
         this.onProfileChange(profileToSave.id);
 
         this.isEditingProfile = false;
+        this.validationError = null; // Clear error
         this.requestUpdate();
     }
 
@@ -2348,11 +2373,11 @@ export class CustomizeView extends LitElement {
                     <div class="form-group">
                         <label class="form-label">Audio Model</label>
                         <select class="form-control" 
-                            .value=${this.modelPrefs?.audioToText?.primaryModel || 'groq:meta-llama/llama-4-maverick-17b-128e-instruct'} 
+                            .value=${(this.modelPrefs?.audioToText?.primaryProvider || 'groq') + ':' + (this.modelPrefs?.audioToText?.primaryModel || 'meta-llama/llama-4-maverick-17b-128e-instruct')} 
                             @change=${(e) => this.handleModelChange('audioToText', 'primary', e.target.value)}>
                             <optgroup label="Groq">
                                 <option value="groq:meta-llama/llama-4-maverick-17b-128e-instruct">Llama 4 Maverick</option>
-                                <option value="groq:meta-llama/llama-4-scout-7b-128k-instruct">Llama 4 Scout</option>
+                                <option value="groq:meta-llama/llama-4-scout-17b-16e-instruct">Llama 4 Scout</option>
                             </optgroup>
                         </select>
                     </div>
@@ -2365,7 +2390,7 @@ export class CustomizeView extends LitElement {
                         </select>
                          ${this.audioTriggerMethod === 'manual' ? html`
                             <div class="form-description" style="margin-top: 5px; color: var(--accent-color);">
-                                <strong>Shortcut:</strong> Ctrl + Shift + ? (Toggle Rec/Stop)
+                                <strong>Shortcut:</strong> ${this.keybinds.manualTrigger} (Toggle Rec/Stop)
                             </div>
                         ` : ''}
                     </div>

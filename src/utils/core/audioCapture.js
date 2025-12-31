@@ -51,7 +51,6 @@ async function sendAudioToGemini(base64Data, geminiSessionRef) {
     if (!geminiSessionRef.current) return;
 
     try {
-        process.stdout.write('.');
         await geminiSessionRef.current.sendRealtimeInput({
             audio: {
                 data: base64Data,
@@ -107,7 +106,7 @@ async function startMacOSAudioCapture(geminiSessionRef) {
 
     let audioBuffer = Buffer.alloc(0);
 
-    systemAudioProc.stdout.on('data', data => {
+    systemAudioProc.stdout.on('data', async data => {
         audioBuffer = Buffer.concat([audioBuffer, data]);
 
         while (audioBuffer.length >= CHUNK_SIZE) {
@@ -116,7 +115,7 @@ async function startMacOSAudioCapture(geminiSessionRef) {
 
             const monoChunk = CHANNELS === 2 ? convertStereoToMono(chunk) : chunk;
             const base64Data = monoChunk.toString('base64');
-            sendAudioToGemini(base64Data, geminiSessionRef);
+            await sendAudioToGemini(base64Data, geminiSessionRef);
 
             if (process.env.DEBUG_AUDIO) {
                 console.log(`Processed audio chunk: ${chunk.length} bytes`);

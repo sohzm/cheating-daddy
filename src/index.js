@@ -6,6 +6,7 @@ const { app, BrowserWindow, shell, ipcMain, globalShortcut } = require('electron
 const { createWindow, updateGlobalShortcuts } = require('./utils/window');
 const { setupAssistantIpcHandlers, stopMacOSAudioCapture, sendToRenderer, toggleManualRecording } = require('./utils/core/assistantManager');
 const storage = require('./storage');
+const rateLimitManager = require('./utils/rateLimitManager');
 
 const geminiSessionRef = { current: null };
 let mainWindow = null;
@@ -115,7 +116,6 @@ function setupStorageIpcHandlers() {
     // ============ USAGE STATS ============
     ipcMain.handle('storage:get-usage-stats', async () => {
         try {
-            const rateLimitManager = require('./utils/rateLimitManager');
             return { success: true, data: rateLimitManager.getAllUsageStats() };
         } catch (error) {
             console.error('Error getting usage stats:', error);
@@ -125,7 +125,6 @@ function setupStorageIpcHandlers() {
 
     ipcMain.handle('storage:get-usage-reset-time', async () => {
         try {
-            const rateLimitManager = require('./utils/rateLimitManager');
             return { success: true, data: rateLimitManager.getTimeUntilReset() };
         } catch (error) {
             console.error('Error getting usage reset time:', error);
@@ -315,6 +314,31 @@ function setupGeneralIpcHandlers() {
             // Also save to storage
             storage.setKeybinds(newKeybinds);
             updateGlobalShortcuts(newKeybinds, mainWindow, sendToRenderer, geminiSessionRef);
+        }
+    });
+
+    // Validates an API key against the provider
+    ipcMain.handle('assistant:validate-api-key', async (event, providerName, apiKey) => {
+        try {
+            console.log(`Validating API key for ${providerName}...`);
+            let provider;
+
+            if (providerName === 'groq') {
+                const GroqProvider = require('./utils/providers/groq');
+                provider = new GroqProvider(apiKey);
+            } else if (providerName === 'gemini') {
+                const GeminiProvider = require('./utils/providers/gemini');
+                provider = new GeminiProvider(apiKey);
+            } else {
+                return { valid: false, error: 'Unknown provider' };
+            }
+
+            const result = await provider.validateApiKey();
+            console.log(`Validation result for ${providerName}:`, result);
+            return result;
+        } catch (error) {
+            console.error(`Error validating ${providerName} key:`, error);
+            return { valid: false, error: error.message };
         }
     });
 
