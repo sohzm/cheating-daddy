@@ -106,7 +106,30 @@ async function startMacOSAudioCapture(geminiSessionRef) {
 
     let audioBuffer = Buffer.alloc(0);
 
-    systemAudioProc.stdout.on('data', async data => {
+    // Queue for sequential processing to avoid latency-induced reordering
+    const audioQueue = [];
+    let isProcessingQueue = false;
+    const MAX_QUEUE_SIZE = 50; // ~5 seconds buffer (assuming 0.1s chunks)
+
+    const processQueue = async () => {
+        if (isProcessingQueue) return;
+        isProcessingQueue = true;
+
+        try {
+            while (audioQueue.length > 0) {
+                const item = audioQueue.shift();
+                await sendAudioToGemini(item.base64Data, item.geminiSessionRef);
+            }
+        } catch (err) {
+            console.error('Error processing audio queue:', err);
+        } finally {
+            isProcessingQueue = false;
+            // Re-check in case new items were added during processing loop exit (handled by while, but safe)
+            if (audioQueue.length > 0) processQueue();
+        }
+    };
+
+    systemAudioProc.stdout.on('data', data => {
         audioBuffer = Buffer.concat([audioBuffer, data]);
 
         while (audioBuffer.length >= CHUNK_SIZE) {
@@ -115,7 +138,15 @@ async function startMacOSAudioCapture(geminiSessionRef) {
 
             const monoChunk = CHANNELS === 2 ? convertStereoToMono(chunk) : chunk;
             const base64Data = monoChunk.toString('base64');
-            await sendAudioToGemini(base64Data, geminiSessionRef);
+
+            // Backpressure / Flow Control
+            if (audioQueue.length >= MAX_QUEUE_SIZE) {
+                console.warn('Audio queue full, dropping oldest chunk to catch up');
+                audioQueue.shift(); // Drop oldest
+            }
+
+            audioQueue.push({ base64Data, geminiSessionRef });
+            processQueue();
 
             if (process.env.DEBUG_AUDIO) {
                 console.log(`Processed audio chunk: ${chunk.length} bytes`);

@@ -106,6 +106,11 @@ function setupStorageIpcHandlers() {
     ipcMain.handle('storage:set-api-key', async (event, apiKey, provider) => {
         try {
             storage.setApiKey(apiKey, provider);
+
+            // Reset provider instances so next use picks up new key
+            const { resetProviders } = require('./utils/providers/registry');
+            resetProviders();
+
             return { success: true };
         } catch (error) {
             console.error('Error setting API key:', error);

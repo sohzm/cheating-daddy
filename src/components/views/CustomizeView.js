@@ -955,8 +955,11 @@ export class CustomizeView extends LitElement {
             this.geminiKeyStatus = this.geminiApiKey ? 'checking' : 'notset';
             this.groqKeyStatus = this.groqApiKey ? 'checking' : 'notset';
 
-            if (this.geminiApiKey) this.validateStoredKey('gemini', this.geminiApiKey);
-            if (this.groqApiKey) this.validateStoredKey('groq', this.groqApiKey);
+            const validationPromises = [];
+            if (this.geminiApiKey) validationPromises.push(this.validateStoredKey('gemini', this.geminiApiKey));
+            if (this.groqApiKey) validationPromises.push(this.validateStoredKey('groq', this.groqApiKey));
+
+            await Promise.all(validationPromises);
 
             // Load model preferences
             this.modelPrefs = {

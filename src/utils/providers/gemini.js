@@ -99,7 +99,12 @@ class GeminiProvider {
             }
         });
 
-        return response;
+        // Return standardized format matching Groq provider
+        // Note: generateContentStream returns the async iterable directly
+        return {
+            stream: response,
+            transcription: '' // Gemini stream doesn't give full text immediately, handled by stream consumer
+        };
     }
 
     /**

@@ -603,56 +603,57 @@ function setupAssistantIpcHandlers(geminiSessionRef) {
         return false;
     });
 
+    // Helper to process audio chunks for VAD and buffering
+    function processAudioChunk(chunk, prefs) {
+        const method = prefs.audioTriggerMethod || 'vad';
+
+        // Manual Trigger Mode
+        if (method === 'manual') {
+            if (manualRecordingActive) {
+                audioTextBuffer = Buffer.concat([audioTextBuffer, chunk]);
+            }
+            return { success: true };
+        }
+
+        // VAD Mode (Energy-based)
+        let sum = 0;
+        // Process 16-bit samples
+        for (let i = 0; i < chunk.length; i += 2) {
+            const sample = chunk.readInt16LE(i);
+            sum += sample * sample;
+        }
+        const rms = Math.sqrt(sum / (chunk.length / 2));
+
+        // Threshold for silence
+        const VAD_THRESHOLD = 800;
+
+        if (rms > VAD_THRESHOLD) {
+            // Speech detected
+            audioTextBuffer = Buffer.concat([audioTextBuffer, chunk]);
+            lastAudioProcessTime = Date.now(); // Reset timer on speech
+        }
+
+        // VAD Buffer Management
+        const MIN_BUFFER_SIZE = 24000 * 2 * 2; // 2 seconds
+
+        if (audioTextBuffer.length >= MIN_BUFFER_SIZE) {
+            processBufferedAudio(prefs);
+        } else if (audioTextBuffer.length > 0 && Date.now() - lastAudioProcessTime > 1500) {
+            // Flush older buffer if silence follows speech
+            processBufferedAudio(prefs);
+        }
+
+        return { success: true };
+    }
+
     ipcMain.handle('send-audio-content', async (event, { data, mimeType }) => {
         try {
             const prefs = await getPreferences();
 
             // Audio -> Text Mode
             if (prefs.audioProcessingMode === 'audio-to-text') {
-                // Simple Energy-based VAD (Root Mean Square)
                 const chunk = Buffer.from(data, 'base64');
-                let sum = 0;
-                // Process 16-bit samples
-                for (let i = 0; i < chunk.length; i += 2) {
-                    const sample = chunk.readInt16LE(i);
-                    sum += sample * sample;
-                }
-                const rms = Math.sqrt(sum / (chunk.length / 2));
-
-                // Threshold for silence (adjustable) - typical noise floor is ~100-300
-                // Increased to 800 to filter out background noise/breathing
-                const VAD_THRESHOLD = 800;
-
-                if (rms > VAD_THRESHOLD) {
-                    // Speech detected
-                    audioTextBuffer = Buffer.concat([audioTextBuffer, chunk]);
-                    lastAudioProcessTime = Date.now(); // Reset timer on speech
-                } else {
-                    // Silence - do nothing or perhaps check buffer age to process pending speech
-                }
-
-                // Process if buffer is large enough (e.g., > 2 seconds of speech) OR time interval passed since last clear
-                const method = prefs.audioTriggerMethod || 'vad';
-
-                if (method === 'manual') {
-                    if (manualRecordingActive) {
-                        audioTextBuffer = Buffer.concat([audioTextBuffer, chunk]);
-                    }
-                    return { success: true };
-                }
-
-                // VAD Logic (only if not manual)
-                // 2 seconds of audio at 24kHz * 2 bytes = 96000 bytes
-                const MIN_BUFFER_SIZE = 24000 * 2 * 2;
-
-                if (audioTextBuffer.length >= MIN_BUFFER_SIZE) {
-                    processBufferedAudio(prefs);
-                } else if (audioTextBuffer.length > 0 && Date.now() - lastAudioProcessTime > 1500) {
-                    // Flush older buffer if silence follows speech
-                    processBufferedAudio(prefs);
-                }
-
-                return { success: true };
+                return processAudioChunk(chunk, prefs);
             }
 
             // Live Conversation Mode (Legacy)
@@ -677,48 +678,7 @@ function setupAssistantIpcHandlers(geminiSessionRef) {
             // Audio -> Text Mode
             if (prefs.audioProcessingMode === 'audio-to-text') {
                 const chunk = Buffer.from(data, 'base64');
-
-                // Simple Energy-based VAD (Root Mean Square)
-                let sum = 0;
-                // Process 16-bit samples
-                for (let i = 0; i < chunk.length; i += 2) {
-                    const sample = chunk.readInt16LE(i);
-                    sum += sample * sample;
-                }
-                const rms = Math.sqrt(sum / (chunk.length / 2));
-
-                // Threshold for silence
-                // Mic tends to be noisier, so maybe keep 800 or adjust? 
-                // Using same threshold as system audio for consistency
-                const VAD_THRESHOLD = 800;
-
-                if (rms > VAD_THRESHOLD) {
-                    // Speech detected
-                    audioTextBuffer = Buffer.concat([audioTextBuffer, chunk]);
-                    lastAudioProcessTime = Date.now(); // Reset timer on speech
-                }
-
-                // Process logic
-                const method = prefs.audioTriggerMethod || 'vad';
-
-                if (method === 'manual') {
-                    if (manualRecordingActive) {
-                        audioTextBuffer = Buffer.concat([audioTextBuffer, chunk]);
-                    }
-                    return { success: true };
-                }
-
-                // VAD Logic (only if not manual)
-                const MIN_BUFFER_SIZE = 24000 * 2 * 2; // 2 seconds
-
-                if (audioTextBuffer.length >= MIN_BUFFER_SIZE) {
-                    processBufferedAudio(prefs);
-                } else if (audioTextBuffer.length > 0 && Date.now() - lastAudioProcessTime > 1500) {
-                    // Flush older buffer if silence follows speech
-                    processBufferedAudio(prefs);
-                }
-
-                return { success: true };
+                return processAudioChunk(chunk, prefs);
             }
 
             // Live Conversation Mode (Legacy)

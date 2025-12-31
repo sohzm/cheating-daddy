@@ -49,10 +49,10 @@ const DEFAULT_PREFERENCES = {
         model: 'gemini-2.5-flash-native-audio-preview-12-2025'
     },
     audioToText: {
-        primaryProvider: 'gemini',
-        primaryModel: 'gemini-2.5-flash',
+        primaryProvider: 'groq',
+        primaryModel: 'meta-llama/llama-4-maverick-17b-128e-instruct',
         fallbackProvider: 'groq',
-        fallbackModel: 'meta-llama/llama-4-maverick-17b-128e-instruct'
+        fallbackModel: 'meta-llama/llama-4-scout-17b-16e-instruct'
     }
 };
 
