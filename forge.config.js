@@ -7,6 +7,14 @@ module.exports = {
         extraResource: ['./src/assets/SystemAudioDump'],
         name: 'Cheating Daddy',
         icon: 'src/assets/logo',
+        // macOS permission descriptions for Info.plist
+        // These are shown when the OS prompts for permissions
+        extendInfo: {
+            NSMicrophoneUsageDescription: 'Cheating Daddy needs microphone access to capture audio for AI transcription.',
+            NSCameraUsageDescription: 'Cheating Daddy needs camera access for video capture.',
+            // Note: Screen recording permission cannot be prompted programmatically,
+            // users must enable it manually in System Preferences > Privacy & Security
+        },
         // use `security find-identity -v -p codesigning` to find your identity
         // for macos signing
         // also fuck apple

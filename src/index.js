@@ -2,7 +2,7 @@ if (require('electron-squirrel-startup')) {
     process.exit(0);
 }
 
-const { app, BrowserWindow, shell, ipcMain, globalShortcut } = require('electron');
+const { app, BrowserWindow, shell, ipcMain, globalShortcut, systemPreferences } = require('electron');
 const { createWindow, updateGlobalShortcuts } = require('./utils/window');
 const { setupAssistantIpcHandlers, stopMacOSAudioCapture, sendToRenderer, toggleManualRecording } = require('./utils/core/assistantManager');
 const storage = require('./storage');
@@ -373,5 +373,40 @@ function setupGeneralIpcHandlers() {
     // Debug logging from renderer
     ipcMain.on('log-message', (event, msg) => {
         console.log(msg);
+    });
+
+    // ============ macOS PERMISSION CHECKS ============
+    // Check if a permission is granted (screen, microphone, camera)
+    ipcMain.handle('check-permission', async (event, type) => {
+        // On non-macOS platforms, always return granted
+        if (process.platform !== 'darwin') {
+            return 'granted';
+        }
+        try {
+            return systemPreferences.getMediaAccessStatus(type);
+        } catch (error) {
+            console.error(`Error checking ${type} permission:`, error);
+            return 'unknown';
+        }
+    });
+
+    // Request permission (microphone, camera - screen recording must be done in System Preferences)
+    ipcMain.handle('request-permission', async (event, type) => {
+        // On non-macOS platforms, always return true
+        if (process.platform !== 'darwin') {
+            return true;
+        }
+        try {
+            // Note: askForMediaAccess only works for 'microphone' and 'camera'
+            // Screen recording permission must be granted manually in System Preferences
+            if (type === 'microphone' || type === 'camera') {
+                return await systemPreferences.askForMediaAccess(type);
+            }
+            // For screen, we can only check - not request
+            return systemPreferences.getMediaAccessStatus(type) === 'granted';
+        } catch (error) {
+            console.error(`Error requesting ${type} permission:`, error);
+            return false;
+        }
     });
 }

@@ -229,6 +229,14 @@ const storage = {
     async getTodayLimits() {
         const result = await ipcRenderer.invoke('storage:get-today-limits');
         return result.success ? result.data : { flash: { count: 0 }, flashLite: { count: 0 } };
+    },
+
+    // Permissions (macOS)
+    async checkPermission(type) {
+        return ipcRenderer.invoke('check-permission', type);
+    },
+    async requestPermission(type) {
+        return ipcRenderer.invoke('request-permission', type);
     }
 };
 
