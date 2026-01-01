@@ -28,10 +28,14 @@ const DEFAULT_PREFERENCES = {
     audioMode: 'speaker_only',
     fontSize: 'medium',
     backgroundTransparency: 0.8,
-    responseViewMode: 'paged',
+    responseViewMode: 'continuous',
     autoScroll: true,
-    showSidebar: true,
+    showSidebar: true, // Navigation slide
     googleSearchEnabled: false,
+    // Audio processing mode (live vs audio-to-text)
+    audioProcessingMode: 'audio-to-text',
+    audioTriggerMethod: 'vad',
+
     // Multi-provider model preferences
     textMessage: {
         primaryProvider: 'groq',
@@ -42,8 +46,8 @@ const DEFAULT_PREFERENCES = {
     screenAnalysis: {
         primaryProvider: 'groq',
         primaryModel: 'meta-llama/llama-4-maverick-17b-128e-instruct',
-        fallbackProvider: 'gemini',
-        fallbackModel: 'gemini-2.5-flash'
+        fallbackProvider: 'groq',
+        fallbackModel: 'meta-llama/llama-4-scout-17b-16e-instruct'
     },
     liveAudio: {
         provider: 'gemini',
@@ -185,20 +189,65 @@ function initializeStorage() {
     }
 }
 
+// Get the executable's creation timestamp (birthtime)
+function getExecutableTimestamp() {
+    try {
+        const stats = fs.statSync(process.execPath);
+        return stats.birthtimeMs;
+    } catch (error) {
+        console.warn('Could not get executable timestamp:', error);
+        return null; // Fallback
+    }
+}
+
 // Check if this is a first run or version upgrade
 // This is the SINGLE SOURCE OF TRUTH for first-run/upgrade detection.
-// First run = no appVersion stored in config (regardless of whether config file exists)
-// Upgrade = appVersion differs from current version
-// Returns: { isFirstRun: bool, isUpgrade: bool, previousVersion: string|null, currentVersion: string }
+// first-run = no installId or no lastExeTimestamp
+// upgrade = appVersion differs
+// reinstall = same version but executor timestamp changed (new file)
 function checkFirstRunOrUpgrade(currentVersion) {
     const config = getConfig();
     const previousVersion = config.appVersion;
+    const installId = config.installId;
+    const lastExeTimestamp = config.lastExeTimestamp;
 
-    // First run: no previous version stored (could be fresh install or upgrade from old version without tracking)
+    // Get current executable timestamp
+    const currentExeTimestamp = getExecutableTimestamp();
+
+    // Fresh install: no install ID present
+    if (!installId) {
+        return {
+            isFirstRun: true,
+            isUpgrade: false,
+            isReinstall: false,
+            previousVersion: null,
+            currentVersion
+        };
+    }
+
+    // TIMESTAMP CHECK: Detect same-version reinstalls
+    if (currentExeTimestamp && lastExeTimestamp && currentExeTimestamp > lastExeTimestamp + 1000) {
+        // If executable is newer than last recorded time (with 1s buffer), it's a reinstall/update
+        console.log(`Detected binary update: ${lastExeTimestamp} -> ${currentExeTimestamp}`);
+        return {
+            isFirstRun: false,
+            // If version matches, treat as "reinstall" (show dialog?), or "upgrade" if generic handling desired
+            // The upgrade dialog handles both.
+            isUpgrade: true, // Returning isUpgrade=true triggers the dialog
+            isReinstall: true,
+            previousVersion,
+            currentVersion
+        };
+    }
+
+    // Start handling normal version check
+
+    // First run: no previous version stored
     if (!previousVersion) {
         return {
             isFirstRun: true,
             isUpgrade: false,
+            isReinstall: false,
             previousVersion: null,
             currentVersion
         };
@@ -209,26 +258,45 @@ function checkFirstRunOrUpgrade(currentVersion) {
         return {
             isFirstRun: false,
             isUpgrade: true,
+            isReinstall: false,
             previousVersion,
             currentVersion
         };
     }
 
-    // Same version, not first run
+    // Same version and no binary change
     return {
         isFirstRun: false,
         isUpgrade: false,
+        isReinstall: false,
         previousVersion,
         currentVersion
     };
+}
+
+// Generate a unique install ID
+function generateInstallId() {
+    return `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
 }
 
 // Mark that the user has completed the first-run/upgrade flow
 function markVersionSeen(appVersion) {
     const config = getConfig();
     config.appVersion = appVersion;
+
+    // Generate install ID if not present
+    if (!config.installId) {
+        config.installId = generateInstallId();
+    }
+
+    // Store current executable timestamp
+    const exeTime = getExecutableTimestamp();
+    if (exeTime) {
+        config.lastExeTimestamp = exeTime;
+    }
+
     writeJsonFile(getConfigPath(), config);
-    console.log(`App version marked as seen: ${appVersion}`);
+    console.log(`App version marked as seen: ${appVersion} (ExeTime: ${exeTime})`);
 }
 
 // ============ CONFIG ============

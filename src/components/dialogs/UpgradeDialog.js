@@ -256,16 +256,19 @@ export class UpgradeDialog extends LitElement {
             // Clear all data
             await cheatingDaddy.storage.clearAll();
 
+            // Mark version as seen so dialog doesn't reappear on next launch
+            await cheatingDaddy.storage.markVersionSeen();
+
             this.dispatchEvent(new CustomEvent('dialog-complete', {
                 detail: { action: 'reset' },
                 bubbles: true,
                 composed: true
             }));
 
-            // Quit and restart for clean state
+            // Restart app for clean state
             if (window.require) {
                 const { ipcRenderer } = window.require('electron');
-                await ipcRenderer.invoke('quit-application');
+                await ipcRenderer.invoke('restart-application');
             }
         } catch (error) {
             console.error('Error resetting config:', error);

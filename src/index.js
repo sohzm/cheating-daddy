@@ -327,6 +327,18 @@ function setupGeneralIpcHandlers() {
         }
     });
 
+    ipcMain.handle('restart-application', async event => {
+        try {
+            stopMacOSAudioCapture();
+            app.relaunch();
+            app.quit();
+            return { success: true };
+        } catch (error) {
+            console.error('Error restarting application:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
     ipcMain.handle('open-external', async (event, url) => {
         try {
             await shell.openExternal(url);
