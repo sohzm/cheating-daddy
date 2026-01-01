@@ -1,5 +1,6 @@
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
 import { resizeLayout } from '../../utils/windowResize.js';
+import { UpgradeDialog } from '../dialogs/UpgradeDialog.js';
 
 export class CustomizeView extends LitElement {
     static styles = css`
@@ -757,6 +758,8 @@ export class CustomizeView extends LitElement {
         audioProcessingMode: { type: String },
         audioTriggerMethod: { type: String },
         validationError: { type: String },
+        // Clear dialog
+        showClearDialog: { type: Boolean },
     };
 
     constructor() {
@@ -836,6 +839,9 @@ export class CustomizeView extends LitElement {
         // Audio Processing defaults
         this.audioProcessingMode = 'live-conversation';
         this.audioTriggerMethod = 'vad';
+
+        // Clear dialog state
+        this.showClearDialog = false;
 
         this._loadFromStorage();
     }
@@ -978,6 +984,12 @@ export class CustomizeView extends LitElement {
                 liveAudio: prefs.liveAudio || {
                     provider: 'gemini',
                     model: 'gemini-2.5-flash-native-audio-preview-12-2025'
+                },
+                audioToText: prefs.audioToText || {
+                    primaryProvider: 'groq',
+                    primaryModel: 'meta-llama/llama-4-maverick-17b-128e-instruct',
+                    fallbackProvider: 'groq',
+                    fallbackModel: 'meta-llama/llama-4-scout-17b-16e-instruct'
                 }
             };
 
@@ -1125,12 +1137,19 @@ export class CustomizeView extends LitElement {
             liveAudio: {
                 provider: 'gemini',
                 model: 'gemini-2.5-flash-native-audio-preview-12-2025'
+            },
+            audioToText: {
+                primaryProvider: 'groq',
+                primaryModel: 'meta-llama/llama-4-maverick-17b-128e-instruct',
+                fallbackProvider: 'groq',
+                fallbackModel: 'meta-llama/llama-4-scout-17b-16e-instruct'
             }
         };
 
         await cheatingDaddy.storage.updatePreference('textMessage', this.modelPrefs.textMessage);
         await cheatingDaddy.storage.updatePreference('screenAnalysis', this.modelPrefs.screenAnalysis);
         await cheatingDaddy.storage.updatePreference('liveAudio', this.modelPrefs.liveAudio);
+        await cheatingDaddy.storage.updatePreference('audioToText', this.modelPrefs.audioToText);
         this.requestUpdate();
     }
 
@@ -1520,39 +1539,19 @@ export class CustomizeView extends LitElement {
     }
 
     async clearLocalData() {
-        if (this.isClearing) return;
-
-        this.isClearing = true;
-        this.clearStatusMessage = '';
-        this.clearStatusType = '';
+        // Show the clear confirmation dialog
+        this.showClearDialog = true;
         this.requestUpdate();
+    }
 
-        try {
-            await cheatingDaddy.storage.clearAll();
+    handleClearDialogComplete(e) {
+        const { action } = e.detail;
 
-            this.clearStatusMessage = 'Successfully cleared all local data';
-            this.clearStatusType = 'success';
-            this.requestUpdate();
-
-            // Close the application after a short delay
-            setTimeout(() => {
-                this.clearStatusMessage = 'Closing application...';
-                this.requestUpdate();
-                setTimeout(async () => {
-                    if (window.require) {
-                        const { ipcRenderer } = window.require('electron');
-                        await ipcRenderer.invoke('quit-application');
-                    }
-                }, 1000);
-            }, 2000);
-        } catch (error) {
-            console.error('Error clearing data:', error);
-            this.clearStatusMessage = `Error clearing data: ${error.message}`;
-            this.clearStatusType = 'error';
-        } finally {
-            this.isClearing = false;
+        if (action === 'cancel') {
+            this.showClearDialog = false;
             this.requestUpdate();
         }
+        // If action is 'reset', the dialog handles quitting the app
     }
 
     async handleBackgroundTransparencyChange(e) {
@@ -2630,6 +2629,13 @@ export class CustomizeView extends LitElement {
                     ${this.renderSectionContent()}
                 </div>
             </div>
+
+            ${this.showClearDialog ? html`
+                <upgrade-dialog
+                    .mode=${'clear'}
+                    @dialog-complete=${this.handleClearDialogComplete}
+                ></upgrade-dialog>
+            ` : ''}
         `;
     }
 }

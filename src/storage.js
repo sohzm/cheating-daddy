@@ -7,6 +7,7 @@ const CONFIG_VERSION = 1;
 // Default values
 const DEFAULT_CONFIG = {
     configVersion: CONFIG_VERSION,
+    appVersion: null, // Will be set during initialization
     onboarded: false,
     layout: 'normal'
 };
@@ -170,6 +171,8 @@ function resetConfigDir() {
 }
 
 // Initialize storage - call this on app startup
+// This only ensures the storage directory and files exist - it does NOT handle first-run detection.
+// For first-run/upgrade detection, use checkFirstRunOrUpgrade() after this is called.
 function initializeStorage() {
     if (needsReset()) {
         resetConfigDir();
@@ -180,6 +183,52 @@ function initializeStorage() {
             fs.mkdirSync(historyDir, { recursive: true });
         }
     }
+}
+
+// Check if this is a first run or version upgrade
+// This is the SINGLE SOURCE OF TRUTH for first-run/upgrade detection.
+// First run = no appVersion stored in config (regardless of whether config file exists)
+// Upgrade = appVersion differs from current version
+// Returns: { isFirstRun: bool, isUpgrade: bool, previousVersion: string|null, currentVersion: string }
+function checkFirstRunOrUpgrade(currentVersion) {
+    const config = getConfig();
+    const previousVersion = config.appVersion;
+
+    // First run: no previous version stored (could be fresh install or upgrade from old version without tracking)
+    if (!previousVersion) {
+        return {
+            isFirstRun: true,
+            isUpgrade: false,
+            previousVersion: null,
+            currentVersion
+        };
+    }
+
+    // Upgrade: previous version differs from current
+    if (previousVersion !== currentVersion) {
+        return {
+            isFirstRun: false,
+            isUpgrade: true,
+            previousVersion,
+            currentVersion
+        };
+    }
+
+    // Same version, not first run
+    return {
+        isFirstRun: false,
+        isUpgrade: false,
+        previousVersion,
+        currentVersion
+    };
+}
+
+// Mark that the user has completed the first-run/upgrade flow
+function markVersionSeen(appVersion) {
+    const config = getConfig();
+    config.appVersion = appVersion;
+    writeJsonFile(getConfigPath(), config);
+    console.log(`App version marked as seen: ${appVersion}`);
 }
 
 // ============ CONFIG ============
@@ -488,6 +537,8 @@ function clearAllData() {
 module.exports = {
     // Initialization
     initializeStorage,
+    checkFirstRunOrUpgrade,
+    markVersionSeen,
     getConfigDir,
 
     // Config

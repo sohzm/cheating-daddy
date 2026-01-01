@@ -6,6 +6,7 @@ import { HelpView } from '../views/HelpView.js';
 import { HistoryView } from '../views/HistoryView.js';
 import { AssistantView } from '../views/AssistantView.js';
 import { OnboardingView } from '../views/OnboardingView.js';
+import { UpgradeDialog } from '../dialogs/UpgradeDialog.js';
 
 export class CheatingDaddyApp extends LitElement {
     static styles = css`
@@ -182,6 +183,10 @@ export class CheatingDaddyApp extends LitElement {
         toastMessage: { type: String },
         toastType: { type: String },
         toastVisible: { type: Boolean },
+
+        // Upgrade Dialog State
+        showUpgradeDialog: { type: Boolean },
+        upgradeInfo: { type: Object },
     };
 
     constructor() {
@@ -209,12 +214,24 @@ export class CheatingDaddyApp extends LitElement {
         this.shouldAnimateResponse = false;
         this._storageLoaded = false;
 
+        // Upgrade dialog state
+        this.showUpgradeDialog = false;
+        this.upgradeInfo = null;
+
         // Load from storage
         this._loadFromStorage();
     }
 
     async _loadFromStorage() {
         try {
+            // Check for first run or upgrade BEFORE loading settings
+            const upgradeCheck = await cheatingDaddy.storage.checkFirstRunOrUpgrade();
+
+            if (upgradeCheck.isFirstRun || upgradeCheck.isUpgrade) {
+                this.upgradeInfo = upgradeCheck;
+                this.showUpgradeDialog = true;
+            }
+
             const [config, prefs] = await Promise.all([
                 cheatingDaddy.storage.getConfig(),
                 cheatingDaddy.storage.getPreferences()
@@ -541,6 +558,23 @@ export class CheatingDaddyApp extends LitElement {
         this.requestUpdate();
     }
 
+    handleUpgradeDialogComplete(e) {
+        const { action } = e.detail;
+
+        if (action === 'keep') {
+            // User chose to keep config, hide dialog
+            this.showUpgradeDialog = false;
+            this.upgradeInfo = null;
+            this.requestUpdate();
+        }
+        // If action is 'reset', the dialog handles quitting the app
+    }
+
+    handleUpgradeDialogError(e) {
+        const { error } = e.detail;
+        this.showToast(`Error: ${error}`, 'error');
+    }
+
     // Onboarding event handlers
     handleOnboardingComplete() {
         this.currentView = 'main';
@@ -677,6 +711,17 @@ export class CheatingDaddyApp extends LitElement {
                         <span>${this.toastMessage}</span>
                     </div>
                 </div>
+
+                ${this.showUpgradeDialog && this.upgradeInfo ? html`
+                    <upgrade-dialog
+                        .isFirstRun=${this.upgradeInfo.isFirstRun}
+                        .isUpgrade=${this.upgradeInfo.isUpgrade}
+                        .previousVersion=${this.upgradeInfo.previousVersion || ''}
+                        .currentVersion=${this.upgradeInfo.currentVersion || ''}
+                        @dialog-complete=${this.handleUpgradeDialogComplete}
+                        @dialog-error=${this.handleUpgradeDialogError}
+                    ></upgrade-dialog>
+                ` : ''}
             </div>
         `;
     }

@@ -34,9 +34,9 @@ class GeminiProvider {
 
         const response = await this.client.models.generateContentStream({
             model: model,
-            contents: [{ text: prompt }],
-            systemInstruction: systemPrompt ? { parts: [{ text: systemPrompt }] } : undefined,
-            generationConfig: {
+            contents: prompt,
+            config: {
+                ...(systemPrompt && { systemInstruction: systemPrompt }),
                 temperature: options.temperature || 0.7,
                 maxOutputTokens: options.maxTokens || 2048
             }
@@ -58,14 +58,14 @@ class GeminiProvider {
                     data: base64Image
                 }
             },
-            { text: prompt }
+            prompt
         ];
 
         const response = await this.client.models.generateContentStream({
             model: model,
             contents: contents,
-            systemInstruction: systemPrompt ? { parts: [{ text: systemPrompt }] } : undefined,
-            generationConfig: {
+            config: {
+                ...(systemPrompt && { systemInstruction: systemPrompt }),
                 temperature: options.temperature || 0.7,
                 maxOutputTokens: options.maxTokens || 2048
             }
@@ -87,13 +87,13 @@ class GeminiProvider {
                     data: base64Audio
                 }
             },
-            { text: prompt }
+            prompt
         ];
 
         const response = await this.client.models.generateContentStream({
             model: model,
             contents: contents,
-            generationConfig: {
+            config: {
                 temperature: options.temperature || 0.7,
                 maxOutputTokens: options.maxTokens || 2048
             }
@@ -115,8 +115,8 @@ class GeminiProvider {
             this.initialize();
             await this.client.models.generateContent({
                 model: 'gemini-2.5-flash-lite',
-                contents: [{ text: 'Hi' }],
-                generationConfig: { maxOutputTokens: 1 }
+                contents: 'Hi',
+                config: { maxOutputTokens: 1 }
             });
             return { valid: true };
         } catch (error) {

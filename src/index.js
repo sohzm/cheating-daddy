@@ -17,7 +17,7 @@ function createMainWindow() {
 }
 
 app.whenReady().then(async () => {
-    // Initialize storage (checks version, resets if needed)
+    // Initialize storage (ensures directory exists, resets if needed)
     storage.initializeStorage();
 
     createMainWindow();
@@ -283,6 +283,29 @@ function setupStorageIpcHandlers() {
             return { success: true };
         } catch (error) {
             console.error('Error clearing all data:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    // ============ FIRST RUN / UPGRADE ============
+    ipcMain.handle('storage:check-first-run-or-upgrade', async () => {
+        try {
+            const currentVersion = app.getVersion();
+            const result = storage.checkFirstRunOrUpgrade(currentVersion);
+            return { success: true, data: result };
+        } catch (error) {
+            console.error('Error checking first run/upgrade:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('storage:mark-version-seen', async () => {
+        try {
+            const currentVersion = app.getVersion();
+            storage.markVersionSeen(currentVersion);
+            return { success: true };
+        } catch (error) {
+            console.error('Error marking version seen:', error);
             return { success: false, error: error.message };
         }
     });

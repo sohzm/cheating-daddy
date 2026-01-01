@@ -216,6 +216,15 @@ const storage = {
         return ipcRenderer.invoke('storage:clear-all');
     },
 
+    // First run / Upgrade detection
+    async checkFirstRunOrUpgrade() {
+        const result = await ipcRenderer.invoke('storage:check-first-run-or-upgrade');
+        return result.success ? result.data : { isFirstRun: false, isUpgrade: false };
+    },
+    async markVersionSeen() {
+        return ipcRenderer.invoke('storage:mark-version-seen');
+    },
+
     // Limits
     async getTodayLimits() {
         const result = await ipcRenderer.invoke('storage:get-today-limits');
