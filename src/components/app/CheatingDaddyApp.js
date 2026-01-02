@@ -6,6 +6,7 @@ import { HelpView } from '../views/HelpView.js';
 import { HistoryView } from '../views/HistoryView.js';
 import { AssistantView } from '../views/AssistantView.js';
 import { OnboardingView } from '../views/OnboardingView.js';
+import { UpgradeDialog } from '../dialogs/UpgradeDialog.js';
 
 export class CheatingDaddyApp extends LitElement {
     static styles = css`
@@ -90,6 +91,70 @@ export class CheatingDaddyApp extends LitElement {
         ::-webkit-scrollbar-thumb:hover {
             background: var(--scrollbar-thumb-hover);
         }
+
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 10000;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            align-items: flex-end;
+        }
+
+        .toast {
+            background: #2a2a2a; /* Fallback */
+            background: var(--bg-tertiary, #2a2a2a);
+            color: var(--text-color, #fff);
+            padding: 12px 16px;
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            border-left: 4px solid #00E6CC; /* Default/Info */
+            opacity: 0;
+            transform: translateX(20px);
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            pointer-events: auto;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            max-width: 320px;
+            pointer-events: none; /* Let clicks pass through if covered, but toast itself handles */
+        }
+        
+        .toast.visible {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .toast.error { border-left-color: #ef4444; }
+        .toast.warning { border-left-color: #f59e0b; }
+        .toast.success { border-left-color: #10b981; }
+
+        .branding-footer {
+            position: fixed;
+            bottom: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255, 255, 255, 0.9);
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            pointer-events: none;
+            z-index: 9999;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.6), 0 0 20px rgba(0, 255, 255, 0.4);
+            opacity: 0.9;
+            white-space: nowrap;
+            border-top: 1px solid rgba(0, 255, 255, 0.3);
+            padding-top: 5px;
+            background: linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.05), transparent);
+            width: 100%;
+            text-align: center;
+        }
     `;
 
     static properties = {
@@ -104,12 +169,24 @@ export class CheatingDaddyApp extends LitElement {
         currentResponseIndex: { type: Number },
         selectedScreenshotInterval: { type: String },
         selectedImageQuality: { type: String },
+        responseViewMode: { type: String },
+        autoScroll: { type: Boolean },
+        showSidebar: { type: Boolean },
         layoutMode: { type: String },
         _viewInstances: { type: Object, state: true },
         _isClickThrough: { state: true },
         _awaitingNewResponse: { state: true },
         shouldAnimateResponse: { type: Boolean },
         _storageLoaded: { state: true },
+
+        // Toast State
+        toastMessage: { type: String },
+        toastType: { type: String },
+        toastVisible: { type: Boolean },
+
+        // Upgrade Dialog State
+        showUpgradeDialog: { type: Boolean },
+        upgradeInfo: { type: Object },
     };
 
     constructor() {
@@ -124,6 +201,9 @@ export class CheatingDaddyApp extends LitElement {
         this.selectedLanguage = 'en-US';
         this.selectedScreenshotInterval = '5';
         this.selectedImageQuality = 'medium';
+        this.responseViewMode = 'paged';
+        this.autoScroll = true;
+        this.showSidebar = true;
         this.layoutMode = 'normal';
         this.responses = [];
         this.currentResponseIndex = -1;
@@ -134,12 +214,24 @@ export class CheatingDaddyApp extends LitElement {
         this.shouldAnimateResponse = false;
         this._storageLoaded = false;
 
+        // Upgrade dialog state
+        this.showUpgradeDialog = false;
+        this.upgradeInfo = null;
+
         // Load from storage
         this._loadFromStorage();
     }
 
     async _loadFromStorage() {
         try {
+            // Check for first run or upgrade BEFORE loading settings
+            const upgradeCheck = await cheatingDaddy.storage.checkFirstRunOrUpgrade();
+
+            if (upgradeCheck.isFirstRun || upgradeCheck.isUpgrade) {
+                this.upgradeInfo = upgradeCheck;
+                this.showUpgradeDialog = true;
+            }
+
             const [config, prefs] = await Promise.all([
                 cheatingDaddy.storage.getConfig(),
                 cheatingDaddy.storage.getPreferences()
@@ -159,6 +251,9 @@ export class CheatingDaddyApp extends LitElement {
             this.selectedLanguage = prefs.selectedLanguage || 'en-US';
             this.selectedScreenshotInterval = prefs.selectedScreenshotInterval || '5';
             this.selectedImageQuality = prefs.selectedImageQuality || 'medium';
+            this.responseViewMode = prefs.responseViewMode || 'paged';
+            this.autoScroll = prefs.autoScroll ?? true;
+            this.showSidebar = prefs.showSidebar ?? true;
             this.layoutMode = config.layout || 'normal';
 
             this._storageLoaded = true;
@@ -238,6 +333,12 @@ export class CheatingDaddyApp extends LitElement {
             ipcRenderer.on('reconnect-failed', (_, data) => {
                 this.addNewResponse(data.message);
             });
+            ipcRenderer.on('toast', (_, data) => {
+                this.handleToast(data);
+            });
+            ipcRenderer.on('setting-changed', (_, data) => {
+                this.handleSettingChanged(data);
+            });
         }
     }
 
@@ -250,6 +351,37 @@ export class CheatingDaddyApp extends LitElement {
             ipcRenderer.removeAllListeners('update-status');
             ipcRenderer.removeAllListeners('click-through-toggled');
             ipcRenderer.removeAllListeners('reconnect-failed');
+            ipcRenderer.removeAllListeners('toast');
+            ipcRenderer.removeAllListeners('setting-changed');
+        }
+    }
+
+    handleToast(data) {
+        if (!data || !data.message) return;
+
+        this.toastMessage = data.message;
+        this.toastType = data.type || 'info';
+        this.toastVisible = true;
+
+        // Auto-hide after 3 seconds
+        if (this._toastTimeout) clearTimeout(this._toastTimeout);
+        this._toastTimeout = setTimeout(() => {
+            this.toastVisible = false;
+        }, 3000);
+    }
+
+    handleSettingChanged(data) {
+        if (!data || !data.key) return;
+
+        console.log('Setting changed via IPC:', data);
+
+        // If we need to update internal state based on specific keys
+        if (data.key === 'audioProcessingMode') {
+            // Force CustomizeView to refresh if it's potentially active or cached
+            // We can dispatch a global event for sub-components
+            window.dispatchEvent(new CustomEvent('external-setting-change', {
+                detail: { key: data.key, value: data.value }
+            }));
         }
     }
 
@@ -273,12 +405,16 @@ export class CheatingDaddyApp extends LitElement {
     }
 
     updateCurrentResponse(response) {
-        // Update the current response in place (streaming subsequent words)
         if (this.responses.length > 0) {
-            this.responses = [...this.responses.slice(0, -1), response];
-            console.log('[updateCurrentResponse] Updated to:', response);
+            const current = this.responses[this.responses.length - 1];
+            let responseToMerge = typeof response === 'string' ? { text: response } : { ...response };
+
+            Object.keys(responseToMerge).forEach(key => responseToMerge[key] === undefined && delete responseToMerge[key]);
+
+            const updated = { ...current, ...responseToMerge };
+            this.responses = [...this.responses.slice(0, -1), updated];
+            console.log('[updateCurrentResponse] Updated response');
         } else {
-            // Fallback: if no responses exist, add as new
             this.addNewResponse(response);
         }
         this.requestUpdate();
@@ -300,7 +436,7 @@ export class CheatingDaddyApp extends LitElement {
         this.requestUpdate();
     }
 
-        async handleClose() {
+    async handleClose() {
         if (this.currentView === 'customize' || this.currentView === 'help' || this.currentView === 'history') {
             this.currentView = 'main';
         } else if (this.currentView === 'assistant') {
@@ -332,14 +468,19 @@ export class CheatingDaddyApp extends LitElement {
 
     // Main view event handlers
     async handleStart() {
-        // check if api key is empty do nothing
-        const apiKey = await cheatingDaddy.storage.getApiKey();
-        if (!apiKey || apiKey === '') {
-            // Trigger the red blink animation on the API key input
-            const mainView = this.shadowRoot.querySelector('main-view');
-            if (mainView && mainView.triggerApiKeyError) {
-                mainView.triggerApiKeyError();
-            }
+        // Check if any API key is configured
+        const credentials = await cheatingDaddy.storage.getCredentials();
+        // Check for gemini key (support legacy 'apiKey' field too)
+        const geminiKey = credentials.gemini || credentials.apiKey || '';
+        const groqKey = credentials.groq || '';
+
+        const hasGemini = geminiKey.length > 0;
+        const hasGroq = groqKey.length > 0;
+
+        if (!hasGemini && !hasGroq) {
+            // Redirect to settings if no keys are configured
+            this.currentView = 'customize';
+            this.setStatus('Please configure your API keys to get started.');
             return;
         }
 
@@ -380,6 +521,11 @@ export class CheatingDaddyApp extends LitElement {
         await cheatingDaddy.storage.updatePreference('selectedImageQuality', quality);
     }
 
+    async handleResponseViewModeChange(mode) {
+        this.responseViewMode = mode;
+        await cheatingDaddy.storage.updatePreference('responseViewMode', mode);
+    }
+
     handleBackClick() {
         this.currentView = 'main';
         this.requestUpdate();
@@ -410,6 +556,23 @@ export class CheatingDaddyApp extends LitElement {
         this.currentResponseIndex = e.detail.index;
         this.shouldAnimateResponse = false;
         this.requestUpdate();
+    }
+
+    handleUpgradeDialogComplete(e) {
+        const { action } = e.detail;
+
+        if (action === 'keep') {
+            // User chose to keep config, hide dialog
+            this.showUpgradeDialog = false;
+            this.upgradeInfo = null;
+            this.requestUpdate();
+        }
+        // If action is 'reset', the dialog handles quitting the app
+    }
+
+    handleUpgradeDialogError(e) {
+        const { error } = e.detail;
+        this.showToast(`Error: ${error}`, 'error');
     }
 
     // Onboarding event handlers
@@ -471,6 +634,7 @@ export class CheatingDaddyApp extends LitElement {
                         .onLanguageChange=${language => this.handleLanguageChange(language)}
                         .onScreenshotIntervalChange=${interval => this.handleScreenshotIntervalChange(interval)}
                         .onImageQualityChange=${quality => this.handleImageQualityChange(quality)}
+                        .onResponseViewModeChange=${mode => this.handleResponseViewModeChange(mode)}
                         .onLayoutModeChange=${layoutMode => this.handleLayoutModeChange(layoutMode)}
                     ></customize-view>
                 `;
@@ -487,15 +651,18 @@ export class CheatingDaddyApp extends LitElement {
                         .responses=${this.responses}
                         .currentResponseIndex=${this.currentResponseIndex}
                         .selectedProfile=${this.selectedProfile}
+                        .viewMode=${this.responseViewMode}
+                        .autoScroll=${this.autoScroll}
+                        .showSidebar=${this.showSidebar}
                         .onSendText=${message => this.handleSendText(message)}
                         .shouldAnimateResponse=${this.shouldAnimateResponse}
                         @response-index-changed=${this.handleResponseIndexChanged}
                         @response-animation-complete=${() => {
-                            this.shouldAnimateResponse = false;
-                            this._currentResponseIsComplete = true;
-                            console.log('[response-animation-complete] Marked current response as complete');
-                            this.requestUpdate();
-                        }}
+                        this.shouldAnimateResponse = false;
+                        this._currentResponseIsComplete = true;
+                        console.log('[response-animation-complete] Marked current response as complete');
+                        this.requestUpdate();
+                    }}
                     ></assistant-view>
                 `;
 
@@ -533,6 +700,28 @@ export class CheatingDaddyApp extends LitElement {
                         <div class="view-container">${this.renderCurrentView()}</div>
                     </div>
                 </div>
+                ${this.currentView !== 'assistant' ? html`
+                    <div class="branding-footer">
+                        Cheating Daddy On Steroids On Steroids By klaus-qodes
+                    </div>
+                ` : ''}
+                
+                <div class="toast-container">
+                    <div class="toast ${this.toastVisible ? 'visible' : ''} ${this.toastType}">
+                        <span>${this.toastMessage}</span>
+                    </div>
+                </div>
+
+                ${this.showUpgradeDialog && this.upgradeInfo ? html`
+                    <upgrade-dialog
+                        .isFirstRun=${this.upgradeInfo.isFirstRun}
+                        .isUpgrade=${this.upgradeInfo.isUpgrade}
+                        .previousVersion=${this.upgradeInfo.previousVersion || ''}
+                        .currentVersion=${this.upgradeInfo.currentVersion || ''}
+                        @dialog-complete=${this.handleUpgradeDialogComplete}
+                        @dialog-error=${this.handleUpgradeDialogError}
+                    ></upgrade-dialog>
+                ` : ''}
             </div>
         `;
     }

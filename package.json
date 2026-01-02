@@ -1,8 +1,8 @@
 {
     "name": "cheating-daddy",
     "productName": "cheating-daddy",
-    "version": "0.5.0",
-    "description": "cheating daddy",
+    "version": "0.5.4",
+    "description": "Cheating Daddy On Steroids",
     "main": "src/index.js",
     "scripts": {
         "start": "electron-forge start",
@@ -12,20 +12,28 @@
         "lint": "echo \"No linting configured\""
     },
     "keywords": [
-        "cheating daddy",
-        "cheating daddy ai",
-        "cheating daddy ai assistant",
-        "cheating daddy ai assistant for interviews",
-        "cheating daddy ai assistant for interviews"
+        "Cheating Daddy On Steroids",
+        "Cheating Daddy On Steroids ai",
+        "Cheating Daddy On Steroids ai assistant",
+        "Cheating Daddy On Steroids ai assistant for interviews",
+        "Cheating Daddy On Steroids ai assistant for interviews"
     ],
     "author": {
         "name": "sohzm",
         "email": "sohambharambe9@gmail.com"
     },
+    "modified by": [
+        {
+            "name": "klaus-qodes",
+            "github": "https://github.com/klaus-qodes",
+            "version": "v0.5.4"
+        }
+    ],
     "license": "GPL-3.0",
     "dependencies": {
-        "@google/genai": "^1.2.0",
-        "electron-squirrel-startup": "^1.0.1"
+        "@google/genai": "^1.34.0",
+        "electron-squirrel-startup": "^1.0.1",
+        "groq-sdk": "^0.37.0"
     },
     "devDependencies": {
         "@electron-forge/cli": "^7.8.1",

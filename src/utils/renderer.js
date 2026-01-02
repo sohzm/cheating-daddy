@@ -1,5 +1,104 @@
 // renderer.js
 const { ipcRenderer } = require('electron');
+// --- DATA DEFINITIONS FOR UI ---
+const PERSONAS = {
+    interview: {
+        name: 'Job Interview',
+        intro: `You are an AI-powered interview assistant, designed to act as a discreet on-screen teleprompter. Your mission is to help the user excel in their job interview by providing ready-to-speak answers. Analyze the dialogue and the 'User-provided context'.`,
+        contextInstruction: `To help the candidate excel: 
+1. Heavily rely on the 'User-provided context' (resume, job desc, skills).
+2. Tailor every response to match their specific experience level and field.`,
+        searchFocus: `If interviewer mentions recent events, news, or company-specific info, ALWAYS use Google Search.`
+    },
+    sales: {
+        name: 'Sales Call',
+        intro: `You are a sales call assistant. Your job is to provide the exact words the salesperson should say to prospects to handle objections and close deals.`,
+        contextInstruction: `To help close the deal:
+1. Use the 'User-provided context' to tailor value props to the specific product/service.
+2. Focus on ROI and solving customer pain points.`,
+        searchFocus: `If prospect mentions industry trends, competitor pricing, or news, ALWAYS use Google Search.`
+    },
+    meeting: {
+        name: 'Business Meeting',
+        intro: `You are a meeting assistant. Your job is to provide the exact words to say during professional meetings to sound articulate and leadership-oriented.`,
+        contextInstruction: `To add value:
+1. Use 'User-provided context' to align with project goals and role.
+2. Keep the tone professional and collaborative.`,
+        searchFocus: `If participants mention market news, regulatory changes, or competitor moves, ALWAYS use Google Search.`
+    },
+    presentation: {
+        name: 'Presentation',
+        intro: `You are a presentation coach. Your job is to provide the exact words to say during pitches and public speaking to sound confident and engaging.`,
+        contextInstruction: `To engage the audience:
+1. Use 'User-provided context' to reference specific data and slides.
+2. Maintain a strong, narrative-driven flow.`,
+        searchFocus: `If audience asks about recent market stats or trends, ALWAYS use Google Search.`
+    },
+    negotiation: {
+        name: 'Negotiation',
+        intro: `You are a negotiation assistant. Your job is to provide strategic responses for deal-making and contract discussions.`,
+        contextInstruction: `To win the negotiation:
+1. Use 'User-provided context' to know the walk-away points and leverage.
+2. Focus on win-win outcomes while protecting interests.`,
+        searchFocus: `If they mention market rates or competitor offers, ALWAYS use Google Search to verify.`
+    },
+    exam: {
+        name: 'Exam Assistant',
+        intro: `You are an exam assistant. Your role is to provide direct, accurate answers to questions with minimal fluff.`,
+        contextInstruction: `To ensure accuracy:
+1. Use 'User-provided context' to understand the subject matter or course level.
+2. Prioritize correctness over style.`,
+        searchFocus: `If the question involves recent facts, current events, or changing data, ALWAYS use Google Search.`
+    },
+    dating: {
+        name: 'Dating Assistant',
+        intro: `You are a dating assistant (Rizz GPT). Your goal is to provide charming, witty, and engaging responses for dating app conversations or dates.`,
+        contextInstruction: `To build attraction:
+1. Use 'User-provided context' to know the user's personality and interests.
+2. Keep it playful but respectful. Match the energy of the conversation.`,
+        searchFocus: `If they mention a specific movie, place, or event, search to get details to sound informed.`
+    }
+};
+
+const LENGTHS = {
+    concise: {
+        name: 'Concise (Teleprompter)',
+        instruction: `**LENGTH REQUIREMENT:** Keep responses EXTREMELY SHORT (1-3 sentences max). simple and direct.`
+    },
+    balanced: {
+        name: 'Balanced (Natural)',
+        instruction: `**LENGTH REQUIREMENT:** Keep responses conversational (3-5 sentences). Explain the 'Why' but don't ramble.`
+    },
+    detailed: {
+        name: 'Detailed (Comprehensive)',
+        instruction: `**LENGTH REQUIREMENT:** Provide comprehensive, thorough responses (8+ sentences). Cover all aspects of the question, use examples, and provide deep context.`
+    }
+};
+
+const FORMATS = {
+    teleprompter: {
+        name: 'Teleprompter',
+        instruction: `**FORMATTING:** Optimize for reading aloud.
+- Use **BOLD** for identifying keywords instantly.
+- Add blank lines between distinct ideas.
+- Avoid large blocks of text.`
+    },
+    structural: {
+        name: 'Structural',
+        instruction: `**FORMATTING:** Use structured Markdown.
+- Use headers (##) for sections.
+- Use bullet points (-) for lists.
+- Use **bold** for emphasis.`
+    },
+    plain: {
+        name: 'Plain Text',
+        instruction: `**FORMATTING:** Use valid Markdown but keep it minimal.
+- Paragraphs only.
+- No heavy bolding or lists unless absolutely necessary.`
+    }
+};
+
+const prompts = { PERSONAS, LENGTHS, FORMATS };
 
 let mediaStream = null;
 let screenshotInterval = null;
@@ -42,12 +141,22 @@ const storage = {
     async setCredentials(credentials) {
         return ipcRenderer.invoke('storage:set-credentials', credentials);
     },
-    async getApiKey() {
-        const result = await ipcRenderer.invoke('storage:get-api-key');
+    async getApiKey(provider = null) {
+        const result = await ipcRenderer.invoke('storage:get-api-key', provider);
         return result.success ? result.data : '';
     },
-    async setApiKey(apiKey) {
-        return ipcRenderer.invoke('storage:set-api-key', apiKey);
+    async setApiKey(apiKey, provider = null) {
+        return ipcRenderer.invoke('storage:set-api-key', apiKey, provider);
+    },
+
+    // Usage stats
+    async getUsageStats() {
+        const result = await ipcRenderer.invoke('storage:get-usage-stats');
+        return result.success ? result.data : { groq: [], gemini: [] };
+    },
+    async getUsageResetTime() {
+        const result = await ipcRenderer.invoke('storage:get-usage-reset-time');
+        return result.success ? result.data : { hours: 0, minutes: 0 };
     },
 
     // Preferences
@@ -60,6 +169,18 @@ const storage = {
     },
     async updatePreference(key, value) {
         return ipcRenderer.invoke('storage:update-preference', key, value);
+    },
+
+    // Custom Profiles
+    async getCustomProfiles() {
+        const result = await ipcRenderer.invoke('storage:get-custom-profiles');
+        return result.success ? result.data : [];
+    },
+    async saveCustomProfile(profile) {
+        return ipcRenderer.invoke('storage:save-custom-profile', profile);
+    },
+    async deleteCustomProfile(profileId) {
+        return ipcRenderer.invoke('storage:delete-custom-profile', profileId);
     },
 
     // Keybinds
@@ -95,10 +216,27 @@ const storage = {
         return ipcRenderer.invoke('storage:clear-all');
     },
 
+    // First run / Upgrade detection
+    async checkFirstRunOrUpgrade() {
+        const result = await ipcRenderer.invoke('storage:check-first-run-or-upgrade');
+        return result.success ? result.data : { isFirstRun: false, isUpgrade: false };
+    },
+    async markVersionSeen() {
+        return ipcRenderer.invoke('storage:mark-version-seen');
+    },
+
     // Limits
     async getTodayLimits() {
         const result = await ipcRenderer.invoke('storage:get-today-limits');
         return result.success ? result.data : { flash: { count: 0 }, flashLite: { count: 0 } };
+    },
+
+    // Permissions (macOS)
+    async checkPermission(type) {
+        return ipcRenderer.invoke('check-permission', type);
+    },
+    async requestPermission(type) {
+        return ipcRenderer.invoke('request-permission', type);
     }
 };
 
@@ -921,6 +1059,13 @@ const cheatingDaddy = {
     // App version
     getVersion: async () => ipcRenderer.invoke('get-app-version'),
 
+    // Assistant API
+    assistant: {
+        validateApiKey: async (provider, apiKey) => {
+            return ipcRenderer.invoke('assistant:validate-api-key', provider, apiKey);
+        }
+    },
+
     // Element access
     element: () => cheatingDaddyApp,
     e: () => cheatingDaddyApp,
@@ -943,6 +1088,9 @@ const cheatingDaddy = {
 
     // Storage API
     storage,
+
+    // Prompts API
+    prompts,
 
     // Theme API
     theme,

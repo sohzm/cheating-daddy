@@ -22,16 +22,51 @@ export class AssistantView extends LitElement {
             padding: 12px;
             scroll-behavior: smooth;
             user-select: text;
-            cursor: text;
+            cursor: default;
         }
 
         .response-container * {
             user-select: text;
-            cursor: text;
+            cursor: default;
         }
 
         .response-container a {
             cursor: pointer;
+        }
+
+        /* Continuous Mode Styles */
+        .response-list {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            padding-bottom: 50px;
+        }
+
+        .response-item {
+            position: relative;
+            padding: 8px 0;
+        }
+        
+        .response-checkpoint {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 16px 0 8px 0;
+            opacity: 0.5;
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .response-checkpoint::before,
+        .response-checkpoint::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--border-color);
+        }
+
+        .response-item.active-item {
+            /* Highlight active item if needed, currently subtle */
         }
 
         /* Word display (no animation) */
@@ -314,16 +349,113 @@ export class AssistantView extends LitElement {
             opacity: 0.5;
             font-size: 10px;
         }
+
+        /* Sidebar Styles */
+        .main-container {
+            display: flex;
+            flex: 1;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .content-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            min-width: 0; /* Prevent flex overflow */
+        }
+
+        .sidebar {
+            width: 260px;
+            background: var(--bg-secondary);
+            border-left: 1px solid var(--border-color);
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+
+        .sidebar-header {
+            padding: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            background: var(--bg-secondary);
+            z-index: 10;
+        }
+
+        .sidebar-content {
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .sidebar-item {
+            padding: 6px 8px; /* Reduced padding */
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            color: var(--text-secondary);
+            transition: all 0.2s ease;
+            border: 1px solid transparent;
+        }
+
+        .sidebar-item:hover {
+            background: var(--bg-hover);
+            color: var(--text-color);
+        }
+
+        .sidebar-item.active {
+            background: var(--bg-tertiary);
+            color: var(--text-color);
+            border-color: var(--border-color);
+        }
+
+        .sidebar-item-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 2px; /* Reduced margin */
+            font-size: 10px; /* Reduced font size */
+            opacity: 0.7;
+            font-family: 'SF Mono', Monaco, monospace;
+        }
+
+        .sidebar-item-preview {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            line-height: 1.4;
+            font-weight: 500;
+        }
+
+        .sidebar-empty {
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: var(--text-muted);
+            font-style: italic;
+        }
     `;
 
     static properties = {
         responses: { type: Array },
         currentResponseIndex: { type: Number },
         selectedProfile: { type: String },
+        viewMode: { type: String },
+        autoScroll: { type: Boolean },
+        showSidebar: { type: Boolean },
         onSendText: { type: Function },
         shouldAnimateResponse: { type: Boolean },
         flashCount: { type: Number },
         flashLiteCount: { type: Number },
+        usageStats: { type: Object },
     };
 
     constructor() {
@@ -331,9 +463,13 @@ export class AssistantView extends LitElement {
         this.responses = [];
         this.currentResponseIndex = -1;
         this.selectedProfile = 'interview';
-        this.onSendText = () => {};
+        this.onSendText = () => { };
         this.flashCount = 0;
         this.flashLiteCount = 0;
+        this.usageStats = { groq: [], gemini: [] };
+        this.viewMode = 'paged'; // 'paged' or 'continuous'
+        this.showSidebar = true;
+        this._userScrolledUp = false;
     }
 
     getProfileNames() {
@@ -355,6 +491,9 @@ export class AssistantView extends LitElement {
     }
 
     renderMarkdown(content) {
+        // Handle object responses (with metadata)
+        const text = (typeof content === 'object' && content !== null) ? content.text : content;
+
         // Check if marked is available
         if (typeof window !== 'undefined' && window.marked) {
             try {
@@ -364,16 +503,16 @@ export class AssistantView extends LitElement {
                     gfm: true,
                     sanitize: false, // We trust the AI responses
                 });
-                let rendered = window.marked.parse(content);
+                let rendered = window.marked.parse(text || '');
                 rendered = this.wrapWordsInSpans(rendered);
                 return rendered;
             } catch (error) {
                 console.warn('Error parsing markdown:', error);
-                return content; // Fallback to plain text
+                return text || ''; // Fallback to plain text
             }
         }
         console.log('Marked not available, using plain text');
-        return content; // Fallback if marked is not available
+        return text || ''; // Fallback if marked is not available
     }
 
     wrapWordsInSpans(html) {
@@ -409,26 +548,67 @@ export class AssistantView extends LitElement {
     }
 
     navigateToPreviousResponse() {
-        if (this.currentResponseIndex > 0) {
-            this.currentResponseIndex--;
+        const newIndex = this.currentResponseIndex - 1;
+        if (newIndex >= 0) {
+            this.currentResponseIndex = newIndex;
             this.dispatchEvent(
                 new CustomEvent('response-index-changed', {
                     detail: { index: this.currentResponseIndex },
                 })
             );
-            this.requestUpdate();
+
+            if (this.viewMode === 'continuous') {
+                this.scrollToResponse(this.currentResponseIndex);
+            } else {
+                this.requestUpdate();
+            }
         }
     }
 
     navigateToNextResponse() {
-        if (this.currentResponseIndex < this.responses.length - 1) {
-            this.currentResponseIndex++;
+        const newIndex = this.currentResponseIndex + 1;
+        if (newIndex < this.responses.length) {
+            this.currentResponseIndex = newIndex;
             this.dispatchEvent(
                 new CustomEvent('response-index-changed', {
                     detail: { index: this.currentResponseIndex },
                 })
             );
+
+            if (this.viewMode === 'continuous') {
+                this.scrollToResponse(this.currentResponseIndex);
+            } else {
+                this.requestUpdate();
+            }
+        }
+    }
+
+    scrollToResponse(index) {
+        if (index < 0 || index >= this.responses.length) return;
+
+        if (this.currentResponseIndex !== index) {
+            this.currentResponseIndex = index;
+            this.dispatchEvent(
+                new CustomEvent('response-index-changed', {
+                    detail: { index: this.currentResponseIndex },
+                })
+            );
+        }
+
+        if (this.viewMode === 'continuous') {
+            const container = this.shadowRoot.querySelector('.response-container');
+            const item = this.shadowRoot.querySelector(`#response-item-${index}`);
+
+            if (container && item) {
+                const topOffset = item.offsetTop - 20;
+                container.scrollTo({
+                    top: Math.max(0, topOffset),
+                    behavior: 'smooth'
+                });
+            }
+        } else {
             this.requestUpdate();
+            setTimeout(() => this.updateResponseContent(), 0);
         }
     }
 
@@ -523,10 +703,10 @@ export class AssistantView extends LitElement {
     }
 
     async loadLimits() {
-        if (window.cheatingDaddy?.storage?.getTodayLimits) {
-            const limits = await window.cheatingDaddy.storage.getTodayLimits();
-            this.flashCount = limits.flash?.count || 0;
-            this.flashLiteCount = limits.flashLite?.count || 0;
+        if (window.cheatingDaddy?.storage?.getUsageStats) {
+            const stats = await window.cheatingDaddy.storage.getUsageStats();
+            this.usageStats = stats || { groq: [], gemini: [] };
+            this.requestUpdate();
         }
     }
 
@@ -555,6 +735,20 @@ export class AssistantView extends LitElement {
         }, 0);
     }
 
+    handleScroll(e) {
+        const container = e.target;
+        // Check if user is at the bottom (with a small threshold)
+        const isAtBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 50;
+
+        if (!isAtBottom) {
+            // User scrolled up manually
+            this._userScrolledUp = true;
+        } else {
+            // User is at the bottom, re-enable stickiness
+            this._userScrolledUp = false;
+        }
+    }
+
     firstUpdated() {
         super.firstUpdated();
         this.updateResponseContent();
@@ -562,12 +756,40 @@ export class AssistantView extends LitElement {
 
     updated(changedProperties) {
         super.updated(changedProperties);
-        if (changedProperties.has('responses') || changedProperties.has('currentResponseIndex')) {
-            this.updateResponseContent();
+        if (changedProperties.has('responses') || changedProperties.has('currentResponseIndex') || changedProperties.has('viewMode')) {
+            // Check if current response is 'live'
+            const currentResponse = this.responses[this.currentResponseIndex];
+            // If it's a string (old format) assume it's NOT live to be safe, or default to scrolling? 
+            // Better to default to scrolling if string to match previous behavior, 
+            // but user explicitly asked to restrict it.
+            // If it's undefined, skip.
+            const isLive = currentResponse && typeof currentResponse === 'object' && currentResponse.type === 'live';
+
+            // If continuous mode and just added a new response (index increased), scroll to bottom
+            if (this.viewMode === 'continuous' &&
+                this.autoScroll &&
+                changedProperties.has('currentResponseIndex') &&
+                this.currentResponseIndex > (changedProperties.get('currentResponseIndex') || -1)) {
+                // Wait for render
+                setTimeout(() => this.scrollToResponse(this.currentResponseIndex), 50);
+            } else if (this.viewMode === 'continuous' &&
+                this.autoScroll &&
+                changedProperties.has('responses') &&
+                !this._userScrolledUp &&
+                isLive) {
+                // Handle streaming updates - scroll to bottom ONLY if LIVE response
+                this.scrollToBottom();
+            }
+
+            if (this.viewMode === 'paged') {
+                this.updateResponseContent();
+            }
         }
     }
 
     updateResponseContent() {
+        if (this.viewMode === 'continuous') return; // Handled by render() in continuous mode
+
         console.log('updateResponseContent called');
         const container = this.shadowRoot.querySelector('#responseContainer');
         if (container) {
@@ -585,49 +807,106 @@ export class AssistantView extends LitElement {
         }
     }
 
-    render() {
-        const responseCounter = this.getResponseCounter();
+    renderSidebar() {
+        if (!this.responses || this.responses.length === 0) {
+            return html`
+                <div class="sidebar">
+                    <div class="sidebar-header">Response Navigator</div>
+                    <div class="sidebar-empty">No responses yet</div>
+                </div>
+            `;
+        }
 
         return html`
-            <div class="response-container" id="responseContainer"></div>
+            <div class="sidebar">
+                <div class="sidebar-header">Response Navigator</div>
+                <div class="sidebar-content">
+                    ${this.responses.map((response, index) => {
+            const question = (typeof response === 'object' && response?.question) ? response.question : '';
+            const previewText = question || '(No question)';
 
-            <div class="text-input-container">
-                <button class="nav-button" @click=${this.navigateToPreviousResponse} ?disabled=${this.currentResponseIndex <= 0}>
-                    <svg width="24px" height="24px" stroke-width="1.7" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M15 6L9 12L15 18" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
-                    </svg>
-                </button>
-
-                ${this.responses.length > 0 ? html`<span class="response-counter">${responseCounter}</span>` : ''}
-
-                <button class="nav-button" @click=${this.navigateToNextResponse} ?disabled=${this.currentResponseIndex >= this.responses.length - 1}>
-                    <svg width="24px" height="24px" stroke-width="1.7" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M9 6L15 12L9 18" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
-                    </svg>
-                </button>
-
-                <input type="text" id="textInput" placeholder="Type a message to the AI..." @keydown=${this.handleTextKeydown} />
-
-                <div class="screen-answer-btn-wrapper">
-                    <div class="tooltip">
-                        <div class="tooltip-row">
-                            <span class="tooltip-label">Flash</span>
-                            <span class="tooltip-value">${this.flashCount}/20</span>
+            return html`
+                        <div class="sidebar-item ${index === this.currentResponseIndex ? 'active' : ''}"
+                             @click=${() => this.scrollToResponse(index)}>
+                            <div class="sidebar-item-header">
+                                <span>#${index + 1}</span>
+                                <span>${this.formatTime(index)}</span>
+                            </div>
+                            <div class="sidebar-item-preview" title="${previewText}">
+                                ${previewText}
+                            </div>
                         </div>
-                        <div class="tooltip-row">
-                            <span class="tooltip-label">Flash Lite</span>
-                            <span class="tooltip-value">${this.flashLiteCount}/20</span>
-                        </div>
-                        <div class="tooltip-note">Resets every 24 hours</div>
-                    </div>
-                    <button class="screen-answer-btn" @click=${this.handleScreenAnswer}>
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                            <path d="M15.98 1.804a1 1 0 0 0-1.96 0l-.24 1.192a1 1 0 0 1-.784.785l-1.192.238a1 1 0 0 0 0 1.962l1.192.238a1 1 0 0 1 .785.785l.238 1.192a1 1 0 0 0 1.962 0l.238-1.192a1 1 0 0 1 .785-.785l1.192-.238a1 1 0 0 0 0-1.962l-1.192-.238a1 1 0 0 1-.785-.785l-.238-1.192ZM6.949 5.684a1 1 0 0 0-1.898 0l-.683 2.051a1 1 0 0 1-.633.633l-2.051.683a1 1 0 0 0 0 1.898l2.051.684a1 1 0 0 1 .633.632l.683 2.051a1 1 0 0 0 1.898 0l.683-2.051a1 1 0 0 1 .633-.633l2.051-.683a1 1 0 0 0 0-1.898l-2.051-.683a1 1 0 0 1-.633-.633L6.95 5.684ZM13.949 13.684a1 1 0 0 0-1.898 0l-.184.551a1 1 0 0 1-.632.633l-.551.183a1 1 0 0 0 0 1.898l.551.183a1 1 0 0 1 .633.633l.183.551a1 1 0 0 0 1.898 0l.184-.551a1 1 0 0 1 .632-.633l.551-.183a1 1 0 0 0 0-1.898l-.551-.184a1 1 0 0 1-.633-.632l-.183-.551Z" />
-                        </svg>
-                        <span>Analyze screen</span>
-                        <span class="usage-count">(${this.getTotalUsed()}/${this.getTotalAvailable()})</span>
-                    </button>
+                    `;
+        })}
                 </div>
+            </div>
+        `;
+    }
+
+    formatTime(index) {
+        // Placeholder for timestamp if we had it, for now just return empty or generic
+        return '';
+    }
+
+    render() {
+        const responseCounter = this.getResponseCounter();
+        const profileNames = this.getProfileNames();
+        const placeholder = `Hey, Im listening to your ${profileNames[this.selectedProfile] || 'session'}?`;
+
+        // Determine if sidebar should be shown (now available in both modes)
+        const showSidebar = this.showSidebar;
+
+        return html`
+            <div class="main-container">
+                <div class="content-area">
+                    <div class="response-container" id="responseContainer" @scroll=${this.handleScroll}>
+                        ${this.viewMode === 'continuous'
+                ? html`
+                                <div class="response-list">
+                                    ${this.responses.length === 0
+                        ? html`<div class="response-item" .innerHTML=${this.renderMarkdown(placeholder)}></div>`
+                        : this.responses.map((response, index) => html`
+                                            ${index > 0 ? html`<div class="response-checkpoint">Response ${index + 1}</div>` : ''}
+                                            <div class="response-item ${index === this.currentResponseIndex ? 'active-item' : ''}" 
+                                                 id="response-item-${index}">
+                                                <div .innerHTML=${this.renderMarkdown(response)}></div>
+                                            </div>
+                                          `)
+                    }
+                                </div>
+                            `
+                : '' // Empty for paged mode, content injected via updateResponseContent
+            }
+                    </div>
+
+                    <div class="text-input-container">
+                        <button class="nav-button" @click=${this.navigateToPreviousResponse} ?disabled=${this.currentResponseIndex <= 0}>
+                            <svg width="24px" height="24px" stroke-width="1.7" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M15 6L9 12L15 18" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
+                            </svg>
+                        </button>
+
+                        ${this.responses.length > 0 ? html`<span class="response-counter">${responseCounter}</span>` : ''}
+
+                        <button class="nav-button" @click=${this.navigateToNextResponse} ?disabled=${this.currentResponseIndex >= this.responses.length - 1}>
+                            <svg width="24px" height="24px" stroke-width="1.7" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M9 6L15 12L9 18" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
+                            </svg>
+                        </button>
+
+                        <input type="text" id="textInput" placeholder="Type a message to the AI..." @keydown=${this.handleTextKeydown} />
+
+                        <div class="screen-answer-btn-wrapper">
+                            <button class="screen-answer-btn" @click=${this.handleScreenAnswer}>
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M15.98 1.804a1 1 0 0 0-1.96 0l-.24 1.192a1 1 0 0 1-.784.785l-1.192.238a1 1 0 0 0 0 1.962l1.192.238a1 1 0 0 1 .785.785l.238 1.192a1 1 0 0 0 1.962 0l.238-1.192a1 1 0 0 1 .785-.785l1.192-.238a1 1 0 0 0 0-1.962l-1.192-.238a1 1 0 0 1-.785-.785l-.238-1.192ZM6.949 5.684a1 1 0 0 0-1.898 0l-.683 2.051a1 1 0 0 1-.633.633l-2.051.683a1 1 0 0 0 0 1.898l2.051.684a1 1 0 0 1 .633.632l.683 2.051a1 1 0 0 0 1.898 0l.683-2.051a1 1 0 0 1 .633-.633l2.051-.683a1 1 0 0 0 0-1.898l-2.051-.683a1 1 0 0 1-.633-.633L6.95 5.684ZM13.949 13.684a1 1 0 0 0-1.898 0l-.184.551a1 1 0 0 1-.632.633l-.551.183a1 1 0 0 0 0 1.898l.551.183a1 1 0 0 1 .633.633l.183.551a1 1 0 0 0 1.898 0l.184-.551a1 1 0 0 1 .632-.633l.551-.183a1 1 0 0 0 0-1.898l-.551-.184a1 1 0 0 1-.633-.632l-.183-.551Z" />
+                                </svg>
+                                <span>Analyze screen</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                ${showSidebar ? this.renderSidebar() : ''}
             </div>
         `;
     }

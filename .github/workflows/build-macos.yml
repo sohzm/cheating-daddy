@@ -1,0 +1,37 @@
+name: Build Electron App (macOS)
+
+on:
+  push:
+    branches: [ main, master, improvements ]
+  pull_request:
+    branches: [ main, master, improvements ]
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Make Electron app (macOS DMG)
+        run: npm run make
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-dmg
+          path: out/make/**/*.dmg
+
+      - name: Upload ZIP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-zip
+          path: out/make/**/*.zip

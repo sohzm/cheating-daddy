@@ -141,12 +141,12 @@ export class AppHeader extends LitElement {
         this.currentView = 'main';
         this.statusText = '';
         this.startTime = null;
-        this.onCustomizeClick = () => {};
-        this.onHelpClick = () => {};
-        this.onHistoryClick = () => {};
-        this.onCloseClick = () => {};
-        this.onBackClick = () => {};
-        this.onHideToggleClick = () => {};
+        this.onCustomizeClick = () => { };
+        this.onHelpClick = () => { };
+        this.onHistoryClick = () => { };
+        this.onCloseClick = () => { };
+        this.onBackClick = () => { };
+        this.onHideToggleClick = () => { };
         this.isClickThrough = false;
         this.updateAvailable = false;
         this._timerInterval = null;
@@ -242,15 +242,15 @@ export class AppHeader extends LitElement {
 
     getViewTitle() {
         const titles = {
-            onboarding: 'Welcome to Cheating Daddy',
-            main: 'Cheating Daddy',
+            onboarding: 'Welcome to Cheating Daddy On Steroids On Steroids',
+            main: 'Cheating Daddy On Steroids On Steroids',
             customize: 'Customize',
             help: 'Help & Shortcuts',
             history: 'Conversation History',
             advanced: 'Advanced Tools',
-            assistant: 'Cheating Daddy',
+            assistant: 'Cheating Daddy On Steroids On Steroids',
         };
-        return titles[this.currentView] || 'Cheating Daddy';
+        return titles[this.currentView] || 'Cheating Daddy On Steroids On Steroids';
     }
 
     getElapsedTime() {
@@ -279,14 +279,14 @@ export class AppHeader extends LitElement {
                 <div class="header-title">${this.getViewTitle()}</div>
                 <div class="header-actions">
                     ${this.currentView === 'assistant'
-                        ? html`
+                ? html`
                               <span>${elapsedTime}</span>
                               <span>${this.statusText}</span>
                               ${this.isClickThrough ? html`<span class="click-through-indicator">click-through</span>` : ''}
                           `
-                        : ''}
+                : ''}
                     ${this.currentView === 'main'
-                        ? html`
+                ? html`
                               ${this.updateAvailable ? html`
                                   <button class="update-button" @click=${this._openUpdatePage}>
                                       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor">
@@ -311,9 +311,9 @@ export class AppHeader extends LitElement {
                                   </svg>
                               </button>
                           `
-                        : ''}
+                : ''}
                     ${this.currentView === 'assistant'
-                        ? html`
+                ? html`
                               <button @click=${this.onHideToggleClick} class="button">
                                   Hide&nbsp;&nbsp;<span class="key" style="pointer-events: none;">${cheatingDaddy.isMacOS ? 'Cmd' : 'Ctrl'}</span
                                   >&nbsp;&nbsp;<span class="key">&bsol;</span>
@@ -324,7 +324,7 @@ export class AppHeader extends LitElement {
                                   </svg>
                               </button>
                           `
-                        : html`
+                : html`
                               <button @click=${this.isNavigationView() ? this.onBackClick : this.onCloseClick} class="icon-button window-close">
                                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                                       <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />

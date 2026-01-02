@@ -5,8 +5,16 @@ module.exports = {
     packagerConfig: {
         asar: true,
         extraResource: ['./src/assets/SystemAudioDump'],
-        name: 'Cheating Daddy',
+        name: 'Cheating Daddy On Steroids',
         icon: 'src/assets/logo',
+        // macOS permission descriptions for Info.plist
+        // These are shown when the OS prompts for permissions
+        extendInfo: {
+            NSMicrophoneUsageDescription: 'Cheating Daddy On Steroids needs microphone access to capture audio for AI transcription.',
+            NSCameraUsageDescription: 'Cheating Daddy On Steroids needs camera access for video capture.',
+            // Note: Screen recording permission cannot be prompted programmatically,
+            // users must enable it manually in System Preferences > Privacy & Security
+        },
         // use `security find-identity -v -p codesigning` to find your identity
         // for macos signing
         // also fuck apple
@@ -31,8 +39,8 @@ module.exports = {
             name: '@electron-forge/maker-squirrel',
             config: {
                 name: 'cheating-daddy',
-                productName: 'Cheating Daddy',
-                shortcutName: 'Cheating Daddy',
+                productName: 'Cheating Daddy On Steroids',
+                shortcutName: 'Cheating Daddy On Steroids',
                 createDesktopShortcut: true,
                 createStartMenuShortcut: true,
             },
@@ -46,8 +54,8 @@ module.exports = {
             platforms: ['linux'],
             config: {
                 options: {
-                    name: 'Cheating Daddy',
-                    productName: 'Cheating Daddy',
+                    name: 'Cheating Daddy On Steroids',
+                    productName: 'Cheating Daddy On Steroids',
                     genericName: 'AI Assistant',
                     description: 'AI assistant for interviews and learning',
                     categories: ['Development', 'Education'],
