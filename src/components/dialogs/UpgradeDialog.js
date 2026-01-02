@@ -380,11 +380,8 @@ export class UpgradeDialog extends LitElement {
                     composed: true
                 }));
 
-                // Restart app for clean state
-                if (window.require) {
-                    const { ipcRenderer } = window.require('electron');
-                    await ipcRenderer.invoke('restart-application');
-                }
+                // Just reload the page for clean state - no need for full app restart
+                window.location.reload();
             }
         } catch (error) {
             console.error('Error resetting config:', error);

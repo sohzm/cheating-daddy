@@ -14,6 +14,8 @@ let mainWindow = null;
 
 // Check if we should skip the upgrade check (after a reset)
 const skipUpgradeCheck = process.argv.includes('--skip-upgrade-check');
+console.log('App Startup: process.argv =', process.argv);
+console.log('App Startup: skipUpgradeCheck =', skipUpgradeCheck);
 
 function createMainWindow() {
     mainWindow = createWindow(sendToRenderer, geminiSessionRef);
@@ -160,8 +162,14 @@ app.whenReady().then(async () => {
                     // Mark version as seen AFTER clearing so dialog won't show on restart
                     const currentVersion = app.getVersion();
                     storage.markVersionSeen(currentVersion);
+                    
+                    // Build relaunch args - preserve existing args and add skip flag
+                    const relaunchArgs = process.argv.slice(1).filter(arg => arg !== '--skip-upgrade-check');
+                    relaunchArgs.push('--skip-upgrade-check');
+                    console.log('App Startup: Relaunching with args:', relaunchArgs);
+                    
                     // Restart the app with flag to skip upgrade check
-                    app.relaunch({ args: process.argv.slice(1).concat(['--skip-upgrade-check']) });
+                    app.relaunch({ args: relaunchArgs });
                     app.quit();
                     shouldStartApp = false;
                 } else if (userAction === 'keep' || userAction === 'error') {
@@ -512,12 +520,33 @@ function setupGeneralIpcHandlers() {
         }
     });
 
-    ipcMain.handle('restart-application', async event => {
+    ipcMain.handle('restart-application', async (event, options = {}) => {
         try {
             stopMacOSAudioCapture();
-            app.relaunch();
+            
+            // In development mode (not packaged), just reload the window instead of full restart
+            // This avoids killing the Electron Forge dev server
+            if (!app.isPackaged) {
+                console.log('restart-application: Development mode - reloading window instead of full restart');
+                const win = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];
+                if (win) {
+                    win.webContents.reload();
+                }
+                return { success: true, mode: 'reload' };
+            }
+            
+            // Production mode: full restart with args
+            const relaunchArgs = process.argv.slice(1).filter(arg => arg !== '--skip-upgrade-check');
+            
+            // If skipUpgradeCheck is requested, add the flag
+            if (options.skipUpgradeCheck) {
+                relaunchArgs.push('--skip-upgrade-check');
+                console.log('restart-application: Relaunching with --skip-upgrade-check');
+            }
+            
+            app.relaunch({ args: relaunchArgs.length > 0 ? relaunchArgs : undefined });
             app.quit();
-            return { success: true };
+            return { success: true, mode: 'relaunch' };
         } catch (error) {
             console.error('Error restarting application:', error);
             return { success: false, error: error.message };
