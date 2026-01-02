@@ -702,7 +702,7 @@ export class CheatingDaddyApp extends LitElement {
                 </div>
                 ${this.currentView !== 'assistant' ? html`
                     <div class="branding-footer">
-                        Cheating Daddy On Steroids On Steroids By klaus-qodes
+                        Cheating Daddy On Steroids By klaus-qodes
                     </div>
                 ` : ''}
                 

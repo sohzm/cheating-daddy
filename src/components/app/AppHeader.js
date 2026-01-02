@@ -242,15 +242,15 @@ export class AppHeader extends LitElement {
 
     getViewTitle() {
         const titles = {
-            onboarding: 'Welcome to Cheating Daddy On Steroids On Steroids',
-            main: 'Cheating Daddy On Steroids On Steroids',
+            onboarding: 'Welcome to Cheating Daddy On Steroids',
+            main: 'Cheating Daddy On Steroids',
             customize: 'Customize',
             help: 'Help & Shortcuts',
             history: 'Conversation History',
             advanced: 'Advanced Tools',
-            assistant: 'Cheating Daddy On Steroids On Steroids',
+            assistant: 'Cheating Daddy On Steroids',
         };
-        return titles[this.currentView] || 'Cheating Daddy On Steroids On Steroids';
+        return titles[this.currentView] || 'Cheating Daddy On Steroids';
     }
 
     getElapsedTime() {
