@@ -2579,7 +2579,15 @@ export class CustomizeView extends LitElement {
     }
 
     renderUpdatesSection() {
-        const currentVersion = window.require ? window.require('./utils/updateChecker.js').getCurrentVersion() : 'Unknown';
+        let currentVersion = 'Unknown';
+        if (window.require) {
+            try {
+                const updateChecker = window.require('./utils/updateChecker.js');
+                currentVersion = updateChecker?.getCurrentVersion?.() || 'Unknown';
+            } catch (error) {
+                console.error('Failed to load updateChecker:', error);
+            }
+        }
 
         return html`
             <div class="content-header">Updates</div>
@@ -2622,15 +2630,16 @@ export class CustomizeView extends LitElement {
 
         try {
             const { checkForUpdates, isNewerVersion, getCurrentVersion } = window.require('./utils/updateChecker.js');
+            const { getUpdatePreferences, setUpdatePreferences } = window.require('./storage.js');
+            const { ipcRenderer } = window.require('electron');
             const result = await checkForUpdates();
 
             if (result.updateInfo) {
                 const isNewer = isNewerVersion(result.updateInfo.version, getCurrentVersion());
                 let isNewContent = false;
+                const contentId = result.updateInfo.buildDate || result.updateInfo.message || result.updateInfo.version;
 
                 if (!isNewer) {
-                    const contentId = result.updateInfo.buildDate || result.updateInfo.message || result.updateInfo.version;
-                    const { getUpdatePreferences, setUpdatePreferences } = window.require('./storage.js');
                     const prefs = getUpdatePreferences();
                     if (prefs.lastSeenForcedId !== contentId) {
                         isNewContent = true;
@@ -2643,13 +2652,10 @@ export class CustomizeView extends LitElement {
                     this.updateInfo = result.updateInfo;
 
                     // Trigger the separate update window
-                    const { ipcRenderer } = window.require('electron');
-                    ipcRenderer.invoke('open-update-window', result.updateInfo);
+                    await ipcRenderer.invoke('open-update-window', result.updateInfo);
 
                     // If it was just a content change, mark as seen
                     if (!isNewer && isNewContent) {
-                        const { setUpdatePreferences } = window.require('./storage.js');
-                        const contentId = result.updateInfo.buildDate || result.updateInfo.message || result.updateInfo.version;
                         setUpdatePreferences({ lastSeenForcedId: contentId });
                     }
                 } else {

@@ -4,11 +4,22 @@
 <head>
     <meta charset="UTF-8">
     <style>
+        :root {
+            --bg-primary: #1e1e1e;
+            --bg-secondary: #252526;
+            --bg-tertiary: #2d2d2d;
+            --text-color: #e5e5e5;
+            --text-secondary: #a0a0a0;
+            --text-muted: #6b6b6b;
+            --border-color: #3c3c3c;
+            --accent-color: #ffffff;
+        }
+
         body {
             margin: 0;
             padding: 0;
-            background: #1e1e1e;
-            color: white;
+            background: var(--bg-primary);
+            color: var(--text-color);
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             display: flex;
             flex-direction: column;
@@ -21,52 +32,85 @@
 
         .container {
             text-align: center;
+            padding: 32px;
         }
 
         .logo {
-            font-size: 24px;
-            font-weight: 800;
-            margin-bottom: 24px;
-            letter-spacing: -0.5px;
-            color: #4ade80;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 32px;
+            letter-spacing: 3px;
+            color: var(--text-color);
+            text-transform: uppercase;
+        }
+
+        .loader-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 24px;
         }
 
         .loader {
-            width: 48px;
-            height: 48px;
-            border: 3px solid rgba(255, 255, 255, 0.1);
-            border-radius: 50%;
-            border-top-color: #4ade80;
-            animation: spin 1s ease-in-out infinite;
-            margin: 0 auto 20px;
+            width: 32px;
+            height: 2px;
+            background: var(--border-color);
+            position: relative;
+            overflow: hidden;
         }
 
-        @keyframes spin {
-            to {
-                transform: rotate(360deg);
+        .loader::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: var(--accent-color);
+            animation: slide 1.2s ease-in-out infinite;
+        }
+
+        @keyframes slide {
+            0% {
+                left: -100%;
+            }
+            50% {
+                left: 0;
+            }
+            100% {
+                left: 100%;
             }
         }
 
         .status {
-            font-size: 13px;
-            color: #888;
+            font-size: 11px;
+            color: var(--text-muted);
             font-weight: 500;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 1.5px;
+        }
+
+        .version {
+            position: absolute;
+            bottom: 16px;
+            font-size: 10px;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
         }
     </style>
 </head>
 
 <body>
     <div class="container">
-        <div class="logo">CHEATING DADDY</div>
-        <div class="loader"></div>
-        <div class="status" id="status">Checking for updates</div>
+        <div class="logo">Cheating Daddy</div>
+        <div class="loader-container">
+            <div class="loader"></div>
+            <div class="status" id="status">Checking for updates</div>
+        </div>
     </div>
     <script>
-        const { ipcRenderer } = require('electron');
-        ipcRenderer.on('update-status', (event, status) => {
-            document.getElementById('status').innerText = status;
+        window.electronAPI.onUpdateStatus((status) => {
+            document.getElementById('status').textContent = status;
         });
     </script>
 </body>

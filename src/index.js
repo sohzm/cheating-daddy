@@ -32,6 +32,7 @@ app.whenReady().then(async () => {
 
         if (updateResult.updateInfo) {
             let shouldShowUpdate = false;
+            let contentId = null;
             const isNewer = isNewerVersion(updateResult.updateInfo.version, getCurrentVersion());
 
             if (isNewer) {
@@ -40,13 +41,12 @@ app.whenReady().then(async () => {
             } else {
                 // Not a version bump, but check if the content (message/buildDate) has changed
                 const prefs = storage.getUpdatePreferences();
-                const contentId = updateResult.updateInfo.buildDate || updateResult.updateInfo.message || updateResult.updateInfo.version;
+                contentId = updateResult.updateInfo.buildDate || updateResult.updateInfo.message || updateResult.updateInfo.version;
 
                 if (prefs.lastSeenForcedId !== contentId) {
                     console.log(`App Startup: New update content detected (ID: ${contentId})`);
                     shouldShowUpdate = true;
-                    // Persist that we've seen this one
-                    storage.setUpdatePreferences({ lastSeenForcedId: contentId });
+                    // Note: Do NOT persist here - wait until user has acknowledged the update
                 } else {
                     console.log('App Startup: Update content already seen, skipping');
                 }
@@ -73,9 +73,14 @@ app.whenReady().then(async () => {
                 // Clean up listener
                 ipcMain.removeListener('close-update-window', handleAction);
 
+                // Persist that we've seen this update content (after user has acknowledged)
+                if (contentId) {
+                    storage.setUpdatePreferences({ lastSeenForcedId: contentId });
+                }
+
                 if (userAction === 'download') {
                     console.log('App Startup: User chose download. Opening URL and quitting.');
-                    shell.openExternal(updateResult.updateInfo.downloadUrl);
+                    await shell.openExternal(updateResult.updateInfo.downloadUrl);
                     shouldStartApp = false;
                     app.quit();
                 } else {

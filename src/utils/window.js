@@ -113,8 +113,9 @@ function createSplashWindow() {
         alwaysOnTop: true,
         resizable: false,
         webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false,
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: path.join(__dirname, '../preload.js'),
         },
         backgroundColor: '#00000000',
     });
@@ -137,8 +138,9 @@ function createUpdateWindow(updateInfo) {
         alwaysOnTop: true,
         resizable: false,
         webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false,
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: path.join(__dirname, '../preload.js'),
         },
         backgroundColor: '#00000000',
     });
@@ -155,14 +157,24 @@ function createUpdateWindow(updateInfo) {
 
     // Send update info to window once ready
     updateWindow.webContents.once('dom-ready', () => {
+        if (!updateInfo) {
+            console.warn('createUpdateWindow called without updateInfo');
+            return;
+        }
         updateWindow.webContents.send('update-info', updateInfo);
     });
 
     // Handle close from renderer
-    ipcMain.once('close-update-window', () => {
+    const closeHandler = () => {
         if (!updateWindow.isDestroyed()) {
             updateWindow.close();
         }
+    };
+    ipcMain.once('close-update-window', closeHandler);
+
+    // Clean up listener when window is closed by any means
+    updateWindow.on('closed', () => {
+        ipcMain.removeListener('close-update-window', closeHandler);
     });
 
     return updateWindow;
