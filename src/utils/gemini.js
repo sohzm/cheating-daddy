@@ -839,6 +839,7 @@ async function startMacOSAudioCapture(geminiSessionRef, vadEnabled = false, vadM
 
     const { app } = require('electron');
     const path = require('path');
+    const fs = require('fs');
 
     let systemAudioPath;
     if (app.isPackaged) {
@@ -848,6 +849,15 @@ async function startMacOSAudioCapture(geminiSessionRef, vadEnabled = false, vadM
     }
 
     console.log('SystemAudioDump path:', systemAudioPath);
+
+    // Check if SystemAudioDump binary exists before attempting to spawn
+    if (!fs.existsSync(systemAudioPath)) {
+        console.warn('⚠ SystemAudioDump binary not found at:', systemAudioPath);
+        console.warn('ℹ macOS system audio capture will not be available.');
+        console.warn('ℹ The app will continue but audio from other apps will not be captured.');
+        console.warn('ℹ To enable audio capture, ensure SystemAudioDump is in src/assets/ (development) or Resources/ (packaged).');
+        return false;
+    }
 
     // Spawn SystemAudioDump with stealth options
     const spawnOptions = {

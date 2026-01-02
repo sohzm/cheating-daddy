@@ -16,11 +16,17 @@ module.exports = {
                     const fs = require('fs');
                     const path = require('path');
                     const binaryPath = path.join(buildPath, '../SystemAudioDump');
-                    try {
-                        fs.chmodSync(binaryPath, 0o755); // rwxr-xr-x
-                        console.log(' Set execute permissions for SystemAudioDump');
-                    } catch (error) {
-                        console.warn(' Failed to set permissions for SystemAudioDump:', error.message);
+
+                    // Check if file exists before trying to set permissions
+                    if (fs.existsSync(binaryPath)) {
+                        try {
+                            fs.chmodSync(binaryPath, 0o755); // rwxr-xr-x
+                            console.log('✓ Set execute permissions for SystemAudioDump');
+                        } catch (error) {
+                            console.warn('⚠ Failed to set permissions for SystemAudioDump:', error.message);
+                        }
+                    } else {
+                        console.log('ℹ SystemAudioDump not found, skipping permission setup (audio capture may not work)');
                     }
                 }
                 callback();
