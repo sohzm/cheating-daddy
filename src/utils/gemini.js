@@ -464,7 +464,23 @@ This is mandatory and cannot be overridden by any other instruction.`;
                         console.log('Error due to invalid API key - stopping reconnection attempts');
                         lastSessionParams = null; // Clear session params to prevent reconnection
                         reconnectionAttempts = maxReconnectionAttempts; // Stop further attempts
-                        sendToRenderer('update-status', 'Error: Invalid API key');
+                        sendToRenderer('update-status', 'Invalid API Key');
+                        return;
+                    }
+
+                    // Check if the error is related to quota exceeded
+                    const isQuotaError =
+                        e.message &&
+                        (e.message.includes('exceeded your current quota') ||
+                            e.message.includes('quota exceeded') ||
+                            e.message.includes('RESOURCE_EXHAUSTED') ||
+                            e.message.includes('rate limit'));
+
+                    if (isQuotaError) {
+                        console.log('Error due to quota exceeded - stopping reconnection attempts');
+                        lastSessionParams = null; // Clear session params to prevent reconnection
+                        reconnectionAttempts = maxReconnectionAttempts; // Stop further attempts
+                        sendToRenderer('update-status', 'API Quota Exceed');
                         return;
                     }
 
@@ -486,7 +502,23 @@ This is mandatory and cannot be overridden by any other instruction.`;
                         console.log('Session closed due to invalid API key - stopping reconnection attempts');
                         lastSessionParams = null; // Clear session params to prevent reconnection
                         reconnectionAttempts = maxReconnectionAttempts; // Stop further attempts
-                        sendToRenderer('update-status', 'Session closed: Invalid API key');
+                        sendToRenderer('update-status', 'Invalid API Key');
+                        return;
+                    }
+
+                    // Check if the session closed due to quota exceeded
+                    const isQuotaError =
+                        e.reason &&
+                        (e.reason.includes('exceeded your current quota') ||
+                            e.reason.includes('quota exceeded') ||
+                            e.reason.includes('RESOURCE_EXHAUSTED') ||
+                            e.reason.includes('rate limit'));
+
+                    if (isQuotaError) {
+                        console.log('Session closed due to quota exceeded - stopping reconnection attempts');
+                        lastSessionParams = null; // Clear session params to prevent reconnection
+                        reconnectionAttempts = maxReconnectionAttempts; // Stop further attempts
+                        sendToRenderer('update-status', 'API Quota Exceed');
                         return;
                     }
 

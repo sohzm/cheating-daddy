@@ -183,9 +183,10 @@ export class CheatingDaddyApp extends LitElement {
 
     setStatus(text) {
         this.statusText = text;
-        
+
         // Mark response as complete when we get certain status messages
-        if (text.includes('Ready') || text.includes('Listening') || text.includes('Error')) {
+        if (text.includes('Ready') || text.includes('Listening') || text.includes('Error') ||
+            text.includes('Quota') || text.includes('Session closed')) {
             this._currentResponseIsComplete = true;
             console.log('[setStatus] Marked current response as complete');
         }
