@@ -233,18 +233,8 @@ export class CheatingDaddyApp extends LitElement {
 
     async _loadFromStorage() {
         try {
-            // Check for first run or upgrade BEFORE loading settings
-            const upgradeCheck = await cheatingDaddy.storage.checkFirstRunOrUpgrade();
-
-            if (upgradeCheck.isFirstRun || upgradeCheck.isUpgrade) {
-                this.upgradeInfo = upgradeCheck;
-                this.showUpgradeDialog = true;
-
-                // Fetch release notes for the current version to show in UpgradeDialog
-                if (upgradeCheck.isUpgrade) {
-                    this._fetchReleaseNotes();
-                }
-            }
+            // Note: First run/upgrade dialog is now handled at app startup in a separate window
+            // The upgrade check here is skipped - we go straight to loading settings
 
             const [config, prefs] = await Promise.all([
                 cheatingDaddy.storage.getConfig(),

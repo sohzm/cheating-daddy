@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Configuration Reset - Cheating Daddy</title>
+    <style>
+        :root {
+            --bg-primary: #1e1e1e;
+            --bg-secondary: #252526;
+            --bg-tertiary: #2d2d2d;
+            --text-color: #e5e5e5;
+            --text-secondary: #a0a0a0;
+            --text-muted: #6b6b6b;
+            --border-color: #3c3c3c;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: transparent;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        #upgrade-container {
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="upgrade-container"></div>
+    <script type="module" src="./upgrade-renderer.js"></script>
+</body>
+
+</html>

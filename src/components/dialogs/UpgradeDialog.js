@@ -1,9 +1,27 @@
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
 
+/**
+ * UpgradeDialog - Shows when app is first run or upgraded
+ * Minimalistic design with sharp edges matching the app's formal style
+ */
 export class UpgradeDialog extends LitElement {
     static styles = css`
         :host {
             display: block;
+            --bg-primary: #1e1e1e;
+            --bg-secondary: #252526;
+            --bg-tertiary: #2d2d2d;
+            --text-color: #e5e5e5;
+            --text-secondary: #a0a0a0;
+            --text-muted: #6b6b6b;
+            --border-color: #3c3c3c;
+            --accent-color: #ffffff;
+            --error-color: #f14c4c;
+        }
+
+        * {
+            cursor: default;
+            box-sizing: border-box;
         }
 
         .overlay {
@@ -12,73 +30,89 @@ export class UpgradeDialog extends LitElement {
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(0, 0, 0, 0.85);
+            background: rgba(0, 0, 0, 0.9);
             display: flex;
             align-items: center;
             justify-content: center;
             z-index: 10000;
-            backdrop-filter: blur(4px);
         }
 
         .dialog {
-            background: var(--bg-secondary, #2a2a2a);
-            border-radius: 4px;
+            background: var(--bg-primary);
             padding: 24px;
-            max-width: 420px;
+            max-width: 400px;
             width: 90%;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-            border: 1px solid var(--border-color, #404040);
-            animation: slideIn 0.3s ease-out;
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid var(--border-color);
+            animation: fadeIn 0.2s ease-out;
         }
 
-        @keyframes slideIn {
+        @keyframes fadeIn {
             from {
                 opacity: 0;
-                transform: translateY(-20px) scale(0.95);
+                transform: translateY(-10px);
             }
             to {
                 opacity: 1;
-                transform: translateY(0) scale(1);
+                transform: translateY(0);
             }
         }
 
         .dialog-header {
             margin-bottom: 20px;
-            border-bottom: 1px solid var(--border-color, #404040);
+            border-bottom: 1px solid var(--border-color);
             padding-bottom: 16px;
         }
 
         .dialog-title {
-            font-size: 16px;
+            font-size: 14px;
             font-weight: 600;
-            color: var(--text-color, #fff);
+            color: var(--text-color);
             margin-bottom: 4px;
+            letter-spacing: 0.3px;
         }
 
         .dialog-subtitle {
-            font-size: 12px;
-            color: var(--text-secondary, #aaa);
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
 
         .dialog-body {
-            margin-bottom: 20px;
+            margin-bottom: 24px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .dialog-body::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .dialog-body::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+
+        .dialog-body::-webkit-scrollbar-thumb {
+            background: var(--border-color);
         }
 
         .info-section {
-            background: var(--bg-tertiary, #333);
-            border-radius: 4px;
-            padding: 12px;
-            margin-bottom: 12px;
-            border: 1px solid var(--border-color, #404040);
+            background: var(--bg-secondary);
+            padding: 16px;
+            margin-bottom: 16px;
+            border: 1px solid var(--border-color);
         }
 
         .info-title {
-            font-size: 12px;
+            font-size: 10px;
             font-weight: 600;
-            color: var(--error-color, #f14c4c);
-            margin-bottom: 8px;
+            color: var(--error-color);
+            margin-bottom: 12px;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 1px;
         }
 
         .data-list {
@@ -89,45 +123,44 @@ export class UpgradeDialog extends LitElement {
 
         .data-list li {
             font-size: 12px;
-            color: var(--text-secondary, #aaa);
-            padding: 3px 0;
-            padding-left: 16px;
-            position: relative;
+            color: var(--text-secondary);
+            padding: 6px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .data-list li:last-child {
+            border-bottom: none;
         }
 
         .data-list li::before {
-            content: "•";
-            position: absolute;
-            left: 4px;
-            color: var(--text-muted, #666);
+            content: '—';
+            margin-right: 8px;
+            color: var(--text-muted);
         }
 
         .note {
-            font-size: 11px;
-            color: var(--text-muted, #666);
-            padding: 10px;
-            background: rgba(255, 255, 255, 0.03);
-            border-radius: 4px;
-            line-height: 1.5;
-            border: 1px solid var(--border-color, #404040);
+            font-size: 12px;
+            color: var(--text-secondary);
+            padding: 16px;
+            background: var(--bg-secondary);
+            line-height: 1.6;
+            border-left: 2px solid var(--text-muted);
         }
 
         .release-notes-section {
             margin-top: 16px;
-            margin-bottom: 16px;
-            padding: 12px;
-            background: var(--bg-tertiary, #333);
-            border-radius: 4px;
-            border: 1px solid var(--border-color, #404040);
+            padding: 16px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
         }
 
         .release-notes-title {
-            font-size: 11px;
+            font-size: 10px;
             font-weight: 600;
-            color: var(--text-muted, #888);
-            margin-bottom: 8px;
+            color: var(--text-muted);
+            margin-bottom: 12px;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 1px;
         }
 
         .release-notes-list {
@@ -138,59 +171,71 @@ export class UpgradeDialog extends LitElement {
 
         .release-notes-list li {
             font-size: 12px;
-            color: var(--text-secondary, #bbb);
-            padding: 4px 0;
-            line-height: 1.4;
+            color: var(--text-secondary);
+            padding: 6px 0;
+            line-height: 1.5;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .release-notes-list li:last-child {
+            border-bottom: none;
+        }
+
+        .release-notes-list li::before {
+            content: '—';
+            margin-right: 8px;
+            color: var(--text-muted);
         }
 
         .release-channel-badge {
             display: inline-block;
-            background: rgba(99, 102, 241, 0.15);
-            color: #818cf8;
-            padding: 2px 8px;
-            border-radius: 3px;
+            background: var(--bg-secondary);
+            color: var(--text-muted);
+            padding: 4px 8px;
             font-size: 10px;
-            font-weight: 600;
+            font-weight: 500;
             text-transform: uppercase;
+            letter-spacing: 1px;
             margin-left: 8px;
+            border: 1px solid var(--border-color);
             vertical-align: middle;
         }
 
         .dialog-actions {
             display: flex;
-            gap: 10px;
+            gap: 8px;
         }
 
         .btn {
             flex: 1;
-            padding: 10px 16px;
-            border-radius: 4px;
-            font-size: 13px;
+            padding: 12px 16px;
+            font-size: 12px;
             font-weight: 500;
-            cursor: default;
+            text-transform: uppercase;
+            letter-spacing: 1px;
             transition: all 0.15s ease;
-            border: 1px solid transparent;
+            border: 1px solid var(--border-color);
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 6px;
+            gap: 8px;
         }
 
         .btn-primary {
-            background: var(--btn-primary-bg, #fff);
-            color: var(--btn-primary-text, #000);
-            border-color: var(--btn-primary-bg, #fff);
+            background: var(--accent-color);
+            color: var(--bg-primary);
+            border-color: var(--accent-color);
         }
 
         .btn-primary:hover {
-            background: var(--btn-primary-hover, #e0e0e0);
-            border-color: var(--btn-primary-hover, #e0e0e0);
+            background: #e0e0e0;
+            border-color: #e0e0e0;
         }
 
         .btn-danger {
             background: transparent;
-            color: var(--error-color, #f14c4c);
-            border: 1px solid var(--error-color, #f14c4c);
+            color: var(--error-color);
+            border-color: var(--error-color);
         }
 
         .btn-danger:hover {
@@ -198,13 +243,13 @@ export class UpgradeDialog extends LitElement {
         }
 
         .btn-secondary {
-            background: var(--bg-tertiary, #333);
-            color: var(--text-color, #fff);
-            border: 1px solid var(--border-color, #404040);
+            background: transparent;
+            color: var(--text-muted);
         }
 
         .btn-secondary:hover {
-            background: var(--bg-hover, #3a3a3a);
+            background: var(--bg-tertiary);
+            color: var(--text-color);
         }
 
         .btn:disabled {
@@ -213,11 +258,10 @@ export class UpgradeDialog extends LitElement {
         }
 
         .loading-spinner {
-            width: 14px;
-            height: 14px;
+            width: 12px;
+            height: 12px;
             border: 2px solid transparent;
             border-top-color: currentColor;
-            border-radius: 50%;
             animation: spin 0.8s linear infinite;
         }
 
@@ -269,19 +313,36 @@ export class UpgradeDialog extends LitElement {
         return `Previously v${this.previousVersion}`;
     }
 
+    /**
+     * Check if we're running in the separate upgrade window (context isolated)
+     * or in the main app window (has cheatingDaddy global)
+     */
+    get isInSeparateWindow() {
+        return typeof window.electronAPI !== 'undefined' && typeof window.cheatingDaddy === 'undefined';
+    }
+
     async handleKeepConfig() {
         if (this.isProcessing) return;
         this.isProcessing = true;
         this.requestUpdate();
 
         try {
-            // Mark version as seen so dialog won't show again
-            await cheatingDaddy.storage.markVersionSeen();
-            this.dispatchEvent(new CustomEvent('dialog-complete', {
-                detail: { action: 'keep' },
-                bubbles: true,
-                composed: true
-            }));
+            if (this.isInSeparateWindow) {
+                // In separate window - just dispatch event, main process handles storage
+                this.dispatchEvent(new CustomEvent('dialog-complete', {
+                    detail: { action: 'keep' },
+                    bubbles: true,
+                    composed: true
+                }));
+            } else {
+                // In main app - use cheatingDaddy API
+                await cheatingDaddy.storage.markVersionSeen();
+                this.dispatchEvent(new CustomEvent('dialog-complete', {
+                    detail: { action: 'keep' },
+                    bubbles: true,
+                    composed: true
+                }));
+            }
         } catch (error) {
             console.error('Error marking version seen:', error);
             this.dispatchEvent(new CustomEvent('dialog-error', {
@@ -301,25 +362,37 @@ export class UpgradeDialog extends LitElement {
         this.requestUpdate();
 
         try {
-            // Clear all data
-            await cheatingDaddy.storage.clearAll();
+            if (this.isInSeparateWindow) {
+                // In separate window - just dispatch event, main process handles storage & restart
+                this.dispatchEvent(new CustomEvent('dialog-complete', {
+                    detail: { action: 'reset' },
+                    bubbles: true,
+                    composed: true
+                }));
+            } else {
+                // In main app - use cheatingDaddy API
+                await cheatingDaddy.storage.clearAll();
+                await cheatingDaddy.storage.markVersionSeen();
 
-            // Mark version as seen so dialog doesn't reappear on next launch
-            await cheatingDaddy.storage.markVersionSeen();
+                this.dispatchEvent(new CustomEvent('dialog-complete', {
+                    detail: { action: 'reset' },
+                    bubbles: true,
+                    composed: true
+                }));
 
-            this.dispatchEvent(new CustomEvent('dialog-complete', {
-                detail: { action: 'reset' },
-                bubbles: true,
-                composed: true
-            }));
-
-            // Restart app for clean state
-            if (window.require) {
-                const { ipcRenderer } = window.require('electron');
-                await ipcRenderer.invoke('restart-application');
+                // Restart app for clean state
+                if (window.require) {
+                    const { ipcRenderer } = window.require('electron');
+                    await ipcRenderer.invoke('restart-application');
+                }
             }
         } catch (error) {
             console.error('Error resetting config:', error);
+            this.dispatchEvent(new CustomEvent('dialog-error', {
+                detail: { error: error.message },
+                bubbles: true,
+                composed: true
+            }));
         } finally {
             this.isProcessing = false;
             this.requestUpdate();

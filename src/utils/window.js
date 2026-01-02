@@ -180,6 +180,60 @@ function createUpdateWindow(updateInfo) {
     return updateWindow;
 }
 
+function createUpgradeWindow(upgradeInfo) {
+    const windowWidth = 440;
+    const windowHeight = 520;
+
+    const upgradeWindow = new BrowserWindow({
+        width: windowWidth,
+        height: windowHeight,
+        frame: false,
+        transparent: true,
+        alwaysOnTop: true,
+        resizable: false,
+        webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: path.join(__dirname, '../preload.js'),
+        },
+        backgroundColor: '#00000000',
+    });
+
+    // Center window
+    upgradeWindow.center();
+
+    if (process.platform === 'win32') {
+        upgradeWindow.setAlwaysOnTop(true, 'screen-saver', 1);
+        upgradeWindow.setSkipTaskbar(false); // Show in taskbar so it's not totally hidden
+    }
+
+    upgradeWindow.loadFile(path.join(__dirname, '../upgrade.html'));
+
+    // Send upgrade info to window once ready
+    upgradeWindow.webContents.once('dom-ready', () => {
+        if (!upgradeInfo) {
+            console.warn('createUpgradeWindow called without upgradeInfo');
+            return;
+        }
+        upgradeWindow.webContents.send('upgrade-info', upgradeInfo);
+    });
+
+    // Handle close from renderer
+    const closeHandler = (event, action) => {
+        if (!upgradeWindow.isDestroyed()) {
+            upgradeWindow.close();
+        }
+    };
+    ipcMain.once('close-upgrade-window', closeHandler);
+
+    // Clean up listener when window is closed by any means
+    upgradeWindow.on('closed', () => {
+        ipcMain.removeListener('close-upgrade-window', closeHandler);
+    });
+
+    return upgradeWindow;
+}
+
 function getDefaultKeybinds() {
     const isMac = process.platform === 'darwin';
     return {
@@ -592,6 +646,7 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
 module.exports = {
     createWindow,
     createUpdateWindow,
+    createUpgradeWindow,
     createSplashWindow,
     getDefaultKeybinds,
     updateGlobalShortcuts,

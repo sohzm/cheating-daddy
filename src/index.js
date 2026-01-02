@@ -3,7 +3,7 @@ if (require('electron-squirrel-startup')) {
 }
 
 const { app, BrowserWindow, shell, ipcMain, globalShortcut, systemPreferences } = require('electron');
-const { createWindow, createUpdateWindow, createSplashWindow, updateGlobalShortcuts } = require('./utils/window');
+const { createWindow, createUpdateWindow, createUpgradeWindow, createSplashWindow, updateGlobalShortcuts } = require('./utils/window');
 const { checkForUpdates, isNewerVersion, getCurrentVersion } = require('./utils/updateChecker');
 const { setupAssistantIpcHandlers, stopMacOSAudioCapture, sendToRenderer, toggleManualRecording } = require('./utils/core/assistantManager');
 const storage = require('./storage');
@@ -11,6 +11,9 @@ const rateLimitManager = require('./utils/rateLimitManager');
 
 const geminiSessionRef = { current: null };
 let mainWindow = null;
+
+// Check if we should skip the upgrade check (after a reset)
+const skipUpgradeCheck = process.argv.includes('--skip-upgrade-check');
 
 function createMainWindow() {
     mainWindow = createWindow(sendToRenderer, geminiSessionRef);
@@ -99,18 +102,92 @@ app.whenReady().then(async () => {
         }
     } catch (error) {
         console.error('App Startup: Update check failed:', error);
-    } finally {
-        // 3. Launch Main App if permitted
-        if (!splashWindow.isDestroyed()) {
-            splashWindow.close();
-        }
+    }
 
-        if (shouldStartApp) {
-            createMainWindow();
-            setupAssistantIpcHandlers(geminiSessionRef);
-            setupStorageIpcHandlers();
-            setupGeneralIpcHandlers();
+    // 3. Check for first run or version upgrade (config reset dialog)
+    // Skip if launched with --skip-upgrade-check (after a data reset)
+    if (shouldStartApp && !skipUpgradeCheck) {
+        try {
+            splashWindow.webContents.send('update-status', 'Checking configuration...');
+            const currentVersion = app.getVersion();
+            const upgradeCheck = storage.checkFirstRunOrUpgrade(currentVersion);
+
+            if (upgradeCheck.isFirstRun || upgradeCheck.isUpgrade) {
+                console.log('App Startup: Showing upgrade/config dialog', upgradeCheck);
+
+                // Fetch release notes if available
+                let releaseNotes = [];
+                let releaseChannel = '';
+                try {
+                    const updateResult = await checkForUpdates();
+                    if (updateResult.updateInfo) {
+                        releaseNotes = updateResult.updateInfo.releaseNotes || [];
+                        releaseChannel = updateResult.updateInfo.releaseChannel || '';
+                    }
+                } catch (e) {
+                    console.warn('Could not fetch release notes:', e);
+                }
+
+                const upgradeInfo = {
+                    ...upgradeCheck,
+                    releaseNotes,
+                    releaseChannel
+                };
+
+                let userAction = 'keep';
+                const handleUpgradeAction = (event, action) => {
+                    userAction = action;
+                };
+                ipcMain.once('close-upgrade-window', handleUpgradeAction);
+
+                // Show upgrade window and wait for it to be closed
+                const upgradeWindow = createUpgradeWindow(upgradeInfo);
+
+                await new Promise((resolve) => {
+                    upgradeWindow.on('closed', resolve);
+                });
+
+                // Clean up listener
+                ipcMain.removeListener('close-upgrade-window', handleUpgradeAction);
+
+                console.log('App Startup: User completed upgrade dialog with action:', userAction);
+
+                // Handle user's choice
+                if (userAction === 'reset') {
+                    console.log('App Startup: Config reset requested, clearing data and restarting...');
+                    // Clear all data
+                    storage.clearAllData();
+                    // Mark version as seen AFTER clearing so dialog won't show on restart
+                    const currentVersion = app.getVersion();
+                    storage.markVersionSeen(currentVersion);
+                    // Restart the app with flag to skip upgrade check
+                    app.relaunch({ args: process.argv.slice(1).concat(['--skip-upgrade-check']) });
+                    app.quit();
+                    shouldStartApp = false;
+                } else if (userAction === 'keep' || userAction === 'error') {
+                    // Mark version as seen so dialog won't show again
+                    const currentVersion = app.getVersion();
+                    storage.markVersionSeen(currentVersion);
+                    console.log('App Startup: Version marked as seen, proceeding to app');
+                }
+            } else {
+                console.log('App Startup: No upgrade dialog needed');
+            }
+        } catch (error) {
+            console.error('App Startup: Upgrade check failed:', error);
         }
+    }
+
+    // 4. Launch Main App if permitted
+    if (!splashWindow.isDestroyed()) {
+        splashWindow.close();
+    }
+
+    if (shouldStartApp) {
+        createMainWindow();
+        setupAssistantIpcHandlers(geminiSessionRef);
+        setupStorageIpcHandlers();
+        setupGeneralIpcHandlers();
     }
 });
 
