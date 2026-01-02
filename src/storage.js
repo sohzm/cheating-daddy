@@ -604,7 +604,8 @@ function deleteCustomProfile(profileId) {
 function getUpdatePreferences() {
     return readJsonFile(getUpdatePreferencesPath(), {
         skippedVersion: null,
-        lastSeenReleaseNotesVersion: null  // Tracks which version's release notes have been shown
+        lastSeenReleaseNotesVersion: null,
+        lastSeenForcedId: null // Tracks which specific forced update was shown
     });
 }
 

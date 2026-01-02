@@ -12,10 +12,11 @@ const CURRENT_VERSION = '0.5.4';
 
 /**
  * Check for updates by fetching the remote update.json
- * @returns {Promise<{hasUpdate: boolean, updateInfo: object|null, error: string|null, skipped: boolean}>}
+ * @returns {Promise<{hasUpdate: boolean, updateInfo: object|null, error: string|null}>}
  */
-export async function checkForUpdates() {
+async function checkForUpdates() {
     try {
+        // Use global fetch (available in both Electron renderer and modern Node/main)
         const response = await fetch(UPDATE_URL, {
             cache: 'no-store', // Always fetch fresh
             headers: {
@@ -29,40 +30,26 @@ export async function checkForUpdates() {
 
         const updateInfo = await response.json();
 
-        // Check if this is a forced notification or a version update
-        const hasUpdate = updateInfo.forceShow === true || isNewerVersion(updateInfo.version, CURRENT_VERSION);
-
-        // Check if user has skipped this version (only applies if not forced)
-        const skippedVersion = await getSkippedVersion();
-        if (!updateInfo.forceShow && skippedVersion === updateInfo.version) {
-            return { hasUpdate: false, updateInfo: null, error: null, skipped: true };
-        }
+        // Check if there is a version update
+        const hasUpdate = isNewerVersion(updateInfo.version, CURRENT_VERSION);
 
         return {
             hasUpdate,
             updateInfo: updateInfo, // Always return info if we successfully fetched it
-            error: null,
-            skipped: false
+            error: null
         };
     } catch (error) {
         console.error('Update check failed:', error);
         return {
             hasUpdate: false,
             updateInfo: null,
-            error: error.message,
-            skipped: false
+            error: error.message
         };
     }
 }
 
 /**
  * Compare version strings to determine if remote is newer
- * Properly handles semantic versioning including prereleases
- * Supports formats like "0.5.4", "1.0.0", "0.5.5-beta", "0.5.5-alpha.1"
- * 
- * Semantic versioning rules:
- * - Stable (no prerelease) > prerelease
- * - Higher major.minor.patch > lower
  */
 function isNewerVersion(remote, current) {
     if (!remote || !current) return false;
@@ -84,56 +71,14 @@ function isNewerVersion(remote, current) {
     }
 
     // Base versions are equal - check prerelease
-    // No prerelease (stable) > prerelease
     if (!remotePrerelease && currentPrerelease) return true;
     if (remotePrerelease && !currentPrerelease) return false;
 
-    return false; // Equal versions (including equal prereleases)
+    return false;
 }
 
-/**
- * Get the version that user chose to skip
- */
-async function getSkippedVersion() {
-    try {
-        if (window.cheatingDaddy?.storage?.getUpdatePreferences) {
-            const prefs = await window.cheatingDaddy.storage.getUpdatePreferences();
-            return prefs?.skippedVersion || null;
-        }
-    } catch (e) {
-        console.error('Error getting skipped version:', e);
-    }
-    return null;
-}
-
-/**
- * Skip a specific version (user chose "Skip This Version")
- * @throws {Error} if storage operation fails
- */
-export async function skipVersion(version) {
-    if (window.cheatingDaddy?.storage?.setUpdatePreferences) {
-        await window.cheatingDaddy.storage.setUpdatePreferences({ skippedVersion: version });
-    } else {
-        throw new Error('Storage API not available');
-    }
-}
-
-/**
- * Clear skipped version (useful for testing or reset)
- */
-export async function clearSkippedVersion() {
-    try {
-        if (window.cheatingDaddy?.storage?.setUpdatePreferences) {
-            await window.cheatingDaddy.storage.setUpdatePreferences({ skippedVersion: null });
-        }
-    } catch (e) {
-        console.error('Error clearing skipped version:', e);
-    }
-}
-
-/**
- * Get current app version
- */
-export function getCurrentVersion() {
-    return CURRENT_VERSION;
-}
+module.exports = {
+    checkForUpdates,
+    isNewerVersion,
+    getCurrentVersion: () => CURRENT_VERSION
+};

@@ -836,6 +836,12 @@ export class CustomizeView extends LitElement {
         this.usageStats = { groq: [], gemini: [] };
         this.usageResetTime = '';
 
+        // Update state
+        this.isCheckingUpdate = false;
+        this.updateCheckMessage = '';
+        this.updateCheckStatus = ''; // 'success', 'error', 'none'
+        this.updateInfo = null;
+
         // Audio Processing defaults
         this.audioProcessingMode = 'live-conversation';
         this.audioTriggerMethod = 'vad';
@@ -867,6 +873,7 @@ export class CustomizeView extends LitElement {
             { id: 'capture', name: 'Capture', icon: 'camera' },
             { id: 'keyboard', name: 'Keyboard', icon: 'keyboard' },
             { id: 'search', name: 'Search', icon: 'search' },
+            { id: 'updates', name: 'Updates', icon: 'refresh' },
             { id: 'advanced', name: 'Advanced', icon: 'warning', danger: true },
         ];
     }
@@ -928,6 +935,11 @@ export class CustomizeView extends LitElement {
                 <line x1="18" y1="20" x2="18" y2="10"></line>
                 <line x1="12" y1="20" x2="12" y2="4"></line>
                 <line x1="6" y1="20" x2="6" y2="14"></line>
+            </svg>`,
+            refresh: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M23 4v6h-6"></path>
+                <path d="M1 20v-6h6"></path>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
             </svg>`,
         };
         return icons[icon] || '';
@@ -2566,6 +2578,104 @@ export class CustomizeView extends LitElement {
     `;
     }
 
+    renderUpdatesSection() {
+        const currentVersion = window.require ? window.require('./utils/updateChecker.js').getCurrentVersion() : 'Unknown';
+
+        return html`
+            <div class="content-header">Updates</div>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label class="form-label">Software Version</label>
+                    <div class="form-description">Current version: <strong>${currentVersion}</strong></div>
+                </div>
+
+                <div class="form-group" style="margin-top: 10px;">
+                    <button class="secondary-button" 
+                        @click=${this.handleManualUpdateCheck}
+                        ?disabled=${this.isCheckingUpdate}
+                        style="width: fit-content; min-width: 140px;">
+                        ${this.isCheckingUpdate ? 'Checking...' : 'Check for Updates'}
+                    </button>
+                    
+                    ${this.updateCheckMessage ? html`
+                        <div class="status-message ${this.updateCheckStatus === 'success' ? 'status-success' :
+                    this.updateCheckStatus === 'error' ? 'status-error' : 'status-success'}">
+                            ${this.updateCheckMessage}
+                        </div>
+                    ` : ''}
+                </div>
+
+                <div class="form-description" style="margin-top: 24px; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 8px;">
+                    <strong>Auto-check:</strong> Cheating Daddy automatically checks for critical updates every time the application starts up.
+                </div>
+            </div>
+        `;
+    }
+
+    async handleManualUpdateCheck() {
+        if (!window.require) return;
+
+        this.isCheckingUpdate = true;
+        this.updateCheckStatus = 'checking';
+        this.updateCheckMessage = 'Contacting update server...';
+        this.requestUpdate();
+
+        try {
+            const { checkForUpdates, isNewerVersion, getCurrentVersion } = window.require('./utils/updateChecker.js');
+            const result = await checkForUpdates();
+
+            if (result.updateInfo) {
+                const isNewer = isNewerVersion(result.updateInfo.version, getCurrentVersion());
+                let isNewContent = false;
+
+                if (!isNewer) {
+                    const contentId = result.updateInfo.buildDate || result.updateInfo.message || result.updateInfo.version;
+                    const { getUpdatePreferences, setUpdatePreferences } = window.require('./storage.js');
+                    const prefs = getUpdatePreferences();
+                    if (prefs.lastSeenForcedId !== contentId) {
+                        isNewContent = true;
+                    }
+                }
+
+                if (isNewer || isNewContent) {
+                    this.updateCheckMessage = isNewer ? `New version available: v${result.updateInfo.version}` : 'New update information available';
+                    this.updateCheckStatus = 'success';
+                    this.updateInfo = result.updateInfo;
+
+                    // Trigger the separate update window
+                    const { ipcRenderer } = window.require('electron');
+                    ipcRenderer.invoke('open-update-window', result.updateInfo);
+
+                    // If it was just a content change, mark as seen
+                    if (!isNewer && isNewContent) {
+                        const { setUpdatePreferences } = window.require('./storage.js');
+                        const contentId = result.updateInfo.buildDate || result.updateInfo.message || result.updateInfo.version;
+                        setUpdatePreferences({ lastSeenForcedId: contentId });
+                    }
+                } else {
+                    this.updateCheckMessage = 'You are using the latest version.';
+                    this.updateCheckStatus = 'success';
+                    this.updateInfo = null;
+                }
+            } else if (result.error) {
+                this.updateCheckMessage = `Update check failed: ${result.error}`;
+                this.updateCheckStatus = 'error';
+                this.updateInfo = null;
+            } else {
+                this.updateCheckMessage = 'You are using the latest version.';
+                this.updateCheckStatus = 'success';
+                this.updateInfo = null;
+            }
+        } catch (error) {
+            console.error('Manual update check error:', error);
+            this.updateCheckMessage = `Error: ${error.message}`;
+            this.updateCheckStatus = 'error';
+        } finally {
+            this.isCheckingUpdate = false;
+            this.requestUpdate();
+        }
+    }
+
     renderSectionContent() {
         switch (this.activeSection) {
             case 'profile':
@@ -2588,6 +2698,8 @@ export class CustomizeView extends LitElement {
                 return this.renderKeyboardSection();
             case 'search':
                 return this.renderSearchSection();
+            case 'updates':
+                return this.renderUpdatesSection();
             case 'advanced':
                 return this.renderAdvancedSection();
             default:

@@ -101,6 +101,73 @@ function createWindow(sendToRenderer, geminiSessionRef) {
     return mainWindow;
 }
 
+function createSplashWindow() {
+    const windowWidth = 300;
+    const windowHeight = 350;
+
+    const splashWindow = new BrowserWindow({
+        width: windowWidth,
+        height: windowHeight,
+        frame: false,
+        transparent: true,
+        alwaysOnTop: true,
+        resizable: false,
+        webPreferences: {
+            nodeIntegration: true,
+            contextIsolation: false,
+        },
+        backgroundColor: '#00000000',
+    });
+
+    splashWindow.center();
+    splashWindow.loadFile(path.join(__dirname, '../splash.html'));
+
+    return splashWindow;
+}
+
+function createUpdateWindow(updateInfo) {
+    const windowWidth = 440;
+    const windowHeight = 550;
+
+    const updateWindow = new BrowserWindow({
+        width: windowWidth,
+        height: windowHeight,
+        frame: false,
+        transparent: true,
+        alwaysOnTop: true,
+        resizable: false,
+        webPreferences: {
+            nodeIntegration: true,
+            contextIsolation: false,
+        },
+        backgroundColor: '#00000000',
+    });
+
+    // Center window
+    updateWindow.center();
+
+    if (process.platform === 'win32') {
+        updateWindow.setAlwaysOnTop(true, 'screen-saver', 1);
+        updateWindow.setSkipTaskbar(false); // Show in taskbar so it's not totally hidden
+    }
+
+    updateWindow.loadFile(path.join(__dirname, '../update.html'));
+
+    // Send update info to window once ready
+    updateWindow.webContents.once('dom-ready', () => {
+        updateWindow.webContents.send('update-info', updateInfo);
+    });
+
+    // Handle close from renderer
+    ipcMain.once('close-update-window', () => {
+        if (!updateWindow.isDestroyed()) {
+            updateWindow.close();
+        }
+    });
+
+    return updateWindow;
+}
+
 function getDefaultKeybinds() {
     const isMac = process.platform === 'darwin';
     return {
@@ -512,6 +579,8 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
 
 module.exports = {
     createWindow,
+    createUpdateWindow,
+    createSplashWindow,
     getDefaultKeybinds,
     updateGlobalShortcuts,
     setupWindowIpcHandlers,

@@ -3,7 +3,8 @@ if (require('electron-squirrel-startup')) {
 }
 
 const { app, BrowserWindow, shell, ipcMain, globalShortcut, systemPreferences } = require('electron');
-const { createWindow, updateGlobalShortcuts } = require('./utils/window');
+const { createWindow, createUpdateWindow, createSplashWindow, updateGlobalShortcuts } = require('./utils/window');
+const { checkForUpdates, isNewerVersion, getCurrentVersion } = require('./utils/updateChecker');
 const { setupAssistantIpcHandlers, stopMacOSAudioCapture, sendToRenderer, toggleManualRecording } = require('./utils/core/assistantManager');
 const storage = require('./storage');
 const rateLimitManager = require('./utils/rateLimitManager');
@@ -20,10 +21,92 @@ app.whenReady().then(async () => {
     // Initialize storage (ensures directory exists, resets if needed)
     storage.initializeStorage();
 
-    createMainWindow();
-    setupAssistantIpcHandlers(geminiSessionRef);
-    setupStorageIpcHandlers();
-    setupGeneralIpcHandlers();
+    // 1. Show Splash Screen
+    const splashWindow = createSplashWindow();
+
+    let shouldStartApp = true;
+    try {
+        // 2. Check for Updates
+        console.log('App Startup: Checking for updates...');
+        const updateResult = await checkForUpdates();
+
+        if (updateResult.updateInfo) {
+            let shouldShowUpdate = false;
+            const isNewer = isNewerVersion(updateResult.updateInfo.version, getCurrentVersion());
+
+            if (isNewer) {
+                // Always show if it's a version bump
+                shouldShowUpdate = true;
+            } else {
+                // Not a version bump, but check if the content (message/buildDate) has changed
+                const prefs = storage.getUpdatePreferences();
+                const contentId = updateResult.updateInfo.buildDate || updateResult.updateInfo.message || updateResult.updateInfo.version;
+
+                if (prefs.lastSeenForcedId !== contentId) {
+                    console.log(`App Startup: New update content detected (ID: ${contentId})`);
+                    shouldShowUpdate = true;
+                    // Persist that we've seen this one
+                    storage.setUpdatePreferences({ lastSeenForcedId: contentId });
+                } else {
+                    console.log('App Startup: Update content already seen, skipping');
+                }
+            }
+
+            if (shouldShowUpdate) {
+                console.log('App Startup: Showing update window');
+                splashWindow.webContents.send('update-status', 'Update available');
+
+                let userAction = 'later';
+                const handleAction = (event, action) => {
+                    userAction = action;
+                };
+                ipcMain.once('close-update-window', handleAction);
+
+                // Show update window and wait for it to be closed
+                const updateWindow = createUpdateWindow(updateResult.updateInfo);
+
+                // Wait for update window to be closed before proceeding to app
+                await new Promise((resolve) => {
+                    updateWindow.on('closed', resolve);
+                });
+
+                // Clean up listener
+                ipcMain.removeListener('close-update-window', handleAction);
+
+                if (userAction === 'download') {
+                    console.log('App Startup: User chose download. Opening URL and quitting.');
+                    shell.openExternal(updateResult.updateInfo.downloadUrl);
+                    shouldStartApp = false;
+                    app.quit();
+                } else {
+                    console.log('App Startup: User chose later, proceeding to app');
+                }
+            } else {
+                console.log('App Startup: No new applicable updates found');
+                splashWindow.webContents.send('update-status', 'Starting app...');
+                await new Promise(r => setTimeout(r, 800));
+            }
+        } else {
+            console.log('App Startup: No updates found');
+            splashWindow.webContents.send('update-status', 'Starting app...');
+            // Small delay for better UX
+            await new Promise(r => setTimeout(r, 800));
+        }
+    } catch (error) {
+        console.error('App Startup: Update check failed:', error);
+    } finally {
+        // 3. Launch Main App if permitted
+        if (!splashWindow.isDestroyed()) {
+            splashWindow.close();
+        }
+
+        if (shouldStartApp) {
+            createMainWindow();
+            setupAssistantIpcHandlers(geminiSessionRef);
+            setupStorageIpcHandlers();
+            setupGeneralIpcHandlers();
+        }
+    }
 });
 
 app.on('window-all-closed', () => {
@@ -405,6 +488,11 @@ function setupGeneralIpcHandlers() {
     // Debug logging from renderer
     ipcMain.on('log-message', (event, msg) => {
         console.log(msg);
+    });
+
+    ipcMain.handle('open-update-window', (event, updateInfo) => {
+        createUpdateWindow(updateInfo);
+        return { success: true };
     });
 
     // ============ macOS PERMISSION CHECKS ============

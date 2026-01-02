@@ -7,8 +7,7 @@ import { HistoryView } from '../views/HistoryView.js';
 import { AssistantView } from '../views/AssistantView.js';
 import { OnboardingView } from '../views/OnboardingView.js';
 import { UpgradeDialog } from '../dialogs/UpgradeDialog.js';
-import { UpdateDialog } from '../dialogs/UpdateDialog.js';
-import { checkForUpdates, skipVersion } from '../../utils/updateChecker.js';
+
 
 export class CheatingDaddyApp extends LitElement {
     static styles = css`
@@ -275,8 +274,7 @@ export class CheatingDaddyApp extends LitElement {
             this.updateLayoutMode();
             this.requestUpdate();
 
-            // Check for updates on every launch (non-blocking)
-            this._checkForAppUpdates();
+
         } catch (error) {
             console.error('Error loading from storage:', error);
             this._storageLoaded = true;
@@ -286,6 +284,7 @@ export class CheatingDaddyApp extends LitElement {
 
     async _fetchReleaseNotes() {
         try {
+            const { checkForUpdates } = window.require('./utils/updateChecker.js');
             const result = await checkForUpdates();
             // Even if hasUpdate is false (because we are already on latest),
             // if we just updated, we want to show notes for the CURRENT version
@@ -303,27 +302,7 @@ export class CheatingDaddyApp extends LitElement {
         }
     }
 
-    async _checkForAppUpdates() {
-        try {
-            console.log('Checking for updates...');
-            const result = await checkForUpdates();
 
-            if (result.hasUpdate && result.updateInfo) {
-                console.log('Update available:', result.updateInfo);
-                this.updateInfo = result.updateInfo;
-                this.showUpdateDialog = true;
-                this.requestUpdate();
-            } else if (result.error) {
-                console.log('Update check failed (non-critical):', result.error);
-            } else if (result.skipped) {
-                console.log('User skipped this version');
-            } else {
-                console.log('App is up to date');
-            }
-        } catch (error) {
-            console.error('Update check error (non-critical):', error);
-        }
-    }
 
     handleUpdateDialogClose() {
         this.showUpdateDialog = false;
@@ -331,16 +310,7 @@ export class CheatingDaddyApp extends LitElement {
         this.requestUpdate();
     }
 
-    async handleUpdateSkip(version) {
-        try {
-            await skipVersion(version);
-            this.handleUpdateDialogClose();
-        } catch (error) {
-            console.error('Failed to skip version:', error);
-            this.handleToast({ message: 'Failed to skip version', type: 'error' });
-            this.handleUpdateDialogClose();
-        }
-    }
+
 
     hexToRgb(hex) {
         const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -799,14 +769,6 @@ export class CheatingDaddyApp extends LitElement {
                         @dialog-complete=${this.handleUpgradeDialogComplete}
                         @dialog-error=${this.handleUpgradeDialogError}
                     ></upgrade-dialog>
-                ` : ''}
-
-                ${this.showUpdateDialog && this.updateInfo ? html`
-                    <update-dialog
-                        .updateInfo=${this.updateInfo}
-                        .onClose=${() => this.handleUpdateDialogClose()}
-                        .onSkip=${(version) => this.handleUpdateSkip(version)}
-                    ></update-dialog>
                 ` : ''}
             </div>
         `;

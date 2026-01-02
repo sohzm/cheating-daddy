@@ -29,10 +29,13 @@ export class UpdateDialog extends LitElement {
 
         .dialog {
             background: var(--bg-secondary, #2a2a2a);
-            border-radius: 8px;
+            border-radius: 0;
             padding: 24px;
-            max-width: 400px;
+            max-width: 440px;
             width: 90%;
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
             border: 1px solid var(--border-color, #404040);
             animation: slideIn 0.3s ease-out;
@@ -57,10 +60,10 @@ export class UpdateDialog extends LitElement {
         }
 
         .update-icon {
-            width: 40px;
-            height: 40px;
-            background: linear-gradient(135deg, #4ade80, #22c55e);
-            border-radius: 10px;
+            width: 32px;
+            height: 32px;
+            background: #4ade80;
+            border-radius: 0;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -90,17 +93,29 @@ export class UpdateDialog extends LitElement {
 
         .dialog-body {
             margin-bottom: 20px;
+            overflow-y: auto;
+            flex: 1;
+            padding-right: 8px;
+        }
+
+        .dialog-body::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .dialog-body::-webkit-scrollbar-thumb {
+            background: var(--border-color, #404040);
         }
 
         .version-badge {
             display: inline-block;
-            background: rgba(74, 222, 128, 0.15);
+            background: rgba(74, 222, 128, 0.1);
             color: #4ade80;
-            padding: 4px 10px;
-            border-radius: 4px;
+            padding: 2px 8px;
+            border-radius: 0;
             font-size: 12px;
             font-weight: 600;
             margin-bottom: 12px;
+            border: 1px solid rgba(74, 222, 128, 0.2);
         }
 
         .update-message {
@@ -109,8 +124,8 @@ export class UpdateDialog extends LitElement {
             line-height: 1.5;
             padding: 12px;
             background: var(--bg-tertiary, #333);
-            border-radius: 6px;
-            border-left: 3px solid #4ade80;
+            border-radius: 0;
+            border-left: 2px solid #4ade80;
         }
 
         .build-date {
@@ -121,21 +136,22 @@ export class UpdateDialog extends LitElement {
 
         .release-channel {
             display: inline-block;
-            background: rgba(99, 102, 241, 0.15);
+            background: rgba(99, 102, 241, 0.1);
             color: #818cf8;
             padding: 2px 8px;
-            border-radius: 3px;
+            border-radius: 0;
             font-size: 10px;
             font-weight: 600;
             text-transform: uppercase;
             margin-left: 8px;
+            border: 1px solid rgba(99, 102, 241, 0.2);
         }
 
         .release-notes {
             margin-top: 12px;
-            padding: 10px 12px;
-            background: var(--bg-tertiary, #333);
-            border-radius: 4px;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 0;
             border: 1px solid var(--border-color, #404040);
         }
 
@@ -169,11 +185,11 @@ export class UpdateDialog extends LitElement {
         .btn {
             flex: 1;
             padding: 10px 16px;
-            border-radius: 6px;
+            border-radius: 0;
             font-size: 13px;
             font-weight: 500;
             transition: all 0.15s ease;
-            border: none;
+            border: 1px solid transparent;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -181,13 +197,12 @@ export class UpdateDialog extends LitElement {
         }
 
         .btn-primary {
-            background: linear-gradient(135deg, #4ade80, #22c55e);
+            background: #fff;
             color: #000;
         }
 
         .btn-primary:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(74, 222, 128, 0.3);
+            background: #e0e0e0;
         }
 
         .btn-secondary {
@@ -201,58 +216,29 @@ export class UpdateDialog extends LitElement {
             color: var(--text-color, #fff);
         }
 
-        .skip-link {
-            text-align: center;
-            margin-top: 12px;
-        }
 
-        .skip-link a {
-            font-size: 11px;
-            color: var(--text-muted, #666);
-            text-decoration: underline;
-            text-underline-offset: 2px;
-        }
-
-        .skip-link a:hover {
-            color: var(--text-secondary, #aaa);
-        }
     `;
 
     static properties = {
         updateInfo: { type: Object },
         onClose: { type: Function },
-        onSkip: { type: Function },
     };
 
     constructor() {
         super();
         this.updateInfo = null;
         this.onClose = () => { };
-        this.onSkip = () => { };
     }
 
     handleDownload() {
-        if (this.updateInfo?.downloadUrl) {
-            // Open in external browser
-            if (window.require) {
-                const { shell } = window.require('electron');
-                shell.openExternal(this.updateInfo.downloadUrl);
-            } else {
-                // Security: noopener,noreferrer prevents tab-napping attacks
-                window.open(this.updateInfo.downloadUrl, '_blank', 'noopener,noreferrer');
-            }
-        }
-        this.onClose();
+        this.onClose('download');
     }
 
     handleLater() {
-        this.onClose();
+        this.onClose('later');
     }
 
-    handleSkip() {
-        this.onSkip(this.updateInfo?.version);
-        this.onClose();
-    }
+
 
     render() {
         if (!this.updateInfo) return html``;
@@ -309,11 +295,7 @@ export class UpdateDialog extends LitElement {
                         </button>
                     </div>
 
-                    <div class="skip-link">
-                        <a href="#" @click=${(e) => { e.preventDefault(); this.handleSkip(); }}>
-                            Skip this version
-                        </a>
-                    </div>
+
                 </div>
             </div>
         `;
