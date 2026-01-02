@@ -38,7 +38,7 @@ export class MainView extends LitElement {
             gap: 8px;
             transition: background 0.1s ease;
             width: 100%;
-            cursor: pointer;
+            cursor: default;
         }
 
         .start-button:hover {
@@ -70,7 +70,7 @@ export class MainView extends LitElement {
         .link {
             color: var(--text-color);
             text-decoration: underline;
-            cursor: pointer;
+            cursor: default;
             text-underline-offset: 2px;
         }
 

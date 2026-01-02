@@ -54,7 +54,7 @@ export class HelpView extends LitElement {
             color: var(--text-color);
             text-decoration: underline;
             text-underline-offset: 2px;
-            cursor: pointer;
+            cursor: default;
         }
 
         .key {
@@ -157,7 +157,7 @@ export class HelpView extends LitElement {
             font-size: 11px;
             font-weight: 500;
             transition: background 0.1s ease;
-            cursor: pointer;
+            cursor: default;
         }
 
         .community-link:hover {

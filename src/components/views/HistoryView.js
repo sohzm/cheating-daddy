@@ -30,7 +30,7 @@ export class HistoryView extends LitElement {
         .session-item {
             padding: 12px;
             border-bottom: 1px solid var(--border-color);
-            cursor: pointer;
+            cursor: default;
             transition: background 0.1s ease;
         }
 
@@ -114,7 +114,7 @@ export class HistoryView extends LitElement {
             border-radius: 3px;
             font-size: 11px;
             font-weight: 500;
-            cursor: pointer;
+            cursor: default;
             display: flex;
             align-items: center;
             gap: 6px;
@@ -205,7 +205,7 @@ export class HistoryView extends LitElement {
             padding: 8px 16px;
             font-size: 11px;
             font-weight: 500;
-            cursor: pointer;
+            cursor: default;
             border-bottom: 2px solid transparent;
             margin-bottom: -1px;
             transition: color 0.1s ease;
@@ -287,7 +287,7 @@ export class HistoryView extends LitElement {
             padding: 8px 16px;
             font-size: 12px;
             font-weight: 500;
-            cursor: pointer;
+            cursor: default;
             transition: color 0.1s ease;
             border-bottom: 2px solid transparent;
             margin-bottom: -1px;
@@ -341,7 +341,7 @@ export class HistoryView extends LitElement {
             border: none;
             padding: 4px;
             border-radius: 3px;
-            cursor: pointer;
+            cursor: default;
             transition: all 0.1s ease;
         }
 
@@ -481,7 +481,7 @@ export class HistoryView extends LitElement {
         return html`
             <div class="sessions-list">
                 ${this.sessions.map(
-                    session => html`
+            session => html`
                         <div class="session-item" @click=${() => this.handleSessionClick(session)}>
                             <div class="session-header">
                                 <div class="session-date">${this.formatDate(session.createdAt)}</div>
@@ -490,7 +490,7 @@ export class HistoryView extends LitElement {
                             <div class="session-preview">${this.getSessionPreview(session)}</div>
                         </div>
                     `
-                )}
+        )}
             </div>
         `;
     }
@@ -625,10 +625,10 @@ export class HistoryView extends LitElement {
             </div>
             <div class="conversation-view">
                 ${this.activeTab === 'conversation'
-                    ? this.renderConversationContent()
-                    : this.activeTab === 'screen'
-                        ? this.renderScreenAnalysisContent()
-                        : this.renderContextContent()}
+                ? this.renderConversationContent()
+                : this.activeTab === 'screen'
+                    ? this.renderScreenAnalysisContent()
+                    : this.renderContextContent()}
             </div>
         `;
     }

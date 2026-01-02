@@ -40,7 +40,7 @@ export class CustomizeView extends LitElement {
             border-radius: 3px;
             font-size: 12px;
             color: var(--text-secondary);
-            cursor: pointer;
+            cursor: default;
             transition: all 0.1s ease;
             border: none;
             background: transparent;
@@ -195,7 +195,7 @@ export class CustomizeView extends LitElement {
         }
 
         select.form-control {
-            cursor: pointer;
+            cursor: default;
             appearance: none;
             background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b6b6b' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
             background-position: right 8px center;
@@ -251,7 +251,7 @@ export class CustomizeView extends LitElement {
         }
 
         .keybind-input {
-            cursor: pointer;
+            cursor: default;
             font-family: 'SF Mono', Monaco, monospace;
             text-align: center;
             letter-spacing: 0.5px;
@@ -275,7 +275,7 @@ export class CustomizeView extends LitElement {
             border-radius: 3px;
             font-size: 11px;
             font-weight: 500;
-            cursor: pointer;
+            cursor: default;
             transition: background 0.1s ease;
         }
 
@@ -291,7 +291,7 @@ export class CustomizeView extends LitElement {
             border-radius: 3px;
             font-size: 11px;
             font-weight: 500;
-            cursor: pointer;
+            cursor: default;
             transition: all 0.1s ease;
         }
 
@@ -385,14 +385,14 @@ export class CustomizeView extends LitElement {
             width: 14px;
             height: 14px;
             accent-color: var(--text-color);
-            cursor: pointer;
+            cursor: default;
         }
 
         .checkbox-label {
             font-weight: 500;
             font-size: 12px;
             color: var(--text-color);
-            cursor: pointer;
+            cursor: default;
             user-select: none;
         }
 
@@ -427,7 +427,7 @@ export class CustomizeView extends LitElement {
             border-radius: 2px;
             background: var(--border-color);
             outline: none;
-            cursor: pointer;
+            cursor: default;
         }
 
         .slider-input::-webkit-slider-thumb {
@@ -437,7 +437,7 @@ export class CustomizeView extends LitElement {
             height: 14px;
             border-radius: 50%;
             background: var(--text-color);
-            cursor: pointer;
+            cursor: default;
             border: none;
         }
 
@@ -446,7 +446,7 @@ export class CustomizeView extends LitElement {
             height: 14px;
             border-radius: 50%;
             background: var(--text-color);
-            cursor: pointer;
+            cursor: default;
             border: none;
         }
 
@@ -472,7 +472,7 @@ export class CustomizeView extends LitElement {
             height: 32px;
             border: 1px solid var(--border-color);
             border-radius: 3px;
-            cursor: pointer;
+            cursor: default;
             padding: 2px;
             background: var(--input-background);
         }
@@ -500,7 +500,7 @@ export class CustomizeView extends LitElement {
             border-radius: 3px;
             font-size: 11px;
             font-weight: 500;
-            cursor: pointer;
+            cursor: default;
             transition: all 0.1s ease;
         }
 
@@ -518,7 +518,7 @@ export class CustomizeView extends LitElement {
             border-radius: 3px;
             font-size: 11px;
             font-weight: 500;
-            cursor: pointer;
+            cursor: default;
             transition: background 0.1s ease;
         }
 
@@ -557,7 +557,7 @@ export class CustomizeView extends LitElement {
             border: 1px solid var(--border-color);
             border-radius: 4px;
             padding: 6px 10px;
-            cursor: pointer;
+            cursor: default;
             font-size: 14px;
         }
 
@@ -649,7 +649,7 @@ export class CustomizeView extends LitElement {
             color: var(--text-color);
             padding: 8px 16px;
             border-radius: 4px;
-            cursor: pointer;
+            cursor: default;
             font-size: 12px;
             transition: all 0.15s ease;
         }
@@ -666,7 +666,7 @@ export class CustomizeView extends LitElement {
             background: var(--bg-tertiary);
             border: 1px solid var(--border-color);
             border-radius: 6px;
-            cursor: pointer;
+            cursor: default;
             transition: all 0.15s ease;
         }
 
@@ -1802,7 +1802,7 @@ export class CustomizeView extends LitElement {
                         </div>
 
                         <details>
-                            <summary style="cursor: pointer; font-size: 12px; color: var(--accent-color); margin: 8px 0;">Advanced: Edit Prompt Instructions</summary>
+                            <summary style="cursor: default; font-size: 12px; color: var(--accent-color); margin: 8px 0;">Advanced: Edit Prompt Instructions</summary>
                             ${renderTextArea(
             'Intro Instruction',
             this.editingProfileData.settings.persona.intro,
@@ -1850,7 +1850,7 @@ export class CustomizeView extends LitElement {
                         </div>
                         
                         <details>
-                            <summary style="cursor: pointer; font-size: 12px; color: var(--accent-color); margin: 8px 0;">Advanced: Edit Length Rules</summary>
+                            <summary style="cursor: default; font-size: 12px; color: var(--accent-color); margin: 8px 0;">Advanced: Edit Length Rules</summary>
                             ${renderTextArea(
             'Length Instruction',
             this.editingProfileData.settings.length.instruction,
@@ -1880,7 +1880,7 @@ export class CustomizeView extends LitElement {
                         </div>
                         
                         <details>
-                            <summary style="cursor: pointer; font-size: 12px; color: var(--accent-color); margin: 8px 0;">Advanced: Edit Formatting Rules</summary>
+                            <summary style="cursor: default; font-size: 12px; color: var(--accent-color); margin: 8px 0;">Advanced: Edit Formatting Rules</summary>
                             ${renderTextArea(
             'Format Instruction',
             this.editingProfileData.settings.format.instruction,

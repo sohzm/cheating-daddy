@@ -48,7 +48,7 @@ export class OnboardingView extends LitElement {
             display: flex;
             align-items: center;
             justify-content: center;
-            cursor: pointer;
+            cursor: default;
             transition: all 0.2s ease;
             color: rgba(255, 255, 255, 0.6);
         }
@@ -182,7 +182,7 @@ export class OnboardingView extends LitElement {
             border-radius: 6px;
             font-size: 13px;
             font-weight: 500;
-            cursor: pointer;
+            cursor: default;
             transition: all 0.2s ease;
             display: flex;
             align-items: center;
@@ -223,7 +223,7 @@ export class OnboardingView extends LitElement {
             border-radius: 50%;
             background: rgba(255, 255, 255, 0.2);
             transition: all 0.2s ease;
-            cursor: pointer;
+            cursor: default;
         }
 
         .dot:hover {

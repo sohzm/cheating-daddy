@@ -31,7 +31,7 @@ export class AssistantView extends LitElement {
         }
 
         .response-container a {
-            cursor: pointer;
+            cursor: default;
         }
 
         /* Continuous Mode Styles */
@@ -265,7 +265,7 @@ export class AssistantView extends LitElement {
             border-radius: 20px;
             font-size: 12px;
             font-weight: 500;
-            cursor: pointer;
+            cursor: default;
             transition: all 0.15s ease;
             white-space: nowrap;
         }
@@ -400,7 +400,7 @@ export class AssistantView extends LitElement {
         .sidebar-item {
             padding: 6px 8px; /* Reduced padding */
             border-radius: 6px;
-            cursor: pointer;
+            cursor: default;
             font-size: 13px;
             color: var(--text-secondary);
             transition: all 0.2s ease;
