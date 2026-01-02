@@ -125,10 +125,6 @@ GPL-3.0 License - See [LICENSE](LICENSE) for details.
 
 ---
 
-## 💡 Sponsor
-
-If you're looking for a hosted desktop recording API, check out [Recall.ai](https://www.recall.ai/product/desktop-recording-sdk/?utm_source=github&utm_medium=sponsorship&utm_campaign=sohzm-cheating-daddy) - an API that records Zoom, Google Meet, Microsoft Teams, and more.
-
 > [!NOTE]  
 > Use latest macOS and Windows versions. Older versions have limited support.
 
