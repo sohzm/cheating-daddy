@@ -108,6 +108,10 @@ function getHistoryDir() {
     return path.join(getConfigDir(), 'history');
 }
 
+function getUpdatePreferencesPath() {
+    return path.join(getConfigDir(), 'updatePreferences.json');
+}
+
 // Helper to read JSON file safely
 function readJsonFile(filePath, defaultValue) {
     try {
@@ -595,6 +599,21 @@ function deleteCustomProfile(profileId) {
     return setCustomProfiles(filtered);
 }
 
+// ============ UPDATE PREFERENCES ============
+
+function getUpdatePreferences() {
+    return readJsonFile(getUpdatePreferencesPath(), {
+        skippedVersion: null,
+        lastSeenReleaseNotesVersion: null  // Tracks which version's release notes have been shown
+    });
+}
+
+function setUpdatePreferences(prefs) {
+    const current = getUpdatePreferences();
+    const updated = { ...current, ...prefs };
+    return writeJsonFile(getUpdatePreferencesPath(), updated);
+}
+
 // ============ CLEAR ALL DATA ============
 
 function clearAllData() {
@@ -648,6 +667,10 @@ module.exports = {
     getAllSessions,
     deleteSession,
     deleteAllSessions,
+
+    // Update Preferences
+    getUpdatePreferences,
+    setUpdatePreferences,
 
     // Clear all
     clearAllData
