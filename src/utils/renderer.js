@@ -225,6 +225,15 @@ const storage = {
         return ipcRenderer.invoke('storage:mark-version-seen');
     },
 
+    // Update Preferences
+    async getUpdatePreferences() {
+        const result = await ipcRenderer.invoke('storage:get-update-preferences');
+        return result.success ? result.data : { skippedVersion: null };
+    },
+    async setUpdatePreferences(prefs) {
+        return ipcRenderer.invoke('storage:set-update-preferences', prefs);
+    },
+
     // Limits
     async getTodayLimits() {
         const result = await ipcRenderer.invoke('storage:get-today-limits');

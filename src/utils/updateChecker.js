@@ -40,7 +40,7 @@ export async function checkForUpdates() {
 
         return {
             hasUpdate,
-            updateInfo: hasUpdate ? updateInfo : null,
+            updateInfo: updateInfo, // Always return info if we successfully fetched it
             error: null,
             skipped: false
         };

@@ -276,6 +276,26 @@ function setupStorageIpcHandlers() {
         }
     });
 
+    // ============ UPDATE PREFERENCES ============
+    ipcMain.handle('storage:get-update-preferences', async () => {
+        try {
+            return { success: true, data: storage.getUpdatePreferences() };
+        } catch (error) {
+            console.error('Error getting update preferences:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('storage:set-update-preferences', async (event, prefs) => {
+        try {
+            storage.setUpdatePreferences(prefs);
+            return { success: true };
+        } catch (error) {
+            console.error('Error setting update preferences:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
     // ============ CLEAR ALL ============
     ipcMain.handle('storage:clear-all', async () => {
         try {

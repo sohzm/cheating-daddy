@@ -1,0 +1,15 @@
+{
+    "version": "0.5.4",
+    "buildDate": "2026-01-02",
+    "message": "Initial release with stealth mode, multi-provider AI, and enhanced features",
+    "downloadUrl": "https://drive.google.com/drive/folders/1gqDBo0cOhtA6rs0MDbg0WOcY0iDOibkO?usp=sharing",
+    "forceShow": true,
+    "releaseChannel": "stable",
+    "releaseNotes": [
+        "Stealth mode cursor - all cursors remain default",
+        "Multi-provider AI support (Gemini + Groq)",
+        "Smart update checker with GitHub integration",
+        "Enhanced audio processing modes",
+        "Response navigator sidebar"
+    ]
+}

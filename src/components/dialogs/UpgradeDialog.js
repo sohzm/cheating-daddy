@@ -112,6 +112,50 @@ export class UpgradeDialog extends LitElement {
             border: 1px solid var(--border-color, #404040);
         }
 
+        .release-notes-section {
+            margin-top: 16px;
+            margin-bottom: 16px;
+            padding: 12px;
+            background: var(--bg-tertiary, #333);
+            border-radius: 4px;
+            border: 1px solid var(--border-color, #404040);
+        }
+
+        .release-notes-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted, #888);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .release-notes-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .release-notes-list li {
+            font-size: 12px;
+            color: var(--text-secondary, #bbb);
+            padding: 4px 0;
+            line-height: 1.4;
+        }
+
+        .release-channel-badge {
+            display: inline-block;
+            background: rgba(99, 102, 241, 0.15);
+            color: #818cf8;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-left: 8px;
+            vertical-align: middle;
+        }
+
         .dialog-actions {
             display: flex;
             gap: 10px;
@@ -188,7 +232,9 @@ export class UpgradeDialog extends LitElement {
         previousVersion: { type: String },
         currentVersion: { type: String },
         isProcessing: { type: Boolean },
-        mode: { type: String } // 'upgrade' or 'clear' (for Settings clear all data)
+        mode: { type: String }, // 'upgrade' or 'clear' (for Settings clear all data)
+        releaseNotes: { type: Array },
+        releaseChannel: { type: String }
     };
 
     constructor() {
@@ -199,6 +245,8 @@ export class UpgradeDialog extends LitElement {
         this.currentVersion = '';
         this.isProcessing = false;
         this.mode = 'upgrade';
+        this.releaseNotes = [];
+        this.releaseChannel = '';
     }
 
     get title() {
@@ -208,7 +256,7 @@ export class UpgradeDialog extends LitElement {
         if (this.isFirstRun) {
             return 'Welcome to Cheating Daddy On Steroids';
         }
-        return `Updated to v${this.currentVersion}`;
+        return `Updated to v${this.currentVersion}${this.releaseChannel ? ` (${this.releaseChannel})` : ''}`;
     }
 
     get subtitle() {
@@ -317,6 +365,15 @@ export class UpgradeDialog extends LitElement {
                     : `If you experienced bugs or issues in the previous version, resetting may help. Otherwise, keep your current config.`
                 }
                             </div>
+
+                            ${this.releaseNotes && this.releaseNotes.length > 0 ? html`
+                                <div class="release-notes-section">
+                                    <div class="release-notes-title">What's New</div>
+                                    <ul class="release-notes-list">
+                                        ${this.releaseNotes.map(note => html`<li>${note}</li>`)}
+                                    </ul>
+                                </div>
+                            ` : ''}
                         ` : html`
                             <div class="note">
                                 This action cannot be undone. The app will close after reset.

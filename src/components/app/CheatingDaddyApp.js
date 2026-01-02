@@ -240,6 +240,11 @@ export class CheatingDaddyApp extends LitElement {
             if (upgradeCheck.isFirstRun || upgradeCheck.isUpgrade) {
                 this.upgradeInfo = upgradeCheck;
                 this.showUpgradeDialog = true;
+
+                // Fetch release notes for the current version to show in UpgradeDialog
+                if (upgradeCheck.isUpgrade) {
+                    this._fetchReleaseNotes();
+                }
             }
 
             const [config, prefs] = await Promise.all([
@@ -276,6 +281,25 @@ export class CheatingDaddyApp extends LitElement {
             console.error('Error loading from storage:', error);
             this._storageLoaded = true;
             this.requestUpdate();
+        }
+    }
+
+    async _fetchReleaseNotes() {
+        try {
+            const result = await checkForUpdates();
+            // Even if hasUpdate is false (because we are already on latest),
+            // if we just updated, we want to show notes for the CURRENT version
+            // which is returned as part of the check result's updateInfo or by re-fetching
+            if (result.updateInfo) {
+                this.upgradeInfo = {
+                    ...this.upgradeInfo,
+                    releaseNotes: result.updateInfo.releaseNotes,
+                    releaseChannel: result.updateInfo.releaseChannel
+                };
+                this.requestUpdate();
+            }
+        } catch (error) {
+            console.error('Error fetching release notes:', error);
         }
     }
 
@@ -770,6 +794,8 @@ export class CheatingDaddyApp extends LitElement {
                         .isUpgrade=${this.upgradeInfo.isUpgrade}
                         .previousVersion=${this.upgradeInfo.previousVersion || ''}
                         .currentVersion=${this.upgradeInfo.currentVersion || ''}
+                        .releaseNotes=${this.upgradeInfo.releaseNotes || []}
+                        .releaseChannel=${this.upgradeInfo.releaseChannel || ''}
                         @dialog-complete=${this.handleUpgradeDialogComplete}
                         @dialog-error=${this.handleUpgradeDialogError}
                     ></upgrade-dialog>
