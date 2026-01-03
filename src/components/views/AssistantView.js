@@ -9,7 +9,11 @@ export class AssistantView extends LitElement {
         }
 
         * {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family:
+                'Inter',
+                -apple-system,
+                BlinkMacSystemFont,
+                sans-serif;
             cursor: default;
         }
 
@@ -46,7 +50,7 @@ export class AssistantView extends LitElement {
             position: relative;
             padding: 8px 0;
         }
-        
+
         .response-checkpoint {
             display: flex;
             align-items: center;
@@ -86,12 +90,24 @@ export class AssistantView extends LitElement {
             font-weight: 600;
         }
 
-        .response-container h1 { font-size: 1.6em; }
-        .response-container h2 { font-size: 1.4em; }
-        .response-container h3 { font-size: 1.2em; }
-        .response-container h4 { font-size: 1.1em; }
-        .response-container h5 { font-size: 1em; }
-        .response-container h6 { font-size: 0.9em; }
+        .response-container h1 {
+            font-size: 1.6em;
+        }
+        .response-container h2 {
+            font-size: 1.4em;
+        }
+        .response-container h3 {
+            font-size: 1.2em;
+        }
+        .response-container h4 {
+            font-size: 1.1em;
+        }
+        .response-container h5 {
+            font-size: 1em;
+        }
+        .response-container h6 {
+            font-size: 0.9em;
+        }
 
         .response-container p {
             margin: 0.6em 0;
@@ -303,9 +319,11 @@ export class AssistantView extends LitElement {
             white-space: nowrap;
             opacity: 0;
             visibility: hidden;
-            transition: opacity 0.15s ease, visibility 0.15s ease;
+            transition:
+                opacity 0.15s ease,
+                visibility 0.15s ease;
             pointer-events: none;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
             z-index: 100;
         }
 
@@ -345,7 +363,7 @@ export class AssistantView extends LitElement {
         .tooltip-note {
             margin-top: 6px;
             padding-top: 6px;
-            border-top: 1px solid rgba(255,255,255,0.1);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
             opacity: 0.5;
             font-size: 10px;
         }
@@ -463,7 +481,7 @@ export class AssistantView extends LitElement {
         this.responses = [];
         this.currentResponseIndex = -1;
         this.selectedProfile = 'interview';
-        this.onSendText = () => { };
+        this.onSendText = () => {};
         this.flashCount = 0;
         this.flashLiteCount = 0;
         this.usageStats = { groq: [], gemini: [] };
@@ -492,7 +510,7 @@ export class AssistantView extends LitElement {
 
     renderMarkdown(content) {
         // Handle object responses (with metadata)
-        const text = (typeof content === 'object' && content !== null) ? content.text : content;
+        const text = typeof content === 'object' && content !== null ? content.text : content;
 
         // Check if marked is available
         if (typeof window !== 'undefined' && window.marked) {
@@ -603,7 +621,7 @@ export class AssistantView extends LitElement {
                 const topOffset = item.offsetTop - 20;
                 container.scrollTo({
                     top: Math.max(0, topOffset),
-                    behavior: 'smooth'
+                    behavior: 'smooth',
                 });
             }
         } else {
@@ -634,10 +652,8 @@ export class AssistantView extends LitElement {
         // Load limits on mount
         this.loadLimits();
 
-        // Set up IPC listeners for keyboard shortcuts
-        if (window.require) {
-            const { ipcRenderer } = window.require('electron');
-
+        // Set up IPC listeners for keyboard shortcuts via preload bridge
+        if (window.electronAPI) {
             this.handlePreviousResponse = () => {
                 console.log('Received navigate-previous-response message');
                 this.navigateToPreviousResponse();
@@ -658,31 +674,29 @@ export class AssistantView extends LitElement {
                 this.scrollResponseDown();
             };
 
-            ipcRenderer.on('navigate-previous-response', this.handlePreviousResponse);
-            ipcRenderer.on('navigate-next-response', this.handleNextResponse);
-            ipcRenderer.on('scroll-response-up', this.handleScrollUp);
-            ipcRenderer.on('scroll-response-down', this.handleScrollDown);
+            // Store cleanup functions for disconnectedCallback
+            this._cleanupPreviousResponse = window.electronAPI.onNavigatePreviousResponse(this.handlePreviousResponse);
+            this._cleanupNextResponse = window.electronAPI.onNavigateNextResponse(this.handleNextResponse);
+            this._cleanupScrollUp = window.electronAPI.onScrollResponseUp(this.handleScrollUp);
+            this._cleanupScrollDown = window.electronAPI.onScrollResponseDown(this.handleScrollDown);
         }
     }
 
     disconnectedCallback() {
         super.disconnectedCallback();
 
-        // Clean up IPC listeners
-        if (window.require) {
-            const { ipcRenderer } = window.require('electron');
-            if (this.handlePreviousResponse) {
-                ipcRenderer.removeListener('navigate-previous-response', this.handlePreviousResponse);
-            }
-            if (this.handleNextResponse) {
-                ipcRenderer.removeListener('navigate-next-response', this.handleNextResponse);
-            }
-            if (this.handleScrollUp) {
-                ipcRenderer.removeListener('scroll-response-up', this.handleScrollUp);
-            }
-            if (this.handleScrollDown) {
-                ipcRenderer.removeListener('scroll-response-down', this.handleScrollDown);
-            }
+        // Clean up IPC listeners via stored cleanup functions
+        if (this._cleanupPreviousResponse) {
+            this._cleanupPreviousResponse();
+        }
+        if (this._cleanupNextResponse) {
+            this._cleanupNextResponse();
+        }
+        if (this._cleanupScrollUp) {
+            this._cleanupScrollUp();
+        }
+        if (this._cleanupScrollDown) {
+            this._cleanupScrollDown();
         }
     }
 
@@ -759,24 +773,22 @@ export class AssistantView extends LitElement {
         if (changedProperties.has('responses') || changedProperties.has('currentResponseIndex') || changedProperties.has('viewMode')) {
             // Check if current response is 'live'
             const currentResponse = this.responses[this.currentResponseIndex];
-            // If it's a string (old format) assume it's NOT live to be safe, or default to scrolling? 
-            // Better to default to scrolling if string to match previous behavior, 
+            // If it's a string (old format) assume it's NOT live to be safe, or default to scrolling?
+            // Better to default to scrolling if string to match previous behavior,
             // but user explicitly asked to restrict it.
             // If it's undefined, skip.
             const isLive = currentResponse && typeof currentResponse === 'object' && currentResponse.type === 'live';
 
             // If continuous mode and just added a new response (index increased), scroll to bottom
-            if (this.viewMode === 'continuous' &&
+            if (
+                this.viewMode === 'continuous' &&
                 this.autoScroll &&
                 changedProperties.has('currentResponseIndex') &&
-                this.currentResponseIndex > (changedProperties.get('currentResponseIndex') || -1)) {
+                this.currentResponseIndex > (changedProperties.get('currentResponseIndex') || -1)
+            ) {
                 // Wait for render
                 setTimeout(() => this.scrollToResponse(this.currentResponseIndex), 50);
-            } else if (this.viewMode === 'continuous' &&
-                this.autoScroll &&
-                changedProperties.has('responses') &&
-                !this._userScrolledUp &&
-                isLive) {
+            } else if (this.viewMode === 'continuous' && this.autoScroll && changedProperties.has('responses') && !this._userScrolledUp && isLive) {
                 // Handle streaming updates - scroll to bottom ONLY if LIVE response
                 this.scrollToBottom();
             }
@@ -822,22 +834,22 @@ export class AssistantView extends LitElement {
                 <div class="sidebar-header">Response Navigator</div>
                 <div class="sidebar-content">
                     ${this.responses.map((response, index) => {
-            const question = (typeof response === 'object' && response?.question) ? response.question : '';
-            const previewText = question || '(No question)';
+                        const question = typeof response === 'object' && response?.question ? response.question : '';
+                        const previewText = question || '(No question)';
 
-            return html`
-                        <div class="sidebar-item ${index === this.currentResponseIndex ? 'active' : ''}"
-                             @click=${() => this.scrollToResponse(index)}>
-                            <div class="sidebar-item-header">
-                                <span>#${index + 1}</span>
-                                <span>${this.formatTime(index)}</span>
+                        return html`
+                            <div
+                                class="sidebar-item ${index === this.currentResponseIndex ? 'active' : ''}"
+                                @click=${() => this.scrollToResponse(index)}
+                            >
+                                <div class="sidebar-item-header">
+                                    <span>#${index + 1}</span>
+                                    <span>${this.formatTime(index)}</span>
+                                </div>
+                                <div class="sidebar-item-preview" title="${previewText}">${previewText}</div>
                             </div>
-                            <div class="sidebar-item-preview" title="${previewText}">
-                                ${previewText}
-                            </div>
-                        </div>
-                    `;
-        })}
+                        `;
+                    })}
                 </div>
             </div>
         `;
@@ -860,37 +872,57 @@ export class AssistantView extends LitElement {
             <div class="main-container">
                 <div class="content-area">
                     <div class="response-container" id="responseContainer" @scroll=${this.handleScroll}>
-                        ${this.viewMode === 'continuous'
-                ? html`
-                                <div class="response-list">
-                                    ${this.responses.length === 0
-                        ? html`<div class="response-item" .innerHTML=${this.renderMarkdown(placeholder)}></div>`
-                        : this.responses.map((response, index) => html`
-                                            ${index > 0 ? html`<div class="response-checkpoint">Response ${index + 1}</div>` : ''}
-                                            <div class="response-item ${index === this.currentResponseIndex ? 'active-item' : ''}" 
-                                                 id="response-item-${index}">
-                                                <div .innerHTML=${this.renderMarkdown(response)}></div>
-                                            </div>
-                                          `)
-                    }
-                                </div>
-                            `
-                : '' // Empty for paged mode, content injected via updateResponseContent
-            }
+                        ${
+                            this.viewMode === 'continuous'
+                                ? html`
+                                      <div class="response-list">
+                                          ${this.responses.length === 0
+                                              ? html`<div class="response-item" .innerHTML=${this.renderMarkdown(placeholder)}></div>`
+                                              : this.responses.map(
+                                                    (response, index) => html`
+                                                        ${index > 0 ? html`<div class="response-checkpoint">Response ${index + 1}</div>` : ''}
+                                                        <div
+                                                            class="response-item ${index === this.currentResponseIndex ? 'active-item' : ''}"
+                                                            id="response-item-${index}"
+                                                        >
+                                                            <div .innerHTML=${this.renderMarkdown(response)}></div>
+                                                        </div>
+                                                    `
+                                                )}
+                                      </div>
+                                  `
+                                : '' // Empty for paged mode, content injected via updateResponseContent
+                        }
                     </div>
 
                     <div class="text-input-container">
                         <button class="nav-button" @click=${this.navigateToPreviousResponse} ?disabled=${this.currentResponseIndex <= 0}>
                             <svg width="24px" height="24px" stroke-width="1.7" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M15 6L9 12L15 18" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
+                                <path
+                                    d="M15 6L9 12L15 18"
+                                    stroke="currentColor"
+                                    stroke-width="1.7"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                ></path>
                             </svg>
                         </button>
 
                         ${this.responses.length > 0 ? html`<span class="response-counter">${responseCounter}</span>` : ''}
 
-                        <button class="nav-button" @click=${this.navigateToNextResponse} ?disabled=${this.currentResponseIndex >= this.responses.length - 1}>
+                        <button
+                            class="nav-button"
+                            @click=${this.navigateToNextResponse}
+                            ?disabled=${this.currentResponseIndex >= this.responses.length - 1}
+                        >
                             <svg width="24px" height="24px" stroke-width="1.7" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M9 6L15 12L9 18" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
+                                <path
+                                    d="M9 6L15 12L9 18"
+                                    stroke="currentColor"
+                                    stroke-width="1.7"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                ></path>
                             </svg>
                         </button>
 
@@ -899,7 +931,9 @@ export class AssistantView extends LitElement {
                         <div class="screen-answer-btn-wrapper">
                             <button class="screen-answer-btn" @click=${this.handleScreenAnswer}>
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                    <path d="M15.98 1.804a1 1 0 0 0-1.96 0l-.24 1.192a1 1 0 0 1-.784.785l-1.192.238a1 1 0 0 0 0 1.962l1.192.238a1 1 0 0 1 .785.785l.238 1.192a1 1 0 0 0 1.962 0l.238-1.192a1 1 0 0 1 .785-.785l1.192-.238a1 1 0 0 0 0-1.962l-1.192-.238a1 1 0 0 1-.785-.785l-.238-1.192ZM6.949 5.684a1 1 0 0 0-1.898 0l-.683 2.051a1 1 0 0 1-.633.633l-2.051.683a1 1 0 0 0 0 1.898l2.051.684a1 1 0 0 1 .633.632l.683 2.051a1 1 0 0 0 1.898 0l.683-2.051a1 1 0 0 1 .633-.633l2.051-.683a1 1 0 0 0 0-1.898l-2.051-.683a1 1 0 0 1-.633-.633L6.95 5.684ZM13.949 13.684a1 1 0 0 0-1.898 0l-.184.551a1 1 0 0 1-.632.633l-.551.183a1 1 0 0 0 0 1.898l.551.183a1 1 0 0 1 .633.633l.183.551a1 1 0 0 0 1.898 0l.184-.551a1 1 0 0 1 .632-.633l.551-.183a1 1 0 0 0 0-1.898l-.551-.184a1 1 0 0 1-.633-.632l-.183-.551Z" />
+                                    <path
+                                        d="M15.98 1.804a1 1 0 0 0-1.96 0l-.24 1.192a1 1 0 0 1-.784.785l-1.192.238a1 1 0 0 0 0 1.962l1.192.238a1 1 0 0 1 .785.785l.238 1.192a1 1 0 0 0 1.962 0l.238-1.192a1 1 0 0 1 .785-.785l1.192-.238a1 1 0 0 0 0-1.962l-1.192-.238a1 1 0 0 1-.785-.785l-.238-1.192ZM6.949 5.684a1 1 0 0 0-1.898 0l-.683 2.051a1 1 0 0 1-.633.633l-2.051.683a1 1 0 0 0 0 1.898l2.051.684a1 1 0 0 1 .633.632l.683 2.051a1 1 0 0 0 1.898 0l.683-2.051a1 1 0 0 1 .633-.633l2.051-.683a1 1 0 0 0 0-1.898l-2.051-.683a1 1 0 0 1-.633-.633L6.95 5.684ZM13.949 13.684a1 1 0 0 0-1.898 0l-.184.551a1 1 0 0 1-.632.633l-.551.183a1 1 0 0 0 0 1.898l.551.183a1 1 0 0 1 .633.633l.183.551a1 1 0 0 0 1.898 0l.184-.551a1 1 0 0 1 .632-.633l.551-.183a1 1 0 0 0 0-1.898l-.551-.184a1 1 0 0 1-.633-.632l-.183-.551Z"
+                                    />
                                 </svg>
                                 <span>Analyze screen</span>
                             </button>

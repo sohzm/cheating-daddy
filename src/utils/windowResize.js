@@ -1,8 +1,7 @@
 export async function resizeLayout() {
     try {
-        if (window.require) {
-            const { ipcRenderer } = window.require('electron');
-            const result = await ipcRenderer.invoke('update-sizes');
+        if (window.electronAPI) {
+            const result = await window.electronAPI.window.updateSizes();
             if (result.success) {
                 console.log('Window resized for current view');
             } else {

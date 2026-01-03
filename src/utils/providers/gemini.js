@@ -28,13 +28,32 @@ class GeminiProvider {
 
     /**
      * Generate text response (streaming)
+     * @param {string} model - Model name
+     * @param {string} prompt - User prompt
+     * @param {string} systemPrompt - System prompt
+     * @param {object} options - Options including conversationContext
      */
     async generateText(model, prompt, systemPrompt, options = {}) {
         this.initialize();
 
+        // Build contents array with conversation context
+        let contents;
+        if (options.conversationContext && Array.isArray(options.conversationContext) && options.conversationContext.length > 0) {
+            // Convert conversation context to Gemini format
+            contents = options.conversationContext.map(msg => ({
+                role: msg.role === 'assistant' ? 'model' : 'user',
+                parts: [{ text: msg.content }]
+            }));
+            // Add current prompt
+            contents.push({ role: 'user', parts: [{ text: prompt }] });
+            console.log('[Gemini] Added', options.conversationContext.length / 2, 'previous turns for context');
+        } else {
+            contents = prompt;
+        }
+
         const response = await this.client.models.generateContentStream({
             model: model,
-            contents: prompt,
+            contents: contents,
             config: {
                 ...(systemPrompt && { systemInstruction: systemPrompt }),
                 temperature: options.temperature || 0.7,
@@ -47,19 +66,39 @@ class GeminiProvider {
 
     /**
      * Analyze image with vision model (streaming)
+     * Note: For vision, we include conversation context as text history, NOT previous images
      */
     async analyzeImage(model, base64Image, prompt, systemPrompt, options = {}) {
         this.initialize();
 
-        const contents = [
-            {
-                inlineData: {
-                    mimeType: 'image/jpeg',
-                    data: base64Image
-                }
-            },
-            prompt
-        ];
+        let contents;
+        if (options.conversationContext && Array.isArray(options.conversationContext) && options.conversationContext.length > 0) {
+            // Build history from conversation context (text only)
+            contents = options.conversationContext.map(msg => ({
+                role: msg.role === 'assistant' ? 'model' : 'user',
+                parts: [{ text: msg.content }]
+            }));
+            // Add current image + prompt
+            contents.push({
+                role: 'user',
+                parts: [
+                    { inlineData: { mimeType: 'image/jpeg', data: base64Image } },
+                    { text: prompt }
+                ]
+            });
+            console.log('[Gemini] Added', options.conversationContext.length / 2, 'previous turns for image context');
+        } else {
+            // No context - original behavior
+            contents = [
+                {
+                    inlineData: {
+                        mimeType: 'image/jpeg',
+                        data: base64Image
+                    }
+                },
+                prompt
+            ];
+        }
 
         const response = await this.client.models.generateContentStream({
             model: model,

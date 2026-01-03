@@ -32,16 +32,31 @@ class GroqProvider {
 
     /**
      * Generate text response (streaming)
+     * @param {string} model - Model name
+     * @param {string} prompt - User prompt
+     * @param {string} systemPrompt - System prompt
+     * @param {object} options - Options including conversationContext
      */
     async generateText(model, prompt, systemPrompt, options = {}) {
         this.initialize();
 
+        // Build messages array
+        const messages = [
+            { role: 'system', content: systemPrompt }
+        ];
+
+        // Add conversation context for follow-up support
+        if (options.conversationContext && Array.isArray(options.conversationContext)) {
+            messages.push(...options.conversationContext);
+            console.log('[Groq] Added', options.conversationContext.length / 2, 'previous turns for context');
+        }
+
+        // Add current user prompt
+        messages.push({ role: 'user', content: prompt });
+
         const stream = await this.client.chat.completions.create({
             model: model,
-            messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: prompt }
-            ],
+            messages: messages,
             stream: true,
             temperature: options.temperature || 0.7,
             max_tokens: options.maxTokens || 2048
@@ -52,26 +67,54 @@ class GroqProvider {
 
     /**
      * Analyze image with vision model (streaming)
+     * Note: For vision, we include conversation context as text, NOT the images
+     * Images from previous turns are not re-sent (too expensive, model handles text context)
      */
     async analyzeImage(model, base64Image, prompt, systemPrompt, options = {}) {
         this.initialize();
 
+        // Build messages array with context
+        const messages = [];
+
+        // Add conversation context as text-only messages (no previous images)
+        if (options.conversationContext && Array.isArray(options.conversationContext)) {
+            // System prompt first
+            messages.push({ role: 'system', content: systemPrompt });
+            // Then conversation history
+            messages.push(...options.conversationContext);
+            console.log('[Groq] Added', options.conversationContext.length / 2, 'previous turns for image context');
+            // Then current image + prompt
+            messages.push({
+                role: 'user',
+                content: [
+                    { type: 'text', text: prompt },
+                    {
+                        type: 'image_url',
+                        image_url: {
+                            url: `data:image/jpeg;base64,${base64Image}`
+                        }
+                    }
+                ]
+            });
+        } else {
+            // No context - original behavior
+            messages.push({
+                role: 'user',
+                content: [
+                    { type: 'text', text: systemPrompt + '\n\n' + prompt },
+                    {
+                        type: 'image_url',
+                        image_url: {
+                            url: `data:image/jpeg;base64,${base64Image}`
+                        }
+                    }
+                ]
+            });
+        }
+
         const stream = await this.client.chat.completions.create({
             model: model,
-            messages: [
-                {
-                    role: 'user',
-                    content: [
-                        { type: 'text', text: systemPrompt + '\n\n' + prompt },
-                        {
-                            type: 'image_url',
-                            image_url: {
-                                url: `data:image/jpeg;base64,${base64Image}`
-                            }
-                        }
-                    ]
-                }
-            ],
+            messages: messages,
             stream: true,
             temperature: options.temperature || 0.7,
             max_tokens: options.maxTokens || 2048
@@ -149,16 +192,26 @@ class GroqProvider {
                 };
             }
 
-            // 3. Process with LLM
-            const finalPrompt = prompt
-                ? `${prompt}\n\nTranscribed Audio:\n"${transcribedText}"`
-                : `Transcribed Audio:\n"${transcribedText}"\n\nPlease analyze or respond to this audio transcription.`;
+            // 3. Build messages array with conversation context for follow-up questions
+            const messages = [];
+
+            // Add system prompt
+            if (prompt) {
+                messages.push({ role: 'system', content: prompt });
+            }
+
+            // Add conversation context (last 2 Q&A pairs) for follow-up support
+            if (options.conversationContext && Array.isArray(options.conversationContext)) {
+                messages.push(...options.conversationContext);
+                console.log('[Groq] Added', options.conversationContext.length / 2, 'previous turns for context');
+            }
+
+            // Add current transcription as user message
+            messages.push({ role: 'user', content: transcribedText });
 
             const stream = await this.client.chat.completions.create({
                 model: model,
-                messages: [
-                    { role: 'user', content: finalPrompt }
-                ],
+                messages: messages,
                 stream: true,
                 temperature: options.temperature || 0.7,
                 max_tokens: options.maxTokens || 2048

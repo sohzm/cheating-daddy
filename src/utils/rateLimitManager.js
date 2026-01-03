@@ -1,6 +1,11 @@
 /**
  * Rate Limit Manager
  * Tracks API usage per provider/model and provides proactive fallback
+ * 
+ * Uses async I/O with write batching to prevent UI stutter:
+ * - In-memory cache for immediate reads
+ * - Batched writes (every 5 updates or 5 seconds)
+ * - Async file operations
  */
 
 const fs = require('fs');
@@ -25,6 +30,12 @@ const LIMITS = {
 
 // Threshold to switch to fallback (90% of limit)
 const FALLBACK_THRESHOLD = 0.9;
+
+// Write batching configuration
+const BATCH_CONFIG = {
+    MAX_PENDING_WRITES: 5,  // Flush after this many writes
+    FLUSH_INTERVAL_MS: 5000 // Or flush every 5 seconds
+};
 
 // Get config directory path
 function getConfigDir() {
@@ -53,6 +64,101 @@ function getDefaultRateLimits() {
 // In-memory cache
 let limitsCache = null;
 
+// Write batching state
+let pendingWriteCount = 0;
+let flushTimer = null;
+let isWriting = false;
+
+/**
+ * Schedule a batched write to disk
+ * Writes happen after MAX_PENDING_WRITES updates or FLUSH_INTERVAL_MS, whichever comes first
+ */
+function scheduleBatchedWrite() {
+    pendingWriteCount++;
+
+    // Flush immediately if we've hit the batch limit
+    if (pendingWriteCount >= BATCH_CONFIG.MAX_PENDING_WRITES) {
+        flushToDisk();
+        return;
+    }
+
+    // Otherwise, ensure a timer is running
+    if (!flushTimer) {
+        flushTimer = setTimeout(() => {
+            flushToDisk();
+        }, BATCH_CONFIG.FLUSH_INTERVAL_MS);
+    }
+}
+
+/**
+ * Flush the in-memory cache to disk asynchronously
+ */
+function flushToDisk() {
+    // Clear timer if running
+    if (flushTimer) {
+        clearTimeout(flushTimer);
+        flushTimer = null;
+    }
+
+    // Reset pending count
+    const writeCount = pendingWriteCount;
+    pendingWriteCount = 0;
+
+    // Don't write if nothing to write or already writing
+    if (!limitsCache || isWriting) return;
+
+    isWriting = true;
+
+    const filePath = getRateLimitsPath();
+    const dir = path.dirname(filePath);
+    const data = JSON.stringify(limitsCache, null, 2);
+
+    // Ensure directory exists (synchronously - only happens once per session typically)
+    if (!fs.existsSync(dir)) {
+        try {
+            fs.mkdirSync(dir, { recursive: true });
+        } catch (error) {
+            console.error('[RateLimitManager] Error creating directory:', error);
+            isWriting = false;
+            return;
+        }
+    }
+
+    // Write asynchronously
+    fs.writeFile(filePath, data, 'utf8', (error) => {
+        isWriting = false;
+        if (error) {
+            console.error('[RateLimitManager] Error writing rate limits:', error);
+        } else if (writeCount > 0) {
+            // console.log(`[RateLimitManager] Flushed ${writeCount} updates to disk`);
+        }
+    });
+}
+
+/**
+ * Force flush on app exit (called from main process)
+ */
+function flushSync() {
+    if (!limitsCache) return;
+
+    if (flushTimer) {
+        clearTimeout(flushTimer);
+        flushTimer = null;
+    }
+
+    try {
+        const filePath = getRateLimitsPath();
+        const dir = path.dirname(filePath);
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+        }
+        fs.writeFileSync(filePath, JSON.stringify(limitsCache, null, 2));
+        console.log('[RateLimitManager] Sync flush completed');
+    } catch (error) {
+        console.error('[RateLimitManager] Error in sync flush:', error);
+    }
+}
+
 // Read rate limits from file (with caching)
 function getRateLimits() {
     if (limitsCache) return limitsCache;
@@ -71,20 +177,10 @@ function getRateLimits() {
     return limitsCache;
 }
 
-// Write rate limits to file (and update cache)
+// Write rate limits - now uses batched async writes
 function setRateLimits(limits) {
-    limitsCache = limits; // Update cache immediately
-
-    try {
-        const filePath = getRateLimitsPath();
-        const dir = path.dirname(filePath);
-        if (!fs.existsSync(dir)) {
-            fs.mkdirSync(dir, { recursive: true });
-        }
-        fs.writeFileSync(filePath, JSON.stringify(limits, null, 2));
-    } catch (error) {
-        console.error('Error writing rate limits:', error);
-    }
+    limitsCache = limits; // Update cache immediately (sync for reads)
+    scheduleBatchedWrite(); // Schedule async disk write
 }
 
 // Get midnight UTC timestamp for today
@@ -296,5 +392,7 @@ module.exports = {
     getAllUsageStats,
     getTimeUntilReset,
     getUsage,
-    checkAndResetIfNeeded
+    checkAndResetIfNeeded,
+    flushSync, // Call on app exit to ensure data is saved
+    flushToDisk // Force async flush
 };

@@ -1,8 +1,83 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { safeStorage } = require('electron');
 
 const CONFIG_VERSION = 1;
+
+// ============ ENCRYPTION HELPERS ============
+
+/**
+ * Check if encryption is available on this system.
+ * safeStorage uses OS keychain (Windows Credential Manager, macOS Keychain, etc.)
+ */
+function isEncryptionAvailable() {
+    try {
+        return safeStorage.isEncryptionAvailable();
+    } catch (error) {
+        console.warn('safeStorage not available:', error.message);
+        return false;
+    }
+}
+
+/**
+ * Encrypt a string using the OS keychain.
+ * Returns a base64-encoded encrypted string.
+ */
+function encryptString(plaintext) {
+    if (!plaintext) return '';
+    if (!isEncryptionAvailable()) {
+        console.warn('Encryption not available, storing in plain text');
+        return plaintext;
+    }
+    try {
+        const encrypted = safeStorage.encryptString(plaintext);
+        return encrypted.toString('base64');
+    } catch (error) {
+        console.error('Encryption failed:', error.message);
+        return plaintext; // Fallback to plain text
+    }
+}
+
+/**
+ * Decrypt a base64-encoded encrypted string.
+ * Returns the original plaintext.
+ */
+function decryptString(encryptedBase64) {
+    if (!encryptedBase64) return '';
+    if (!isEncryptionAvailable()) {
+        // If encryption isn't available, assume it's plain text
+        return encryptedBase64;
+    }
+    try {
+        const buffer = Buffer.from(encryptedBase64, 'base64');
+        return safeStorage.decryptString(buffer);
+    } catch (error) {
+        // If decryption fails, it might be plain text from before encryption was enabled
+        // Try to detect if it looks like a valid API key (not encrypted)
+        if (isLikelyPlainTextApiKey(encryptedBase64)) {
+            console.log('Detected plain text credential, will encrypt on next save');
+            return encryptedBase64;
+        }
+        console.error('Decryption failed:', error.message);
+        return '';
+    }
+}
+
+/**
+ * Heuristic to detect if a string looks like a plain text API key.
+ * Encrypted data in base64 typically has different patterns than API keys.
+ */
+function isLikelyPlainTextApiKey(str) {
+    if (!str || str.length === 0) return false;
+    // Common API key patterns: alphanumeric with dashes/underscores, specific prefixes
+    // Groq keys start with 'gsk_', Gemini keys are typically alphanumeric
+    if (str.startsWith('gsk_')) return true;
+    if (str.startsWith('AIza')) return true; // Google/Gemini keys often start with this
+    // If it's short and mostly alphanumeric, likely a key
+    if (str.length < 100 && /^[A-Za-z0-9_-]+$/.test(str)) return true;
+    return false;
+}
 
 // Default values
 const DEFAULT_CONFIG = {
@@ -32,6 +107,9 @@ const DEFAULT_PREFERENCES = {
     autoScroll: true,
     showSidebar: true, // Navigation slide
     googleSearchEnabled: false,
+    // Conversation context for follow-up questions
+    conversationContextEnabled: false,
+    conversationContextCount: 2, // Number of recent Q&A pairs (1-5)
     // Audio processing mode (live vs audio-to-text)
     audioProcessingMode: 'audio-to-text',
     audioTriggerMethod: 'vad',
@@ -323,14 +401,101 @@ function updateConfig(key, value) {
 
 // ============ CREDENTIALS ============
 
-function getCredentials() {
-    return readJsonFile(getCredentialsPath(), DEFAULT_CREDENTIALS);
+/**
+ * Get credentials path for encrypted storage.
+ * Uses .encrypted.json extension to distinguish from plain text.
+ */
+function getEncryptedCredentialsPath() {
+    return path.join(getConfigDir(), 'credentials.encrypted.json');
 }
 
+/**
+ * Internal: Read credentials without triggering migration.
+ * Used by setCredentials to avoid recursive calls.
+ */
+function _readCredentialsRaw() {
+    const encryptedPath = getEncryptedCredentialsPath();
+    const plainPath = getCredentialsPath();
+
+    // Check for encrypted credentials first
+    if (fs.existsSync(encryptedPath)) {
+        const encrypted = readJsonFile(encryptedPath, {});
+        return {
+            apiKey: decryptString(encrypted.apiKey || ''),
+            gemini: decryptString(encrypted.gemini || ''),
+            groq: decryptString(encrypted.groq || '')
+        };
+    }
+
+    // Fall back to plain text credentials (legacy)
+    if (fs.existsSync(plainPath)) {
+        return readJsonFile(plainPath, DEFAULT_CREDENTIALS);
+    }
+
+    return DEFAULT_CREDENTIALS;
+}
+
+/**
+ * Read and decrypt credentials.
+ * Handles migration from plain text to encrypted format.
+ */
+function getCredentials() {
+    const encryptedPath = getEncryptedCredentialsPath();
+    const plainPath = getCredentialsPath();
+
+    // Check for encrypted credentials first
+    if (fs.existsSync(encryptedPath)) {
+        const encrypted = readJsonFile(encryptedPath, {});
+        return {
+            apiKey: decryptString(encrypted.apiKey || ''),
+            gemini: decryptString(encrypted.gemini || ''),
+            groq: decryptString(encrypted.groq || '')
+        };
+    }
+
+    // Fall back to plain text credentials (legacy)
+    if (fs.existsSync(plainPath)) {
+        const plain = readJsonFile(plainPath, DEFAULT_CREDENTIALS);
+        // Migrate to encrypted format on first read (only if there are actual credentials)
+        if (plain.apiKey || plain.gemini || plain.groq) {
+            console.log('Migrating plain text credentials to encrypted storage...');
+            // Write encrypted file directly (don't call setCredentials to avoid recursion)
+            const encrypted = {
+                apiKey: encryptString(plain.apiKey || ''),
+                gemini: encryptString(plain.gemini || ''),
+                groq: encryptString(plain.groq || '')
+            };
+            writeJsonFile(encryptedPath, encrypted);
+            // Remove plain text file after successful migration
+            try {
+                fs.unlinkSync(plainPath);
+                console.log('Plain text credentials file removed after migration');
+            } catch (error) {
+                console.warn('Could not remove plain text credentials file:', error.message);
+            }
+        }
+        return plain;
+    }
+
+    return DEFAULT_CREDENTIALS;
+}
+
+/**
+ * Encrypt and save credentials.
+ */
 function setCredentials(credentials) {
-    const current = getCredentials();
-    const updated = { ...current, ...credentials };
-    return writeJsonFile(getCredentialsPath(), updated);
+    // Use raw read to avoid triggering migration
+    const current = _readCredentialsRaw();
+    const merged = { ...current, ...credentials };
+
+    // Encrypt each credential
+    const encrypted = {
+        apiKey: encryptString(merged.apiKey || ''),
+        gemini: encryptString(merged.gemini || ''),
+        groq: encryptString(merged.groq || '')
+    };
+
+    return writeJsonFile(getEncryptedCredentialsPath(), encrypted);
 }
 
 function getApiKey(provider = null) {

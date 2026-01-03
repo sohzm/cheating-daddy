@@ -1,4 +1,4 @@
-# Cheating Daddy on Steroids 🚀
+# Cheating Daddy On Steroids 🚀
 
 <img width="1299" height="424" alt="cd (1)" src="https://github.com/user-attachments/assets/b25fff4d-043d-4f38-9985-f832ae0d0f6e" />
 
@@ -6,7 +6,26 @@
 
 ---
 
-## 🌟 What's New in This Fork (v0.5.4)
+## 🌟 What's New in v0.5.5
+
+### Conversation Memory
+- **Follow-up Question Support**: AI remembers recent Q&A for contextual follow-ups
+- **Configurable History**: Choose 1-5 previous Q&A pairs to include
+- **Works Everywhere**: Text mode, audio mode, and screen analysis
+
+### Architecture Overhaul
+- **Centralized IPC Gateway**: 58 channels across 5 subsystems
+- **Encrypted API Keys**: OS keychain integration (Windows Credential Manager, macOS Keychain)
+- **Modular Handler System**: Storage, Assistant, Window, Application, Update handlers
+
+### Production Cleanup
+- **Optimized Codebase**: Removed ~700 lines of dead code
+- **Faster Speech Detection**: Reduced end-of-utterance silence to 1.5s
+- **Isolated Context Builders**: Separate conversation and screen analysis history
+
+---
+
+## 🌟 What's New in v0.5.4
 
 ### Multi-Provider AI Engine
 - **Groq Integration**: Added Groq (Llama 4 Maverick/Scout, Whisper) alongside Gemini for task-specific optimization

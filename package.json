@@ -1,7 +1,7 @@
 {
     "name": "cheating-daddy",
     "productName": "cheating-daddy",
-    "version": "0.5.4",
+    "version": "0.5.5",
     "description": "Cheating Daddy On Steroids",
     "main": "src/index.js",
     "scripts": {
@@ -9,7 +9,10 @@
         "package": "electron-forge package",
         "make": "electron-forge make",
         "publish": "electron-forge publish",
-        "lint": "echo \"No linting configured\""
+        "lint": "echo \"No linting configured\"",
+        "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+        "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
+        "test:regression": "node --experimental-vm-modules node_modules/jest/bin/jest.js tests/regression"
     },
     "keywords": [
         "Cheating Daddy On Steroids",
@@ -26,7 +29,7 @@
         {
             "name": "klaus-qodes",
             "github": "https://github.com/klaus-qodes",
-            "version": "v0.5.4"
+            "version": "v0.5.5"
         }
     ],
     "license": "GPL-3.0",
@@ -45,7 +48,9 @@
         "@electron-forge/plugin-auto-unpack-natives": "^7.8.1",
         "@electron-forge/plugin-fuses": "^7.8.1",
         "@electron/fuses": "^1.8.0",
+        "@jest/globals": "^30.2.0",
         "@reforged/maker-appimage": "^5.0.0",
-        "electron": "^30.0.5"
+        "electron": "^30.0.5",
+        "jest": "^30.2.0"
     }
 }

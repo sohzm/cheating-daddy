@@ -5,7 +5,11 @@ import { UpgradeDialog } from '../dialogs/UpgradeDialog.js';
 export class CustomizeView extends LitElement {
     static styles = css`
         * {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family:
+                'Inter',
+                -apple-system,
+                BlinkMacSystemFont,
+                sans-serif;
             cursor: default;
             user-select: none;
         }
@@ -612,7 +616,7 @@ export class CustomizeView extends LitElement {
         .usage-bar {
             flex: 1;
             height: 8px;
-            background: rgba(255,255,255,0.1);
+            background: rgba(255, 255, 255, 0.1);
             border-radius: 4px;
             overflow: hidden;
         }
@@ -679,7 +683,7 @@ export class CustomizeView extends LitElement {
             background: rgba(var(--accent-primary-rgb, 99, 102, 241), 0.1);
         }
 
-        .radio-card input[type="radio"] {
+        .radio-card input[type='radio'] {
             margin-top: 2px;
             accent-color: var(--accent-primary);
         }
@@ -704,7 +708,7 @@ export class CustomizeView extends LitElement {
             display: inline-block;
             font-size: 10px;
             padding: 2px 6px;
-            background: rgba(255,255,255,0.1);
+            background: rgba(255, 255, 255, 0.1);
             border-radius: 3px;
             margin-top: 4px;
             width: fit-content;
@@ -724,6 +728,8 @@ export class CustomizeView extends LitElement {
         keybinds: { type: Object },
         googleSearchEnabled: { type: Boolean },
         detailedAnswers: { type: Boolean },
+        conversationContextEnabled: { type: Boolean },
+        conversationContextCount: { type: Number },
         backgroundTransparency: { type: Number },
         responseViewMode: { type: String },
         autoScroll: { type: Boolean },
@@ -769,17 +775,21 @@ export class CustomizeView extends LitElement {
         this.selectedImageQuality = 'medium';
         this.layoutMode = 'normal';
         this.keybinds = this.getDefaultKeybinds();
-        this.onProfileChange = () => { };
-        this.onLanguageChange = () => { };
-        this.onImageQualityChange = () => { };
-        this.onLayoutModeChange = () => { };
-        this.onResponseViewModeChange = () => { };
+        this.onProfileChange = () => {};
+        this.onLanguageChange = () => {};
+        this.onImageQualityChange = () => {};
+        this.onLayoutModeChange = () => {};
+        this.onResponseViewModeChange = () => {};
 
         // Google Search default
         this.googleSearchEnabled = true;
 
         // Detailed answers mode default
         this.detailedAnswers = false;
+
+        // Conversation context defaults
+        this.conversationContextEnabled = false;
+        this.conversationContextCount = 2;
 
         // Clear data state
         this.isClearing = false;
@@ -818,7 +828,7 @@ export class CustomizeView extends LitElement {
         this.editingProfileData = {
             id: '',
             name: '',
-            settings: { persona: 'interview', length: 'concise', format: 'teleprompter' }
+            settings: { persona: 'interview', length: 'concise', format: 'teleprompter' },
         };
 
         // API Keys state
@@ -880,31 +890,87 @@ export class CustomizeView extends LitElement {
 
     renderSidebarIcon(icon) {
         const icons = {
-            user: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M19 21V19C19 17.9391 18.5786 16.9217 17.8284 16.1716C17.0783 15.4214 16.0609 15 15 15H9C7.93913 15 6.92172 15.4214 6.17157 16.1716C5.42143 16.9217 5 17.9391 5 19V21"></path>
+            user: html`<svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
+                <path
+                    d="M19 21V19C19 17.9391 18.5786 16.9217 17.8284 16.1716C17.0783 15.4214 16.0609 15 15 15H9C7.93913 15 6.92172 15.4214 6.17157 16.1716C5.42143 16.9217 5 17.9391 5 19V21"
+                ></path>
                 <circle cx="12" cy="7" r="4"></circle>
             </svg>`,
-            mic: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            mic: html`<svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
                 <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
                 <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
                 <line x1="12" y1="19" x2="12" y2="23"></line>
                 <line x1="8" y1="23" x2="16" y2="23"></line>
             </svg>`,
-            globe: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            globe: html`<svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
                 <circle cx="12" cy="12" r="10"></circle>
                 <line x1="2" y1="12" x2="22" y2="12"></line>
                 <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
             </svg>`,
-            display: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            display: html`<svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
                 <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
                 <line x1="8" y1="21" x2="16" y2="21"></line>
                 <line x1="12" y1="17" x2="12" y2="21"></line>
             </svg>`,
-            camera: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            camera: html`<svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
                 <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
                 <circle cx="12" cy="13" r="4"></circle>
             </svg>`,
-            keyboard: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            keyboard: html`<svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
                 <rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect>
                 <path d="M6 8h.001"></path>
                 <path d="M10 8h.001"></path>
@@ -915,28 +981,88 @@ export class CustomizeView extends LitElement {
                 <path d="M16 12h.001"></path>
                 <path d="M7 16h10"></path>
             </svg>`,
-            search: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            search: html`<svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
                 <circle cx="11" cy="11" r="8"></circle>
                 <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
             </svg>`,
-            warning: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            warning: html`<svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
                 <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
                 <line x1="12" y1="9" x2="12" y2="13"></line>
                 <line x1="12" y1="17" x2="12.01" y2="17"></line>
             </svg>`,
-            key: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
+            key: html`<svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
+                <path
+                    d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"
+                ></path>
             </svg>`,
-            brain: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 4.44-2.04z"></path>
-                <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-4.44-2.04z"></path>
+            brain: html`<svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
+                <path
+                    d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 4.44-2.04z"
+                ></path>
+                <path
+                    d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-4.44-2.04z"
+                ></path>
             </svg>`,
-            chart: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            chart: html`<svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
                 <line x1="18" y1="20" x2="18" y2="10"></line>
                 <line x1="12" y1="20" x2="12" y2="4"></line>
                 <line x1="6" y1="20" x2="6" y2="14"></line>
             </svg>`,
-            refresh: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            refresh: html`<svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
                 <path d="M23 4v6h-6"></path>
                 <path d="M1 20v-6h6"></path>
                 <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
@@ -951,11 +1077,13 @@ export class CustomizeView extends LitElement {
                 cheatingDaddy.storage.getPreferences(),
                 cheatingDaddy.storage.getKeybinds(),
                 cheatingDaddy.storage.getCustomProfiles(),
-                cheatingDaddy.storage.getCredentials()
+                cheatingDaddy.storage.getCredentials(),
             ]);
 
             this.googleSearchEnabled = prefs.googleSearchEnabled ?? true;
             this.detailedAnswers = prefs.detailedAnswers ?? false;
+            this.conversationContextEnabled = prefs.conversationContextEnabled ?? false;
+            this.conversationContextCount = prefs.conversationContextCount ?? 2;
             this.backgroundTransparency = prefs.backgroundTransparency ?? 0.8;
             this.responseViewMode = prefs.responseViewMode ?? 'paged';
             this.autoScroll = prefs.autoScroll ?? true;
@@ -985,24 +1113,24 @@ export class CustomizeView extends LitElement {
                     primaryProvider: 'groq',
                     primaryModel: 'llama-3.3-70b-versatile',
                     fallbackProvider: 'groq',
-                    fallbackModel: 'llama-3.1-8b-instant'
+                    fallbackModel: 'llama-3.1-8b-instant',
                 },
                 screenAnalysis: prefs.screenAnalysis || {
                     primaryProvider: 'groq',
                     primaryModel: 'meta-llama/llama-4-maverick-17b-128e-instruct',
                     fallbackProvider: 'gemini',
-                    fallbackModel: 'gemini-2.5-flash'
+                    fallbackModel: 'gemini-2.5-flash',
                 },
                 liveAudio: prefs.liveAudio || {
                     provider: 'gemini',
-                    model: 'gemini-2.5-flash-native-audio-preview-12-2025'
+                    model: 'gemini-2.5-flash-native-audio-preview-12-2025',
                 },
                 audioToText: prefs.audioToText || {
                     primaryProvider: 'groq',
                     primaryModel: 'meta-llama/llama-4-maverick-17b-128e-instruct',
                     fallbackProvider: 'groq',
-                    fallbackModel: 'meta-llama/llama-4-scout-17b-16e-instruct'
-                }
+                    fallbackModel: 'meta-llama/llama-4-scout-17b-16e-instruct',
+                },
             };
 
             // Load audio processing settings
@@ -1138,24 +1266,24 @@ export class CustomizeView extends LitElement {
                 primaryProvider: 'groq',
                 primaryModel: 'llama-3.3-70b-versatile',
                 fallbackProvider: 'groq',
-                fallbackModel: 'llama-3.1-8b-instant'
+                fallbackModel: 'llama-3.1-8b-instant',
             },
             screenAnalysis: {
                 primaryProvider: 'groq',
                 primaryModel: 'meta-llama/llama-4-maverick-17b-128e-instruct',
                 fallbackProvider: 'gemini',
-                fallbackModel: 'gemini-2.5-flash'
+                fallbackModel: 'gemini-2.5-flash',
             },
             liveAudio: {
                 provider: 'gemini',
-                model: 'gemini-2.5-flash-native-audio-preview-12-2025'
+                model: 'gemini-2.5-flash-native-audio-preview-12-2025',
             },
             audioToText: {
                 primaryProvider: 'groq',
                 primaryModel: 'meta-llama/llama-4-maverick-17b-128e-instruct',
                 fallbackProvider: 'groq',
-                fallbackModel: 'meta-llama/llama-4-scout-17b-16e-instruct'
-            }
+                fallbackModel: 'meta-llama/llama-4-scout-17b-16e-instruct',
+            },
         };
 
         await cheatingDaddy.storage.updatePreference('textMessage', this.modelPrefs.textMessage);
@@ -1168,10 +1296,10 @@ export class CustomizeView extends LitElement {
     // Usage stats handlers
     async loadUsageStats() {
         try {
-            const stats = await cheatingDaddy.storage.getUsageStats?.() || { groq: [], gemini: [] };
+            const stats = (await cheatingDaddy.storage.getUsageStats?.()) || { groq: [], gemini: [] };
             this.usageStats = stats;
 
-            const resetTime = await cheatingDaddy.storage.getUsageResetTime?.() || { hours: 0, minutes: 0 };
+            const resetTime = (await cheatingDaddy.storage.getUsageResetTime?.()) || { hours: 0, minutes: 0 };
             this.usageResetTime = `${resetTime.hours}h ${resetTime.minutes}m remaining`;
         } catch (error) {
             console.error('Error loading usage stats:', error);
@@ -1227,7 +1355,7 @@ export class CustomizeView extends LitElement {
             value: p.id,
             name: p.name,
             description: `Custom: ${p.settings.persona} • ${p.settings.length} • ${p.settings.format}`,
-            isCustom: true
+            isCustom: true,
         }));
 
         return [...builtIn, ...custom];
@@ -1284,8 +1412,6 @@ export class CustomizeView extends LitElement {
 
         return names;
     }
-
-
 
     handleProfileSelect(e) {
         this.selectedProfile = e.target.value;
@@ -1365,9 +1491,8 @@ export class CustomizeView extends LitElement {
     async saveKeybinds() {
         await cheatingDaddy.storage.setKeybinds(this.keybinds);
         // Send to main process to update global shortcuts
-        if (window.require) {
-            const { ipcRenderer } = window.require('electron');
-            ipcRenderer.send('update-keybinds', this.keybinds);
+        if (window.electronAPI) {
+            window.electronAPI.send.updateKeybinds(this.keybinds);
         }
     }
 
@@ -1381,9 +1506,8 @@ export class CustomizeView extends LitElement {
         this.keybinds = this.getDefaultKeybinds();
         await cheatingDaddy.storage.setKeybinds(null);
         this.requestUpdate();
-        if (window.require) {
-            const { ipcRenderer } = window.require('electron');
-            ipcRenderer.send('update-keybinds', this.keybinds);
+        if (window.electronAPI) {
+            window.electronAPI.send.updateKeybinds(this.keybinds);
         }
     }
 
@@ -1532,10 +1656,9 @@ export class CustomizeView extends LitElement {
         await cheatingDaddy.storage.updatePreference('googleSearchEnabled', this.googleSearchEnabled);
 
         // Notify main process if available
-        if (window.require) {
+        if (window.electronAPI) {
             try {
-                const { ipcRenderer } = window.require('electron');
-                await ipcRenderer.invoke('update-google-search-setting', this.googleSearchEnabled);
+                await window.electronAPI.assistant.updateGoogleSearchSetting(this.googleSearchEnabled);
             } catch (error) {
                 console.error('Failed to notify main process:', error);
             }
@@ -1547,6 +1670,18 @@ export class CustomizeView extends LitElement {
     async handleDetailedAnswersChange(e) {
         this.detailedAnswers = e.target.checked;
         await cheatingDaddy.storage.updatePreference('detailedAnswers', this.detailedAnswers);
+        this.requestUpdate();
+    }
+
+    async handleConversationContextToggle(e) {
+        this.conversationContextEnabled = e.target.checked;
+        await cheatingDaddy.storage.updatePreference('conversationContextEnabled', this.conversationContextEnabled);
+        this.requestUpdate();
+    }
+
+    async handleConversationContextCountChange(e) {
+        this.conversationContextCount = parseInt(e.target.value, 10);
+        await cheatingDaddy.storage.updatePreference('conversationContextCount', this.conversationContextCount);
         this.requestUpdate();
     }
 
@@ -1600,7 +1735,7 @@ export class CustomizeView extends LitElement {
 
     handleCreateProfile() {
         // Initialize with deep copies of default templates
-        const deepCopy = (obj) => {
+        const deepCopy = obj => {
             const copy = JSON.parse(JSON.stringify(obj));
             if (copy && copy.name && !copy.name.startsWith('Custom ')) {
                 copy.name = `Custom ${copy.name}`;
@@ -1619,14 +1754,14 @@ export class CustomizeView extends LitElement {
             settings: {
                 persona: deepCopy(p),
                 length: deepCopy(l),
-                format: deepCopy(f)
-            }
+                format: deepCopy(f),
+            },
         };
         // Add template trackers to dropdowns
         this.editingProfileTemplates = {
             persona: 'interview',
             length: 'concise',
-            format: 'teleprompter'
+            format: 'teleprompter',
         };
 
         this.isEditingProfile = true;
@@ -1643,7 +1778,7 @@ export class CustomizeView extends LitElement {
             this.editingProfileTemplates = {
                 persona: 'custom',
                 length: 'custom',
-                format: 'custom'
+                format: 'custom',
             };
 
             this.isEditingProfile = true;
@@ -1678,9 +1813,9 @@ export class CustomizeView extends LitElement {
                 ...this.editingProfileData.settings,
                 [component]: {
                     ...this.editingProfileData.settings[component],
-                    [property]: value
-                }
-            }
+                    [property]: value,
+                },
+            },
         };
         this.requestUpdate();
     }
@@ -1689,7 +1824,7 @@ export class CustomizeView extends LitElement {
     updateComponentTemplate(component, templateKey) {
         this.editingProfileTemplates = {
             ...this.editingProfileTemplates,
-            [component]: templateKey
+            [component]: templateKey,
         };
 
         const defaults = window.cheatingDaddy?.prompts || { PERSONAS: {}, LENGTHS: {}, FORMATS: {} };
@@ -1718,8 +1853,8 @@ export class CustomizeView extends LitElement {
                     ...this.editingProfileData,
                     settings: {
                         ...this.editingProfileData.settings,
-                        [component]: copy
-                    }
+                        [component]: copy,
+                    },
                 };
             }
         }
@@ -1736,7 +1871,7 @@ export class CustomizeView extends LitElement {
 
         const profileToSave = {
             ...this.editingProfileData,
-            id: this.editingProfileData.id || crypto.randomUUID()
+            id: this.editingProfileData.id || crypto.randomUUID(),
         };
 
         try {
@@ -1763,15 +1898,15 @@ export class CustomizeView extends LitElement {
 
     renderProfileEditor() {
         // Access prompts definitions - ensure they are available
-        // We'll need to expose them from main process or have them in renderer? 
+        // We'll need to expose them from main process or have them in renderer?
         // For now, assuming they are available via cheatingDaddy.prompts which we'll add
         const PROMPTS = window.cheatingDaddy?.prompts || { PERSONAS: {}, LENGTHS: {}, FORMATS: {} };
 
         const renderTextArea = (label, value, onChange, placeholder, rows = 3) => html`
             <div class="form-group" style="margin-top: 8px;">
                 <label class="form-label" style="font-size: 11px; color: var(--text-secondary);">${label}</label>
-                <textarea 
-                    class="form-control" 
+                <textarea
+                    class="form-control"
                     style="font-family: monospace; font-size: 12px; line-height: 1.4;"
                     rows="${rows}"
                     .value=${value || ''}
@@ -1784,7 +1919,13 @@ export class CustomizeView extends LitElement {
         return html`
             <div class="profile-section">
                 <div class="content-header" style="display: flex; align-items: center; gap: 10px;">
-                    <button class="reset-keybinds-button" @click=${() => { this.isEditingProfile = false; this.requestUpdate(); }}>
+                    <button
+                        class="reset-keybinds-button"
+                        @click=${() => {
+                            this.isEditingProfile = false;
+                            this.requestUpdate();
+                        }}
+                    >
                         &larr; Back
                     </button>
                     <span>${this.editingProfileData.id ? 'Edit Profile' : 'New Profile'}</span>
@@ -1792,121 +1933,135 @@ export class CustomizeView extends LitElement {
                 <div class="form-grid">
                     <div class="form-group">
                         <label class="form-label">Profile Name</label>
-                        <input type="text" class="form-control" .value=${this.editingProfileData.name} 
-                            @input=${(e) => this.updateEditingProfile('name', e.target.value)} 
-                            placeholder="e.g. Technical Interview" />
+                        <input
+                            type="text"
+                            class="form-control"
+                            .value=${this.editingProfileData.name}
+                            @input=${e => this.updateEditingProfile('name', e.target.value)}
+                            placeholder="e.g. Technical Interview"
+                        />
                     </div>
 
                     <!-- PERSONA EDITOR -->
                     <div class="form-group" style="border: 1px solid var(--border-color); padding: 12px; border-radius: 6px;">
                         <label class="form-label" style="margin-bottom: 8px;">Persona Configuration</label>
-                        
+
                         <div class="form-group">
                             <label class="form-label" style="font-size: 12px;">Base Template</label>
-                            <select class="form-control" 
+                            <select
+                                class="form-control"
                                 .value=${this.editingProfileTemplates?.persona || 'interview'}
-                                @change=${(e) => this.updateComponentTemplate('persona', e.target.value)}>
-                                ${Object.entries(PROMPTS.PERSONAS).map(([key, p]) => html`
-                                    <option value="${key}">${p.name}</option>
-                                `)}
+                                @change=${e => this.updateComponentTemplate('persona', e.target.value)}
+                            >
+                                ${Object.entries(PROMPTS.PERSONAS).map(([key, p]) => html` <option value="${key}">${p.name}</option> `)}
                                 <option value="custom">Custom (Edited)</option>
                             </select>
                         </div>
 
                         <details>
-                            <summary style="cursor: default; font-size: 12px; color: var(--accent-color); margin: 8px 0;">Advanced: Edit Prompt Instructions</summary>
+                            <summary style="cursor: default; font-size: 12px; color: var(--accent-color); margin: 8px 0;">
+                                Advanced: Edit Prompt Instructions
+                            </summary>
                             ${renderTextArea(
-            'Intro Instruction',
-            this.editingProfileData.settings.persona.intro,
-            (e) => {
-                this.updateComponentProperty('persona', 'intro', e.target.value);
-                this.editingProfileTemplates.persona = 'custom';
-            },
-            'Who is the AI?'
-        )}
+                                'Intro Instruction',
+                                this.editingProfileData.settings.persona.intro,
+                                e => {
+                                    this.updateComponentProperty('persona', 'intro', e.target.value);
+                                    this.editingProfileTemplates.persona = 'custom';
+                                },
+                                'Who is the AI?'
+                            )}
                             ${renderTextArea(
-            'Context Instruction',
-            this.editingProfileData.settings.persona.contextInstruction,
-            (e) => {
-                this.updateComponentProperty('persona', 'contextInstruction', e.target.value);
-                this.editingProfileTemplates.persona = 'custom';
-            },
-            'How should user context be used?'
-        )}
+                                'Context Instruction',
+                                this.editingProfileData.settings.persona.contextInstruction,
+                                e => {
+                                    this.updateComponentProperty('persona', 'contextInstruction', e.target.value);
+                                    this.editingProfileTemplates.persona = 'custom';
+                                },
+                                'How should user context be used?'
+                            )}
                             ${renderTextArea(
-            'Search Rules',
-            this.editingProfileData.settings.persona.searchFocus,
-            (e) => {
-                this.updateComponentProperty('persona', 'searchFocus', e.target.value);
-                this.editingProfileTemplates.persona = 'custom';
-            },
-            'When should it search?'
-        )}
+                                'Search Rules',
+                                this.editingProfileData.settings.persona.searchFocus,
+                                e => {
+                                    this.updateComponentProperty('persona', 'searchFocus', e.target.value);
+                                    this.editingProfileTemplates.persona = 'custom';
+                                },
+                                'When should it search?'
+                            )}
                         </details>
                     </div>
 
                     <!-- LENGTH EDITOR -->
                     <div class="form-group" style="border: 1px solid var(--border-color); padding: 12px; border-radius: 6px;">
                         <label class="form-label" style="margin-bottom: 8px;">Length Configuration</label>
-                        
+
                         <div class="form-group">
                             <label class="form-label" style="font-size: 12px;">Base Template</label>
-                            <select class="form-control" 
+                            <select
+                                class="form-control"
                                 .value=${this.editingProfileTemplates?.length || 'concise'}
-                                @change=${(e) => this.updateComponentTemplate('length', e.target.value)}>
-                                ${Object.entries(PROMPTS.LENGTHS).map(([key, l]) => html`
-                                    <option value="${key}">${l.name}</option>
-                                `)}
+                                @change=${e => this.updateComponentTemplate('length', e.target.value)}
+                            >
+                                ${Object.entries(PROMPTS.LENGTHS).map(([key, l]) => html` <option value="${key}">${l.name}</option> `)}
                                 <option value="custom">Custom (Edited)</option>
                             </select>
                         </div>
-                        
+
                         <details>
-                            <summary style="cursor: default; font-size: 12px; color: var(--accent-color); margin: 8px 0;">Advanced: Edit Length Rules</summary>
+                            <summary style="cursor: default; font-size: 12px; color: var(--accent-color); margin: 8px 0;">
+                                Advanced: Edit Length Rules
+                            </summary>
                             ${renderTextArea(
-            'Length Instruction',
-            this.editingProfileData.settings.length.instruction,
-            (e) => {
-                this.updateComponentProperty('length', 'instruction', e.target.value);
-                this.editingProfileTemplates.length = 'custom';
-            },
-            'How long should responses be?'
-        )}
+                                'Length Instruction',
+                                this.editingProfileData.settings.length.instruction,
+                                e => {
+                                    this.updateComponentProperty('length', 'instruction', e.target.value);
+                                    this.editingProfileTemplates.length = 'custom';
+                                },
+                                'How long should responses be?'
+                            )}
                         </details>
                     </div>
 
                     <!-- FORMAT EDITOR -->
                     <div class="form-group" style="border: 1px solid var(--border-color); padding: 12px; border-radius: 6px;">
                         <label class="form-label" style="margin-bottom: 8px;">Format Configuration</label>
-                        
+
                         <div class="form-group">
                             <label class="form-label" style="font-size: 12px;">Base Template</label>
-                            <select class="form-control" 
+                            <select
+                                class="form-control"
                                 .value=${this.editingProfileTemplates?.format || 'teleprompter'}
-                                @change=${(e) => this.updateComponentTemplate('format', e.target.value)}>
-                                ${Object.entries(PROMPTS.FORMATS).map(([key, f]) => html`
-                                    <option value="${key}">${f.name}</option>
-                                `)}
+                                @change=${e => this.updateComponentTemplate('format', e.target.value)}
+                            >
+                                ${Object.entries(PROMPTS.FORMATS).map(([key, f]) => html` <option value="${key}">${f.name}</option> `)}
                                 <option value="custom">Custom (Edited)</option>
                             </select>
                         </div>
-                        
+
                         <details>
-                            <summary style="cursor: default; font-size: 12px; color: var(--accent-color); margin: 8px 0;">Advanced: Edit Formatting Rules</summary>
+                            <summary style="cursor: default; font-size: 12px; color: var(--accent-color); margin: 8px 0;">
+                                Advanced: Edit Formatting Rules
+                            </summary>
                             ${renderTextArea(
-            'Format Instruction',
-            this.editingProfileData.settings.format.instruction,
-            (e) => {
-                this.updateComponentProperty('format', 'instruction', e.target.value);
-                this.editingProfileTemplates.format = 'custom';
-            },
-            'How should text be styled?'
-        )}
+                                'Format Instruction',
+                                this.editingProfileData.settings.format.instruction,
+                                e => {
+                                    this.updateComponentProperty('format', 'instruction', e.target.value);
+                                    this.editingProfileTemplates.format = 'custom';
+                                },
+                                'How should text be styled?'
+                            )}
                         </details>
                     </div>
 
                     <div class="form-group" style="margin-top: 20px;">
-                        <button class="reset-keybinds-button" style="width: 100%; background: var(--btn-primary-bg); color: var(--btn-primary-text); text-align: center; padding: 10px; font-weight: bold; border: none;" @click=${this.saveProfile}>
+                        <button
+                            class="reset-keybinds-button"
+                            style="width: 100%; background: var(--btn-primary-bg); color: var(--btn-primary-text); text-align: center; padding: 10px; font-weight: bold; border: none;"
+                            @click=${this.saveProfile}
+                        >
                             Save Custom Profile
                         </button>
                     </div>
@@ -1937,46 +2092,87 @@ export class CustomizeView extends LitElement {
                         <div style="display: flex; gap: 8px;">
                             <select class="form-control" style="flex: 1;" .value=${this.selectedProfile} @change=${this.handleProfileSelect}>
                                 ${profiles.map(
-            profile => html`
-                                        <option value=${profile.value} ?selected=${this.selectedProfile === profile.value}>
-                                            ${profile.name}
-                                        </option>
+                                    profile => html`
+                                        <option value=${profile.value} ?selected=${this.selectedProfile === profile.value}>${profile.name}</option>
                                     `
-        )}
+                                )}
                             </select>
-                            
-                            <button class="reset-keybinds-button" @click=${this.handleCreateProfile} title="Create New Profile">
-                                +
-                            </button>
-                            
-                            ${isCustomProfile ? html`
-                                <button class="reset-keybinds-button" @click=${() => this.handleEditProfile(currentProfile)} title="Edit Profile">
-                                    Edit
-                                </button>
-                                <button class="danger-button" @click=${() => this.handleDeleteProfile(currentProfile.value)} style="padding: 6px 10px;" title="Delete Profile">
-                                    X
-                                </button>
-                            ` : ''}
+
+                            <button class="reset-keybinds-button" @click=${this.handleCreateProfile} title="Create New Profile">+</button>
+
+                            ${isCustomProfile
+                                ? html`
+                                      <button
+                                          class="reset-keybinds-button"
+                                          @click=${() => this.handleEditProfile(currentProfile)}
+                                          title="Edit Profile"
+                                      >
+                                          Edit
+                                      </button>
+                                      <button
+                                          class="danger-button"
+                                          @click=${() => this.handleDeleteProfile(currentProfile.value)}
+                                          style="padding: 6px 10px;"
+                                          title="Delete Profile"
+                                      >
+                                          X
+                                      </button>
+                                  `
+                                : ''}
                         </div>
                     </div>
 
-                    ${!isCustomProfile ? html`
+                    ${!isCustomProfile
+                        ? html`
+                              <div class="form-group">
+                                  <div class="checkbox-group">
+                                      <input
+                                          type="checkbox"
+                                          id="detailedAnswers"
+                                          class="checkbox-input"
+                                          .checked=${this.detailedAnswers}
+                                          @change=${this.handleDetailedAnswersChange}
+                                      />
+                                      <label class="checkbox-label" for="detailedAnswers">Detailed Answers Mode</label>
+                                  </div>
+                                  <div class="form-description">
+                                      When enabled, AI provides comprehensive, in-depth responses instead of concise answers
+                                  </div>
+                              </div>
+                          `
+                        : ''}
+
                     <div class="form-group">
                         <div class="checkbox-group">
                             <input
                                 type="checkbox"
-                                id="detailedAnswers"
+                                id="conversationContext"
                                 class="checkbox-input"
-                                .checked=${this.detailedAnswers}
-                                @change=${this.handleDetailedAnswersChange}
+                                .checked=${this.conversationContextEnabled}
+                                @change=${this.handleConversationContextToggle}
                             />
-                            <label class="checkbox-label" for="detailedAnswers">Detailed Answers Mode</label>
+                            <label class="checkbox-label" for="conversationContext">Conversation Memory</label>
                         </div>
                         <div class="form-description">
-                            When enabled, AI provides comprehensive, in-depth responses instead of concise answers
+                            Include recent Q&A history so AI can handle follow-up questions
                         </div>
+                        ${this.conversationContextEnabled ? html`
+                            <div style="margin-top: 8px; margin-left: 22px;">
+                                <select
+                                    class="form-control"
+                                    style="width: auto;"
+                                    .value=${String(this.conversationContextCount)}
+                                    @change=${this.handleConversationContextCountChange}
+                                >
+                                    <option value="1">Last 1 Q&A</option>
+                                    <option value="2">Last 2 Q&A</option>
+                                    <option value="3">Last 3 Q&A</option>
+                                    <option value="4">Last 4 Q&A</option>
+                                    <option value="5">Last 5 Q&A</option>
+                                </select>
+                            </div>
+                        ` : ''}
                     </div>
-                    ` : ''}
 
                     <div class="form-group expand">
                         <label class="form-label">User Context / Background Info</label>
@@ -1998,7 +2194,7 @@ export class CustomizeView extends LitElement {
     renderAudioSection() {
         return html`
             <div class="content-header">Audio Settings</div>
-            
+
             <div class="form-grid">
                 <div class="form-group">
                     <label class="form-label">Audio Source</label>
@@ -2026,12 +2222,10 @@ export class CustomizeView extends LitElement {
                     </label>
                     <select class="form-control" .value=${this.selectedLanguage} @change=${this.handleLanguageSelect}>
                         ${languages.map(
-            language => html`
-                                <option value=${language.value} ?selected=${this.selectedLanguage === language.value}>
-                                    ${language.name}
-                                </option>
+                            language => html`
+                                <option value=${language.value} ?selected=${this.selectedLanguage === language.value}>${language.name}</option>
                             `
-        )}
+                        )}
                     </select>
                     <div class="form-description">Language for speech recognition and AI responses</div>
                 </div>
@@ -2052,17 +2246,9 @@ export class CustomizeView extends LitElement {
                         <span class="current-selection">${currentTheme?.name || 'Dark'}</span>
                     </label>
                     <select class="form-control" .value=${this.theme} @change=${this.handleThemeChange}>
-                        ${themes.map(
-            theme => html`
-                                <option value=${theme.value} ?selected=${this.theme === theme.value}>
-                                    ${theme.name}
-                                </option>
-                            `
-        )}
+                        ${themes.map(theme => html` <option value=${theme.value} ?selected=${this.theme === theme.value}>${theme.name}</option> `)}
                     </select>
-                    <div class="form-description">
-                        Choose a color theme for the interface
-                    </div>
+                    <div class="form-description">Choose a color theme for the interface</div>
                 </div>
 
                 <div class="form-group">
@@ -2075,10 +2261,7 @@ export class CustomizeView extends LitElement {
                         <option value="compact" ?selected=${this.layoutMode === 'compact'}>Compact</option>
                     </select>
                     <div class="form-description">
-                        ${this.layoutMode === 'compact'
-                ? 'Smaller window with reduced padding'
-                : 'Standard layout with comfortable spacing'
-            }
+                        ${this.layoutMode === 'compact' ? 'Smaller window with reduced padding' : 'Standard layout with comfortable spacing'}
                     </div>
                 </div>
 
@@ -2091,23 +2274,23 @@ export class CustomizeView extends LitElement {
                     </select>
                 </div>
 
-                ${this.responseViewMode === 'continuous' ? html`
-                    <div class="form-group" style="padding-left: 12px; border-left: 2px solid var(--border-color);">
-                        <div class="checkbox-group">
-                            <input
-                                type="checkbox"
-                                id="autoScroll"
-                                class="checkbox-input"
-                                .checked=${this.autoScroll}
-                                @change=${this.handleAutoScrollChange}
-                            />
-                            <label class="checkbox-label" for="autoScroll">Auto-scroll to New Responses</label>
-                        </div>
-                        <div class="form-description">
-                            Automatically scroll to the bottom when a new response arrives
-                        </div>
-                    </div>
-                ` : ''}
+                ${this.responseViewMode === 'continuous'
+                    ? html`
+                          <div class="form-group" style="padding-left: 12px; border-left: 2px solid var(--border-color);">
+                              <div class="checkbox-group">
+                                  <input
+                                      type="checkbox"
+                                      id="autoScroll"
+                                      class="checkbox-input"
+                                      .checked=${this.autoScroll}
+                                      @change=${this.handleAutoScrollChange}
+                                  />
+                                  <label class="checkbox-label" for="autoScroll">Auto-scroll to New Responses</label>
+                              </div>
+                              <div class="form-description">Automatically scroll to the bottom when a new response arrives</div>
+                          </div>
+                      `
+                    : ''}
 
                 <div class="form-group">
                     <div class="checkbox-group">
@@ -2120,9 +2303,7 @@ export class CustomizeView extends LitElement {
                         />
                         <label class="checkbox-label" for="showSidebar">Show Response Navigator</label>
                     </div>
-                    <div class="form-description">
-                        Display a sidebar to navigate between responses
-                    </div>
+                    <div class="form-description">Display a sidebar to navigate between responses</div>
                 </div>
 
                 <div class="form-group">
@@ -2168,51 +2349,52 @@ export class CustomizeView extends LitElement {
                         </div>
                     </div>
                 </div>
-            </div >
-    `;
+            </div>
+        `;
     }
 
     renderCaptureSection() {
         return html`
-    <div class="content-header">Screen Capture</div>
+            <div class="content-header">Screen Capture</div>
             <div class="form-grid">
                 <div class="form-group">
                     <label class="form-label">
                         Image Quality
-                        <span class="current-selection">${this.selectedImageQuality.charAt(0).toUpperCase() + this.selectedImageQuality.slice(1)}</span>
+                        <span class="current-selection"
+                            >${this.selectedImageQuality.charAt(0).toUpperCase() + this.selectedImageQuality.slice(1)}</span
+                        >
                     </label>
                     <select class="form-control" .value=${this.selectedImageQuality} @change=${this.handleImageQualitySelect}>
                         <option value="high" ?selected=${this.selectedImageQuality === 'high'}>High Quality</option>
                         <option value="medium" ?selected=${this.selectedImageQuality === 'medium'}>Medium Quality</option>
                         <option value="low" ?selected=${this.selectedImageQuality === 'low'}>Low Quality</option>
-                    </select >
-    <div class="form-description">
-        ${this.selectedImageQuality === 'high'
-                ? 'Best quality, uses more tokens'
-                : this.selectedImageQuality === 'medium'
-                    ? 'Balanced quality and token usage'
-                    : 'Lower quality, uses fewer tokens'
-            }
-    </div>
-                </div >
-            </div >
-    `;
+                    </select>
+                    <div class="form-description">
+                        ${this.selectedImageQuality === 'high'
+                            ? 'Best quality, uses more tokens'
+                            : this.selectedImageQuality === 'medium'
+                              ? 'Balanced quality and token usage'
+                              : 'Lower quality, uses fewer tokens'}
+                    </div>
+                </div>
+            </div>
+        `;
     }
 
     renderKeyboardSection() {
         return html`
-    <div class="content-header">Keyboard Shortcuts</div>
-        <div class="form-grid">
-            <table class="keybinds-table">
-                <thead>
-                    <tr>
-                        <th>Action</th>
-                        <th>Shortcut</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${this.getKeybindActions().map(
-            action => html`
+            <div class="content-header">Keyboard Shortcuts</div>
+            <div class="form-grid">
+                <table class="keybinds-table">
+                    <thead>
+                        <tr>
+                            <th>Action</th>
+                            <th>Shortcut</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${this.getKeybindActions().map(
+                            action => html`
                                 <tr>
                                     <td>
                                         <div class="action-name">${action.name}</div>
@@ -2232,16 +2414,16 @@ export class CustomizeView extends LitElement {
                                     </td>
                                 </tr>
                             `
-        )}
-                    <tr class="table-reset-row">
-                        <td colspan="2">
-                            <button class="reset-keybinds-button" @click=${this.resetKeybinds}>Reset to Defaults</button>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
-            </div >
-    `;
+                        )}
+                        <tr class="table-reset-row">
+                            <td colspan="2">
+                                <button class="reset-keybinds-button" @click=${this.resetKeybinds}>Reset to Defaults</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        `;
     }
 
     renderSearchSection() {
@@ -2289,52 +2471,79 @@ export class CustomizeView extends LitElement {
             <div class="form-grid">
                 <div class="form-group">
                     <label class="form-label">Gemini API Key</label>
-                    <div class="form-description">Required for Live Audio mode. Get free key at <a href="https://aistudio.google.com" target="_blank" style="color: var(--accent-primary);">aistudio.google.com</a></div>
+                    <div class="form-description">
+                        Required for Live Audio mode. Get free key at
+                        <a href="https://aistudio.google.com" target="_blank" style="color: var(--accent-primary);">aistudio.google.com</a>
+                    </div>
                     <div style="display: flex; gap: 8px; align-items: center;">
                         <input
                             type="${this.showGeminiKey ? 'text' : 'password'}"
                             class="form-control"
                             .value=${this.geminiApiKey || ''}
-                            @input=${(e) => this.handleApiKeyChange('gemini', e.target.value)}
+                            @input=${e => this.handleApiKeyChange('gemini', e.target.value)}
                             placeholder="Enter Gemini API key..."
                             style="flex: 1;"
                         />
-                        <button class="toggle-btn" @click=${() => { this.showGeminiKey = !this.showGeminiKey; this.requestUpdate(); }}>
+                        <button
+                            class="toggle-btn"
+                            @click=${() => {
+                                this.showGeminiKey = !this.showGeminiKey;
+                                this.requestUpdate();
+                            }}
+                        >
                             ${this.showGeminiKey ? 'Hide' : 'Show'}
                         </button>
                     </div>
                     <div class="status-indicator ${this.geminiKeyStatus}">
-                        ${this.geminiKeyStatus === 'valid' ? 'Connected' :
-                this.geminiKeyStatus === 'invalid' ? 'Invalid key' :
-                    this.geminiKeyStatus === 'checking' ? 'Checking...' : 'Not set'}
+                        ${this.geminiKeyStatus === 'valid'
+                            ? 'Connected'
+                            : this.geminiKeyStatus === 'invalid'
+                              ? 'Invalid key'
+                              : this.geminiKeyStatus === 'checking'
+                                ? 'Checking...'
+                                : 'Not set'}
                     </div>
                 </div>
 
                 <div class="form-group">
                     <label class="form-label">Groq API Key</label>
-                    <div class="form-description">Recommended for Text & Vision. Get free key at <a href="https://console.groq.com" target="_blank" style="color: var(--accent-primary);">console.groq.com</a></div>
+                    <div class="form-description">
+                        Recommended for Text & Vision. Get free key at
+                        <a href="https://console.groq.com" target="_blank" style="color: var(--accent-primary);">console.groq.com</a>
+                    </div>
                     <div style="display: flex; gap: 8px; align-items: center;">
                         <input
                             type="${this.showGroqKey ? 'text' : 'password'}"
                             class="form-control"
                             .value=${this.groqApiKey || ''}
-                            @input=${(e) => this.handleApiKeyChange('groq', e.target.value)}
+                            @input=${e => this.handleApiKeyChange('groq', e.target.value)}
                             placeholder="Enter Groq API key..."
                             style="flex: 1;"
                         />
-                        <button class="toggle-btn" @click=${() => { this.showGroqKey = !this.showGroqKey; this.requestUpdate(); }}>
+                        <button
+                            class="toggle-btn"
+                            @click=${() => {
+                                this.showGroqKey = !this.showGroqKey;
+                                this.requestUpdate();
+                            }}
+                        >
                             ${this.showGroqKey ? 'Hide' : 'Show'}
                         </button>
                     </div>
                     <div class="status-indicator ${this.groqKeyStatus}">
-                        ${this.groqKeyStatus === 'valid' ? 'Connected' :
-                this.groqKeyStatus === 'invalid' ? 'Invalid key' :
-                    this.groqKeyStatus === 'checking' ? 'Checking...' : 'Not set'}
+                        ${this.groqKeyStatus === 'valid'
+                            ? 'Connected'
+                            : this.groqKeyStatus === 'invalid'
+                              ? 'Invalid key'
+                              : this.groqKeyStatus === 'checking'
+                                ? 'Checking...'
+                                : 'Not set'}
                     </div>
                 </div>
 
                 <div class="form-description" style="margin-top: 12px; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 8px;">
-                    <strong>Tip:</strong> Both keys are recommended. Groq has 50x more daily requests (1,000 vs 20), while Gemini is required for Live Audio mode.
+                    <strong>Tip:</strong> Both keys are recommended. Groq has 50x more daily requests (1,000 vs 20), while Gemini is required for Live
+                    Audio mode.
                 </div>
             </div>
         `;
@@ -2345,36 +2554,47 @@ export class CustomizeView extends LitElement {
             { value: 'groq:llama-3.3-70b-versatile', label: 'Groq: llama-3.3-70b (1K/day)', recommended: true },
             { value: 'groq:llama-3.1-8b-instant', label: 'Groq: llama-3.1-8b (14K/day)' },
             { value: 'gemini:gemini-2.5-flash', label: 'Gemini: 2.5-flash (20/day)' },
-            { value: 'none', label: 'None (No fallback)' }
+            { value: 'none', label: 'None (No fallback)' },
         ];
 
         const visionModels = [
             { value: 'groq:meta-llama/llama-4-maverick-17b-128e-instruct', label: 'Groq: llama-4-maverick (1K/day)', recommended: true },
             { value: 'groq:meta-llama/llama-4-scout-17b-16e-instruct', label: 'Groq: llama-4-scout (1K/day)' },
             { value: 'gemini:gemini-2.5-flash', label: 'Gemini: 2.5-flash (20/day)' },
-            { value: 'none', label: 'None (No fallback)' }
+            { value: 'none', label: 'None (No fallback)' },
         ];
 
         return html`
             <div class="content-header">AI Models</div>
             <div class="form-grid">
-                
                 <div class="form-group" style="margin-bottom: 20px;">
                     <label class="form-label">Audio Processing Mode</label>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                        <label class="radio-card ${this.audioProcessingMode === 'live-conversation' ? 'selected' : ''}"
-                            @click=${() => this.handleAudioProcessingModeChange('live-conversation')}>
-                            <input type="radio" name="audioProcessingMode" value="live-conversation"
-                                ?checked=${this.audioProcessingMode === 'live-conversation'} />
+                        <label
+                            class="radio-card ${this.audioProcessingMode === 'live-conversation' ? 'selected' : ''}"
+                            @click=${() => this.handleAudioProcessingModeChange('live-conversation')}
+                        >
+                            <input
+                                type="radio"
+                                name="audioProcessingMode"
+                                value="live-conversation"
+                                ?checked=${this.audioProcessingMode === 'live-conversation'}
+                            />
                             <div class="radio-content">
                                 <strong>Live Conversation</strong>
                                 <span class="radio-description">Real-time bidirectional audio</span>
                             </div>
                         </label>
-                        <label class="radio-card ${this.audioProcessingMode === 'audio-to-text' ? 'selected' : ''}"
-                            @click=${() => this.handleAudioProcessingModeChange('audio-to-text')}>
-                            <input type="radio" name="audioProcessingMode" value="audio-to-text"
-                                ?checked=${this.audioProcessingMode === 'audio-to-text'} />
+                        <label
+                            class="radio-card ${this.audioProcessingMode === 'audio-to-text' ? 'selected' : ''}"
+                            @click=${() => this.handleAudioProcessingModeChange('audio-to-text')}
+                        >
+                            <input
+                                type="radio"
+                                name="audioProcessingMode"
+                                value="audio-to-text"
+                                ?checked=${this.audioProcessingMode === 'audio-to-text'}
+                            />
                             <div class="radio-content">
                                 <strong>Audio → Text</strong>
                                 <span class="radio-description">Discrete requests & responses</span>
@@ -2383,50 +2603,56 @@ export class CustomizeView extends LitElement {
                     </div>
                 </div>
 
-                ${this.audioProcessingMode === 'audio-to-text' ? html`
-                    <div class="form-group">
-                        <label class="form-label">Audio Model</label>
-                        <select class="form-control" 
-                            .value=${(this.modelPrefs?.audioToText?.primaryProvider || 'groq') + ':' + (this.modelPrefs?.audioToText?.primaryModel || 'meta-llama/llama-4-maverick-17b-128e-instruct')} 
-                            @change=${(e) => this.handleModelChange('audioToText', 'primary', e.target.value)}>
-                            <optgroup label="Groq">
-                                <option value="groq:meta-llama/llama-4-maverick-17b-128e-instruct">Llama 4 Maverick</option>
-                                <option value="groq:meta-llama/llama-4-scout-17b-16e-instruct">Llama 4 Scout</option>
-                            </optgroup>
-                        </select>
-                    </div>
+                ${this.audioProcessingMode === 'audio-to-text'
+                    ? html`
+                          <div class="form-group">
+                              <label class="form-label">Audio Model</label>
+                              <select
+                                  class="form-control"
+                                  .value=${(this.modelPrefs?.audioToText?.primaryProvider || 'groq') +
+                                  ':' +
+                                  (this.modelPrefs?.audioToText?.primaryModel || 'meta-llama/llama-4-maverick-17b-128e-instruct')}
+                                  @change=${e => this.handleModelChange('audioToText', 'primary', e.target.value)}
+                              >
+                                  <optgroup label="Groq">
+                                      <option value="groq:meta-llama/llama-4-maverick-17b-128e-instruct">Llama 4 Maverick</option>
+                                      <option value="groq:meta-llama/llama-4-scout-17b-16e-instruct">Llama 4 Scout</option>
+                                  </optgroup>
+                              </select>
+                          </div>
 
-                    <div class="form-group">
-                        <label class="form-label">Evaluation Mode</label>
-                        <select class="form-control" .value=${this.audioTriggerMethod} @change=${this.handleAudioTriggerChange}>
-                            <option value="vad">Auto (Voice Activity)</option>
-                            <option value="manual">Manual Trigger</option>
-                        </select>
-                         ${this.audioTriggerMethod === 'manual' ? html`
-                            <div class="form-description" style="margin-top: 5px; color: var(--accent-color);">
-                                <strong>Shortcut:</strong> ${this.keybinds.manualTrigger} (Toggle Rec/Stop)
-                            </div>
-                        ` : ''}
-                    </div>
-                ` : html`
-                     <div class="form-group">
-                        <label class="form-label">Live Audio</label>
-                        <div class="form-description">Real-time conversation mode</div>
-                        <div style="padding: 12px; background: rgba(255,255,255,0.05); border-radius: 8px;">
-                            <div style="display: flex; align-items: center; gap: 8px;">
-                                <span style="opacity: 0.7;">Provider:</span>
-                                <span style="color: var(--accent-primary);">Gemini</span>
-                                <span style="font-size: 10px; opacity: 0.5;">Only option</span>
-                            </div>
-                            <div style="margin-top: 8px; font-size: 12px; opacity: 0.7;">
-                                Model: gemini-2.5-flash-native-audio
-                            </div>
-                            <div style="margin-top: 8px; font-size: 11px; color: var(--success-color);">
-                                Unlimited requests • Real-time • Speaker ID
-                            </div>
-                        </div>
-                    </div>
-                `}
+                          <div class="form-group">
+                              <label class="form-label">Evaluation Mode</label>
+                              <select class="form-control" .value=${this.audioTriggerMethod} @change=${this.handleAudioTriggerChange}>
+                                  <option value="vad">Auto (Voice Activity)</option>
+                                  <option value="manual">Manual Trigger</option>
+                              </select>
+                              ${this.audioTriggerMethod === 'manual'
+                                  ? html`
+                                        <div class="form-description" style="margin-top: 5px; color: var(--accent-color);">
+                                            <strong>Shortcut:</strong> ${this.keybinds.manualTrigger} (Toggle Rec/Stop)
+                                        </div>
+                                    `
+                                  : ''}
+                          </div>
+                      `
+                    : html`
+                          <div class="form-group">
+                              <label class="form-label">Live Audio</label>
+                              <div class="form-description">Real-time conversation mode</div>
+                              <div style="padding: 12px; background: rgba(255,255,255,0.05); border-radius: 8px;">
+                                  <div style="display: flex; align-items: center; gap: 8px;">
+                                      <span style="opacity: 0.7;">Provider:</span>
+                                      <span style="color: var(--accent-primary);">Gemini</span>
+                                      <span style="font-size: 10px; opacity: 0.5;">Only option</span>
+                                  </div>
+                                  <div style="margin-top: 8px; font-size: 12px; opacity: 0.7;">Model: gemini-2.5-flash-native-audio</div>
+                                  <div style="margin-top: 8px; font-size: 11px; color: var(--success-color);">
+                                      Unlimited requests • Real-time • Speaker ID
+                                  </div>
+                              </div>
+                          </div>
+                      `}
 
                 <div class="form-group">
                     <label class="form-label">Text Messages</label>
@@ -2434,26 +2660,38 @@ export class CustomizeView extends LitElement {
                     <div style="display: grid; gap: 8px;">
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <span style="width: 70px; font-size: 12px; opacity: 0.7;">Primary:</span>
-                            <select class="form-control" style="flex: 1;" 
-                                @change=${(e) => this.handleModelChange('textMessage', 'primary', e.target.value)}
-                                .value=${this.modelPrefs?.textMessage?.primaryProvider + ':' + this.modelPrefs?.textMessage?.primaryModel}>
-                                ${textModels.filter(m => m.value !== 'none').map(m => html`
-                                    <option value="${m.value}" ?selected=${this.isModelSelected('textMessage', 'primary', m.value)}>
-                                        ${m.label}${m.recommended ? ' (Rec)' : ''}
-                                    </option>
-                                `)}
+                            <select
+                                class="form-control"
+                                style="flex: 1;"
+                                @change=${e => this.handleModelChange('textMessage', 'primary', e.target.value)}
+                                .value=${this.modelPrefs?.textMessage?.primaryProvider + ':' + this.modelPrefs?.textMessage?.primaryModel}
+                            >
+                                ${textModels
+                                    .filter(m => m.value !== 'none')
+                                    .map(
+                                        m => html`
+                                            <option value="${m.value}" ?selected=${this.isModelSelected('textMessage', 'primary', m.value)}>
+                                                ${m.label}${m.recommended ? ' (Rec)' : ''}
+                                            </option>
+                                        `
+                                    )}
                             </select>
                         </div>
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <span style="width: 70px; font-size: 12px; opacity: 0.7;">Fallback:</span>
-                            <select class="form-control" style="flex: 1;"
-                                @change=${(e) => this.handleModelChange('textMessage', 'fallback', e.target.value)}
-                                .value=${this.modelPrefs?.textMessage?.fallbackProvider + ':' + this.modelPrefs?.textMessage?.fallbackModel}>
-                                ${textModels.map(m => html`
-                                    <option value="${m.value}" ?selected=${this.isModelSelected('textMessage', 'fallback', m.value)}>
-                                        ${m.label}
-                                    </option>
-                                `)}
+                            <select
+                                class="form-control"
+                                style="flex: 1;"
+                                @change=${e => this.handleModelChange('textMessage', 'fallback', e.target.value)}
+                                .value=${this.modelPrefs?.textMessage?.fallbackProvider + ':' + this.modelPrefs?.textMessage?.fallbackModel}
+                            >
+                                ${textModels.map(
+                                    m => html`
+                                        <option value="${m.value}" ?selected=${this.isModelSelected('textMessage', 'fallback', m.value)}>
+                                            ${m.label}
+                                        </option>
+                                    `
+                                )}
                             </select>
                         </div>
                     </div>
@@ -2465,34 +2703,44 @@ export class CustomizeView extends LitElement {
                     <div style="display: grid; gap: 8px;">
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <span style="width: 70px; font-size: 12px; opacity: 0.7;">Primary:</span>
-                            <select class="form-control" style="flex: 1;"
-                                @change=${(e) => this.handleModelChange('screenAnalysis', 'primary', e.target.value)}
-                                .value=${this.modelPrefs?.screenAnalysis?.primaryProvider + ':' + this.modelPrefs?.screenAnalysis?.primaryModel}>
-                                ${visionModels.filter(m => m.value !== 'none').map(m => html`
-                                    <option value="${m.value}" ?selected=${this.isModelSelected('screenAnalysis', 'primary', m.value)}>
-                                        ${m.label}${m.recommended ? ' (Rec)' : ''}
-                                    </option>
-                                `)}
+                            <select
+                                class="form-control"
+                                style="flex: 1;"
+                                @change=${e => this.handleModelChange('screenAnalysis', 'primary', e.target.value)}
+                                .value=${this.modelPrefs?.screenAnalysis?.primaryProvider + ':' + this.modelPrefs?.screenAnalysis?.primaryModel}
+                            >
+                                ${visionModels
+                                    .filter(m => m.value !== 'none')
+                                    .map(
+                                        m => html`
+                                            <option value="${m.value}" ?selected=${this.isModelSelected('screenAnalysis', 'primary', m.value)}>
+                                                ${m.label}${m.recommended ? ' (Rec)' : ''}
+                                            </option>
+                                        `
+                                    )}
                             </select>
                         </div>
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <span style="width: 70px; font-size: 12px; opacity: 0.7;">Fallback:</span>
-                            <select class="form-control" style="flex: 1;"
-                                @change=${(e) => this.handleModelChange('screenAnalysis', 'fallback', e.target.value)}
-                                .value=${this.modelPrefs?.screenAnalysis?.fallbackProvider + ':' + this.modelPrefs?.screenAnalysis?.fallbackModel}>
-                                ${visionModels.map(m => html`
-                                    <option value="${m.value}" ?selected=${this.isModelSelected('screenAnalysis', 'fallback', m.value)}>
-                                        ${m.label}
-                                    </option>
-                                `)}
+                            <select
+                                class="form-control"
+                                style="flex: 1;"
+                                @change=${e => this.handleModelChange('screenAnalysis', 'fallback', e.target.value)}
+                                .value=${this.modelPrefs?.screenAnalysis?.fallbackProvider + ':' + this.modelPrefs?.screenAnalysis?.fallbackModel}
+                            >
+                                ${visionModels.map(
+                                    m => html`
+                                        <option value="${m.value}" ?selected=${this.isModelSelected('screenAnalysis', 'fallback', m.value)}>
+                                            ${m.label}
+                                        </option>
+                                    `
+                                )}
                             </select>
                         </div>
                     </div>
                 </div>
 
-                <button class="secondary-button" @click=${this.resetModelPreferences} style="margin-top: 12px;">
-                    Reset to Defaults
-                </button>
+                <button class="secondary-button" @click=${this.resetModelPreferences} style="margin-top: 12px;">Reset to Defaults</button>
             </div>
         `;
     }
@@ -2501,92 +2749,102 @@ export class CustomizeView extends LitElement {
         return html`
             <div class="content-header">Usage Today</div>
             <div class="form-grid">
-                <div class="form-description" style="margin-bottom: 12px;">
-                    Resets at midnight UTC • ${this.usageResetTime || 'Loading...'}
-                </div>
+                <div class="form-description" style="margin-bottom: 12px;">Resets at midnight UTC • ${this.usageResetTime || 'Loading...'}</div>
 
                 <div class="form-group">
                     <label class="form-label">GROQ</label>
                     <div class="usage-container">
-                        ${(this.usageStats?.groq || []).map(stat => html`
-                            <div class="usage-row">
-                                <span class="usage-model">${stat.model.split('/').pop()}</span>
-                                <div class="usage-bar">
-                                    <div class="usage-bar-fill ${stat.percentage >= 90 ? 'red' : stat.percentage >= 50 ? 'yellow' : 'green'}"
-                                        style="width: ${Math.min(stat.percentage, 100)}%"></div>
+                        ${(this.usageStats?.groq || []).map(
+                            stat => html`
+                                <div class="usage-row">
+                                    <span class="usage-model">${stat.model.split('/').pop()}</span>
+                                    <div class="usage-bar">
+                                        <div
+                                            class="usage-bar-fill ${stat.percentage >= 90 ? 'red' : stat.percentage >= 50 ? 'yellow' : 'green'}"
+                                            style="width: ${Math.min(stat.percentage, 100)}%"
+                                        ></div>
+                                    </div>
+                                    <span class="usage-count">${stat.count}/${stat.limit === Infinity ? 'Unlim' : stat.limit}</span>
                                 </div>
-                                <span class="usage-count">${stat.count}/${stat.limit === Infinity ? 'Unlim' : stat.limit}</span>
-                            </div>
-                        `)}
+                            `
+                        )}
                     </div>
                 </div>
 
                 <div class="form-group">
                     <label class="form-label">GEMINI</label>
                     <div class="usage-container">
-                        ${(this.usageStats?.gemini || []).map(stat => html`
-                            <div class="usage-row">
-                                <span class="usage-model">${stat.model.replace('gemini-', '')}</span>
-                                <div class="usage-bar">
-                                    ${stat.limit === Infinity ? html`
-                                        <span style="font-size: 11px; opacity: 0.7;">Unlimited</span>
-                                    ` : html`
-                                        <div class="usage-bar-fill ${stat.percentage >= 90 ? 'red' : stat.percentage >= 50 ? 'yellow' : 'green'}"
-                                            style="width: ${Math.min(stat.percentage, 100)}%"></div>
-                                    `}
+                        ${(this.usageStats?.gemini || []).map(
+                            stat => html`
+                                <div class="usage-row">
+                                    <span class="usage-model">${stat.model.replace('gemini-', '')}</span>
+                                    <div class="usage-bar">
+                                        ${stat.limit === Infinity
+                                            ? html` <span style="font-size: 11px; opacity: 0.7;">Unlimited</span> `
+                                            : html`
+                                                  <div
+                                                      class="usage-bar-fill ${stat.percentage >= 90
+                                                          ? 'red'
+                                                          : stat.percentage >= 50
+                                                            ? 'yellow'
+                                                            : 'green'}"
+                                                      style="width: ${Math.min(stat.percentage, 100)}%"
+                                                  ></div>
+                                              `}
+                                    </div>
+                                    <span class="usage-count">${stat.limit === Infinity ? 'Unlim' : `${stat.count}/${stat.limit}`}</span>
                                 </div>
-                                <span class="usage-count">${stat.limit === Infinity ? 'Unlim' : `${stat.count}/${stat.limit}`}</span>
-                            </div>
-                        `)}
+                            `
+                        )}
                     </div>
                 </div>
 
                 <div class="form-description" style="margin-top: 12px; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 8px;">
-                     Groq has 50x more daily requests than Gemini Flash models
+                    Groq has 50x more daily requests than Gemini Flash models
                 </div>
 
-                <button class="secondary-button" @click=${this.refreshUsageStats} style="margin-top: 12px;">
-                    Refresh Usage
-                </button>
+                <button class="secondary-button" @click=${this.refreshUsageStats} style="margin-top: 12px;">Refresh Usage</button>
             </div>
         `;
     }
 
     renderAdvancedSection() {
         return html`
-    <div class="content-header" style="color: var(--error-color);">Advanced</div>
-        <div class="form-grid">
-            <div class="form-group">
-                <label class="form-label" style="color: var(--error-color);">Data Management</label>
-                <div class="form-description" style="margin-bottom: 12px;">
-                    <strong>Warning:</strong> This action will permanently delete all local data including API keys, preferences, and session history. This cannot be undone.
+            <div class="content-header" style="color: var(--error-color);">Advanced</div>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label class="form-label" style="color: var(--error-color);">Data Management</label>
+                    <div class="form-description" style="margin-bottom: 12px;">
+                        <strong>Warning:</strong> This action will permanently delete all local data including API keys, preferences, and session
+                        history. This cannot be undone.
+                    </div>
+                    <button class="danger-button" @click=${this.clearLocalData} ?disabled=${this.isClearing}>
+                        ${this.isClearing ? 'Clearing...' : 'Clear All Local Data'}
+                    </button>
+                    ${this.clearStatusMessage
+                        ? html`
+                              <div class="status-message ${this.clearStatusType === 'success' ? 'status-success' : 'status-error'}">
+                                  ${this.clearStatusMessage}
+                              </div>
+                          `
+                        : ''}
                 </div>
-                <button
-                    class="danger-button"
-                        @click=${this.clearLocalData}
-                ?disabled=${this.isClearing}
-                    >
-                ${this.isClearing ? 'Clearing...' : 'Clear All Local Data'}
-            </button>
-            ${this.clearStatusMessage ? html`
-                        <div class="status-message ${this.clearStatusType === 'success' ? 'status-success' : 'status-error'}">
-                            ${this.clearStatusMessage}
-                        </div>
-                    ` : ''}
-        </div>
-            </div >
-    `;
+            </div>
+        `;
     }
 
     renderUpdatesSection() {
-        let currentVersion = 'Unknown';
-        if (window.require) {
-            try {
-                const updateChecker = window.require('./utils/updateChecker.js');
-                currentVersion = updateChecker?.getCurrentVersion?.() || 'Unknown';
-            } catch (error) {
-                console.error('Failed to load updateChecker:', error);
-            }
+        // Version is loaded asynchronously, show cached value or placeholder
+        const currentVersion = this._currentVersion || 'Loading...';
+
+        // Fetch version if not cached
+        if (!this._currentVersion && !this._versionFetching) {
+            this._versionFetching = true;
+            cheatingDaddy.getVersion().then(version => {
+                this._currentVersion = version || 'Unknown';
+                this._versionFetching = false;
+                this.requestUpdate();
+            });
         }
 
         return html`
@@ -2598,30 +2856,40 @@ export class CustomizeView extends LitElement {
                 </div>
 
                 <div class="form-group" style="margin-top: 10px;">
-                    <button class="secondary-button" 
+                    <button
+                        class="secondary-button"
                         @click=${this.handleManualUpdateCheck}
                         ?disabled=${this.isCheckingUpdate}
-                        style="width: fit-content; min-width: 140px;">
+                        style="width: fit-content; min-width: 140px;"
+                    >
                         ${this.isCheckingUpdate ? 'Checking...' : 'Check for Updates'}
                     </button>
-                    
-                    ${this.updateCheckMessage ? html`
-                        <div class="status-message ${this.updateCheckStatus === 'success' ? 'status-success' :
-                    this.updateCheckStatus === 'error' ? 'status-error' : 'status-success'}">
-                            ${this.updateCheckMessage}
-                        </div>
-                    ` : ''}
+
+                    ${this.updateCheckMessage
+                        ? html`
+                              <div
+                                  class="status-message ${this.updateCheckStatus === 'success'
+                                      ? 'status-success'
+                                      : this.updateCheckStatus === 'error'
+                                        ? 'status-error'
+                                        : 'status-success'}"
+                              >
+                                  ${this.updateCheckMessage}
+                              </div>
+                          `
+                        : ''}
                 </div>
 
                 <div class="form-description" style="margin-top: 24px; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 8px;">
-                    <strong>Auto-check:</strong> Cheating Daddy automatically checks for critical updates every time the application starts up.
+                    <strong>Auto-check:</strong> Cheating Daddy On Steroids automatically checks for critical updates every time the application starts up.
                 </div>
             </div>
         `;
     }
 
     async handleManualUpdateCheck() {
-        if (!window.require) return;
+        // Note: With context isolation, we need to use the preload bridge
+        if (!window.electronAPI) return;
 
         this.isCheckingUpdate = true;
         this.updateCheckStatus = 'checking';
@@ -2629,44 +2897,48 @@ export class CustomizeView extends LitElement {
         this.requestUpdate();
 
         try {
-            const { checkForUpdates, isNewerVersion, getCurrentVersion } = window.require('./utils/updateChecker.js');
-            const { getUpdatePreferences, setUpdatePreferences } = window.require('./storage.js');
-            const { ipcRenderer } = window.require('electron');
-            const result = await checkForUpdates();
+            // Use the storage API through cheatingDaddy instead of direct require
+            const currentVersion = await cheatingDaddy.getVersion();
+            const updatePrefs = await cheatingDaddy.storage.getUpdatePreferences();
 
-            if (result.updateInfo) {
-                const isNewer = isNewerVersion(result.updateInfo.version, getCurrentVersion());
+            // Fetch update info from GitHub (same URL as updateChecker.js)
+            const response = await fetch('https://raw.githubusercontent.com/klaus-qodes/cheating-daddy/master/update.json', {
+                cache: 'no-store',
+                headers: { 'Cache-Control': 'no-cache' },
+            });
+            if (!response.ok) {
+                throw new Error('Failed to fetch update info');
+            }
+            const updateInfo = await response.json();
+
+            if (updateInfo && updateInfo.version) {
+                const isNewer = this._isNewerVersion(updateInfo.version, currentVersion);
                 let isNewContent = false;
-                const contentId = result.updateInfo.buildDate || result.updateInfo.message || result.updateInfo.version;
+                const contentId = updateInfo.buildDate || updateInfo.message || updateInfo.version;
 
                 if (!isNewer) {
-                    const prefs = getUpdatePreferences();
-                    if (prefs.lastSeenForcedId !== contentId) {
+                    if (updatePrefs.lastSeenForcedId !== contentId) {
                         isNewContent = true;
                     }
                 }
 
                 if (isNewer || isNewContent) {
-                    this.updateCheckMessage = isNewer ? `New version available: v${result.updateInfo.version}` : 'New update information available';
+                    this.updateCheckMessage = isNewer ? `New version available: v${updateInfo.version}` : 'New update information available';
                     this.updateCheckStatus = 'success';
-                    this.updateInfo = result.updateInfo;
+                    this.updateInfo = updateInfo;
 
                     // Trigger the separate update window
-                    await ipcRenderer.invoke('open-update-window', result.updateInfo);
+                    await window.electronAPI.window.openUpdateWindow(updateInfo);
 
                     // If it was just a content change, mark as seen
                     if (!isNewer && isNewContent) {
-                        setUpdatePreferences({ lastSeenForcedId: contentId });
+                        await cheatingDaddy.storage.setUpdatePreferences({ lastSeenForcedId: contentId });
                     }
                 } else {
                     this.updateCheckMessage = 'You are using the latest version.';
                     this.updateCheckStatus = 'success';
                     this.updateInfo = null;
                 }
-            } else if (result.error) {
-                this.updateCheckMessage = `Update check failed: ${result.error}`;
-                this.updateCheckStatus = 'error';
-                this.updateInfo = null;
             } else {
                 this.updateCheckMessage = 'You are using the latest version.';
                 this.updateCheckStatus = 'success';
@@ -2680,6 +2952,20 @@ export class CustomizeView extends LitElement {
             this.isCheckingUpdate = false;
             this.requestUpdate();
         }
+    }
+
+    // Helper to compare version strings
+    _isNewerVersion(remote, current) {
+        if (!remote || !current) return false;
+        const r = remote.split('.').map(Number);
+        const c = current.split('.').map(Number);
+        for (let i = 0; i < Math.max(r.length, c.length); i++) {
+            const rv = r[i] || 0;
+            const cv = c[i] || 0;
+            if (rv > cv) return true;
+            if (rv < cv) return false;
+        }
+        return false;
     }
 
     renderSectionContent() {
@@ -2732,7 +3018,7 @@ export class CustomizeView extends LitElement {
             <div class="settings-layout">
                 <nav class="settings-sidebar">
                     ${sections.map(
-            section => html`
+                        section => html`
                             <button
                                 class="sidebar-item ${this.activeSection === section.id ? 'active' : ''} ${section.danger ? 'danger' : ''}"
                                 @click=${() => this.setActiveSection(section.id)}
@@ -2741,19 +3027,14 @@ export class CustomizeView extends LitElement {
                                 <span>${section.name}</span>
                             </button>
                         `
-        )}
+                    )}
                 </nav>
-                <div class="settings-content">
-                    ${this.renderSectionContent()}
-                </div>
+                <div class="settings-content">${this.renderSectionContent()}</div>
             </div>
 
-            ${this.showClearDialog ? html`
-                <upgrade-dialog
-                    .mode=${'clear'}
-                    @dialog-complete=${this.handleClearDialogComplete}
-                ></upgrade-dialog>
-            ` : ''}
+            ${this.showClearDialog
+                ? html` <upgrade-dialog .mode=${'clear'} @dialog-complete=${this.handleClearDialogComplete}></upgrade-dialog> `
+                : ''}
         `;
     }
 }

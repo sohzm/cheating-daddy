@@ -23,8 +23,9 @@ function createWindow(sendToRenderer, geminiSessionRef) {
         hasShadow: false,
         alwaysOnTop: true,
         webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false, // TODO: change to true
+            preload: path.join(__dirname, '../preload.js'),
+            nodeIntegration: false,
+            contextIsolation: true,
             backgroundThrottling: false,
             enableBlinkFeatures: 'GetDisplayMedia',
             webSecurity: true,
@@ -96,7 +97,8 @@ function createWindow(sendToRenderer, geminiSessionRef) {
         }, 150);
     });
 
-    setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef);
+    // Note: Window IPC handlers are now registered through the IPC Gateway
+    // See src/core/ipc/handlers/windowHandler.js for implementation
 
     return mainWindow;
 }

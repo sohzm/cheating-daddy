@@ -93,3 +93,12 @@ typings/
 out/
 .specstory
 .specstory/
+# Development files - exclude from production builds
+tests/
+jest.config.js
+docs/
+*.md
+!README.md
+
+# VS Code history
+.history/

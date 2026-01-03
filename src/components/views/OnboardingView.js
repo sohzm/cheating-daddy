@@ -247,8 +247,8 @@ export class OnboardingView extends LitElement {
         super();
         this.currentSlide = 0;
         this.contextText = '';
-        this.onComplete = () => { };
-        this.onClose = () => { };
+        this.onComplete = () => {};
+        this.onClose = () => {};
         this.canvas = null;
         this.ctx = null;
         this.animationId = null;
@@ -456,9 +456,8 @@ export class OnboardingView extends LitElement {
     }
 
     async handleClose() {
-        if (window.require) {
-            const { ipcRenderer } = window.require('electron');
-            await ipcRenderer.invoke('quit-application');
+        if (window.electronAPI) {
+            await window.electronAPI.window.quit();
         }
     }
 
@@ -512,7 +511,9 @@ export class OnboardingView extends LitElement {
             <div class="onboarding-container">
                 <button class="close-button" @click=${this.handleClose} title="Close">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                        <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+                        <path
+                            d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"
+                        />
                     </svg>
                 </button>
                 <canvas class="gradient-canvas"></canvas>
@@ -523,7 +524,7 @@ export class OnboardingView extends LitElement {
                     <div class="slide-content">${slide.content}</div>
 
                     ${slide.showTextarea
-                ? html`
+                        ? html`
                               <textarea
                                   class="context-textarea"
                                   placeholder="Paste your resume, job description, or any relevant context here..."
@@ -531,9 +532,9 @@ export class OnboardingView extends LitElement {
                                   @input=${this.handleContextInput}
                               ></textarea>
                           `
-                : ''}
+                        : ''}
                     ${slide.showFeatures
-                ? html`
+                        ? html`
                               <div class="feature-list">
                                   <div class="feature-item">
                                       <span class="feature-icon">-</span>
@@ -549,7 +550,7 @@ export class OnboardingView extends LitElement {
                                   </div>
                               </div>
                           `
-                : ''}
+                        : ''}
                 </div>
 
                 <div class="navigation">
@@ -561,23 +562,23 @@ export class OnboardingView extends LitElement {
 
                     <div class="progress-dots">
                         ${[0, 1, 2, 3, 4].map(
-                    index => html`
+                            index => html`
                                 <div
                                     class="dot ${index === this.currentSlide ? 'active' : ''}"
                                     @click=${() => {
-                            if (index !== this.currentSlide) {
-                                this.startColorTransition(index);
-                            }
-                        }}
+                                        if (index !== this.currentSlide) {
+                                            this.startColorTransition(index);
+                                        }
+                                    }}
                                 ></div>
                             `
-                )}
+                        )}
                     </div>
 
                     <button class="nav-button" @click=${this.nextSlide}>
                         ${this.currentSlide === 4
-                ? 'Get Started'
-                : html`
+                            ? 'Get Started'
+                            : html`
                                   <svg width="16px" height="16px" stroke-width="2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                       <path d="M9 6L15 12L9 18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"></path>
                                   </svg>

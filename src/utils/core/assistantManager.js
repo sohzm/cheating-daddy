@@ -4,17 +4,12 @@ const { getSystemPrompt, buildSystemPrompt } = require('../prompts');
 const { getAvailableModel, incrementLimitCount, getApiKey, getPreferences, getCustomProfiles } = require('../../storage');
 const { generateText, analyzeImage, processAudio } = require('../providers/registry');
 
-// Core Utilities
-const {
-    startMacOSAudioCapture,
-    stopMacOSAudioCapture,
-    killExistingSystemAudioDump,
-    sendAudioToGemini,
-    convertStereoToMono
-} = require('./audioCapture');
+// Unified Audio Capture Manager
+const { audioCaptureManager, AudioCaptureManager, CONFIG: AUDIO_CONFIG } = require('../../core/audio/AudioCaptureManager');
 
 const { formatSpeakerResults } = require('./aiHelpers');
 const { RATE_LIMIT_EXCEEDED } = require('./errors');
+const { SpeechBuffer } = require('../../core/audio/SpeechBuffer');
 
 // Conversation tracking variables
 let currentSessionId = null;
@@ -28,10 +23,8 @@ let isInitializingSession = false;
 // Audio capture variables
 let messageBuffer = '';
 
-// Audio Processing (Audio -> Text) state
-let audioTextBuffer = Buffer.alloc(0);
-let lastAudioProcessTime = Date.now();
-const AUDIO_PROCESS_INTERVAL = 5000; // 5 seconds default for interval mode
+// Audio Processing (Audio -> Text) state - using SpeechBuffer for robust end-of-speech detection
+let speechBuffer = new SpeechBuffer();
 let isProcessingAudio = false;
 let manualRecordingActive = false;
 
@@ -81,6 +74,57 @@ function initializeNewSession(profile = null, customPrompt = null) {
             customPrompt: customPrompt || ''
         });
     }
+}
+
+/**
+ * Get recent conversation context for follow-up questions
+ * @param {number} count - Number of recent turns to include (default: 2)
+ * @returns {Array} Array of {role, content} messages for LLM context
+ */
+function getRecentConversationContext(count = 2) {
+    if (!conversationHistory || conversationHistory.length === 0) {
+        return [];
+    }
+
+    // Get last N valid turns
+    const recentTurns = conversationHistory
+        .filter(turn => turn.transcription && turn.ai_response)
+        .slice(-count);
+
+    // Convert to message format for LLM
+    const messages = [];
+    for (const turn of recentTurns) {
+        messages.push({ role: 'user', content: turn.transcription.trim() });
+        messages.push({ role: 'assistant', content: turn.ai_response.trim() });
+    }
+
+    return messages;
+}
+
+/**
+ * Get recent screen analysis context for follow-up questions
+ * @param {number} count - Number of recent analyses to include
+ * @returns {Array} Array of {role, content} messages for LLM context
+ */
+function getRecentScreenAnalysisContext(count = 2) {
+    if (!screenAnalysisHistory || screenAnalysisHistory.length === 0) {
+        return [];
+    }
+
+    // Get last N valid analyses (text only, no images)
+    const recentAnalyses = screenAnalysisHistory
+        .filter(item => item.prompt && item.response)
+        .slice(-count);
+
+    // Convert to message format for LLM (user question + AI response)
+    const messages = [];
+    for (const item of recentAnalyses) {
+        // For screen analysis, user asked about something on screen
+        messages.push({ role: 'user', content: item.prompt.trim() });
+        messages.push({ role: 'assistant', content: item.response.trim() });
+    }
+
+    return messages;
 }
 
 function saveConversationTurn(transcription, aiResponse) {
@@ -477,11 +521,20 @@ async function sendImageToGeminiHttp(base64Data, prompt) {
             systemPrompt = getSystemPrompt(profile, customPrompt, false, detailedAnswers);
         }
 
+        // Get conversation context if enabled (for follow-up questions)
+        const options = {};
+        if (prefs.conversationContextEnabled) {
+            const count = prefs.conversationContextCount || 2;
+            // Use screen analysis history for image context
+            options.conversationContext = getRecentScreenAnalysisContext(count);
+        }
+
         const { response, provider, model } = await analyzeImage(
             'screenAnalysis',
             base64Data,
             prompt,
-            systemPrompt
+            systemPrompt,
+            options
         );
 
         console.log(`Image analysis started with ${provider}/${model}`);
@@ -515,11 +568,24 @@ async function sendImageToGeminiHttp(base64Data, prompt) {
 }
 
 async function processBufferedAudio(prefs) {
-    if (isProcessingAudio || audioTextBuffer.length === 0) return;
+    // Consume buffer from SpeechBuffer
+    const consumed = speechBuffer.consume();
+
+    // Check if there's enough audio to process
+    if (!consumed.data) {
+        console.log(`[SpeechBuffer] Skipped processing: ${consumed.reason}, stats:`, consumed.stats);
+        return;
+    }
+
+    if (isProcessingAudio) {
+        console.log('[SpeechBuffer] Already processing, skipping');
+        return;
+    }
 
     isProcessingAudio = true;
-    const audioData = audioTextBuffer.toString('base64');
-    audioTextBuffer = Buffer.alloc(0); // Clear buffer
+    const audioData = consumed.data;
+
+    console.log(`[SpeechBuffer] Processing ${consumed.duration.toFixed(2)}s of audio (${consumed.stats.speechChunks} speech chunks, peak RMS: ${consumed.stats.peakRms.toFixed(0)})`);
 
     // Build proper system prompt
     const customProfiles = getCustomProfiles();
@@ -542,14 +608,20 @@ async function processBufferedAudio(prefs) {
         systemPrompt = getSystemPrompt(profile, customPrompt, false, detailedAnswers);
     }
 
+    // Get conversation context if enabled (for follow-up questions)
+    const options = { mimeType: 'audio/pcm;rate=24000' };
+    if (prefs.conversationContextEnabled) {
+        const count = prefs.conversationContextCount || 2;
+        options.conversationContext = getRecentConversationContext(count);
+    }
+
     try {
-        console.log('Processing buffered audio...');
         sendToRenderer('update-status', 'Processing audio...');
 
         const { response, provider, model, transcription } = await processAudio(
             audioData,
-            systemPrompt, // Use the constructed system prompt as the instruction
-            { mimeType: 'audio/pcm;rate=24000' }
+            systemPrompt,
+            options
         );
 
         let fullText = '';
@@ -560,12 +632,15 @@ async function processBufferedAudio(prefs) {
                 fullText += chunkText;
                 sendToRenderer(isFirst ? 'new-response' : 'update-response', {
                     text: fullText,
-                    type: 'text', // Treat as text response
-                    question: transcription // Include transcription for sidebar
+                    type: 'text',
+                    question: transcription
                 });
                 isFirst = false;
             }
         }
+
+        // Save the conversation turn after streaming is complete
+        saveConversationTurn(transcription, fullText);
 
         sendToRenderer('update-status', 'Listening...');
 
@@ -603,43 +678,33 @@ function setupAssistantIpcHandlers(geminiSessionRef) {
         return false;
     });
 
-    // Helper to process audio chunks for VAD and buffering
+    /**
+     * Process audio chunks using SpeechBuffer for robust end-of-speech detection.
+     *
+     * Key improvements over old implementation:
+     * - Waits for actual end of utterance (2.5s silence) instead of arbitrary 1.5s
+     * - Uses hysteresis to prevent flutter during natural speech pauses
+     * - Captures entire questions regardless of length (up to 60s max)
+     * - Properly handles manual trigger mode
+     */
     function processAudioChunk(chunk, prefs) {
         const method = prefs.audioTriggerMethod || 'vad';
 
-        // Manual Trigger Mode
+        // Manual Trigger Mode - just accumulate, process on button release
         if (method === 'manual') {
             if (manualRecordingActive) {
-                audioTextBuffer = Buffer.concat([audioTextBuffer, chunk]);
+                // In manual mode, always add to buffer while recording
+                speechBuffer.addChunk(chunk);
             }
             return { success: true };
         }
 
-        // VAD Mode (Energy-based)
-        let sum = 0;
-        // Process 16-bit samples
-        for (let i = 0; i < chunk.length; i += 2) {
-            const sample = chunk.readInt16LE(i);
-            sum += sample * sample;
-        }
-        const rms = Math.sqrt(sum / (chunk.length / 2));
+        // VAD Mode - use SpeechBuffer state machine
+        const result = speechBuffer.addChunk(chunk);
 
-        // Threshold for silence
-        const VAD_THRESHOLD = 800;
-
-        if (rms > VAD_THRESHOLD) {
-            // Speech detected
-            audioTextBuffer = Buffer.concat([audioTextBuffer, chunk]);
-            lastAudioProcessTime = Date.now(); // Reset timer on speech
-        }
-
-        // VAD Buffer Management
-        const MIN_BUFFER_SIZE = 24000 * 2 * 2; // 2 seconds
-
-        if (audioTextBuffer.length >= MIN_BUFFER_SIZE) {
-            processBufferedAudio(prefs);
-        } else if (audioTextBuffer.length > 0 && Date.now() - lastAudioProcessTime > 1500) {
-            // Flush older buffer if silence follows speech
+        // Check if buffer is ready for processing
+        if (result.ready) {
+            console.log(`[SpeechBuffer] Ready to process (reason: ${result.reason}, duration: ${speechBuffer.getDuration().toFixed(2)}s)`);
             processBufferedAudio(prefs);
         }
 
@@ -748,10 +813,18 @@ function setupAssistantIpcHandlers(geminiSessionRef) {
                 systemPrompt = getSystemPrompt(profile, customPrompt, true, detailedAnswers);
             }
 
+            // Get conversation context if enabled (for follow-up questions)
+            const options = {};
+            if (prefs.conversationContextEnabled) {
+                const count = prefs.conversationContextCount || 2;
+                options.conversationContext = getRecentConversationContext(count);
+            }
+
             const { response, provider, model } = await generateText(
                 'textMessage',
                 text,
-                systemPrompt
+                systemPrompt,
+                options
             );
 
             let fullText = '';
@@ -769,6 +842,9 @@ function setupAssistantIpcHandlers(geminiSessionRef) {
                 }
             }
 
+            // Save the conversation turn for context
+            saveConversationTurn(text, fullText);
+
             return { success: true, text: fullText, model: model };
         } catch (error) {
             console.error('Error sending text:', error);
@@ -785,8 +861,25 @@ function setupAssistantIpcHandlers(geminiSessionRef) {
         }
 
         try {
-            const success = await startMacOSAudioCapture(geminiSessionRef);
-            return { success };
+            // Setup audio event handler to forward to Gemini
+            audioCaptureManager.removeAllListeners('audio');
+            audioCaptureManager.on('audio', async ({ base64Data }) => {
+                if (geminiSessionRef.current) {
+                    try {
+                        await geminiSessionRef.current.sendRealtimeInput({
+                            audio: {
+                                data: base64Data,
+                                mimeType: `audio/pcm;rate=${AUDIO_CONFIG.SAMPLE_RATE}`,
+                            },
+                        });
+                    } catch (error) {
+                        console.error('[AssistantManager] Error sending audio to Gemini:', error);
+                    }
+                }
+            });
+
+            const result = await audioCaptureManager.start();
+            return result;
         } catch (error) {
             console.error('Error starting macOS audio capture:', error);
             return { success: false, error: error.message };
@@ -795,7 +888,7 @@ function setupAssistantIpcHandlers(geminiSessionRef) {
 
     ipcMain.handle('stop-macos-audio', async event => {
         try {
-            stopMacOSAudioCapture();
+            audioCaptureManager.stop();
             return { success: true };
         } catch (error) {
             console.error('Error stopping macOS audio capture:', error);
@@ -805,7 +898,7 @@ function setupAssistantIpcHandlers(geminiSessionRef) {
 
     ipcMain.handle('close-session', async event => {
         try {
-            stopMacOSAudioCapture();
+            audioCaptureManager.stop();
 
             // Set flag to prevent reconnection attempts
             isUserClosing = true;
@@ -865,15 +958,40 @@ async function toggleManualRecording() {
     }
 
     if (manualRecordingActive) {
-        // Stop & Process
+        // Stop & Process - force the buffer ready and process
         manualRecordingActive = false;
         sendToRenderer('update-status', 'Processing...');
+
+        // Force the speech buffer to ready state (manual trigger bypasses VAD)
+        speechBuffer.forceReady();
         await processBufferedAudio(prefs);
     } else {
-        // Start Recording
+        // Start Recording - reset buffer for fresh start
         manualRecordingActive = true;
-        audioTextBuffer = Buffer.alloc(0); // Clear previous
+        speechBuffer.reset();
         sendToRenderer('update-status', 'Listening...');
+    }
+}
+
+/**
+ * Send audio data to Gemini Live session
+ * Inlined from legacy audioCapture.js
+ */
+async function sendAudioToGemini(base64Data, geminiSessionRef) {
+    if (!geminiSessionRef.current) {
+        console.log('No active Gemini session');
+        return;
+    }
+
+    try {
+        await geminiSessionRef.current.sendRealtimeInput({
+            audio: {
+                data: base64Data,
+                mimeType: 'audio/pcm;rate=24000',
+            },
+        });
+    } catch (error) {
+        console.error('Error sending audio to Gemini:', error.message);
     }
 }
 
@@ -885,12 +1003,21 @@ module.exports = {
     initializeNewSession,
     saveConversationTurn,
     getCurrentSessionData,
-    killExistingSystemAudioDump, // Export from audioCapture
-    startMacOSAudioCapture, // Export from audioCapture
-    convertStereoToMono, // Export from audioCapture
-    stopMacOSAudioCapture, // Export from audioCapture
-    sendAudioToGemini, // Export from audioCapture
+    // Audio capture
+    audioCaptureManager,
+    AudioCaptureManager,
+    startMacOSAudioCapture: async (geminiSessionRef) => {
+        audioCaptureManager.removeAllListeners('audio');
+        audioCaptureManager.on('audio', async ({ base64Data }) => {
+            if (geminiSessionRef.current) {
+                await sendAudioToGemini(base64Data, geminiSessionRef);
+            }
+        });
+        const result = await audioCaptureManager.start();
+        return result.success;
+    },
+    stopMacOSAudioCapture: () => audioCaptureManager.stop(),
     sendImageToGeminiHttp,
-    setupAssistantIpcHandlers, // Renamed
+    setupAssistantIpcHandlers,
     toggleManualRecording,
 };

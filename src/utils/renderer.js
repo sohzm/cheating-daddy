@@ -1,5 +1,5 @@
 // renderer.js
-const { ipcRenderer } = require('electron');
+// Note: All IPC calls go through window.electronAPI (exposed via preload.js)
 // --- DATA DEFINITIONS FOR UI ---
 const PERSONAS = {
     interview: {
@@ -8,7 +8,7 @@ const PERSONAS = {
         contextInstruction: `To help the candidate excel: 
 1. Heavily rely on the 'User-provided context' (resume, job desc, skills).
 2. Tailor every response to match their specific experience level and field.`,
-        searchFocus: `If interviewer mentions recent events, news, or company-specific info, ALWAYS use Google Search.`
+        searchFocus: `If interviewer mentions recent events, news, or company-specific info, ALWAYS use Google Search.`,
     },
     sales: {
         name: 'Sales Call',
@@ -16,7 +16,7 @@ const PERSONAS = {
         contextInstruction: `To help close the deal:
 1. Use the 'User-provided context' to tailor value props to the specific product/service.
 2. Focus on ROI and solving customer pain points.`,
-        searchFocus: `If prospect mentions industry trends, competitor pricing, or news, ALWAYS use Google Search.`
+        searchFocus: `If prospect mentions industry trends, competitor pricing, or news, ALWAYS use Google Search.`,
     },
     meeting: {
         name: 'Business Meeting',
@@ -24,7 +24,7 @@ const PERSONAS = {
         contextInstruction: `To add value:
 1. Use 'User-provided context' to align with project goals and role.
 2. Keep the tone professional and collaborative.`,
-        searchFocus: `If participants mention market news, regulatory changes, or competitor moves, ALWAYS use Google Search.`
+        searchFocus: `If participants mention market news, regulatory changes, or competitor moves, ALWAYS use Google Search.`,
     },
     presentation: {
         name: 'Presentation',
@@ -32,7 +32,7 @@ const PERSONAS = {
         contextInstruction: `To engage the audience:
 1. Use 'User-provided context' to reference specific data and slides.
 2. Maintain a strong, narrative-driven flow.`,
-        searchFocus: `If audience asks about recent market stats or trends, ALWAYS use Google Search.`
+        searchFocus: `If audience asks about recent market stats or trends, ALWAYS use Google Search.`,
     },
     negotiation: {
         name: 'Negotiation',
@@ -40,7 +40,7 @@ const PERSONAS = {
         contextInstruction: `To win the negotiation:
 1. Use 'User-provided context' to know the walk-away points and leverage.
 2. Focus on win-win outcomes while protecting interests.`,
-        searchFocus: `If they mention market rates or competitor offers, ALWAYS use Google Search to verify.`
+        searchFocus: `If they mention market rates or competitor offers, ALWAYS use Google Search to verify.`,
     },
     exam: {
         name: 'Exam Assistant',
@@ -48,7 +48,7 @@ const PERSONAS = {
         contextInstruction: `To ensure accuracy:
 1. Use 'User-provided context' to understand the subject matter or course level.
 2. Prioritize correctness over style.`,
-        searchFocus: `If the question involves recent facts, current events, or changing data, ALWAYS use Google Search.`
+        searchFocus: `If the question involves recent facts, current events, or changing data, ALWAYS use Google Search.`,
     },
     dating: {
         name: 'Dating Assistant',
@@ -56,23 +56,23 @@ const PERSONAS = {
         contextInstruction: `To build attraction:
 1. Use 'User-provided context' to know the user's personality and interests.
 2. Keep it playful but respectful. Match the energy of the conversation.`,
-        searchFocus: `If they mention a specific movie, place, or event, search to get details to sound informed.`
-    }
+        searchFocus: `If they mention a specific movie, place, or event, search to get details to sound informed.`,
+    },
 };
 
 const LENGTHS = {
     concise: {
         name: 'Concise (Teleprompter)',
-        instruction: `**LENGTH REQUIREMENT:** Keep responses EXTREMELY SHORT (1-3 sentences max). simple and direct.`
+        instruction: `**LENGTH REQUIREMENT:** Keep responses EXTREMELY SHORT (1-3 sentences max). simple and direct.`,
     },
     balanced: {
         name: 'Balanced (Natural)',
-        instruction: `**LENGTH REQUIREMENT:** Keep responses conversational (3-5 sentences). Explain the 'Why' but don't ramble.`
+        instruction: `**LENGTH REQUIREMENT:** Keep responses conversational (3-5 sentences). Explain the 'Why' but don't ramble.`,
     },
     detailed: {
         name: 'Detailed (Comprehensive)',
-        instruction: `**LENGTH REQUIREMENT:** Provide comprehensive, thorough responses (8+ sentences). Cover all aspects of the question, use examples, and provide deep context.`
-    }
+        instruction: `**LENGTH REQUIREMENT:** Provide comprehensive, thorough responses (8+ sentences). Cover all aspects of the question, use examples, and provide deep context.`,
+    },
 };
 
 const FORMATS = {
@@ -81,21 +81,21 @@ const FORMATS = {
         instruction: `**FORMATTING:** Optimize for reading aloud.
 - Use **BOLD** for identifying keywords instantly.
 - Add blank lines between distinct ideas.
-- Avoid large blocks of text.`
+- Avoid large blocks of text.`,
     },
     structural: {
         name: 'Structural',
         instruction: `**FORMATTING:** Use structured Markdown.
 - Use headers (##) for sections.
 - Use bullet points (-) for lists.
-- Use **bold** for emphasis.`
+- Use **bold** for emphasis.`,
     },
     plain: {
         name: 'Plain Text',
         instruction: `**FORMATTING:** Use valid Markdown but keep it minimal.
 - Paragraphs only.
-- No heavy bolding or lists unless absolutely necessary.`
-    }
+- No heavy bolding or lists unless absolutely necessary.`,
+    },
 };
 
 const prompts = { PERSONAS, LENGTHS, FORMATS };
@@ -115,138 +115,139 @@ let offscreenCanvas = null;
 let offscreenContext = null;
 let currentImageQuality = 'medium'; // Store current image quality for manual screenshots
 
-const isLinux = process.platform === 'linux';
-const isMacOS = process.platform === 'darwin';
+// Platform detection via preload bridge (Node.js globals not available with contextIsolation)
+const isLinux = window.electronAPI?.system?.isLinux ?? false;
+const isMacOS = window.electronAPI?.system?.isMacOS ?? false;
 
 // ============ STORAGE API ============
-// Wrapper for IPC-based storage access
+// Wrapper for IPC-based storage access via preload bridge
 const storage = {
     // Config
     async getConfig() {
-        const result = await ipcRenderer.invoke('storage:get-config');
+        const result = await window.electronAPI.storage.getConfig();
         return result.success ? result.data : {};
     },
     async setConfig(config) {
-        return ipcRenderer.invoke('storage:set-config', config);
+        return window.electronAPI.storage.setConfig(config);
     },
     async updateConfig(key, value) {
-        return ipcRenderer.invoke('storage:update-config', key, value);
+        return window.electronAPI.storage.updateConfig(key, value);
     },
 
     // Credentials
     async getCredentials() {
-        const result = await ipcRenderer.invoke('storage:get-credentials');
+        const result = await window.electronAPI.storage.getCredentials();
         return result.success ? result.data : {};
     },
     async setCredentials(credentials) {
-        return ipcRenderer.invoke('storage:set-credentials', credentials);
+        return window.electronAPI.storage.setCredentials(credentials);
     },
     async getApiKey(provider = null) {
-        const result = await ipcRenderer.invoke('storage:get-api-key', provider);
+        const result = await window.electronAPI.storage.getApiKey(provider);
         return result.success ? result.data : '';
     },
     async setApiKey(apiKey, provider = null) {
-        return ipcRenderer.invoke('storage:set-api-key', apiKey, provider);
+        return window.electronAPI.storage.setApiKey(apiKey, provider);
     },
 
     // Usage stats
     async getUsageStats() {
-        const result = await ipcRenderer.invoke('storage:get-usage-stats');
+        const result = await window.electronAPI.storage.getUsageStats();
         return result.success ? result.data : { groq: [], gemini: [] };
     },
     async getUsageResetTime() {
-        const result = await ipcRenderer.invoke('storage:get-usage-reset-time');
+        const result = await window.electronAPI.storage.getUsageResetTime();
         return result.success ? result.data : { hours: 0, minutes: 0 };
     },
 
     // Preferences
     async getPreferences() {
-        const result = await ipcRenderer.invoke('storage:get-preferences');
+        const result = await window.electronAPI.storage.getPreferences();
         return result.success ? result.data : {};
     },
     async setPreferences(preferences) {
-        return ipcRenderer.invoke('storage:set-preferences', preferences);
+        return window.electronAPI.storage.setPreferences(preferences);
     },
     async updatePreference(key, value) {
-        return ipcRenderer.invoke('storage:update-preference', key, value);
+        return window.electronAPI.storage.updatePreference(key, value);
     },
 
     // Custom Profiles
     async getCustomProfiles() {
-        const result = await ipcRenderer.invoke('storage:get-custom-profiles');
+        const result = await window.electronAPI.storage.getCustomProfiles();
         return result.success ? result.data : [];
     },
     async saveCustomProfile(profile) {
-        return ipcRenderer.invoke('storage:save-custom-profile', profile);
+        return window.electronAPI.storage.saveCustomProfile(profile);
     },
     async deleteCustomProfile(profileId) {
-        return ipcRenderer.invoke('storage:delete-custom-profile', profileId);
+        return window.electronAPI.storage.deleteCustomProfile(profileId);
     },
 
     // Keybinds
     async getKeybinds() {
-        const result = await ipcRenderer.invoke('storage:get-keybinds');
+        const result = await window.electronAPI.storage.getKeybinds();
         return result.success ? result.data : null;
     },
     async setKeybinds(keybinds) {
-        return ipcRenderer.invoke('storage:set-keybinds', keybinds);
+        return window.electronAPI.storage.setKeybinds(keybinds);
     },
 
     // Sessions (History)
     async getAllSessions() {
-        const result = await ipcRenderer.invoke('storage:get-all-sessions');
+        const result = await window.electronAPI.storage.getAllSessions();
         return result.success ? result.data : [];
     },
     async getSession(sessionId) {
-        const result = await ipcRenderer.invoke('storage:get-session', sessionId);
+        const result = await window.electronAPI.storage.getSession(sessionId);
         return result.success ? result.data : null;
     },
     async saveSession(sessionId, data) {
-        return ipcRenderer.invoke('storage:save-session', sessionId, data);
+        return window.electronAPI.storage.saveSession(sessionId, data);
     },
     async deleteSession(sessionId) {
-        return ipcRenderer.invoke('storage:delete-session', sessionId);
+        return window.electronAPI.storage.deleteSession(sessionId);
     },
     async deleteAllSessions() {
-        return ipcRenderer.invoke('storage:delete-all-sessions');
+        return window.electronAPI.storage.deleteAllSessions();
     },
 
     // Clear all
     async clearAll() {
-        return ipcRenderer.invoke('storage:clear-all');
+        return window.electronAPI.storage.clearAll();
     },
 
     // First run / Upgrade detection
     async checkFirstRunOrUpgrade() {
-        const result = await ipcRenderer.invoke('storage:check-first-run-or-upgrade');
+        const result = await window.electronAPI.storage.checkFirstRunOrUpgrade();
         return result.success ? result.data : { isFirstRun: false, isUpgrade: false };
     },
     async markVersionSeen() {
-        return ipcRenderer.invoke('storage:mark-version-seen');
+        return window.electronAPI.storage.markVersionSeen();
     },
 
     // Update Preferences
     async getUpdatePreferences() {
-        const result = await ipcRenderer.invoke('storage:get-update-preferences');
+        const result = await window.electronAPI.storage.getUpdatePreferences();
         return result.success ? result.data : { skippedVersion: null };
     },
     async setUpdatePreferences(prefs) {
-        return ipcRenderer.invoke('storage:set-update-preferences', prefs);
+        return window.electronAPI.storage.setUpdatePreferences(prefs);
     },
 
     // Limits
     async getTodayLimits() {
-        const result = await ipcRenderer.invoke('storage:get-today-limits');
+        const result = await window.electronAPI.storage.getTodayLimits();
         return result.success ? result.data : { flash: { count: 0 }, flashLite: { count: 0 } };
     },
 
     // Permissions (macOS)
     async checkPermission(type) {
-        return ipcRenderer.invoke('check-permission', type);
+        return window.electronAPI.permissions.check(type);
     },
     async requestPermission(type) {
-        return ipcRenderer.invoke('request-permission', type);
-    }
+        return window.electronAPI.permissions.request(type);
+    },
 };
 
 // Cache for preferences to avoid async calls in hot paths
@@ -284,7 +285,7 @@ async function initializeGemini(profile = 'interview', language = 'en-US') {
     const apiKey = await storage.getApiKey();
     if (apiKey) {
         const prefs = await storage.getPreferences();
-        const success = await ipcRenderer.invoke('initialize-gemini', apiKey, prefs.customPrompt || '', profile, language);
+        const success = await window.electronAPI.assistant.initialize(apiKey, prefs.customPrompt || '', profile, language);
         if (success) {
             cheatingDaddy.setStatus('Live');
         } else {
@@ -294,7 +295,7 @@ async function initializeGemini(profile = 'interview', language = 'en-US') {
 }
 
 // Listen for status updates
-ipcRenderer.on('update-status', (event, status) => {
+window.electronAPI.onUpdateStatus(status => {
     console.log('Status update:', status);
     cheatingDaddy.setStatus(status);
 });
@@ -313,7 +314,7 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
             console.log('Starting macOS capture with SystemAudioDump...');
 
             // Start macOS audio capture
-            const audioResult = await ipcRenderer.invoke('start-macos-audio');
+            const audioResult = await window.electronAPI.audio.startMacOSAudio();
             if (!audioResult.success) {
                 throw new Error('Failed to start macOS audio capture: ' + audioResult.error);
             }
@@ -488,7 +489,7 @@ function setupLinuxMicProcessing(micStream) {
             const pcmData16 = convertFloat32ToInt16(chunk);
             const base64Data = arrayBufferToBase64(pcmData16.buffer);
 
-            await ipcRenderer.invoke('send-mic-audio-content', {
+            await window.electronAPI.audio.sendMicAudioContent({
                 data: base64Data,
                 mimeType: 'audio/pcm;rate=24000',
             });
@@ -521,7 +522,7 @@ function setupLinuxSystemAudioProcessing() {
             const pcmData16 = convertFloat32ToInt16(chunk);
             const base64Data = arrayBufferToBase64(pcmData16.buffer);
 
-            await ipcRenderer.invoke('send-audio-content', {
+            await window.electronAPI.audio.sendAudioContent({
                 data: base64Data,
                 mimeType: 'audio/pcm;rate=24000',
             });
@@ -551,7 +552,7 @@ function setupWindowsLoopbackProcessing() {
             const pcmData16 = convertFloat32ToInt16(chunk);
             const base64Data = arrayBufferToBase64(pcmData16.buffer);
 
-            await ipcRenderer.invoke('send-audio-content', {
+            await window.electronAPI.audio.sendAudioContent({
                 data: base64Data,
                 mimeType: 'audio/pcm;rate=24000',
             });
@@ -637,7 +638,7 @@ async function captureScreenshot(imageQuality = 'medium', isManual = false) {
                     return;
                 }
 
-                const result = await ipcRenderer.invoke('send-image-content', {
+                const result = await window.electronAPI.assistant.sendImageContent({
                     data: base64data,
                 });
 
@@ -728,7 +729,7 @@ async function captureManualScreenshot(imageQuality = null) {
                 }
 
                 // Send image with prompt to HTTP API (response streams via IPC events)
-                const result = await ipcRenderer.invoke('send-image-content', {
+                const result = await window.electronAPI.assistant.sendImageContent({
                     data: base64data,
                     prompt: MANUAL_SCREENSHOT_PROMPT,
                 });
@@ -780,7 +781,7 @@ function stopCapture() {
 
     // Stop macOS audio capture if running
     if (isMacOS) {
-        ipcRenderer.invoke('stop-macos-audio').catch(err => {
+        window.electronAPI.audio.stopMacOSAudio().catch(err => {
             console.error('Error stopping macOS audio:', err);
         });
     }
@@ -803,7 +804,7 @@ async function sendTextMessage(text) {
     }
 
     try {
-        const result = await ipcRenderer.invoke('send-text-message', text);
+        const result = await window.electronAPI.assistant.sendTextMessage(text);
         if (result.success) {
             console.log('Text message sent successfully');
         } else {
@@ -817,7 +818,7 @@ async function sendTextMessage(text) {
 }
 
 // Listen for conversation data from main process and save to storage
-ipcRenderer.on('save-conversation-turn', async (event, data) => {
+window.electronAPI.onSaveConversationTurn(async data => {
     try {
         await storage.saveSession(data.sessionId, { conversationHistory: data.fullHistory });
         console.log('Conversation session saved:', data.sessionId);
@@ -827,11 +828,11 @@ ipcRenderer.on('save-conversation-turn', async (event, data) => {
 });
 
 // Listen for session context (profile info) when session starts
-ipcRenderer.on('save-session-context', async (event, data) => {
+window.electronAPI.onSaveSessionContext(async data => {
     try {
         await storage.saveSession(data.sessionId, {
             profile: data.profile,
-            customPrompt: data.customPrompt
+            customPrompt: data.customPrompt,
         });
         console.log('Session context saved:', data.sessionId, 'profile:', data.profile);
     } catch (error) {
@@ -840,12 +841,12 @@ ipcRenderer.on('save-session-context', async (event, data) => {
 });
 
 // Listen for screen analysis responses (from ctrl+enter)
-ipcRenderer.on('save-screen-analysis', async (event, data) => {
+window.electronAPI.onSaveScreenAnalysis(async data => {
     try {
         await storage.saveSession(data.sessionId, {
             screenAnalysisHistory: data.fullHistory,
             profile: data.profile,
-            customPrompt: data.customPrompt
+            customPrompt: data.customPrompt,
         });
         console.log('Screen analysis saved:', data.sessionId);
     } catch (error) {
@@ -854,7 +855,7 @@ ipcRenderer.on('save-screen-analysis', async (event, data) => {
 });
 
 // Listen for emergency erase command from main process
-ipcRenderer.on('clear-sensitive-data', async () => {
+window.electronAPI.onClearSensitiveData(async () => {
     console.log('Clearing all data...');
     await storage.clearAll();
 });
@@ -880,60 +881,102 @@ const theme = {
     themes: {
         dark: {
             background: '#1e1e1e',
-            text: '#e0e0e0', textSecondary: '#a0a0a0', textMuted: '#6b6b6b',
-            border: '#333333', accent: '#ffffff',
-            btnPrimaryBg: '#ffffff', btnPrimaryText: '#000000', btnPrimaryHover: '#e0e0e0',
-            tooltipBg: '#1a1a1a', tooltipText: '#ffffff',
-            keyBg: 'rgba(255,255,255,0.1)'
+            text: '#e0e0e0',
+            textSecondary: '#a0a0a0',
+            textMuted: '#6b6b6b',
+            border: '#333333',
+            accent: '#ffffff',
+            btnPrimaryBg: '#ffffff',
+            btnPrimaryText: '#000000',
+            btnPrimaryHover: '#e0e0e0',
+            tooltipBg: '#1a1a1a',
+            tooltipText: '#ffffff',
+            keyBg: 'rgba(255,255,255,0.1)',
         },
         light: {
             background: '#ffffff',
-            text: '#1a1a1a', textSecondary: '#555555', textMuted: '#888888',
-            border: '#e0e0e0', accent: '#000000',
-            btnPrimaryBg: '#1a1a1a', btnPrimaryText: '#ffffff', btnPrimaryHover: '#333333',
-            tooltipBg: '#1a1a1a', tooltipText: '#ffffff',
-            keyBg: 'rgba(0,0,0,0.1)'
+            text: '#1a1a1a',
+            textSecondary: '#555555',
+            textMuted: '#888888',
+            border: '#e0e0e0',
+            accent: '#000000',
+            btnPrimaryBg: '#1a1a1a',
+            btnPrimaryText: '#ffffff',
+            btnPrimaryHover: '#333333',
+            tooltipBg: '#1a1a1a',
+            tooltipText: '#ffffff',
+            keyBg: 'rgba(0,0,0,0.1)',
         },
         midnight: {
             background: '#0d1117',
-            text: '#c9d1d9', textSecondary: '#8b949e', textMuted: '#6e7681',
-            border: '#30363d', accent: '#58a6ff',
-            btnPrimaryBg: '#58a6ff', btnPrimaryText: '#0d1117', btnPrimaryHover: '#79b8ff',
-            tooltipBg: '#161b22', tooltipText: '#c9d1d9',
-            keyBg: 'rgba(88,166,255,0.15)'
+            text: '#c9d1d9',
+            textSecondary: '#8b949e',
+            textMuted: '#6e7681',
+            border: '#30363d',
+            accent: '#58a6ff',
+            btnPrimaryBg: '#58a6ff',
+            btnPrimaryText: '#0d1117',
+            btnPrimaryHover: '#79b8ff',
+            tooltipBg: '#161b22',
+            tooltipText: '#c9d1d9',
+            keyBg: 'rgba(88,166,255,0.15)',
         },
         sepia: {
             background: '#f4ecd8',
-            text: '#5c4b37', textSecondary: '#7a6a56', textMuted: '#998875',
-            border: '#d4c8b0', accent: '#8b4513',
-            btnPrimaryBg: '#5c4b37', btnPrimaryText: '#f4ecd8', btnPrimaryHover: '#7a6a56',
-            tooltipBg: '#5c4b37', tooltipText: '#f4ecd8',
-            keyBg: 'rgba(92,75,55,0.15)'
+            text: '#5c4b37',
+            textSecondary: '#7a6a56',
+            textMuted: '#998875',
+            border: '#d4c8b0',
+            accent: '#8b4513',
+            btnPrimaryBg: '#5c4b37',
+            btnPrimaryText: '#f4ecd8',
+            btnPrimaryHover: '#7a6a56',
+            tooltipBg: '#5c4b37',
+            tooltipText: '#f4ecd8',
+            keyBg: 'rgba(92,75,55,0.15)',
         },
         nord: {
             background: '#2e3440',
-            text: '#eceff4', textSecondary: '#d8dee9', textMuted: '#4c566a',
-            border: '#3b4252', accent: '#88c0d0',
-            btnPrimaryBg: '#88c0d0', btnPrimaryText: '#2e3440', btnPrimaryHover: '#8fbcbb',
-            tooltipBg: '#3b4252', tooltipText: '#eceff4',
-            keyBg: 'rgba(136,192,208,0.15)'
+            text: '#eceff4',
+            textSecondary: '#d8dee9',
+            textMuted: '#4c566a',
+            border: '#3b4252',
+            accent: '#88c0d0',
+            btnPrimaryBg: '#88c0d0',
+            btnPrimaryText: '#2e3440',
+            btnPrimaryHover: '#8fbcbb',
+            tooltipBg: '#3b4252',
+            tooltipText: '#eceff4',
+            keyBg: 'rgba(136,192,208,0.15)',
         },
         dracula: {
             background: '#282a36',
-            text: '#f8f8f2', textSecondary: '#bd93f9', textMuted: '#6272a4',
-            border: '#44475a', accent: '#ff79c6',
-            btnPrimaryBg: '#ff79c6', btnPrimaryText: '#282a36', btnPrimaryHover: '#ff92d0',
-            tooltipBg: '#44475a', tooltipText: '#f8f8f2',
-            keyBg: 'rgba(255,121,198,0.15)'
+            text: '#f8f8f2',
+            textSecondary: '#bd93f9',
+            textMuted: '#6272a4',
+            border: '#44475a',
+            accent: '#ff79c6',
+            btnPrimaryBg: '#ff79c6',
+            btnPrimaryText: '#282a36',
+            btnPrimaryHover: '#ff92d0',
+            tooltipBg: '#44475a',
+            tooltipText: '#f8f8f2',
+            keyBg: 'rgba(255,121,198,0.15)',
         },
         abyss: {
             background: '#0a0a0a',
-            text: '#d4d4d4', textSecondary: '#808080', textMuted: '#505050',
-            border: '#1a1a1a', accent: '#ffffff',
-            btnPrimaryBg: '#ffffff', btnPrimaryText: '#0a0a0a', btnPrimaryHover: '#d4d4d4',
-            tooltipBg: '#141414', tooltipText: '#d4d4d4',
-            keyBg: 'rgba(255,255,255,0.08)'
-        }
+            text: '#d4d4d4',
+            textSecondary: '#808080',
+            textMuted: '#505050',
+            border: '#1a1a1a',
+            accent: '#ffffff',
+            btnPrimaryBg: '#ffffff',
+            btnPrimaryText: '#0a0a0a',
+            btnPrimaryHover: '#d4d4d4',
+            tooltipBg: '#141414',
+            tooltipText: '#d4d4d4',
+            keyBg: 'rgba(255,255,255,0.08)',
+        },
     },
 
     current: 'dark',
@@ -950,29 +993,31 @@ const theme = {
             sepia: 'Sepia',
             nord: 'Nord',
             dracula: 'Dracula',
-            abyss: 'Abyss'
+            abyss: 'Abyss',
         };
         return Object.keys(this.themes).map(key => ({
             value: key,
             name: names[key] || key,
-            colors: this.themes[key]
+            colors: this.themes[key],
         }));
     },
 
     hexToRgb(hex) {
         const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-        return result ? {
-            r: parseInt(result[1], 16),
-            g: parseInt(result[2], 16),
-            b: parseInt(result[3], 16)
-        } : { r: 30, g: 30, b: 30 };
+        return result
+            ? {
+                  r: parseInt(result[1], 16),
+                  g: parseInt(result[2], 16),
+                  b: parseInt(result[3], 16),
+              }
+            : { r: 30, g: 30, b: 30 };
     },
 
     lightenColor(rgb, amount) {
         return {
             r: Math.min(255, rgb.r + amount),
             g: Math.min(255, rgb.g + amount),
-            b: Math.min(255, rgb.b + amount)
+            b: Math.min(255, rgb.b + amount),
         };
     },
 
@@ -980,7 +1025,7 @@ const theme = {
         return {
             r: Math.max(0, rgb.r - amount),
             g: Math.max(0, rgb.g - amount),
-            b: Math.max(0, rgb.b - amount)
+            b: Math.max(0, rgb.b - amount),
         };
     },
 
@@ -1060,19 +1105,19 @@ const theme = {
     async save(themeName) {
         await storage.updatePreference('theme', themeName);
         this.apply(themeName);
-    }
+    },
 };
 
 // Consolidated cheatingDaddy object - all functions in one place
 const cheatingDaddy = {
     // App version
-    getVersion: async () => ipcRenderer.invoke('get-app-version'),
+    getVersion: async () => window.electronAPI.system.getVersion(),
 
     // Assistant API
     assistant: {
         validateApiKey: async (provider, apiKey) => {
-            return ipcRenderer.invoke('assistant:validate-api-key', provider, apiKey);
-        }
+            return window.electronAPI.assistant.validateApiKey(provider, apiKey);
+        },
     },
 
     // Element access

@@ -4,7 +4,11 @@ import { resizeLayout } from '../../utils/windowResize.js';
 export class MainView extends LitElement {
     static styles = css`
         * {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family:
+                'Inter',
+                -apple-system,
+                BlinkMacSystemFont,
+                sans-serif;
             cursor: default;
             user-select: none;
         }
@@ -96,18 +100,21 @@ export class MainView extends LitElement {
 
     constructor() {
         super();
-        this.onStart = () => { };
-        this.onAPIKeyHelp = () => { };
+        this.onStart = () => {};
+        this.onAPIKeyHelp = () => {};
         this.isInitializing = false;
-        this.onLayoutModeChange = () => { };
+        this.onLayoutModeChange = () => {};
         this.boundKeydownHandler = this.handleKeydown.bind(this);
     }
 
     connectedCallback() {
         super.connectedCallback();
-        window.electron?.ipcRenderer?.on('session-initializing', (event, isInitializing) => {
-            this.isInitializing = isInitializing;
-        });
+        // Set up IPC listener via preload bridge
+        if (window.electronAPI) {
+            this._cleanupSessionInitializing = window.electronAPI.onSessionInitializing(isInitializing => {
+                this.isInitializing = isInitializing;
+            });
+        }
 
         // Add keyboard event listener for Ctrl+Enter (or Cmd+Enter on Mac)
         document.addEventListener('keydown', this.boundKeydownHandler);
@@ -118,7 +125,10 @@ export class MainView extends LitElement {
 
     disconnectedCallback() {
         super.disconnectedCallback();
-        window.electron?.ipcRenderer?.removeAllListeners('session-initializing');
+        // Clean up IPC listener via stored cleanup function
+        if (this._cleanupSessionInitializing) {
+            this._cleanupSessionInitializing();
+        }
         // Remove keyboard event listener
         document.removeEventListener('keydown', this.boundKeydownHandler);
     }

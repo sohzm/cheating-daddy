@@ -8,12 +8,15 @@ import { AssistantView } from '../views/AssistantView.js';
 import { OnboardingView } from '../views/OnboardingView.js';
 import { UpgradeDialog } from '../dialogs/UpgradeDialog.js';
 
-
 export class CheatingDaddyApp extends LitElement {
     static styles = css`
         * {
             box-sizing: border-box;
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family:
+                'Inter',
+                -apple-system,
+                BlinkMacSystemFont,
+                sans-serif;
             margin: 0px;
             padding: 0px;
             cursor: default;
@@ -111,11 +114,13 @@ export class CheatingDaddyApp extends LitElement {
             color: var(--text-color, #fff);
             padding: 12px 16px;
             border-radius: 6px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-            border-left: 4px solid #00E6CC; /* Default/Info */
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+            border-left: 4px solid #00e6cc; /* Default/Info */
             opacity: 0;
             transform: translateX(20px);
-            transition: opacity 0.3s ease, transform 0.3s ease;
+            transition:
+                opacity 0.3s ease,
+                transform 0.3s ease;
             pointer-events: auto;
             font-size: 13px;
             display: flex;
@@ -124,15 +129,21 @@ export class CheatingDaddyApp extends LitElement {
             max-width: 320px;
             pointer-events: none; /* Let clicks pass through if covered, but toast itself handles */
         }
-        
+
         .toast.visible {
             opacity: 1;
             transform: translateX(0);
         }
 
-        .toast.error { border-left-color: #ef4444; }
-        .toast.warning { border-left-color: #f59e0b; }
-        .toast.success { border-left-color: #10b981; }
+        .toast.error {
+            border-left-color: #ef4444;
+        }
+        .toast.warning {
+            border-left-color: #f59e0b;
+        }
+        .toast.success {
+            border-left-color: #10b981;
+        }
 
         .branding-footer {
             position: fixed;
@@ -147,7 +158,9 @@ export class CheatingDaddyApp extends LitElement {
             letter-spacing: 2px;
             pointer-events: none;
             z-index: 9999;
-            text-shadow: 0 0 10px rgba(0, 255, 255, 0.6), 0 0 20px rgba(0, 255, 255, 0.4);
+            text-shadow:
+                0 0 10px rgba(0, 255, 255, 0.6),
+                0 0 20px rgba(0, 255, 255, 0.4);
             opacity: 0.9;
             white-space: nowrap;
             border-top: 1px solid rgba(0, 255, 255, 0.3);
@@ -236,19 +249,13 @@ export class CheatingDaddyApp extends LitElement {
             // Note: First run/upgrade dialog is now handled at app startup in a separate window
             // The upgrade check here is skipped - we go straight to loading settings
 
-            const [config, prefs] = await Promise.all([
-                cheatingDaddy.storage.getConfig(),
-                cheatingDaddy.storage.getPreferences()
-            ]);
+            const [config, prefs] = await Promise.all([cheatingDaddy.storage.getConfig(), cheatingDaddy.storage.getPreferences()]);
 
             // Check onboarding status
             this.currentView = config.onboarded ? 'main' : 'onboarding';
 
             // Apply background appearance (color + transparency)
-            this.applyBackgroundAppearance(
-                prefs.backgroundColor ?? '#1e1e1e',
-                prefs.backgroundTransparency ?? 0.8
-            );
+            this.applyBackgroundAppearance(prefs.backgroundColor ?? '#1e1e1e', prefs.backgroundTransparency ?? 0.8);
 
             // Load preferences
             this.selectedProfile = prefs.selectedProfile || 'interview';
@@ -263,8 +270,6 @@ export class CheatingDaddyApp extends LitElement {
             this._storageLoaded = true;
             this.updateLayoutMode();
             this.requestUpdate();
-
-
         } catch (error) {
             console.error('Error loading from storage:', error);
             this._storageLoaded = true;
@@ -274,16 +279,22 @@ export class CheatingDaddyApp extends LitElement {
 
     async _fetchReleaseNotes() {
         try {
-            const { checkForUpdates } = window.require('./utils/updateChecker.js');
-            const result = await checkForUpdates();
+            // Fetch update info directly (updateChecker not available with context isolation)
+            const response = await fetch(
+                'https://raw.githubusercontent.com/klaus-qodes/cheating-daddy/master/update.json',
+                { cache: 'no-store' }
+            );
+            if (!response.ok) throw new Error('Failed to fetch update info');
+            const updateInfo = await response.json();
+
             // Even if hasUpdate is false (because we are already on latest),
             // if we just updated, we want to show notes for the CURRENT version
             // which is returned as part of the check result's updateInfo or by re-fetching
-            if (result.updateInfo) {
+            if (updateInfo) {
                 this.upgradeInfo = {
                     ...this.upgradeInfo,
-                    releaseNotes: result.updateInfo.releaseNotes,
-                    releaseChannel: result.updateInfo.releaseChannel
+                    releaseNotes: updateInfo.releaseNotes,
+                    releaseChannel: updateInfo.releaseChannel,
                 };
                 this.requestUpdate();
             }
@@ -292,30 +303,28 @@ export class CheatingDaddyApp extends LitElement {
         }
     }
 
-
-
     handleUpdateDialogClose() {
         this.showUpdateDialog = false;
         this.updateInfo = null;
         this.requestUpdate();
     }
 
-
-
     hexToRgb(hex) {
         const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-        return result ? {
-            r: parseInt(result[1], 16),
-            g: parseInt(result[2], 16),
-            b: parseInt(result[3], 16)
-        } : { r: 30, g: 30, b: 30 };
+        return result
+            ? {
+                  r: parseInt(result[1], 16),
+                  g: parseInt(result[2], 16),
+                  b: parseInt(result[3], 16),
+              }
+            : { r: 30, g: 30, b: 30 };
     }
 
     lightenColor(rgb, amount) {
         return {
             r: Math.min(255, rgb.r + amount),
             g: Math.min(255, rgb.g + amount),
-            b: Math.min(255, rgb.b + amount)
+            b: Math.min(255, rgb.b + amount),
         };
     }
 
@@ -351,28 +360,27 @@ export class CheatingDaddyApp extends LitElement {
         // Apply layout mode to document root
         this.updateLayoutMode();
 
-        // Set up IPC listeners if needed
-        if (window.require) {
-            const { ipcRenderer } = window.require('electron');
-            ipcRenderer.on('new-response', (_, response) => {
+        // Set up IPC listeners via preload bridge
+        if (window.electronAPI) {
+            this._cleanupNewResponse = window.electronAPI.onNewResponse(response => {
                 this.addNewResponse(response);
             });
-            ipcRenderer.on('update-response', (_, response) => {
+            this._cleanupUpdateResponse = window.electronAPI.onUpdateResponse(response => {
                 this.updateCurrentResponse(response);
             });
-            ipcRenderer.on('update-status', (_, status) => {
+            this._cleanupUpdateStatus = window.electronAPI.onUpdateStatus(status => {
                 this.setStatus(status);
             });
-            ipcRenderer.on('click-through-toggled', (_, isEnabled) => {
+            this._cleanupClickThrough = window.electronAPI.onClickThroughToggled(isEnabled => {
                 this._isClickThrough = isEnabled;
             });
-            ipcRenderer.on('reconnect-failed', (_, data) => {
+            this._cleanupReconnectFailed = window.electronAPI.onReconnectFailed(data => {
                 this.addNewResponse(data.message);
             });
-            ipcRenderer.on('toast', (_, data) => {
+            this._cleanupToast = window.electronAPI.onToast(data => {
                 this.handleToast(data);
             });
-            ipcRenderer.on('setting-changed', (_, data) => {
+            this._cleanupSettingChanged = window.electronAPI.onSettingChanged(data => {
                 this.handleSettingChanged(data);
             });
         }
@@ -380,16 +388,14 @@ export class CheatingDaddyApp extends LitElement {
 
     disconnectedCallback() {
         super.disconnectedCallback();
-        if (window.require) {
-            const { ipcRenderer } = window.require('electron');
-            ipcRenderer.removeAllListeners('new-response');
-            ipcRenderer.removeAllListeners('update-response');
-            ipcRenderer.removeAllListeners('update-status');
-            ipcRenderer.removeAllListeners('click-through-toggled');
-            ipcRenderer.removeAllListeners('reconnect-failed');
-            ipcRenderer.removeAllListeners('toast');
-            ipcRenderer.removeAllListeners('setting-changed');
-        }
+        // Clean up IPC listeners via stored cleanup functions
+        if (this._cleanupNewResponse) this._cleanupNewResponse();
+        if (this._cleanupUpdateResponse) this._cleanupUpdateResponse();
+        if (this._cleanupUpdateStatus) this._cleanupUpdateStatus();
+        if (this._cleanupClickThrough) this._cleanupClickThrough();
+        if (this._cleanupReconnectFailed) this._cleanupReconnectFailed();
+        if (this._cleanupToast) this._cleanupToast();
+        if (this._cleanupSettingChanged) this._cleanupSettingChanged();
     }
 
     handleToast(data) {
@@ -415,9 +421,11 @@ export class CheatingDaddyApp extends LitElement {
         if (data.key === 'audioProcessingMode') {
             // Force CustomizeView to refresh if it's potentially active or cached
             // We can dispatch a global event for sub-components
-            window.dispatchEvent(new CustomEvent('external-setting-change', {
-                detail: { key: data.key, value: data.value }
-            }));
+            window.dispatchEvent(
+                new CustomEvent('external-setting-change', {
+                    detail: { key: data.key, value: data.value },
+                })
+            );
         }
     }
 
@@ -479,26 +487,23 @@ export class CheatingDaddyApp extends LitElement {
             cheatingDaddy.stopCapture();
 
             // Close the session
-            if (window.require) {
-                const { ipcRenderer } = window.require('electron');
-                await ipcRenderer.invoke('close-session');
+            if (window.electronAPI) {
+                await window.electronAPI.assistant.closeSession();
             }
             this.sessionActive = false;
             this.currentView = 'main';
             console.log('Session closed');
         } else {
             // Quit the entire application
-            if (window.require) {
-                const { ipcRenderer } = window.require('electron');
-                await ipcRenderer.invoke('quit-application');
+            if (window.electronAPI) {
+                await window.electronAPI.window.quit();
             }
         }
     }
 
     async handleHideToggle() {
-        if (window.require) {
-            const { ipcRenderer } = window.require('electron');
-            await ipcRenderer.invoke('toggle-window-visibility');
+        if (window.electronAPI) {
+            await window.electronAPI.window.toggleVisibility();
         }
     }
 
@@ -530,9 +535,8 @@ export class CheatingDaddyApp extends LitElement {
     }
 
     async handleAPIKeyHelp() {
-        if (window.require) {
-            const { ipcRenderer } = window.require('electron');
-            await ipcRenderer.invoke('open-external', 'https://cheatingdaddy.com/help/api-key');
+        if (window.electronAPI) {
+            await window.electronAPI.window.openExternal('https://cheatingdaddy.com/help/api-key');
         }
     }
 
@@ -569,9 +573,8 @@ export class CheatingDaddyApp extends LitElement {
 
     // Help view event handlers
     async handleExternalLinkClick(url) {
-        if (window.require) {
-            const { ipcRenderer } = window.require('electron');
-            await ipcRenderer.invoke('open-external', url);
+        if (window.electronAPI) {
+            await window.electronAPI.window.openExternal(url);
         }
     }
 
@@ -620,9 +623,8 @@ export class CheatingDaddyApp extends LitElement {
         super.updated(changedProperties);
 
         // Only notify main process of view change if the view actually changed
-        if (changedProperties.has('currentView') && window.require) {
-            const { ipcRenderer } = window.require('electron');
-            ipcRenderer.send('view-changed', this.currentView);
+        if (changedProperties.has('currentView') && window.electronAPI) {
+            window.electronAPI.send.viewChanged(this.currentView);
 
             // Add a small delay to smooth out the transition
             const viewContainer = this.shadowRoot?.querySelector('.view-container');
@@ -694,11 +696,11 @@ export class CheatingDaddyApp extends LitElement {
                         .shouldAnimateResponse=${this.shouldAnimateResponse}
                         @response-index-changed=${this.handleResponseIndexChanged}
                         @response-animation-complete=${() => {
-                        this.shouldAnimateResponse = false;
-                        this._currentResponseIsComplete = true;
-                        console.log('[response-animation-complete] Marked current response as complete');
-                        this.requestUpdate();
-                    }}
+                            this.shouldAnimateResponse = false;
+                            this._currentResponseIsComplete = true;
+                            console.log('[response-animation-complete] Marked current response as complete');
+                            this.requestUpdate();
+                        }}
                     ></assistant-view>
                 `;
 
@@ -709,11 +711,11 @@ export class CheatingDaddyApp extends LitElement {
 
     render() {
         const viewClassMap = {
-            'assistant': 'assistant-view',
-            'onboarding': 'onboarding-view',
-            'customize': 'settings-view',
-            'help': 'help-view',
-            'history': 'history-view',
+            assistant: 'assistant-view',
+            onboarding: 'onboarding-view',
+            customize: 'settings-view',
+            help: 'help-view',
+            history: 'history-view',
         };
         const mainContentClass = `main-content ${viewClassMap[this.currentView] || 'with-border'}`;
 
@@ -736,30 +738,28 @@ export class CheatingDaddyApp extends LitElement {
                         <div class="view-container">${this.renderCurrentView()}</div>
                     </div>
                 </div>
-                ${this.currentView !== 'assistant' ? html`
-                    <div class="branding-footer">
-                        Cheating Daddy On Steroids By klaus-qodes
-                    </div>
-                ` : ''}
-                
+                ${this.currentView !== 'assistant' ? html` <div class="branding-footer">Cheating Daddy On Steroids By klaus-qodes</div> ` : ''}
+
                 <div class="toast-container">
                     <div class="toast ${this.toastVisible ? 'visible' : ''} ${this.toastType}">
                         <span>${this.toastMessage}</span>
                     </div>
                 </div>
 
-                ${this.showUpgradeDialog && this.upgradeInfo ? html`
-                    <upgrade-dialog
-                        .isFirstRun=${this.upgradeInfo.isFirstRun}
-                        .isUpgrade=${this.upgradeInfo.isUpgrade}
-                        .previousVersion=${this.upgradeInfo.previousVersion || ''}
-                        .currentVersion=${this.upgradeInfo.currentVersion || ''}
-                        .releaseNotes=${this.upgradeInfo.releaseNotes || []}
-                        .releaseChannel=${this.upgradeInfo.releaseChannel || ''}
-                        @dialog-complete=${this.handleUpgradeDialogComplete}
-                        @dialog-error=${this.handleUpgradeDialogError}
-                    ></upgrade-dialog>
-                ` : ''}
+                ${this.showUpgradeDialog && this.upgradeInfo
+                    ? html`
+                          <upgrade-dialog
+                              .isFirstRun=${this.upgradeInfo.isFirstRun}
+                              .isUpgrade=${this.upgradeInfo.isUpgrade}
+                              .previousVersion=${this.upgradeInfo.previousVersion || ''}
+                              .currentVersion=${this.upgradeInfo.currentVersion || ''}
+                              .releaseNotes=${this.upgradeInfo.releaseNotes || []}
+                              .releaseChannel=${this.upgradeInfo.releaseChannel || ''}
+                              @dialog-complete=${this.handleUpgradeDialogComplete}
+                              @dialog-error=${this.handleUpgradeDialogError}
+                          ></upgrade-dialog>
+                      `
+                    : ''}
             </div>
         `;
     }
@@ -779,10 +779,9 @@ export class CheatingDaddyApp extends LitElement {
         this.updateLayoutMode();
 
         // Notify main process about layout change for window resizing
-        if (window.require) {
+        if (window.electronAPI) {
             try {
-                const { ipcRenderer } = window.require('electron');
-                await ipcRenderer.invoke('update-sizes');
+                await window.electronAPI.window.updateSizes();
             } catch (error) {
                 console.error('Failed to update sizes in main process:', error);
             }
