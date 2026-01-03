@@ -460,6 +460,54 @@ export class AssistantView extends LitElement {
             color: var(--text-muted);
             font-style: italic;
         }
+
+        /* Engine Loading Overlay */
+        .engine-loader-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--bg-primary);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            gap: 24px;
+        }
+
+        .engine-loader-spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--accent-color, #6366f1);
+            border-radius: 50%;
+            animation: engine-spin 1s linear infinite;
+        }
+
+        @keyframes engine-spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .engine-loader-text {
+            color: var(--text-muted);
+            font-size: 14px;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+        }
+
+        .engine-loader-dots::after {
+            content: '';
+            animation: engine-dots 1.5s infinite;
+        }
+
+        @keyframes engine-dots {
+            0%, 20% { content: ''; }
+            40% { content: '.'; }
+            60% { content: '..'; }
+            80%, 100% { content: '...'; }
+        }
     `;
 
     static properties = {
@@ -474,6 +522,8 @@ export class AssistantView extends LitElement {
         flashCount: { type: Number },
         flashLiteCount: { type: Number },
         usageStats: { type: Object },
+        isEngineReady: { type: Boolean },
+        engineStatus: { type: String },
     };
 
     constructor() {
@@ -488,6 +538,75 @@ export class AssistantView extends LitElement {
         this.viewMode = 'paged'; // 'paged' or 'continuous'
         this.showSidebar = true;
         this._userScrolledUp = false;
+        this.isEngineReady = false;
+        this.engineStatus = 'Initializing...';
+        
+        // Start engine initialization check
+        this._initializeEngine();
+    }
+
+    async _initializeEngine() {
+        try {
+            // Step 1: Wait for IPC handlers to be ready
+            this.engineStatus = 'Connecting to backend...';
+            let ipcReady = false;
+            let attempts = 0;
+            const maxAttempts = 20; // 10 seconds max
+            
+            while (!ipcReady && attempts < maxAttempts) {
+                try {
+                    if (window.electronAPI?.storage?.getPreferences) {
+                        await window.electronAPI.storage.getPreferences();
+                        ipcReady = true;
+                    }
+                } catch (e) {
+                    // IPC not ready yet
+                }
+                if (!ipcReady) {
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    attempts++;
+                }
+            }
+            
+            if (!ipcReady) {
+                this.engineStatus = 'Backend connection failed';
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                this.isEngineReady = true;
+                return;
+            }
+            
+            // Step 2: Check for API credentials (existence only, no validation to save tokens)
+            this.engineStatus = 'Checking API keys...';
+            const credentialsResult = await window.electronAPI.storage.getCredentials();
+            const credentials = credentialsResult?.data || credentialsResult || {};
+            const geminiKey = credentials?.gemini || credentials?.apiKey || '';
+            const groqKey = credentials?.groq || '';
+            
+            if (!geminiKey && !groqKey) {
+                this.engineStatus = 'No API keys configured';
+                console.log('[Engine] No API keys found - user needs to configure in settings');
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                this.isEngineReady = true;
+                return;
+            }
+            
+            // Step 3: Engine ready (keys exist, skip validation to save tokens)
+            const providers = [];
+            if (geminiKey) providers.push('Gemini');
+            if (groqKey) providers.push('Groq');
+            
+            this.engineStatus = 'Engine ready!';
+            console.log(`[Engine] Ready with providers: ${providers.join(', ')}`);
+            
+            await new Promise(resolve => setTimeout(resolve, 600));
+            
+        } catch (error) {
+            console.error('[Engine] Initialization error:', error);
+            this.engineStatus = 'Initialization error';
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        
+        this.isEngineReady = true;
     }
 
     getProfileNames() {
@@ -870,6 +989,14 @@ export class AssistantView extends LitElement {
 
         return html`
             <div class="main-container">
+                ${!this.isEngineReady ? html`
+                    <div class="engine-loader-overlay">
+                        <div class="engine-loader-spinner"></div>
+                        <div class="engine-loader-text">
+                            ${this.engineStatus}<span class="engine-loader-dots"></span>
+                        </div>
+                    </div>
+                ` : ''}
                 <div class="content-area">
                     <div class="response-container" id="responseContainer" @scroll=${this.handleScroll}>
                         ${

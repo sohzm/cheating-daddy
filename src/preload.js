@@ -107,6 +107,7 @@ const ALLOWED_INVOKE_CHANNELS = new Set([
     'toggle-window-visibility',
     'update-sizes',
     'window-minimize',
+    'window:resize-by',
     // Application
     'get-app-version',
     'quit-application',
@@ -115,6 +116,8 @@ const ALLOWED_INVOKE_CHANNELS = new Set([
     'assistant:validate-api-key',
     'check-permission',
     'request-permission',
+    'open-system-preferences',
+    'get-all-permissions',
     // Update
     'open-update-window',
 ]);
@@ -248,6 +251,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     permissions: {
         check: type => secureInvoke('check-permission', type),
         request: type => secureInvoke('request-permission', type),
+        getAll: () => secureInvoke('get-all-permissions'),
+        openSystemPreferences: pane => secureInvoke('open-system-preferences', pane),
     },
 
     // ============ AUDIO APIs ============
@@ -276,6 +281,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         openExternal: url => secureInvoke('open-external', url),
         openUpdateWindow: updateInfo => secureInvoke('open-update-window', updateInfo),
         quit: () => secureInvoke('quit-application'),
+        resizeBy: (widthDelta, heightDelta, xDelta, yDelta) => secureInvoke('window:resize-by', { widthDelta, heightDelta, xDelta, yDelta }),
     },
 
     // ============ SYSTEM APIs ============

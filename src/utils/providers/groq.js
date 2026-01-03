@@ -58,8 +58,7 @@ class GroqProvider {
             model: model,
             messages: messages,
             stream: true,
-            temperature: options.temperature || 0.7,
-            max_tokens: options.maxTokens || 2048
+            temperature: options.temperature || 0.7
         });
 
         return stream;
@@ -116,8 +115,7 @@ class GroqProvider {
             model: model,
             messages: messages,
             stream: true,
-            temperature: options.temperature || 0.7,
-            max_tokens: options.maxTokens || 2048
+            temperature: options.temperature || 0.7
         });
 
         return stream;
@@ -213,8 +211,7 @@ class GroqProvider {
                 model: model,
                 messages: messages,
                 stream: true,
-                temperature: options.temperature || 0.7,
-                max_tokens: options.maxTokens || 2048
+                temperature: options.temperature || 0.7
             });
 
             return {

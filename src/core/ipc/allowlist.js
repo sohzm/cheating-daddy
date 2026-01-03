@@ -434,6 +434,13 @@ const ALLOWED_CHANNELS = {
         sensitivity: 'low',
         description: 'Update window dimensions',
     },
+    'window:resize-by': {
+        direction: 'invoke',
+        subsystem: 'window',
+        payloadValidation: 'object',
+        sensitivity: 'low',
+        description: 'Resize window by delta values (drag resize)',
+    },
     'close-update-window': {
         direction: 'send',
         subsystem: 'window',
@@ -511,6 +518,20 @@ const ALLOWED_CHANNELS = {
         payloadValidation: 'string',
         sensitivity: 'medium',
         description: 'Request system permission',
+    },
+    'open-system-preferences': {
+        direction: 'invoke',
+        subsystem: 'application',
+        payloadValidation: 'string',
+        sensitivity: 'low',
+        description: 'Open macOS System Preferences to specific pane',
+    },
+    'get-all-permissions': {
+        direction: 'invoke',
+        subsystem: 'application',
+        payloadValidation: 'none',
+        sensitivity: 'low',
+        description: 'Get all macOS permission statuses at once',
     },
 
     // ========================================================================

@@ -10,3 +10,7 @@ export { HistoryView } from './views/HistoryView.js';
 export { AssistantView } from './views/AssistantView.js';
 export { OnboardingView } from './views/OnboardingView.js';
 export { AdvancedView } from './views/AdvancedView.js';
+
+// Common components
+export { StealthSelect } from './common/StealthSelect.js';
+export { MacPermissionsSetup } from './common/MacPermissionsSetup.js';

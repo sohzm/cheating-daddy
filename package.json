@@ -1,13 +1,16 @@
 {
     "name": "cheating-daddy",
     "productName": "cheating-daddy",
-    "version": "0.5.5",
+    "version": "0.5.6",
     "description": "Cheating Daddy On Steroids",
     "main": "src/index.js",
     "scripts": {
         "start": "electron-forge start",
         "package": "electron-forge package",
         "make": "electron-forge make",
+        "make:mac": "electron-forge make --platform darwin",
+        "make:win": "electron-forge make --platform win32",
+        "make:linux": "electron-forge make --platform linux",
         "publish": "electron-forge publish",
         "lint": "echo \"No linting configured\"",
         "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
@@ -29,7 +32,7 @@
         {
             "name": "klaus-qodes",
             "github": "https://github.com/klaus-qodes",
-            "version": "v0.5.5"
+            "version": "v0.5.6"
         }
     ],
     "license": "GPL-3.0",

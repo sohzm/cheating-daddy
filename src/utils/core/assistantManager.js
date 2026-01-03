@@ -127,6 +127,82 @@ function getRecentScreenAnalysisContext(count = 2) {
     return messages;
 }
 
+/**
+ * Get unified recent context from both audio and screen analysis histories
+ * Combines all interactions, sorts by timestamp, returns last N turns
+ * @param {number} count - Number of recent turns to include (default: 2)
+ * @returns {Array} Array of {role, content} messages for LLM context
+ */
+function getRecentUnifiedContext(count = 2) {
+    console.log('[Context] Getting unified context...');
+    console.log('[Context] conversationHistory length:', conversationHistory?.length || 0);
+    console.log('[Context] screenAnalysisHistory length:', screenAnalysisHistory?.length || 0);
+    
+    // Normalize conversation history (audio/text mode)
+    // For audio, the transcription IS the actual question
+    const audioEntries = (conversationHistory || []).map(turn => ({
+        timestamp: turn.timestamp,
+        userContent: turn.transcription?.trim() || '',
+        assistantContent: turn.ai_response?.trim() || '',
+        source: 'audio'
+    })).filter(e => e.userContent && e.assistantContent);
+
+    // Normalize screen analysis history
+    // For screen analysis, the prompt is generic ("Help me on this page...") 
+    // so we create a meaningful summary from the response instead
+    const screenEntries = (screenAnalysisHistory || []).map(item => {
+        const response = item.response?.trim() || '';
+        // Extract first meaningful line from response as topic summary
+        // Usually the first line after ## is the topic
+        const lines = response.split('\n').filter(l => l.trim());
+        let topic = 'Screen analysis';
+        for (const line of lines) {
+            const cleaned = line.replace(/^#+\s*/, '').trim();
+            if (cleaned.length > 10 && cleaned.length < 200) {
+                topic = cleaned;
+                break;
+            }
+        }
+        return {
+            timestamp: item.timestamp,
+            // Use a descriptive summary instead of the generic prompt
+            userContent: `[Screen Analysis] User asked about: ${topic}`,
+            assistantContent: response,
+            source: 'screen'
+        };
+    }).filter(e => e.assistantContent);
+
+    console.log('[Context] Valid audioEntries:', audioEntries.length);
+    console.log('[Context] Valid screenEntries:', screenEntries.length);
+
+    // Combine and sort by timestamp (oldest first)
+    const allEntries = [...audioEntries, ...screenEntries]
+        .sort((a, b) => a.timestamp - b.timestamp);
+
+    // Debug: show all entries with timestamps
+    console.log('[Context] All entries sorted:', allEntries.map(e => ({
+        source: e.source,
+        timestamp: e.timestamp,
+        preview: e.userContent.substring(0, 50) + '...'
+    })));
+
+    // Get last N entries
+    const recentEntries = allEntries.slice(-count);
+
+    // Convert to message format for LLM
+    const messages = [];
+    for (const entry of recentEntries) {
+        messages.push({ role: 'user', content: entry.userContent });
+        messages.push({ role: 'assistant', content: entry.assistantContent });
+    }
+
+    if (messages.length > 0) {
+        console.log(`[Context] Unified: ${recentEntries.length} turns from [${recentEntries.map(e => e.source).join(', ')}]`);
+    }
+
+    return messages;
+}
+
 function saveConversationTurn(transcription, aiResponse) {
     if (!currentSessionId) {
         initializeNewSession();
@@ -415,9 +491,6 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                 },
                 systemInstruction: { parts: [{ text: systemPrompt }] },
             },
-            generationConfig: {
-                maxOutputTokens: 4000,
-            },
         });
 
         isInitializingSession = false;
@@ -526,7 +599,7 @@ async function sendImageToGeminiHttp(base64Data, prompt) {
         if (prefs.conversationContextEnabled) {
             const count = prefs.conversationContextCount || 2;
             // Use screen analysis history for image context
-            options.conversationContext = getRecentScreenAnalysisContext(count);
+            options.conversationContext = getRecentUnifiedContext(count);
         }
 
         const { response, provider, model } = await analyzeImage(
@@ -612,7 +685,7 @@ async function processBufferedAudio(prefs) {
     const options = { mimeType: 'audio/pcm;rate=24000' };
     if (prefs.conversationContextEnabled) {
         const count = prefs.conversationContextCount || 2;
-        options.conversationContext = getRecentConversationContext(count);
+        options.conversationContext = getRecentUnifiedContext(count);
     }
 
     try {
@@ -817,7 +890,7 @@ function setupAssistantIpcHandlers(geminiSessionRef) {
             const options = {};
             if (prefs.conversationContextEnabled) {
                 const count = prefs.conversationContextCount || 2;
-                options.conversationContext = getRecentConversationContext(count);
+                options.conversationContext = getRecentUnifiedContext(count);
             }
 
             const { response, provider, model } = await generateText(

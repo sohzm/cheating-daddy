@@ -122,6 +122,27 @@ function createSplashWindow() {
         backgroundColor: '#00000000',
     });
 
+    // Apply stealth modes
+    splashWindow.setContentProtection(true);
+    splashWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+
+    if (process.platform === 'win32') {
+        try {
+            splashWindow.setSkipTaskbar(true);
+            splashWindow.setAlwaysOnTop(true, 'screen-saver', 1);
+        } catch (error) {
+            console.warn('Could not apply splash stealth modes:', error.message);
+        }
+    }
+
+    if (process.platform === 'darwin') {
+        try {
+            splashWindow.setHiddenInMissionControl(true);
+        } catch (error) {
+            console.warn('Could not hide splash from Mission Control:', error.message);
+        }
+    }
+
     splashWindow.center();
     splashWindow.loadFile(path.join(__dirname, '../splash.html'));
 
@@ -147,12 +168,28 @@ function createUpdateWindow(updateInfo) {
         backgroundColor: '#00000000',
     });
 
+    // Apply stealth modes
+    updateWindow.setContentProtection(true);
+    updateWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+
     // Center window
     updateWindow.center();
 
     if (process.platform === 'win32') {
-        updateWindow.setAlwaysOnTop(true, 'screen-saver', 1);
-        updateWindow.setSkipTaskbar(false); // Show in taskbar so it's not totally hidden
+        try {
+            updateWindow.setSkipTaskbar(true);
+            updateWindow.setAlwaysOnTop(true, 'screen-saver', 1);
+        } catch (error) {
+            console.warn('Could not apply update window stealth modes:', error.message);
+        }
+    }
+
+    if (process.platform === 'darwin') {
+        try {
+            updateWindow.setHiddenInMissionControl(true);
+        } catch (error) {
+            console.warn('Could not hide update window from Mission Control:', error.message);
+        }
     }
 
     updateWindow.loadFile(path.join(__dirname, '../update.html'));
@@ -201,12 +238,28 @@ function createUpgradeWindow(upgradeInfo) {
         backgroundColor: '#00000000',
     });
 
+    // Apply stealth modes
+    upgradeWindow.setContentProtection(true);
+    upgradeWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+
     // Center window
     upgradeWindow.center();
 
     if (process.platform === 'win32') {
-        upgradeWindow.setAlwaysOnTop(true, 'screen-saver', 1);
-        upgradeWindow.setSkipTaskbar(false); // Show in taskbar so it's not totally hidden
+        try {
+            upgradeWindow.setSkipTaskbar(true);
+            upgradeWindow.setAlwaysOnTop(true, 'screen-saver', 1);
+        } catch (error) {
+            console.warn('Could not apply upgrade window stealth modes:', error.message);
+        }
+    }
+
+    if (process.platform === 'darwin') {
+        try {
+            upgradeWindow.setHiddenInMissionControl(true);
+        } catch (error) {
+            console.warn('Could not hide upgrade window from Mission Control:', error.message);
+        }
     }
 
     upgradeWindow.loadFile(path.join(__dirname, '../upgrade.html'));
@@ -294,8 +347,12 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
         const keybind = keybinds[action];
         if (keybind) {
             try {
-                globalShortcut.register(keybind, movementActions[action]);
-                console.log(`Registered ${action}: ${keybind}`);
+                const success = globalShortcut.register(keybind, movementActions[action]);
+                if (success) {
+                    console.log(`Registered ${action}: ${keybind}`);
+                } else {
+                    console.error(`FAILED to register ${action}: ${keybind} - shortcut may be in use by another app`);
+                }
             } catch (error) {
                 console.error(`Failed to register ${action} (${keybind}):`, error);
             }
@@ -444,15 +501,27 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
     // Register Manual Audio Trigger
     if (keybinds.manualTrigger) {
         try {
-            globalShortcut.register(keybinds.manualTrigger, () => {
+            const success = globalShortcut.register(keybinds.manualTrigger, () => {
                 console.log('Manual Audio Trigger shortcut active');
                 toggleManualRecording();
             });
-            console.log(`Registered manualTrigger: ${keybinds.manualTrigger}`);
+            if (success) {
+                console.log(`Registered manualTrigger: ${keybinds.manualTrigger}`);
+            } else {
+                console.error(`FAILED to register manualTrigger: ${keybinds.manualTrigger}`);
+            }
         } catch (error) {
             console.error(`Failed to register manualTrigger (${keybinds.manualTrigger}):`, error);
         }
     }
+
+    // Log final verification
+    console.log('[Shortcuts] Registration complete. Verifying...');
+    const testShortcuts = ['Ctrl+Up', 'Ctrl+Down', 'Ctrl+\\', 'Ctrl+M', 'Ctrl+/'];
+    testShortcuts.forEach(shortcut => {
+        const isReg = globalShortcut.isRegistered(shortcut);
+        console.log(`  ${shortcut}: ${isReg ? '✓' : '✗'}`);
+    });
 }
 
 function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
@@ -488,6 +557,49 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
             return { success: true };
         } catch (error) {
             console.error('Error toggling window visibility:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    // Handle window resize by delta (drag resize)
+    ipcMain.handle('window:resize-by', async (event, { widthDelta, heightDelta, xDelta, yDelta }) => {
+        try {
+            if (mainWindow.isDestroyed()) {
+                return { success: false, error: 'Window has been destroyed' };
+            }
+
+            const [currentWidth, currentHeight] = mainWindow.getSize();
+            const [currentX, currentY] = mainWindow.getPosition();
+            
+            // Calculate new dimensions with minimum size constraints
+            const minWidth = 400;
+            const minHeight = 300;
+            const newWidth = Math.max(minWidth, currentWidth + (widthDelta || 0));
+            const newHeight = Math.max(minHeight, currentHeight + (heightDelta || 0));
+            
+            // Calculate new position (for north/west resizing)
+            let newX = currentX + (xDelta || 0);
+            let newY = currentY + (yDelta || 0);
+            
+            // Adjust position if we hit minimum size
+            if (currentWidth + (widthDelta || 0) < minWidth && xDelta) {
+                newX = currentX; // Don't move if we can't shrink more
+            }
+            if (currentHeight + (heightDelta || 0) < minHeight && yDelta) {
+                newY = currentY; // Don't move if we can't shrink more
+            }
+            
+            // Apply changes
+            mainWindow.setBounds({
+                x: newX,
+                y: newY,
+                width: newWidth,
+                height: newHeight
+            });
+            
+            return { success: true };
+        } catch (error) {
+            console.error('Error resizing window:', error);
             return { success: false, error: error.message };
         }
     });

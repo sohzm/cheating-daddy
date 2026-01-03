@@ -3,12 +3,18 @@
  * Checks for new versions by fetching update.json from GitHub
  */
 
+const { app } = require('electron');
+
 // Use 'main' branch for stable production updates
 const UPDATE_URL = 'https://raw.githubusercontent.com/klaus-qodes/cheating-daddy/master/update.json';
 
-// Version should match package.json - in a full build system, this would be imported
-// For now, manually kept in sync with package.json version
-const CURRENT_VERSION = '0.5.4';
+/**
+ * Get the current app version from Electron (reads from package.json automatically)
+ * @returns {string} Current version string
+ */
+function getCurrentVersion() {
+    return app.getVersion();
+}
 
 /**
  * Check for updates by fetching the remote update.json
@@ -31,7 +37,8 @@ async function checkForUpdates() {
         const updateInfo = await response.json();
 
         // Check if there is a version update
-        const hasUpdate = isNewerVersion(updateInfo.version, CURRENT_VERSION);
+        const currentVersion = getCurrentVersion();
+        const hasUpdate = isNewerVersion(updateInfo.version, currentVersion);
 
         return {
             hasUpdate,
@@ -80,5 +87,5 @@ function isNewerVersion(remote, current) {
 module.exports = {
     checkForUpdates,
     isNewerVersion,
-    getCurrentVersion: () => CURRENT_VERSION
+    getCurrentVersion
 };

@@ -1,14 +1,15 @@
 {
-    "version": "0.5.5",
-    "buildDate": "2026-01-03",
-    "message": "Production Release with Conversation Memory & Architecture Overhaul",
+    "version": "0.5.6",
+    "buildDate": "2026-01-04",
+    "message": "Gemini 3.0 Flash, Resizable Window & macOS Improvements",
     "downloadUrl": "https://drive.google.com/drive/folders/1gqDBo0cOhtA6rs0MDbg0WOcY0iDOibkO?usp=sharing",
     "releaseChannel": "stable",
     "releaseNotes": [
-        "Conversation Memory for follow-up questions",
-        "Centralized IPC Gateway (58 channels)",
-        "Encrypted API key storage",
-        "Production codebase cleanup",
-        "Optimized speech buffer timing"
+        "Gemini 3.0 Flash model support",
+        "Resizable window with position persistence",
+        "Zombie process killer for audio cleanup",
+        "macOS permissions panel (one-click setup)",
+        "Stealth dropdowns (hidden from screen share)",
+        "Bug fixes: memory leaks, window persistence"
     ]
 }

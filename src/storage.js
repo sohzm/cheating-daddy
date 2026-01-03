@@ -613,6 +613,9 @@ function incrementLimitCount(model) {
         todayEntry.flash.count++;
     } else if (model === 'gemini-2.5-flash-lite') {
         todayEntry.flashLite.count++;
+    } else if (model === 'gemini-3-flash-preview') {
+        // Track under flash for now (same limits)
+        todayEntry.flash.count++;
     }
 
     setLimits(limits);

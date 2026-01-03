@@ -6,22 +6,23 @@
 
 ---
 
+## 🌟 What's New in v0.5.6
+
+- **Gemini 3.0 Flash** — Latest model with improved speed and accuracy
+- **Resizable Window** — Freely resize; size/position saved between sessions
+- **Zombie Process Killer** — Auto-cleanup of orphaned audio processes
+- **macOS Permissions Panel** — One-click permission setup (Settings → Audio)
+- **Stealth Dropdowns** — Menus hidden from screen share/recordings
+- **Bug Fixes** — Memory leaks, window persistence, audio cleanup
+
+---
+
 ## 🌟 What's New in v0.5.5
 
-### Conversation Memory
-- **Follow-up Question Support**: AI remembers recent Q&A for contextual follow-ups
-- **Configurable History**: Choose 1-5 previous Q&A pairs to include
-- **Works Everywhere**: Text mode, audio mode, and screen analysis
-
-### Architecture Overhaul
-- **Centralized IPC Gateway**: 58 channels across 5 subsystems
-- **Encrypted API Keys**: OS keychain integration (Windows Credential Manager, macOS Keychain)
-- **Modular Handler System**: Storage, Assistant, Window, Application, Update handlers
-
-### Production Cleanup
-- **Optimized Codebase**: Removed ~700 lines of dead code
-- **Faster Speech Detection**: Reduced end-of-utterance silence to 1.5s
-- **Isolated Context Builders**: Separate conversation and screen analysis history
+- **Conversation Memory** — AI remembers recent Q&A for follow-ups
+- **Centralized IPC Gateway** — 58 channels across 5 subsystems
+- **Encrypted API Keys** — OS keychain integration
+- **Production Cleanup** — Removed ~700 lines of dead code
 
 ---
 

@@ -63,7 +63,29 @@ function resetProviders() {
 }
 
 /**
- * Normalize stream output from different providers
+ * Normalize response from different providers
+ * Handles both streaming (Groq) and non-streaming (Gemini) responses
+ * @param {object} response - Raw response from provider
+ * @param {string} provider - Provider name
+ * @returns {AsyncGenerator|object} - Async generator for streaming, or response object for non-streaming
+ */
+function normalizeResponse(response, provider) {
+    // Check if it's a non-streaming response (Gemini text/image)
+    if (response && response.isStream === false) {
+        // Return an async generator that yields the full text at once
+        return (async function* () {
+            if (response.text) {
+                yield response.text;
+            }
+        })();
+    }
+    
+    // Otherwise, it's a stream - use the streaming normalizer
+    return normalizeStream(response, provider);
+}
+
+/**
+ * Normalize stream output from different providers (for actual streaming)
  * @param {object} stream - Raw stream from provider
  * @param {string} provider - Provider name
  * @yields {string} Text chunks
@@ -75,12 +97,27 @@ async function* normalizeStream(stream, provider) {
             if (content) yield content;
         }
     } else if (provider === 'gemini') {
+        // This path is for Gemini streaming (if ever used)
         for await (const chunk of stream) {
             try {
-                // Debug logging
-                // console.log('[Gemini Streaming] raw chunk:', JSON.stringify(chunk, null, 2)); 
-                const content = typeof chunk.text === 'function' ? chunk.text() : '';
-                console.log('[Gemini Streaming] extracted content:', content);
+                let content = '';
+                
+                if (typeof chunk.text === 'function') {
+                    content = chunk.text();
+                }
+                
+                if (!content && typeof chunk.text === 'string') {
+                    content = chunk.text;
+                }
+                
+                if (!content && chunk.candidates?.[0]?.content?.parts?.[0]?.text) {
+                    content = chunk.candidates[0].content.parts[0].text;
+                }
+                
+                if (!content && chunk.parts?.[0]?.text) {
+                    content = chunk.parts[0].text;
+                }
+                
                 if (content) yield content;
             } catch (e) {
                 console.error('[Gemini Streaming] Error extracting text:', e);
@@ -111,7 +148,7 @@ async function generateText(mode, prompt, systemPrompt, options = {}) {
         const response = await providerInstance.generateText(model, prompt, systemPrompt, options);
         incrementUsage(provider, model);
         return {
-            response: normalizeStream(response, provider),
+            response: normalizeResponse(response, provider),
             provider,
             model
         };
@@ -125,7 +162,7 @@ async function generateText(mode, prompt, systemPrompt, options = {}) {
             );
             incrementUsage(prefs.fallbackProvider, prefs.fallbackModel);
             return {
-                response: normalizeStream(fallbackResponse, prefs.fallbackProvider),
+                response: normalizeResponse(fallbackResponse, prefs.fallbackProvider),
                 provider: prefs.fallbackProvider,
                 model: prefs.fallbackModel
             };
@@ -157,7 +194,7 @@ async function analyzeImage(mode, base64Image, prompt, systemPrompt, options = {
         const response = await providerInstance.analyzeImage(model, base64Image, prompt, systemPrompt, options);
         incrementUsage(provider, model);
         return {
-            response: normalizeStream(response, provider),
+            response: normalizeResponse(response, provider),
             provider,
             model
         };
@@ -171,7 +208,7 @@ async function analyzeImage(mode, base64Image, prompt, systemPrompt, options = {
             );
             incrementUsage(prefs.fallbackProvider, prefs.fallbackModel);
             return {
-                response: normalizeStream(fallbackResponse, prefs.fallbackProvider),
+                response: normalizeResponse(fallbackResponse, prefs.fallbackProvider),
                 provider: prefs.fallbackProvider,
                 model: prefs.fallbackModel
             };
@@ -200,12 +237,25 @@ async function processAudio(base64Audio, prompt, options = {}) {
     try {
         const result = await providerInstance.processAudio(model, base64Audio, prompt, options);
         incrementUsage(provider, model);
-        return {
-            response: normalizeStream(result.stream, provider),
-            transcription: result.transcription,
-            provider,
-            model
-        };
+        
+        // Handle both streaming (Groq) and non-streaming (Gemini) responses
+        if (result.isStream === false) {
+            // Gemini non-streaming response
+            return {
+                response: normalizeResponse(result, provider),
+                transcription: result.transcription || '',
+                provider,
+                model
+            };
+        } else {
+            // Groq streaming response
+            return {
+                response: normalizeStream(result.stream, provider),
+                transcription: result.transcription,
+                provider,
+                model
+            };
+        }
     } catch (error) {
         // Try fallback
         if (provider === prefs.primaryProvider && prefs.fallbackProvider) {
@@ -214,12 +264,22 @@ async function processAudio(base64Audio, prompt, options = {}) {
                 prefs.fallbackModel, base64Audio, prompt, options
             );
             incrementUsage(prefs.fallbackProvider, prefs.fallbackModel);
-            return {
-                response: normalizeStream(fallbackResult.stream, prefs.fallbackProvider),
-                transcription: fallbackResult.transcription,
-                provider: prefs.fallbackProvider,
-                model: prefs.fallbackModel
-            };
+            
+            if (fallbackResult.isStream === false) {
+                return {
+                    response: normalizeResponse(fallbackResult, prefs.fallbackProvider),
+                    transcription: fallbackResult.transcription || '',
+                    provider: prefs.fallbackProvider,
+                    model: prefs.fallbackModel
+                };
+            } else {
+                return {
+                    response: normalizeStream(fallbackResult.stream, prefs.fallbackProvider),
+                    transcription: fallbackResult.transcription,
+                    provider: prefs.fallbackProvider,
+                    model: prefs.fallbackModel
+                };
+            }
         }
         throw error;
     }

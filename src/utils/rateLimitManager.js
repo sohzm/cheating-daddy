@@ -24,6 +24,7 @@ const LIMITS = {
     gemini: {
         'gemini-2.5-flash': { rpm: 5, rpd: 20, tpm: 250000 },
         'gemini-2.5-flash-lite': { rpm: 10, rpd: 20, tpm: 250000 },
+        'gemini-3-flash-preview': { rpm: 5, rpd: 20, tpm: 250000 },
         'gemini-2.5-flash-native-audio-preview-12-2025': { rpm: Infinity, rpd: Infinity, tpm: 1000000 }
     }
 };

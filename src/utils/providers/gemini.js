@@ -27,7 +27,7 @@ class GeminiProvider {
     supportsStreaming() { return true; }
 
     /**
-     * Generate text response (streaming)
+     * Generate text response (non-streaming)
      * @param {string} model - Model name
      * @param {string} prompt - User prompt
      * @param {string} systemPrompt - System prompt
@@ -51,21 +51,21 @@ class GeminiProvider {
             contents = prompt;
         }
 
-        const response = await this.client.models.generateContentStream({
+        const response = await this.client.models.generateContent({
             model: model,
             contents: contents,
             config: {
                 ...(systemPrompt && { systemInstruction: systemPrompt }),
-                temperature: options.temperature || 0.7,
-                maxOutputTokens: options.maxTokens || 2048
+                temperature: options.temperature || 1.0 // Gemini 3 recommends 1.0
             }
         });
 
-        return response;
+        // Return the text directly (non-streaming)
+        return { text: response.text, isStream: false };
     }
 
     /**
-     * Analyze image with vision model (streaming)
+     * Analyze image with vision model (non-streaming)
      * Note: For vision, we include conversation context as text history, NOT previous images
      */
     async analyzeImage(model, base64Image, prompt, systemPrompt, options = {}) {
@@ -100,49 +100,68 @@ class GeminiProvider {
             ];
         }
 
-        const response = await this.client.models.generateContentStream({
+        const response = await this.client.models.generateContent({
             model: model,
             contents: contents,
             config: {
                 ...(systemPrompt && { systemInstruction: systemPrompt }),
-                temperature: options.temperature || 0.7,
-                maxOutputTokens: options.maxTokens || 2048
+                temperature: options.temperature || 1.0 // Gemini 3 recommends 1.0
             }
         });
 
-        return response;
+        // Return the text directly (non-streaming)
+        return { text: response.text, isStream: false };
     }
 
     /**
-     * Process audio input (multimodal - for Audio→Text mode)
+     * Process audio input (multimodal - for Audio→Text mode, non-streaming)
+     * Note: For audio, we include conversation context as text history, NOT previous audio
      */
     async processAudio(model, base64Audio, prompt, options = {}) {
         this.initialize();
 
-        const contents = [
-            {
-                inlineData: {
-                    mimeType: options.mimeType || 'audio/wav',
-                    data: base64Audio
-                }
-            },
-            prompt
-        ];
+        let contents;
+        if (options.conversationContext && Array.isArray(options.conversationContext) && options.conversationContext.length > 0) {
+            // Build history from conversation context (text only)
+            contents = options.conversationContext.map(msg => ({
+                role: msg.role === 'assistant' ? 'model' : 'user',
+                parts: [{ text: msg.content }]
+            }));
+            // Add current audio + prompt
+            contents.push({
+                role: 'user',
+                parts: [
+                    { inlineData: { mimeType: options.mimeType || 'audio/wav', data: base64Audio } },
+                    { text: prompt }
+                ]
+            });
+            console.log('[Gemini] Added', options.conversationContext.length / 2, 'previous turns for audio context');
+        } else {
+            // No context - original behavior
+            contents = [
+                {
+                    inlineData: {
+                        mimeType: options.mimeType || 'audio/wav',
+                        data: base64Audio
+                    }
+                },
+                prompt
+            ];
+        }
 
-        const response = await this.client.models.generateContentStream({
+        const response = await this.client.models.generateContent({
             model: model,
             contents: contents,
             config: {
-                temperature: options.temperature || 0.7,
-                maxOutputTokens: options.maxTokens || 2048
+                temperature: options.temperature || 1.0 // Gemini 3 recommends 1.0
             }
         });
 
-        // Return standardized format matching Groq provider
-        // Note: generateContentStream returns the async iterable directly
+        // Return standardized format - non-streaming response
         return {
-            stream: response,
-            transcription: '' // Gemini stream doesn't give full text immediately, handled by stream consumer
+            text: response.text,
+            isStream: false,
+            transcription: '' // Transcription handled separately if needed
         };
     }
 

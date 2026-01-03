@@ -145,6 +145,99 @@ export class CheatingDaddyApp extends LitElement {
             border-left-color: #10b981;
         }
 
+        /* Window Resize Handles - invisible, no cursor change for stealth */
+        .resize-handle {
+            position: fixed;
+            z-index: 10001;
+            cursor: default !important;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .resize-handle::after {
+            content: '';
+            opacity: 0;
+            transition: opacity 0.15s ease;
+            font-size: 10px;
+            color: rgba(0, 230, 204, 0.7);
+            font-weight: bold;
+            pointer-events: none;
+        }
+
+        .resize-handle:hover::after {
+            opacity: 1;
+        }
+
+        .resize-handle-n {
+            top: 0;
+            left: 8px;
+            right: 8px;
+            height: 6px;
+        }
+        .resize-handle-n::after { content: '▲'; }
+
+        .resize-handle-s {
+            bottom: 0;
+            left: 8px;
+            right: 8px;
+            height: 6px;
+        }
+        .resize-handle-s::after { content: '▼'; }
+
+        .resize-handle-e {
+            right: 0;
+            top: 8px;
+            bottom: 8px;
+            width: 6px;
+        }
+        .resize-handle-e::after { content: '▶'; }
+
+        .resize-handle-w {
+            left: 0;
+            top: 8px;
+            bottom: 8px;
+            width: 6px;
+        }
+        .resize-handle-w::after { content: '◀'; }
+
+        .resize-handle-ne {
+            top: 0;
+            right: 0;
+            width: 12px;
+            height: 12px;
+        }
+        .resize-handle-ne::after { content: '◥'; }
+
+        .resize-handle-nw {
+            top: 0;
+            left: 0;
+            width: 12px;
+            height: 12px;
+        }
+        .resize-handle-nw::after { content: '◤'; }
+
+        .resize-handle-se {
+            bottom: 0;
+            right: 0;
+            width: 12px;
+            height: 12px;
+        }
+        .resize-handle-se::after { content: '◢'; }
+
+        .resize-handle-sw {
+            bottom: 0;
+            left: 0;
+            width: 12px;
+            height: 12px;
+        }
+        .resize-handle-sw::after { content: '◣'; }
+
+        /* Subtle resize indicator - shows when actively resizing */
+        :host(.resizing) .window-container {
+            box-shadow: inset 0 0 0 2px rgba(0, 230, 204, 0.3);
+        }
+
         .branding-footer {
             position: fixed;
             bottom: 15px;
@@ -204,8 +297,10 @@ export class CheatingDaddyApp extends LitElement {
 
         // Update Dialog State (for new version notifications)
         showUpdateDialog: { type: Boolean },
-        updateInfo: { type: Object },
-    };
+        updateInfo: { type: Object },        
+        // Window resize state
+        _isResizing: { state: true },
+        _resizeDirection: { state: true },    };
 
     constructor() {
         super();
@@ -239,6 +334,13 @@ export class CheatingDaddyApp extends LitElement {
         // Update dialog state (for new version notifications)
         this.showUpdateDialog = false;
         this.updateInfo = null;
+
+        // Window resize state
+        this._isResizing = false;
+        this._resizeDirection = null;
+        this._resizeStartPos = null;
+        this._boundHandleResizeMove = this._handleResizeMove.bind(this);
+        this._boundHandleResizeEnd = this._handleResizeEnd.bind(this);
 
         // Load from storage
         this._loadFromStorage();
@@ -760,6 +862,16 @@ export class CheatingDaddyApp extends LitElement {
                           ></upgrade-dialog>
                       `
                     : ''}
+
+                <!-- Window Resize Handles -->
+                <div class="resize-handle resize-handle-n" @mousedown=${(e) => this._handleResizeStart(e, 'n')}></div>
+                <div class="resize-handle resize-handle-s" @mousedown=${(e) => this._handleResizeStart(e, 's')}></div>
+                <div class="resize-handle resize-handle-e" @mousedown=${(e) => this._handleResizeStart(e, 'e')}></div>
+                <div class="resize-handle resize-handle-w" @mousedown=${(e) => this._handleResizeStart(e, 'w')}></div>
+                <div class="resize-handle resize-handle-ne" @mousedown=${(e) => this._handleResizeStart(e, 'ne')}></div>
+                <div class="resize-handle resize-handle-nw" @mousedown=${(e) => this._handleResizeStart(e, 'nw')}></div>
+                <div class="resize-handle resize-handle-se" @mousedown=${(e) => this._handleResizeStart(e, 'se')}></div>
+                <div class="resize-handle resize-handle-sw" @mousedown=${(e) => this._handleResizeStart(e, 'sw')}></div>
             </div>
         `;
     }
@@ -771,6 +883,63 @@ export class CheatingDaddyApp extends LitElement {
         } else {
             document.documentElement.classList.remove('compact-layout');
         }
+    }
+
+    // ============ WINDOW RESIZE BY DRAG ============
+    _handleResizeStart(e, direction) {
+        e.preventDefault();
+        this._isResizing = true;
+        this._resizeDirection = direction;
+        this._resizeStartPos = { x: e.screenX, y: e.screenY };
+        
+        // Add visual feedback (subtle inner glow)
+        this.classList.add('resizing');
+        
+        // Add global listeners
+        document.addEventListener('mousemove', this._boundHandleResizeMove);
+        document.addEventListener('mouseup', this._boundHandleResizeEnd);
+    }
+
+    async _handleResizeMove(e) {
+        if (!this._isResizing || !window.electronAPI?.window?.resizeBy) return;
+        
+        const dx = e.screenX - this._resizeStartPos.x;
+        const dy = e.screenY - this._resizeStartPos.y;
+        
+        // Update start position for next move
+        this._resizeStartPos = { x: e.screenX, y: e.screenY };
+        
+        // Calculate resize deltas based on direction
+        let widthDelta = 0;
+        let heightDelta = 0;
+        let xDelta = 0;
+        let yDelta = 0;
+        
+        const dir = this._resizeDirection;
+        
+        if (dir.includes('e')) widthDelta = dx;
+        if (dir.includes('w')) { widthDelta = -dx; xDelta = dx; }
+        if (dir.includes('s')) heightDelta = dy;
+        if (dir.includes('n')) { heightDelta = -dy; yDelta = dy; }
+        
+        try {
+            await window.electronAPI.window.resizeBy(widthDelta, heightDelta, xDelta, yDelta);
+        } catch (error) {
+            // Ignore resize errors during drag
+        }
+    }
+
+    _handleResizeEnd() {
+        this._isResizing = false;
+        this._resizeDirection = null;
+        this._resizeStartPos = null;
+        
+        // Remove visual feedback
+        this.classList.remove('resizing');
+        
+        // Remove global listeners
+        document.removeEventListener('mousemove', this._boundHandleResizeMove);
+        document.removeEventListener('mouseup', this._boundHandleResizeEnd);
     }
 
     async handleLayoutModeChange(layoutMode) {

@@ -1,6 +1,8 @@
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
 import { resizeLayout } from '../../utils/windowResize.js';
 import { UpgradeDialog } from '../dialogs/UpgradeDialog.js';
+import '../common/StealthSelect.js';
+import '../common/MacPermissionsSetup.js';
 
 export class CustomizeView extends LitElement {
     static styles = css`
@@ -196,16 +198,6 @@ export class CustomizeView extends LitElement {
 
         .form-control:hover:not(:focus) {
             border-color: var(--border-default);
-        }
-
-        select.form-control {
-            cursor: default;
-            appearance: none;
-            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b6b6b' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
-            background-position: right 8px center;
-            background-repeat: no-repeat;
-            background-size: 12px;
-            padding-right: 28px;
         }
 
         textarea.form-control {
@@ -1097,15 +1089,10 @@ export class CustomizeView extends LitElement {
             this.geminiApiKey = credentials?.gemini || credentials?.apiKey || '';
             this.groqApiKey = credentials?.groq || '';
 
-            // Set initial status based on presence, then validate async
-            this.geminiKeyStatus = this.geminiApiKey ? 'checking' : 'notset';
-            this.groqKeyStatus = this.groqApiKey ? 'checking' : 'notset';
-
-            const validationPromises = [];
-            if (this.geminiApiKey) validationPromises.push(this.validateStoredKey('gemini', this.geminiApiKey));
-            if (this.groqApiKey) validationPromises.push(this.validateStoredKey('groq', this.groqApiKey));
-
-            await Promise.all(validationPromises);
+            // Set status based on presence only - don't validate on every load to save tokens
+            // Validation only happens when user enters/changes a key
+            this.geminiKeyStatus = this.geminiApiKey ? 'valid' : 'notset';
+            this.groqKeyStatus = this.groqApiKey ? 'valid' : 'notset';
 
             // Load model preferences
             this.modelPrefs = {
@@ -1948,14 +1935,14 @@ export class CustomizeView extends LitElement {
 
                         <div class="form-group">
                             <label class="form-label" style="font-size: 12px;">Base Template</label>
-                            <select
-                                class="form-control"
+                            <stealth-select
                                 .value=${this.editingProfileTemplates?.persona || 'interview'}
-                                @change=${e => this.updateComponentTemplate('persona', e.target.value)}
-                            >
-                                ${Object.entries(PROMPTS.PERSONAS).map(([key, p]) => html` <option value="${key}">${p.name}</option> `)}
-                                <option value="custom">Custom (Edited)</option>
-                            </select>
+                                .options=${[
+                                    ...Object.entries(PROMPTS.PERSONAS).map(([key, p]) => ({ value: key, label: p.name })),
+                                    { value: 'custom', label: 'Custom (Edited)' }
+                                ]}
+                                @change=${e => this.updateComponentTemplate('persona', e.detail.value)}
+                            ></stealth-select>
                         </div>
 
                         <details>
@@ -1998,14 +1985,14 @@ export class CustomizeView extends LitElement {
 
                         <div class="form-group">
                             <label class="form-label" style="font-size: 12px;">Base Template</label>
-                            <select
-                                class="form-control"
+                            <stealth-select
                                 .value=${this.editingProfileTemplates?.length || 'concise'}
-                                @change=${e => this.updateComponentTemplate('length', e.target.value)}
-                            >
-                                ${Object.entries(PROMPTS.LENGTHS).map(([key, l]) => html` <option value="${key}">${l.name}</option> `)}
-                                <option value="custom">Custom (Edited)</option>
-                            </select>
+                                .options=${[
+                                    ...Object.entries(PROMPTS.LENGTHS).map(([key, l]) => ({ value: key, label: l.name })),
+                                    { value: 'custom', label: 'Custom (Edited)' }
+                                ]}
+                                @change=${e => this.updateComponentTemplate('length', e.detail.value)}
+                            ></stealth-select>
                         </div>
 
                         <details>
@@ -2030,14 +2017,14 @@ export class CustomizeView extends LitElement {
 
                         <div class="form-group">
                             <label class="form-label" style="font-size: 12px;">Base Template</label>
-                            <select
-                                class="form-control"
+                            <stealth-select
                                 .value=${this.editingProfileTemplates?.format || 'teleprompter'}
-                                @change=${e => this.updateComponentTemplate('format', e.target.value)}
-                            >
-                                ${Object.entries(PROMPTS.FORMATS).map(([key, f]) => html` <option value="${key}">${f.name}</option> `)}
-                                <option value="custom">Custom (Edited)</option>
-                            </select>
+                                .options=${[
+                                    ...Object.entries(PROMPTS.FORMATS).map(([key, f]) => ({ value: key, label: f.name })),
+                                    { value: 'custom', label: 'Custom (Edited)' }
+                                ]}
+                                @change=${e => this.updateComponentTemplate('format', e.detail.value)}
+                            ></stealth-select>
                         </div>
 
                         <details>
@@ -2090,13 +2077,12 @@ export class CustomizeView extends LitElement {
                             <span class="current-selection">${currentProfile?.name || 'Unknown'}</span>
                         </label>
                         <div style="display: flex; gap: 8px;">
-                            <select class="form-control" style="flex: 1;" .value=${this.selectedProfile} @change=${this.handleProfileSelect}>
-                                ${profiles.map(
-                                    profile => html`
-                                        <option value=${profile.value} ?selected=${this.selectedProfile === profile.value}>${profile.name}</option>
-                                    `
-                                )}
-                            </select>
+                            <stealth-select
+                                style="flex: 1;"
+                                .value=${this.selectedProfile}
+                                .options=${profiles.map(p => ({ value: p.value, label: p.name }))}
+                                @change=${e => this.handleProfileSelect({ target: { value: e.detail.value } })}
+                            ></stealth-select>
 
                             <button class="reset-keybinds-button" @click=${this.handleCreateProfile} title="Create New Profile">+</button>
 
@@ -2158,18 +2144,18 @@ export class CustomizeView extends LitElement {
                         </div>
                         ${this.conversationContextEnabled ? html`
                             <div style="margin-top: 8px; margin-left: 22px;">
-                                <select
-                                    class="form-control"
-                                    style="width: auto;"
+                                <stealth-select
+                                    style="width: 150px;"
                                     .value=${String(this.conversationContextCount)}
-                                    @change=${this.handleConversationContextCountChange}
-                                >
-                                    <option value="1">Last 1 Q&A</option>
-                                    <option value="2">Last 2 Q&A</option>
-                                    <option value="3">Last 3 Q&A</option>
-                                    <option value="4">Last 4 Q&A</option>
-                                    <option value="5">Last 5 Q&A</option>
-                                </select>
+                                    .options=${[
+                                        { value: '1', label: 'Last 1 Q&A' },
+                                        { value: '2', label: 'Last 2 Q&A' },
+                                        { value: '3', label: 'Last 3 Q&A' },
+                                        { value: '4', label: 'Last 4 Q&A' },
+                                        { value: '5', label: 'Last 5 Q&A' }
+                                    ]}
+                                    @change=${e => this.handleConversationContextCountChange({ target: { value: e.detail.value } })}
+                                ></stealth-select>
                             </div>
                         ` : ''}
                     </div>
@@ -2195,14 +2181,21 @@ export class CustomizeView extends LitElement {
         return html`
             <div class="content-header">Audio Settings</div>
 
+            <!-- Mac Permissions Setup (only shows on macOS) -->
+            <mac-permissions-setup></mac-permissions-setup>
+
             <div class="form-grid">
                 <div class="form-group">
                     <label class="form-label">Audio Source</label>
-                    <select class="form-control" .value=${this.audioMode} @change=${this.handleAudioModeSelect}>
-                        <option value="mic_only">Microphone Only</option>
-                        <option value="both">Mic & Speaker (System)</option>
-                        <option value="speaker_only">Speaker Only</option>
-                    </select>
+                    <stealth-select
+                        .value=${this.audioMode}
+                        .options=${[
+                            { value: 'mic_only', label: 'Microphone Only' },
+                            { value: 'both', label: 'Mic & Speaker (System)' },
+                            { value: 'speaker_only', label: 'Speaker Only' }
+                        ]}
+                        @change=${e => this.handleAudioModeSelect({ target: { value: e.detail.value } })}
+                    ></stealth-select>
                 </div>
             </div>
         `;
@@ -2220,13 +2213,11 @@ export class CustomizeView extends LitElement {
                         Speech Language
                         <span class="current-selection">${currentLanguage?.name || 'Unknown'}</span>
                     </label>
-                    <select class="form-control" .value=${this.selectedLanguage} @change=${this.handleLanguageSelect}>
-                        ${languages.map(
-                            language => html`
-                                <option value=${language.value} ?selected=${this.selectedLanguage === language.value}>${language.name}</option>
-                            `
-                        )}
-                    </select>
+                    <stealth-select
+                        .value=${this.selectedLanguage}
+                        .options=${languages.map(l => ({ value: l.value, label: l.name }))}
+                        @change=${e => this.handleLanguageSelect({ target: { value: e.detail.value } })}
+                    ></stealth-select>
                     <div class="form-description">Language for speech recognition and AI responses</div>
                 </div>
             </div>
@@ -2245,9 +2236,11 @@ export class CustomizeView extends LitElement {
                         Theme
                         <span class="current-selection">${currentTheme?.name || 'Dark'}</span>
                     </label>
-                    <select class="form-control" .value=${this.theme} @change=${this.handleThemeChange}>
-                        ${themes.map(theme => html` <option value=${theme.value} ?selected=${this.theme === theme.value}>${theme.name}</option> `)}
-                    </select>
+                    <stealth-select
+                        .value=${this.theme}
+                        .options=${themes.map(t => ({ value: t.value, label: t.name }))}
+                        @change=${e => this.handleThemeChange({ target: { value: e.detail.value } })}
+                    ></stealth-select>
                     <div class="form-description">Choose a color theme for the interface</div>
                 </div>
 
@@ -2256,10 +2249,14 @@ export class CustomizeView extends LitElement {
                         Layout Mode
                         <span class="current-selection">${this.layoutMode === 'compact' ? 'Compact' : 'Normal'}</span>
                     </label>
-                    <select class="form-control" .value=${this.layoutMode} @change=${this.handleLayoutModeSelect}>
-                        <option value="normal" ?selected=${this.layoutMode === 'normal'}>Normal</option>
-                        <option value="compact" ?selected=${this.layoutMode === 'compact'}>Compact</option>
-                    </select>
+                    <stealth-select
+                        .value=${this.layoutMode}
+                        .options=${[
+                            { value: 'normal', label: 'Normal' },
+                            { value: 'compact', label: 'Compact' }
+                        ]}
+                        @change=${e => this.handleLayoutModeSelect({ target: { value: e.detail.value } })}
+                    ></stealth-select>
                     <div class="form-description">
                         ${this.layoutMode === 'compact' ? 'Smaller window with reduced padding' : 'Standard layout with comfortable spacing'}
                     </div>
@@ -2268,10 +2265,14 @@ export class CustomizeView extends LitElement {
                 <div class="form-group">
                     <label class="form-label">View Mode</label>
                     <div class="form-description">Choose how responses are displayed</div>
-                    <select class="form-control" .value=${this.responseViewMode} @change=${this.handleResponseViewModeSelect}>
-                        <option value="paged">Paged (One at a time)</option>
-                        <option value="continuous">Continuous (Scrollable list)</option>
-                    </select>
+                    <stealth-select
+                        .value=${this.responseViewMode}
+                        .options=${[
+                            { value: 'paged', label: 'Paged (One at a time)' },
+                            { value: 'continuous', label: 'Continuous (Scrollable list)' }
+                        ]}
+                        @change=${e => this.handleResponseViewModeSelect({ target: { value: e.detail.value } })}
+                    ></stealth-select>
                 </div>
 
                 ${this.responseViewMode === 'continuous'
@@ -2364,11 +2365,15 @@ export class CustomizeView extends LitElement {
                             >${this.selectedImageQuality.charAt(0).toUpperCase() + this.selectedImageQuality.slice(1)}</span
                         >
                     </label>
-                    <select class="form-control" .value=${this.selectedImageQuality} @change=${this.handleImageQualitySelect}>
-                        <option value="high" ?selected=${this.selectedImageQuality === 'high'}>High Quality</option>
-                        <option value="medium" ?selected=${this.selectedImageQuality === 'medium'}>Medium Quality</option>
-                        <option value="low" ?selected=${this.selectedImageQuality === 'low'}>Low Quality</option>
-                    </select>
+                    <stealth-select
+                        .value=${this.selectedImageQuality}
+                        .options=${[
+                            { value: 'high', label: 'High Quality' },
+                            { value: 'medium', label: 'Medium Quality' },
+                            { value: 'low', label: 'Low Quality' }
+                        ]}
+                        @change=${e => this.handleImageQualitySelect({ target: { value: e.detail.value } })}
+                    ></stealth-select>
                     <div class="form-description">
                         ${this.selectedImageQuality === 'high'
                             ? 'Best quality, uses more tokens'
@@ -2554,6 +2559,7 @@ export class CustomizeView extends LitElement {
             { value: 'groq:llama-3.3-70b-versatile', label: 'Groq: llama-3.3-70b (1K/day)', recommended: true },
             { value: 'groq:llama-3.1-8b-instant', label: 'Groq: llama-3.1-8b (14K/day)' },
             { value: 'gemini:gemini-2.5-flash', label: 'Gemini: 2.5-flash (20/day)' },
+            { value: 'gemini:gemini-3-flash-preview', label: 'Gemini: 3-flash-preview (20/day)' },
             { value: 'none', label: 'None (No fallback)' },
         ];
 
@@ -2561,6 +2567,7 @@ export class CustomizeView extends LitElement {
             { value: 'groq:meta-llama/llama-4-maverick-17b-128e-instruct', label: 'Groq: llama-4-maverick (1K/day)', recommended: true },
             { value: 'groq:meta-llama/llama-4-scout-17b-16e-instruct', label: 'Groq: llama-4-scout (1K/day)' },
             { value: 'gemini:gemini-2.5-flash', label: 'Gemini: 2.5-flash (20/day)' },
+            { value: 'gemini:gemini-3-flash-preview', label: 'Gemini: 3-flash-preview (20/day)' },
             { value: 'none', label: 'None (No fallback)' },
         ];
 
@@ -2607,26 +2614,28 @@ export class CustomizeView extends LitElement {
                     ? html`
                           <div class="form-group">
                               <label class="form-label">Audio Model</label>
-                              <select
-                                  class="form-control"
+                              <stealth-select
                                   .value=${(this.modelPrefs?.audioToText?.primaryProvider || 'groq') +
                                   ':' +
                                   (this.modelPrefs?.audioToText?.primaryModel || 'meta-llama/llama-4-maverick-17b-128e-instruct')}
-                                  @change=${e => this.handleModelChange('audioToText', 'primary', e.target.value)}
-                              >
-                                  <optgroup label="Groq">
-                                      <option value="groq:meta-llama/llama-4-maverick-17b-128e-instruct">Llama 4 Maverick</option>
-                                      <option value="groq:meta-llama/llama-4-scout-17b-16e-instruct">Llama 4 Scout</option>
-                                  </optgroup>
-                              </select>
+                                  .options=${[
+                                      { value: 'groq:meta-llama/llama-4-maverick-17b-128e-instruct', label: 'Llama 4 Maverick' },
+                                      { value: 'groq:meta-llama/llama-4-scout-17b-16e-instruct', label: 'Llama 4 Scout' }
+                                  ]}
+                                  @change=${e => this.handleModelChange('audioToText', 'primary', e.detail.value)}
+                              ></stealth-select>
                           </div>
 
                           <div class="form-group">
                               <label class="form-label">Evaluation Mode</label>
-                              <select class="form-control" .value=${this.audioTriggerMethod} @change=${this.handleAudioTriggerChange}>
-                                  <option value="vad">Auto (Voice Activity)</option>
-                                  <option value="manual">Manual Trigger</option>
-                              </select>
+                              <stealth-select
+                                  .value=${this.audioTriggerMethod}
+                                  .options=${[
+                                      { value: 'vad', label: 'Auto (Voice Activity)' },
+                                      { value: 'manual', label: 'Manual Trigger' }
+                                  ]}
+                                  @change=${e => this.handleAudioTriggerChange({ target: { value: e.detail.value } })}
+                              ></stealth-select>
                               ${this.audioTriggerMethod === 'manual'
                                   ? html`
                                         <div class="form-description" style="margin-top: 5px; color: var(--accent-color);">
@@ -2660,39 +2669,25 @@ export class CustomizeView extends LitElement {
                     <div style="display: grid; gap: 8px;">
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <span style="width: 70px; font-size: 12px; opacity: 0.7;">Primary:</span>
-                            <select
-                                class="form-control"
+                            <stealth-select
                                 style="flex: 1;"
-                                @change=${e => this.handleModelChange('textMessage', 'primary', e.target.value)}
                                 .value=${this.modelPrefs?.textMessage?.primaryProvider + ':' + this.modelPrefs?.textMessage?.primaryModel}
-                            >
-                                ${textModels
-                                    .filter(m => m.value !== 'none')
-                                    .map(
-                                        m => html`
-                                            <option value="${m.value}" ?selected=${this.isModelSelected('textMessage', 'primary', m.value)}>
-                                                ${m.label}${m.recommended ? ' (Rec)' : ''}
-                                            </option>
-                                        `
-                                    )}
-                            </select>
+                                .options=${textModels.filter(m => m.value !== 'none').map(m => ({
+                                    value: m.value,
+                                    label: m.label + (m.recommended ? ' (Rec)' : ''),
+                                    recommended: m.recommended
+                                }))}
+                                @change=${e => this.handleModelChange('textMessage', 'primary', e.detail.value)}
+                            ></stealth-select>
                         </div>
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <span style="width: 70px; font-size: 12px; opacity: 0.7;">Fallback:</span>
-                            <select
-                                class="form-control"
+                            <stealth-select
                                 style="flex: 1;"
-                                @change=${e => this.handleModelChange('textMessage', 'fallback', e.target.value)}
                                 .value=${this.modelPrefs?.textMessage?.fallbackProvider + ':' + this.modelPrefs?.textMessage?.fallbackModel}
-                            >
-                                ${textModels.map(
-                                    m => html`
-                                        <option value="${m.value}" ?selected=${this.isModelSelected('textMessage', 'fallback', m.value)}>
-                                            ${m.label}
-                                        </option>
-                                    `
-                                )}
-                            </select>
+                                .options=${textModels.map(m => ({ value: m.value, label: m.label }))}
+                                @change=${e => this.handleModelChange('textMessage', 'fallback', e.detail.value)}
+                            ></stealth-select>
                         </div>
                     </div>
                 </div>
@@ -2703,39 +2698,25 @@ export class CustomizeView extends LitElement {
                     <div style="display: grid; gap: 8px;">
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <span style="width: 70px; font-size: 12px; opacity: 0.7;">Primary:</span>
-                            <select
-                                class="form-control"
+                            <stealth-select
                                 style="flex: 1;"
-                                @change=${e => this.handleModelChange('screenAnalysis', 'primary', e.target.value)}
                                 .value=${this.modelPrefs?.screenAnalysis?.primaryProvider + ':' + this.modelPrefs?.screenAnalysis?.primaryModel}
-                            >
-                                ${visionModels
-                                    .filter(m => m.value !== 'none')
-                                    .map(
-                                        m => html`
-                                            <option value="${m.value}" ?selected=${this.isModelSelected('screenAnalysis', 'primary', m.value)}>
-                                                ${m.label}${m.recommended ? ' (Rec)' : ''}
-                                            </option>
-                                        `
-                                    )}
-                            </select>
+                                .options=${visionModels.filter(m => m.value !== 'none').map(m => ({
+                                    value: m.value,
+                                    label: m.label + (m.recommended ? ' (Rec)' : ''),
+                                    recommended: m.recommended
+                                }))}
+                                @change=${e => this.handleModelChange('screenAnalysis', 'primary', e.detail.value)}
+                            ></stealth-select>
                         </div>
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <span style="width: 70px; font-size: 12px; opacity: 0.7;">Fallback:</span>
-                            <select
-                                class="form-control"
+                            <stealth-select
                                 style="flex: 1;"
-                                @change=${e => this.handleModelChange('screenAnalysis', 'fallback', e.target.value)}
                                 .value=${this.modelPrefs?.screenAnalysis?.fallbackProvider + ':' + this.modelPrefs?.screenAnalysis?.fallbackModel}
-                            >
-                                ${visionModels.map(
-                                    m => html`
-                                        <option value="${m.value}" ?selected=${this.isModelSelected('screenAnalysis', 'fallback', m.value)}>
-                                            ${m.label}
-                                        </option>
-                                    `
-                                )}
-                            </select>
+                                .options=${visionModels.map(m => ({ value: m.value, label: m.label }))}
+                                @change=${e => this.handleModelChange('screenAnalysis', 'fallback', e.detail.value)}
+                            ></stealth-select>
                         </div>
                     </div>
                 </div>

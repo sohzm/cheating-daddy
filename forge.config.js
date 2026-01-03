@@ -12,21 +12,24 @@ module.exports = {
         extendInfo: {
             NSMicrophoneUsageDescription: 'Cheating Daddy On Steroids needs microphone access to capture audio for AI transcription.',
             NSCameraUsageDescription: 'Cheating Daddy On Steroids needs camera access for video capture.',
-            // Note: Screen recording permission cannot be prompted programmatically,
-            // users must enable it manually in System Preferences > Privacy & Security
+            // Screen recording description (informational - user must grant manually)
+            NSScreenCaptureUsageDescription: 'Cheating Daddy On Steroids needs screen recording access to capture system audio.',
+            // Required for hardened runtime
+            NSAppleEventsUsageDescription: 'Cheating Daddy On Steroids needs to control System Preferences to help grant permissions.',
         },
+        // macOS specific settings
+        darwinDarkModeSupport: true,
         // use `security find-identity -v -p codesigning` to find your identity
         // for macos signing
-        // also fuck apple
         // osxSign: {
         //    identity: '<paste your identity here>',
-        //   optionsForFile: (filePath) => {
-        //       return {
-        //           entitlements: 'entitlements.plist',
-        //       };
-        //   },
+        //    optionsForFile: (filePath) => {
+        //        return {
+        //            entitlements: 'entitlements.plist',
+        //        };
+        //    },
         // },
-        // notarize if off cuz i ran this for 6 hours and it still didnt finish
+        // notarize is off - requires Apple Developer account
         // osxNotarize: {
         //    appleId: 'your apple id',
         //    appleIdPassword: 'app specific password',
@@ -48,6 +51,17 @@ module.exports = {
         {
             name: '@electron-forge/maker-dmg',
             platforms: ['darwin'],
+            config: {
+                name: 'Cheating Daddy On Steroids',
+                icon: 'src/assets/logo.icns',
+                format: 'ULFO', // Lzfse compression - best for modern macOS
+                window: {
+                    size: {
+                        width: 540,
+                        height: 380
+                    }
+                },
+            },
         },
         {
             name: '@reforged/maker-appimage',

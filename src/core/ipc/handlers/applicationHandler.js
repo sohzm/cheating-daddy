@@ -170,7 +170,62 @@ function registerApplicationHandlers({ mainWindow, createUpdateWindow, stopMacOS
         }
     });
 
-    console.log('[ApplicationHandler] Registered 9 application IPC handlers');
+    // ============ OPEN SYSTEM PREFERENCES (macOS) ============
+    ipcMain.handle('open-system-preferences', async (event, pane) => {
+        if (process.platform !== 'darwin') {
+            return { success: false, error: 'Only available on macOS' };
+        }
+
+        try {
+            // Map pane names to macOS System Preferences URLs
+            const paneUrls = {
+                microphone: 'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone',
+                screen: 'x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture',
+                accessibility: 'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility',
+                camera: 'x-apple.systempreferences:com.apple.preference.security?Privacy_Camera',
+                security: 'x-apple.systempreferences:com.apple.preference.security',
+            };
+
+            const url = paneUrls[pane] || paneUrls.security;
+            await shell.openExternal(url);
+            return { success: true };
+        } catch (error) {
+            console.error(`Error opening System Preferences:`, error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    // ============ GET ALL PERMISSIONS STATUS (macOS) ============
+    ipcMain.handle('get-all-permissions', async event => {
+        if (process.platform !== 'darwin') {
+            return {
+                microphone: 'granted',
+                screen: 'granted',
+                camera: 'granted',
+                isMac: false,
+            };
+        }
+
+        try {
+            return {
+                microphone: systemPreferences.getMediaAccessStatus('microphone'),
+                screen: systemPreferences.getMediaAccessStatus('screen'),
+                camera: systemPreferences.getMediaAccessStatus('camera'),
+                isMac: true,
+            };
+        } catch (error) {
+            console.error('Error getting permissions:', error);
+            return {
+                microphone: 'unknown',
+                screen: 'unknown',
+                camera: 'unknown',
+                isMac: true,
+                error: error.message,
+            };
+        }
+    });
+
+    console.log('[ApplicationHandler] Registered 11 application IPC handlers');
 }
 
 module.exports = { registerApplicationHandlers };

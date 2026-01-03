@@ -19,10 +19,62 @@ const skipUpgradeCheck = process.argv.includes('--skip-upgrade-check');
 console.log('App Startup: process.argv =', process.argv);
 console.log('App Startup: skipUpgradeCheck =', skipUpgradeCheck);
 
+/**
+ * Kill zombie processes from previous runs that might be holding global shortcuts
+ * This prevents shortcut registration failures on Windows
+ */
+function killZombieProcesses() {
+    if (process.platform !== 'win32') return;
+    
+    try {
+        const { execSync } = require('child_process');
+        const currentPid = process.pid;
+        const appName = 'Cheating Daddy On Steroids';
+        
+        // Get list of processes with matching name, excluding current process
+        const cmd = `powershell -Command "Get-Process -Name '${appName}' -ErrorAction SilentlyContinue | Where-Object { $_.Id -ne ${currentPid} } | Select-Object -ExpandProperty Id"`;
+        
+        const result = execSync(cmd, { encoding: 'utf8', timeout: 5000 }).trim();
+        
+        if (result) {
+            const pids = result.split('\n').map(p => p.trim()).filter(p => p);
+            if (pids.length > 0) {
+                console.log(`[Zombie Cleanup] Found ${pids.length} zombie process(es): ${pids.join(', ')}`);
+                
+                // Kill each zombie process
+                pids.forEach(pid => {
+                    try {
+                        execSync(`taskkill /PID ${pid} /F`, { encoding: 'utf8', timeout: 3000 });
+                        console.log(`[Zombie Cleanup] Killed process ${pid}`);
+                    } catch (killError) {
+                        // Process may have already exited
+                        console.warn(`[Zombie Cleanup] Could not kill ${pid}:`, killError.message);
+                    }
+                });
+                
+                // Small delay to ensure shortcuts are released
+                const waitSync = (ms) => {
+                    const end = Date.now() + ms;
+                    while (Date.now() < end) { /* busy wait */ }
+                };
+                waitSync(500);
+            }
+        }
+    } catch (error) {
+        // Silently ignore - this is a best-effort cleanup
+        if (error.status !== 1) { // status 1 = no processes found, which is fine
+            console.warn('[Zombie Cleanup] Error during cleanup:', error.message);
+        }
+    }
+}
+
 function createMainWindow() {
     mainWindow = createWindow(sendToRenderer, geminiSessionRef);
     return mainWindow;
 }
+
+// Kill any zombie processes before starting (prevents shortcut conflicts)
+killZombieProcesses();
 
 app.whenReady().then(async () => {
     // Initialize storage (ensures directory exists, resets if needed)
