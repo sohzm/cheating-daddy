@@ -96,53 +96,38 @@ export class CheatingDaddyApp extends LitElement {
             background: var(--scrollbar-thumb-hover);
         }
 
-        .toast-container {
+        /* Stealth Error Bar - unified, subtle error display */
+        .stealth-error-bar {
             position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 10000;
-            pointer-events: none;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            align-items: flex-end;
-        }
-
-        .toast {
-            background: #2a2a2a; /* Fallback */
-            background: var(--bg-tertiary, #2a2a2a);
-            color: var(--text-color, #fff);
-            padding: 12px 16px;
-            border-radius: 6px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-            border-left: 4px solid #00e6cc; /* Default/Info */
+            bottom: 60px; /* Floating well above bottom edge */
+            left: 50%;
+            transform: translateX(-50%) translateY(20px); /* Start slightly below final position */
+            background: rgba(30, 30, 30, 0.95);
+            color: rgba(240, 240, 240, 0.9);
+            font-size: 11px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            text-align: center;
             opacity: 0;
-            transform: translateX(20px);
-            transition:
-                opacity 0.3s ease,
-                transform 0.3s ease;
-            pointer-events: auto;
-            font-size: 13px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            max-width: 320px;
-            pointer-events: none; /* Let clicks pass through if covered, but toast itself handles */
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            pointer-events: none;
+            z-index: 999999;
+            font-family: 'SF Mono', Monaco, monospace;
+            letter-spacing: 0.3px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            white-space: nowrap;
+            backdrop-filter: blur(4px);
         }
 
-        .toast.visible {
+        .stealth-error-bar.visible {
             opacity: 1;
-            transform: translateX(0);
+            transform: translateX(-50%) translateY(0);
         }
 
-        .toast.error {
-            border-left-color: #ef4444;
-        }
-        .toast.warning {
-            border-left-color: #f59e0b;
-        }
-        .toast.success {
-            border-left-color: #10b981;
+        /* Hide branding footer when error bar is visible */
+        .stealth-error-bar.visible ~ .branding-footer {
+            opacity: 0;
         }
 
         /* Window Resize Handles - invisible, no cursor change for stealth */
@@ -286,10 +271,9 @@ export class CheatingDaddyApp extends LitElement {
         shouldAnimateResponse: { type: Boolean },
         _storageLoaded: { state: true },
 
-        // Toast State
-        toastMessage: { type: String },
-        toastType: { type: String },
-        toastVisible: { type: Boolean },
+        // Stealth Error Bar State
+        stealthErrorMessage: { type: String },
+        stealthErrorVisible: { type: Boolean },
 
         // Upgrade Dialog State
         showUpgradeDialog: { type: Boolean },
@@ -297,10 +281,11 @@ export class CheatingDaddyApp extends LitElement {
 
         // Update Dialog State (for new version notifications)
         showUpdateDialog: { type: Boolean },
-        updateInfo: { type: Object },        
+        updateInfo: { type: Object },
         // Window resize state
         _isResizing: { state: true },
-        _resizeDirection: { state: true },    };
+        _resizeDirection: { state: true },
+    };
 
     constructor() {
         super();
@@ -415,10 +400,10 @@ export class CheatingDaddyApp extends LitElement {
         const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
         return result
             ? {
-                  r: parseInt(result[1], 16),
-                  g: parseInt(result[2], 16),
-                  b: parseInt(result[3], 16),
-              }
+                r: parseInt(result[1], 16),
+                g: parseInt(result[2], 16),
+                b: parseInt(result[3], 16),
+            }
             : { r: 30, g: 30, b: 30 };
     }
 
@@ -500,18 +485,43 @@ export class CheatingDaddyApp extends LitElement {
         if (this._cleanupSettingChanged) this._cleanupSettingChanged();
     }
 
-    handleToast(data) {
-        if (!data || !data.message) return;
+    showStealthError(message) {
+        if (!message) return;
 
-        this.toastMessage = data.message;
-        this.toastType = data.type || 'info';
-        this.toastVisible = true;
+        console.log('[StealthError] Showing:', message);
+
+        // Simplify the error message
+        let simplified = message
+            .replace(/^Error:?\s*/i, '')
+            .replace(/\s*\(status:\s*\d+\)/gi, '')
+            .replace(/\[.*?\]\s*/g, '')
+            .trim();
+
+        // Truncate if too long (extended slightly)
+        if (simplified.length > 60) {
+            simplified = simplified.substring(0, 57) + '...';
+        }
+
+        this.stealthErrorMessage = simplified || 'Error occurred';
+        this.stealthErrorVisible = true;
+        this.requestUpdate(); // Force update
 
         // Auto-hide after 3 seconds
-        if (this._toastTimeout) clearTimeout(this._toastTimeout);
-        this._toastTimeout = setTimeout(() => {
-            this.toastVisible = false;
+        if (this._stealthErrorTimeout) clearTimeout(this._stealthErrorTimeout);
+        this._stealthErrorTimeout = setTimeout(() => {
+            this.stealthErrorVisible = false;
+            this.requestUpdate();
         }, 3000);
+    }
+
+    handleToast(data) {
+        // Route all toasts through stealth error bar if they're errors
+        if (!data || !data.message) return;
+
+        if (data.type === 'error' || data.message.toLowerCase().includes('error')) {
+            this.showStealthError(data.message);
+        }
+        // Silently ignore non-error toasts for stealth
     }
 
     handleSettingChanged(data) {
@@ -532,16 +542,39 @@ export class CheatingDaddyApp extends LitElement {
     }
 
     setStatus(text) {
-        this.statusText = text;
+        // Check if this is an error status
+        const isError = text && (
+            text.toLowerCase().includes('error') ||
+            text.includes('429') ||
+            text.includes('failed') ||
+            text.includes('exhausted')
+        );
+
+        if (isError) {
+            // Route errors to stealth error bar, don't show in header
+            this.showStealthError(text);
+            this.statusText = 'Ready'; // Reset header status
+        } else {
+            this.statusText = text;
+        }
 
         // Mark response as complete when we get certain status messages
-        if (text.includes('Ready') || text.includes('Listening') || text.includes('Error')) {
+        if (text.includes('Ready') || text.includes('Listening') || isError) {
             this._currentResponseIsComplete = true;
             console.log('[setStatus] Marked current response as complete');
         }
     }
 
     addNewResponse(response) {
+        // Get the text content to check for errors
+        const text = typeof response === 'object' && response !== null ? response.text : response;
+
+        // Route error messages to stealth error bar instead
+        if (text && (text.startsWith('Error:') || text.startsWith('Error '))) {
+            this.showStealthError(text);
+            return; // Don't add error as a response
+        }
+
         // Add a new response entry (first word of a new AI response)
         this.responses = [...this.responses, response];
         this.currentResponseIndex = this.responses.length - 1;
@@ -798,11 +831,11 @@ export class CheatingDaddyApp extends LitElement {
                         .shouldAnimateResponse=${this.shouldAnimateResponse}
                         @response-index-changed=${this.handleResponseIndexChanged}
                         @response-animation-complete=${() => {
-                            this.shouldAnimateResponse = false;
-                            this._currentResponseIsComplete = true;
-                            console.log('[response-animation-complete] Marked current response as complete');
-                            this.requestUpdate();
-                        }}
+                        this.shouldAnimateResponse = false;
+                        this._currentResponseIsComplete = true;
+                        console.log('[response-animation-complete] Marked current response as complete');
+                        this.requestUpdate();
+                    }}
                     ></assistant-view>
                 `;
 
@@ -842,14 +875,13 @@ export class CheatingDaddyApp extends LitElement {
                 </div>
                 ${this.currentView !== 'assistant' ? html` <div class="branding-footer">Cheating Daddy On Steroids By klaus-qodes</div> ` : ''}
 
-                <div class="toast-container">
-                    <div class="toast ${this.toastVisible ? 'visible' : ''} ${this.toastType}">
-                        <span>${this.toastMessage}</span>
-                    </div>
+                <!-- Stealth Error Bar -->
+                <div class="stealth-error-bar ${this.stealthErrorVisible ? 'visible' : ''}">
+                    ${this.stealthErrorMessage}
                 </div>
 
                 ${this.showUpgradeDialog && this.upgradeInfo
-                    ? html`
+                ? html`
                           <upgrade-dialog
                               .isFirstRun=${this.upgradeInfo.isFirstRun}
                               .isUpgrade=${this.upgradeInfo.isUpgrade}
@@ -861,7 +893,7 @@ export class CheatingDaddyApp extends LitElement {
                               @dialog-error=${this.handleUpgradeDialogError}
                           ></upgrade-dialog>
                       `
-                    : ''}
+                : ''}
 
                 <!-- Window Resize Handles -->
                 <div class="resize-handle resize-handle-n" @mousedown=${(e) => this._handleResizeStart(e, 'n')}></div>
@@ -891,10 +923,10 @@ export class CheatingDaddyApp extends LitElement {
         this._isResizing = true;
         this._resizeDirection = direction;
         this._resizeStartPos = { x: e.screenX, y: e.screenY };
-        
+
         // Add visual feedback (subtle inner glow)
         this.classList.add('resizing');
-        
+
         // Add global listeners
         document.addEventListener('mousemove', this._boundHandleResizeMove);
         document.addEventListener('mouseup', this._boundHandleResizeEnd);
@@ -902,26 +934,26 @@ export class CheatingDaddyApp extends LitElement {
 
     async _handleResizeMove(e) {
         if (!this._isResizing || !window.electronAPI?.window?.resizeBy) return;
-        
+
         const dx = e.screenX - this._resizeStartPos.x;
         const dy = e.screenY - this._resizeStartPos.y;
-        
+
         // Update start position for next move
         this._resizeStartPos = { x: e.screenX, y: e.screenY };
-        
+
         // Calculate resize deltas based on direction
         let widthDelta = 0;
         let heightDelta = 0;
         let xDelta = 0;
         let yDelta = 0;
-        
+
         const dir = this._resizeDirection;
-        
+
         if (dir.includes('e')) widthDelta = dx;
         if (dir.includes('w')) { widthDelta = -dx; xDelta = dx; }
         if (dir.includes('s')) heightDelta = dy;
         if (dir.includes('n')) { heightDelta = -dy; yDelta = dy; }
-        
+
         try {
             await window.electronAPI.window.resizeBy(widthDelta, heightDelta, xDelta, yDelta);
         } catch (error) {
@@ -933,10 +965,10 @@ export class CheatingDaddyApp extends LitElement {
         this._isResizing = false;
         this._resizeDirection = null;
         this._resizeStartPos = null;
-        
+
         // Remove visual feedback
         this.classList.remove('resizing');
-        
+
         // Remove global listeners
         document.removeEventListener('mousemove', this._boundHandleResizeMove);
         document.removeEventListener('mouseup', this._boundHandleResizeEnd);

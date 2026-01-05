@@ -1,7 +1,7 @@
 {
-    "name": "cheating-daddy",
-    "productName": "cheating-daddy",
-    "version": "0.5.6",
+    "name": "cheating-daddy-on-steroids",
+    "productName": "cheating-daddy-on-steroids",
+    "version": "0.5.7",
     "description": "Cheating Daddy On Steroids",
     "main": "src/index.js",
     "scripts": {
@@ -32,7 +32,7 @@
         {
             "name": "klaus-qodes",
             "github": "https://github.com/klaus-qodes",
-            "version": "v0.5.6"
+            "version": "v0.5.7"
         }
     ],
     "license": "GPL-3.0",

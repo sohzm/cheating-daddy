@@ -124,6 +124,18 @@ export class AppHeader extends LitElement {
         .update-button:hover {
             background: rgba(241, 76, 76, 0.1);
         }
+
+        /* Subtle error status styling */
+        .status-error {
+            font-size: 10px;
+            color: var(--text-muted);
+            opacity: 0.6;
+            font-style: italic;
+            max-width: 150px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
     `;
 
     static properties = {
@@ -145,12 +157,12 @@ export class AppHeader extends LitElement {
         this.currentView = 'main';
         this.statusText = '';
         this.startTime = null;
-        this.onCustomizeClick = () => {};
-        this.onHelpClick = () => {};
-        this.onHistoryClick = () => {};
-        this.onCloseClick = () => {};
-        this.onBackClick = () => {};
-        this.onHideToggleClick = () => {};
+        this.onCustomizeClick = () => { };
+        this.onHelpClick = () => { };
+        this.onHistoryClick = () => { };
+        this.onCloseClick = () => { };
+        this.onBackClick = () => { };
+        this.onHideToggleClick = () => { };
         this.isClickThrough = false;
         this.updateAvailable = false;
         this._timerInterval = null;
@@ -271,6 +283,34 @@ export class AppHeader extends LitElement {
         return '';
     }
 
+    formatStatusText(text) {
+        if (!text) return { text: '', isError: false };
+
+        // Check if it's an error message
+        const isError = text.toLowerCase().includes('error') ||
+            text.includes('429') ||
+            text.includes('failed') ||
+            text.includes('exhausted');
+
+        if (isError) {
+            // Simplify error messages
+            let simplified = text
+                .replace(/^Error:?\s*/i, '')
+                .replace(/\s*\(status:\s*\d+\)/gi, '')
+                .replace(/\[.*?\]\s*/g, '')
+                .trim();
+
+            // Truncate if too long
+            if (simplified.length > 30) {
+                simplified = simplified.substring(0, 27) + '...';
+            }
+
+            return { text: simplified || 'Error', isError: true };
+        }
+
+        return { text, isError: false };
+    }
+
     isNavigationView() {
         const navigationViews = ['customize', 'help', 'history', 'advanced'];
         return navigationViews.includes(this.currentView);
@@ -278,22 +318,25 @@ export class AppHeader extends LitElement {
 
     render() {
         const elapsedTime = this.getElapsedTime();
+        const statusInfo = this.formatStatusText(this.statusText);
 
         return html`
             <div class="header">
                 <div class="header-title">${this.getViewTitle()}</div>
                 <div class="header-actions">
                     ${this.currentView === 'assistant'
-                        ? html`
+                ? html`
                               <span>${elapsedTime}</span>
-                              <span>${this.statusText}</span>
+                              ${statusInfo.isError
+                        ? html`<span class="status-error" title="${this.statusText}">${statusInfo.text}</span>`
+                        : html`<span>${statusInfo.text}</span>`}
                               ${this.isClickThrough ? html`<span class="click-through-indicator">click-through</span>` : ''}
                           `
-                        : ''}
+                : ''}
                     ${this.currentView === 'main'
-                        ? html`
+                ? html`
                               ${this.updateAvailable
-                                  ? html`
+                        ? html`
                                         <button class="update-button" @click=${this._openUpdatePage}>
                                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor">
                                                 <path
@@ -305,7 +348,7 @@ export class AppHeader extends LitElement {
                                             Update available
                                         </button>
                                     `
-                                  : ''}
+                        : ''}
                               <button class="icon-button" @click=${this.onHistoryClick}>
                                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                                       <path
@@ -334,9 +377,9 @@ export class AppHeader extends LitElement {
                                   </svg>
                               </button>
                           `
-                        : ''}
+                : ''}
                     ${this.currentView === 'assistant'
-                        ? html`
+                ? html`
                               <button @click=${this.onHideToggleClick} class="button">
                                   Hide&nbsp;&nbsp;<span class="key" style="pointer-events: none;">${cheatingDaddy.isMacOS ? 'Cmd' : 'Ctrl'}</span
                                   >&nbsp;&nbsp;<span class="key">&bsol;</span>
@@ -349,7 +392,7 @@ export class AppHeader extends LitElement {
                                   </svg>
                               </button>
                           `
-                        : html`
+                : html`
                               <button @click=${this.isNavigationView() ? this.onBackClick : this.onCloseClick} class="icon-button window-close">
                                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                                       <path

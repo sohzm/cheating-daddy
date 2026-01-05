@@ -149,6 +149,9 @@ const storage = {
     async setApiKey(apiKey, provider = null) {
         return window.electronAPI.storage.setApiKey(apiKey, provider);
     },
+    async setPaidStatus(provider, isPaid) {
+        return window.electronAPI.storage.setPaidStatus(provider, isPaid);
+    },
 
     // Usage stats
     async getUsageStats() {
@@ -310,8 +313,8 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
 
     try {
         if (isMacOS) {
-            // On macOS, use SystemAudioDump for audio and getDisplayMedia for screen
-            console.log('Starting macOS capture with SystemAudioDump...');
+            // On macOS, use audiotee (Core Audio Taps) for audio and getDisplayMedia for screen
+            console.log('Starting macOS capture with audiotee (Core Audio Taps)...');
 
             // Start macOS audio capture
             const audioResult = await window.electronAPI.audio.startMacOSAudio();
@@ -329,7 +332,7 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
                 audio: false, // Don't use browser audio on macOS
             });
 
-            console.log('macOS screen capture started - audio handled by SystemAudioDump');
+            console.log('macOS screen capture started - audio handled by audiotee');
 
             if (audioMode === 'mic_only' || audioMode === 'both') {
                 let micStream = null;
@@ -1006,10 +1009,10 @@ const theme = {
         const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
         return result
             ? {
-                  r: parseInt(result[1], 16),
-                  g: parseInt(result[2], 16),
-                  b: parseInt(result[3], 16),
-              }
+                r: parseInt(result[1], 16),
+                g: parseInt(result[2], 16),
+                b: parseInt(result[3], 16),
+            }
             : { r: 30, g: 30, b: 30 };
     },
 

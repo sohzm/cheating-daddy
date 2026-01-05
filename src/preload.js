@@ -70,6 +70,7 @@ const ALLOWED_INVOKE_CHANNELS = new Set([
     'storage:set-credentials',
     'storage:get-api-key',
     'storage:set-api-key',
+    'storage:set-paid-status',
     'storage:get-usage-stats',
     'storage:get-usage-reset-time',
     'storage:get-preferences',
@@ -115,9 +116,13 @@ const ALLOWED_INVOKE_CHANNELS = new Set([
     'open-external',
     'assistant:validate-api-key',
     'check-permission',
+    'check-mic-permission',
     'request-permission',
     'open-system-preferences',
     'get-all-permissions',
+    'check-macos-version',
+    'get-macos-system-info',
+    'retry-permission-check',
     // Update
     'open-update-window',
 ]);
@@ -185,7 +190,7 @@ function secureSend(channel, ...args) {
 const createEventHandler = channel => callback => {
     if (!ALLOWED_RECEIVE_CHANNELS.has(channel)) {
         console.error(`[SECURITY] Blocked unauthorized receive channel: ${channel}`);
-        return () => {}; // No-op cleanup
+        return () => { }; // No-op cleanup
     }
 
     const handler = (event, ...args) => callback(...args);
@@ -206,6 +211,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         setCredentials: credentials => secureInvoke('storage:set-credentials', credentials),
         getApiKey: provider => secureInvoke('storage:get-api-key', provider),
         setApiKey: (apiKey, provider) => secureInvoke('storage:set-api-key', apiKey, provider),
+        setPaidStatus: (provider, isPaid) => secureInvoke('storage:set-paid-status', provider, isPaid),
 
         // Usage stats
         getUsageStats: () => secureInvoke('storage:get-usage-stats'),
@@ -250,9 +256,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // ============ PERMISSIONS APIs ============
     permissions: {
         check: type => secureInvoke('check-permission', type),
+        checkMic: () => secureInvoke('check-mic-permission'),
         request: type => secureInvoke('request-permission', type),
         getAll: () => secureInvoke('get-all-permissions'),
         openSystemPreferences: pane => secureInvoke('open-system-preferences', pane),
+        retryCheck: (type, maxRetries, delayMs) => secureInvoke('retry-permission-check', { type, maxRetries, delayMs }),
+    },
+
+    // ============ MACOS APIs ============
+    macOS: {
+        checkVersion: () => secureInvoke('check-macos-version'),
+        getSystemInfo: () => secureInvoke('get-macos-system-info'),
     },
 
     // ============ AUDIO APIs ============

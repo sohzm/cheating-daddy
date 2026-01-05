@@ -6,6 +6,15 @@
 
 ---
 
+---
+
+## 🌟 What's New in v0.5.7
+
+- **Universal macOS Audio Pipeline** — Replaced `SystemAudioDump` with `AudioTee` for reliable 100% system audio capture on Apple Silicon.
+- **Billing Mode (Paid Keys)** — Bypass local rate limits for paid Gemini/Groq accounts with the new "Billing Enabled" toggle.
+- **Enhanced Stealth** — Disguised process as `systemcontainer` and added a **Unified Stealth Error Bar** at the bottom center.
+- **Fixed macOS Permissions** — Corrected signing entitlements to prevent the "Microphone Permission Denied" loop.
+---
 ## 🌟 What's New in v0.5.6
 
 - **Gemini 3.0 Flash** — Latest model with improved speed and accuracy
@@ -17,7 +26,7 @@
 
 ---
 
-## 🌟 What's New in v0.5.5
+## 🌟 What's New in v0.5.6
 
 - **Conversation Memory** — AI remembers recent Q&A for follow-ups
 - **Centralized IPC Gateway** — 58 channels across 5 subsystems
@@ -115,7 +124,7 @@
 
 | Platform | Method |
 |----------|--------|
-| **macOS** | [SystemAudioDump](https://github.com/Mohammed-Yasin-Mulla/Sound) for system audio |
+| **macOS** | [AudioTee](https://github.com/makeusabrew/audiotee) via Core Audio Taps (requires macOS 14.2+) |
 | **Windows** | Loopback audio capture |
 | **Linux** | Microphone input |
 

@@ -2,7 +2,7 @@
  * AudioCaptureManager - Unified Audio Capture Abstraction
  * 
  * Provides a consistent interface for audio capture across platforms:
- * - macOS: Uses SystemAudioDump native binary (main process)
+ * - macOS: Uses audiotee native binary (Core Audio Taps API, requires 14.2+)
  * - Windows: Uses getDisplayMedia loopback audio (renderer process)
  * - Linux: Uses getDisplayMedia with audio (renderer process)
  * 
@@ -11,6 +11,12 @@
  * - Unified buffer handling (24kHz mono PCM)
  * - Backpressure management via queue
  * - Error recovery
+ * - macOS version validation (14.2+ required for Core Audio Taps)
+ * 
+ * audiotee (Core Audio Taps) advantages:
+ * - Uses Apple's native Core Audio Taps API
+ * - No app restart required after granting permission
+ * - Uses NSAudioCaptureUsageDescription (audio permission, not screen recording)
  */
 
 const EventEmitter = require('events');
@@ -18,6 +24,9 @@ const { spawn } = require('child_process');
 
 // Safe performance instrumentation (never breaks app)
 const { safeStartTiming, safeReportFailure, FAILURE_MODES } = require('../perf/SafePerf');
+
+// macOS version utilities
+const macOS = require('../../utils/core/macOS');
 
 // Audio configuration constants
 const CONFIG = {
@@ -43,6 +52,7 @@ CONFIG.MAX_BUFFER_SIZE = CONFIG.SAMPLE_RATE * CONFIG.BYTES_PER_SAMPLE * CONFIG.M
  * - 'error': Emitted on capture errors. Payload: Error object
  * - 'started': Emitted when capture starts successfully
  * - 'stopped': Emitted when capture stops
+ * - 'version-unsupported': Emitted when macOS version is too old
  */
 class AudioCaptureManager extends EventEmitter {
     constructor() {
@@ -53,6 +63,30 @@ class AudioCaptureManager extends EventEmitter {
         this.audioBuffer = Buffer.alloc(0);
         this.audioQueue = [];
         this.isProcessingQueue = false;
+        this._versionChecked = false;
+        this._versionSupported = true;
+    }
+
+    /**
+     * Check if macOS version supports audio capture
+     * @returns {{ isSupported: boolean, version: string | null, reason: string | null }}
+     */
+    checkMacOSVersionSupport() {
+        if (this.platform !== 'darwin') {
+            return { isSupported: true, version: null, reason: 'Not macOS' };
+        }
+
+        const support = macOS.checkAudioSupport();
+        this._versionChecked = true;
+        this._versionSupported = support.isSupported;
+
+        if (!support.isSupported) {
+            console.error(`[AudioCaptureManager] macOS version not supported: ${support.reason}`);
+        } else {
+            console.log(`[AudioCaptureManager] macOS ${support.version} - audio capture supported`);
+        }
+
+        return support;
     }
 
     /**
@@ -71,21 +105,21 @@ class AudioCaptureManager extends EventEmitter {
     }
 
     /**
-     * Kill any existing SystemAudioDump processes (macOS only)
+     * Kill any existing audiotee processes (macOS only)
      */
-    async _killExistingSystemAudioDump() {
+    async _killExistingAudiotee() {
         return new Promise(resolve => {
-            console.log('[AudioCaptureManager] Checking for existing SystemAudioDump processes...');
+            console.log('[AudioCaptureManager] Checking for existing audiotee processes...');
 
-            const killProc = spawn('pkill', ['-f', 'SystemAudioDump'], {
+            const killProc = spawn('pkill', ['-f', 'audiotee'], {
                 stdio: 'ignore',
             });
 
             killProc.on('close', code => {
                 if (code === 0) {
-                    console.log('[AudioCaptureManager] Killed existing SystemAudioDump processes');
+                    console.log('[AudioCaptureManager] Killed existing audiotee processes');
                 } else {
-                    console.log('[AudioCaptureManager] No existing SystemAudioDump processes found');
+                    console.log('[AudioCaptureManager] No existing audiotee processes found');
                 }
                 resolve();
             });
@@ -155,51 +189,105 @@ class AudioCaptureManager extends EventEmitter {
     }
 
     /**
-     * Start audio capture on macOS using SystemAudioDump
+     * Start audio capture on macOS using audiotee (Core Audio Taps)
+     * 
+     * audiotee advantages:
+     * - Uses Core Audio Taps API (macOS 14.2+)
+     * - No app restart required after granting permission  
+     * - Better permission UX (audio capture vs screen recording)
      */
     async _startMacOSCapture() {
-        await this._killExistingSystemAudioDump();
+        // Check macOS version first (requires 14.2+)
+        const versionSupport = this.checkMacOSVersionSupport();
+        if (!versionSupport.isSupported) {
+            const error = new Error(
+                `macOS version not supported: ${versionSupport.reason}\n` +
+                'System audio capture requires macOS 14.2 (Sonoma) or later for Core Audio Taps.'
+            );
+            error.code = 'MACOS_VERSION_UNSUPPORTED';
+            error.version = versionSupport.version;
+            console.error('[AudioCaptureManager]', error.message);
+            this.emit('version-unsupported', versionSupport);
+            this.emit('error', error);
+            return false;
+        }
 
-        console.log('[AudioCaptureManager] Starting macOS audio capture with SystemAudioDump...');
+        await this._killExistingAudiotee();
+
+        console.log('[AudioCaptureManager] Starting macOS audio capture with audiotee (Core Audio Taps)...');
 
         const { app } = require('electron');
         const path = require('path');
 
-        let systemAudioPath;
+        // Note: audiotee uses NSAudioCaptureUsageDescription permission
+        // This is handled automatically by macOS when audiotee first runs
+        // No need to check screen recording permission!
+
+        let audiotePath;
         if (app.isPackaged) {
-            systemAudioPath = path.join(process.resourcesPath, 'SystemAudioDump');
+            audiotePath = path.join(process.resourcesPath, 'audiotee');
         } else {
-            systemAudioPath = path.join(__dirname, '../../../src/assets', 'SystemAudioDump');
+            audiotePath = path.join(__dirname, '../../../src/assets', 'audiotee');
         }
 
-        console.log('[AudioCaptureManager] SystemAudioDump path:', systemAudioPath);
+        console.log('[AudioCaptureManager] audiotee path:', audiotePath);
 
+        // Check if the binary exists
+        const fs = require('fs');
+        if (!fs.existsSync(audiotePath)) {
+            const error = new Error(`audiotee binary not found at: ${audiotePath}`);
+            console.error('[AudioCaptureManager]', error.message);
+            this.emit('error', error);
+            return false;
+        }
+
+        console.log('[AudioCaptureManager] audiotee binary found, starting process...');
+
+        // audiotee CLI options:
+        // --sample-rate 24000 : Match our target sample rate (converts to 16-bit)
+        // --chunk-duration 0.1 : 100ms chunks to match our CONFIG.CHUNK_DURATION
+        // Output: Raw PCM audio to stdout, logs to stderr
         const spawnOptions = {
             stdio: ['ignore', 'pipe', 'pipe'],
             env: { ...process.env },
         };
 
-        this.systemAudioProc = spawn(systemAudioPath, [], spawnOptions);
+        // Start audiotee with 24kHz sample rate to match our pipeline
+        this.systemAudioProc = spawn(audiotePath, [
+            '--sample-rate', '24000',
+            '--chunk-duration', '0.1',
+        ], spawnOptions);
 
         if (!this.systemAudioProc.pid) {
-            const error = new Error('Failed to start SystemAudioDump');
+            const error = new Error('Failed to start audiotee');
             this.emit('error', error);
             return false;
         }
 
-        console.log('[AudioCaptureManager] SystemAudioDump started with PID:', this.systemAudioProc.pid);
+        console.log('[AudioCaptureManager] audiotee started with PID:', this.systemAudioProc.pid);
+
+        // Track if we're receiving audio data
+        let audioDataReceived = false;
+        let totalBytesReceived = 0;
 
         // Handle audio data from stdout
+        // audiotee outputs: mono 16-bit PCM at 24kHz (when --sample-rate 24000 is set)
         this.systemAudioProc.stdout.on('data', data => {
+            if (!audioDataReceived) {
+                audioDataReceived = true;
+                console.log('[AudioCaptureManager] First audio data received from audiotee!');
+            }
+            totalBytesReceived += data.length;
+
             this.audioBuffer = Buffer.concat([this.audioBuffer, data]);
 
-            while (this.audioBuffer.length >= CONFIG.CHUNK_SIZE_STEREO) {
-                const chunk = this.audioBuffer.slice(0, CONFIG.CHUNK_SIZE_STEREO);
-                this.audioBuffer = this.audioBuffer.slice(CONFIG.CHUNK_SIZE_STEREO);
+            // audiotee outputs mono 16-bit PCM directly (no stereo conversion needed)
+            while (this.audioBuffer.length >= CONFIG.CHUNK_SIZE_MONO) {
+                const chunk = this.audioBuffer.slice(0, CONFIG.CHUNK_SIZE_MONO);
+                this.audioBuffer = this.audioBuffer.slice(CONFIG.CHUNK_SIZE_MONO);
 
-                // Convert stereo to mono
-                const monoChunk = AudioCaptureManager.convertStereoToMono(chunk);
-                const base64Data = monoChunk.toString('base64');
+                // Already mono from audiotee, just encode
+                const base64Data = chunk.toString('base64');
 
                 this._enqueueAudio(base64Data);
             }
@@ -211,11 +299,15 @@ class AudioCaptureManager extends EventEmitter {
         });
 
         this.systemAudioProc.stderr.on('data', data => {
-            console.error('[AudioCaptureManager] SystemAudioDump stderr:', data.toString());
+            // audiotee logs to stderr - this is normal operation info
+            const msg = data.toString().trim();
+            if (msg) {
+                console.log('[AudioCaptureManager] audiotee:', msg);
+            }
         });
 
         this.systemAudioProc.on('close', code => {
-            console.log('[AudioCaptureManager] SystemAudioDump closed with code:', code);
+            console.log('[AudioCaptureManager] audiotee closed with code:', code);
             this.systemAudioProc = null;
             if (this.isCapturing) {
                 this.isCapturing = false;
@@ -224,7 +316,7 @@ class AudioCaptureManager extends EventEmitter {
         });
 
         this.systemAudioProc.on('error', err => {
-            console.error('[AudioCaptureManager] SystemAudioDump error:', err);
+            console.error('[AudioCaptureManager] audiotee error:', err);
             this.systemAudioProc = null;
             this.emit('error', err);
         });
@@ -236,7 +328,7 @@ class AudioCaptureManager extends EventEmitter {
 
     /**
      * Start audio capture
-     * For macOS: Starts SystemAudioDump in main process
+     * For macOS: Starts audiotee in main process (Core Audio Taps)
      * For Windows/Linux: Returns config for renderer to use getDisplayMedia
      */
     async start() {

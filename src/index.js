@@ -76,7 +76,73 @@ function createMainWindow() {
 // Kill any zombie processes before starting (prevents shortcut conflicts)
 killZombieProcesses();
 
+/**
+ * Check macOS version and log audio support status
+ * Uses version detection from macOS utilities module
+ */
+function checkMacOSVersion() {
+    if (process.platform !== 'darwin') return { isSupported: true };
+    
+    try {
+        const macOS = require('./utils/core/macOS');
+        const support = macOS.checkAudioSupport();
+        const statusMessage = macOS.getVersionStatusMessage();
+        
+        console.log(`[macOS Version] ${statusMessage.title}`);
+        console.log(`[macOS Version] ${statusMessage.message}`);
+        console.log(`[macOS Version] Audio support: ${support.isSupported ? 'YES' : 'NO'}`);
+        
+        if (!support.isSupported) {
+            console.warn('[macOS Version] ⚠️ System audio capture will NOT work on this macOS version');
+        }
+        
+        return support;
+    } catch (error) {
+        console.error('[macOS Version] Error checking version:', error);
+        return { isSupported: true }; // Assume supported if check fails
+    }
+}
+
+/**
+ * Request macOS permissions at startup
+ * This prompts the user for microphone access if not yet determined
+ * Screen recording must be granted manually in System Preferences
+ */
+async function requestMacPermissions() {
+    if (process.platform !== 'darwin') return;
+    
+    try {
+        // Check microphone permission status
+        const micStatus = systemPreferences.getMediaAccessStatus('microphone');
+        console.log('[macOS Permissions] Microphone status:', micStatus);
+        
+        // If not determined, request permission (shows native dialog)
+        if (micStatus === 'not-determined') {
+            console.log('[macOS Permissions] Requesting microphone access...');
+            const granted = await systemPreferences.askForMediaAccess('microphone');
+            console.log('[macOS Permissions] Microphone access granted:', granted);
+        } else if (micStatus === 'denied') {
+            console.log('[macOS Permissions] Microphone was denied - user needs to grant in System Preferences');
+        }
+        
+        // Check screen recording status (can only check, not request)
+        const screenStatus = systemPreferences.getMediaAccessStatus('screen');
+        console.log('[macOS Permissions] Screen Recording status:', screenStatus);
+        
+        if (screenStatus !== 'granted') {
+            console.log('[macOS Permissions] Screen Recording not granted - user needs to grant in System Preferences > Privacy & Security > Screen Recording');
+        }
+    } catch (error) {
+        console.error('[macOS Permissions] Error requesting permissions:', error);
+    }
+}
+
 app.whenReady().then(async () => {
+    // Check macOS version early (logs warning if unsupported)
+    if (process.platform === 'darwin') {
+        checkMacOSVersion();
+    }
+
     // Initialize storage (ensures directory exists, resets if needed)
     storage.initializeStorage();
 
@@ -246,6 +312,11 @@ app.whenReady().then(async () => {
     }
 
     if (shouldStartApp) {
+        // Request macOS permissions before showing main window
+        if (process.platform === 'darwin') {
+            await requestMacPermissions();
+        }
+        
         createMainWindow();
         
         // Initialize IPC Gateway (Phase-3 refactoring)

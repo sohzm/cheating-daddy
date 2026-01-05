@@ -5,7 +5,7 @@
  * This is a proper migration, not a delegation, because the original function
  * had inline dependencies that are now passed as parameters.
  *
- * Channels (9 total):
+ * Channels (12 total):
  * - get-app-version (handle) - Get application version
  * - quit-application (handle) - Quit the application
  * - restart-application (handle) - Restart the application
@@ -15,9 +15,13 @@
  * - open-update-window (handle) - Open update dialog
  * - check-permission (handle) - Check macOS permission
  * - request-permission (handle) - Request macOS permission
+ * - check-macos-version (handle) - Check macOS version and audio support
+ * - get-macos-system-info (handle) - Get detailed macOS system info
+ * - retry-permission-check (handle) - Retry permission check with delay
  */
 
-const { ipcMain, app, shell, systemPreferences, BrowserWindow } = require('electron');
+const { ipcMain, app, shell, systemPreferences, BrowserWindow, desktopCapturer } = require('electron');
+const macOS = require('../../../utils/core/macOS');
 
 /**
  * Register application IPC handlers
@@ -150,29 +154,81 @@ function registerApplicationHandlers({ mainWindow, createUpdateWindow, stopMacOS
         }
     });
 
-    // ============ REQUEST PERMISSION (macOS) ============
-    ipcMain.handle('request-permission', async (event, type) => {
+    // ============ CHECK MIC PERMISSION (macOS) ============
+    // Quick check for microphone permission - same pattern as InterviewCoder
+    // Returns boolean for simpler usage in renderer
+    ipcMain.handle('check-mic-permission', async () => {
         // On non-macOS platforms, always return true
         if (process.platform !== 'darwin') {
             return true;
         }
         try {
-            // Note: askForMediaAccess only works for 'microphone' and 'camera'
-            // Screen recording permission must be granted manually in System Preferences
-            if (type === 'microphone' || type === 'camera') {
-                return await systemPreferences.askForMediaAccess(type);
+            return systemPreferences.getMediaAccessStatus('microphone') === 'granted';
+        } catch (error) {
+            console.error('Error checking mic permission:', error);
+            return false;
+        }
+    });
+
+    // ============ REQUEST PERMISSION (macOS) ============
+    // Pattern from InterviewCoder: check status first, only prompt if 'not-determined'
+    // For screen permission, use desktopCapturer.getSources() to trigger the system prompt
+    ipcMain.handle('request-permission', async (event, type) => {
+        console.log(`[ApplicationHandler] request-permission called for: ${type}`);
+        
+        // On non-macOS platforms, always return true
+        if (process.platform !== 'darwin') {
+            console.log('[ApplicationHandler] Not macOS, returning true');
+            return true;
+        }
+        
+        try {
+            // For screen permission, use desktopCapturer.getSources() to trigger prompt
+            // This is the same pattern InterviewCoder uses
+            if (type === 'screen') {
+                try {
+                    console.log('[ApplicationHandler] Triggering screen permission via desktopCapturer...');
+                    await desktopCapturer.getSources({ types: ['screen'] });
+                    console.log('[ApplicationHandler] Screen permission check completed');
+                    return true;
+                } catch (error) {
+                    console.error('[ApplicationHandler] Screen permission denied:', error);
+                    return false;
+                }
             }
-            // For screen, we can only check - not request
+            
+            // For microphone and camera, check status first then request
+            if (type === 'microphone' || type === 'camera') {
+                const currentStatus = systemPreferences.getMediaAccessStatus(type);
+                console.log(`[ApplicationHandler] Current ${type} status: ${currentStatus}`);
+                
+                // Only prompt if 'not-determined' - this is key!
+                // If already denied, the system won't show a dialog
+                if (currentStatus === 'not-determined') {
+                    console.log(`[ApplicationHandler] ${type} not determined, requesting access...`);
+                    const result = await systemPreferences.askForMediaAccess(type);
+                    console.log(`[ApplicationHandler] askForMediaAccess result: ${result}`);
+                    return result;
+                }
+                
+                // Return true if already granted, false otherwise
+                return currentStatus === 'granted';
+            }
+            
+            // For other types, just check status
             return systemPreferences.getMediaAccessStatus(type) === 'granted';
         } catch (error) {
-            console.error(`Error requesting ${type} permission:`, error);
+            console.error(`[ApplicationHandler] Error requesting ${type} permission:`, error);
             return false;
         }
     });
 
     // ============ OPEN SYSTEM PREFERENCES (macOS) ============
     ipcMain.handle('open-system-preferences', async (event, pane) => {
+        console.log(`[ApplicationHandler] open-system-preferences called for: ${pane}`);
+        
         if (process.platform !== 'darwin') {
+            console.log('[ApplicationHandler] Not macOS, returning error');
             return { success: false, error: 'Only available on macOS' };
         }
 
@@ -187,10 +243,12 @@ function registerApplicationHandlers({ mainWindow, createUpdateWindow, stopMacOS
             };
 
             const url = paneUrls[pane] || paneUrls.security;
+            console.log(`[ApplicationHandler] Opening URL: ${url}`);
             await shell.openExternal(url);
+            console.log('[ApplicationHandler] Successfully opened System Preferences');
             return { success: true };
         } catch (error) {
-            console.error(`Error opening System Preferences:`, error);
+            console.error(`[ApplicationHandler] Error opening System Preferences:`, error);
             return { success: false, error: error.message };
         }
     });
@@ -225,7 +283,62 @@ function registerApplicationHandlers({ mainWindow, createUpdateWindow, stopMacOS
         }
     });
 
-    console.log('[ApplicationHandler] Registered 11 application IPC handlers');
+    // ============ CHECK MACOS VERSION (macOS) ============
+    ipcMain.handle('check-macos-version', async () => {
+        console.log('[ApplicationHandler] check-macos-version called');
+        
+        const support = macOS.checkAudioSupport();
+        const statusMessage = macOS.getVersionStatusMessage();
+        
+        console.log('[ApplicationHandler] macOS audio support:', support);
+        
+        return {
+            ...support,
+            ...statusMessage,
+            platform: process.platform,
+        };
+    });
+
+    // ============ GET MACOS SYSTEM INFO (macOS) ============
+    ipcMain.handle('get-macos-system-info', async () => {
+        console.log('[ApplicationHandler] get-macos-system-info called');
+        return macOS.getSystemInfo();
+    });
+
+    // ============ RETRY PERMISSION CHECK (macOS) ============
+    // Useful after user grants permission in System Settings
+    ipcMain.handle('retry-permission-check', async (event, { type, maxRetries = 3, delayMs = 1000 }) => {
+        console.log(`[ApplicationHandler] retry-permission-check for ${type} (max: ${maxRetries}, delay: ${delayMs}ms)`);
+        
+        if (process.platform !== 'darwin') {
+            return { status: 'granted', retries: 0 };
+        }
+
+        let lastStatus = 'unknown';
+        
+        for (let i = 0; i < maxRetries; i++) {
+            try {
+                lastStatus = systemPreferences.getMediaAccessStatus(type);
+                console.log(`[ApplicationHandler] Retry ${i + 1}/${maxRetries}: ${type} status = ${lastStatus}`);
+                
+                if (lastStatus === 'granted') {
+                    return { status: 'granted', retries: i };
+                }
+                
+                // Wait before next retry
+                if (i < maxRetries - 1) {
+                    await new Promise(resolve => setTimeout(resolve, delayMs));
+                }
+            } catch (error) {
+                console.error(`[ApplicationHandler] Error checking ${type}:`, error);
+                lastStatus = 'error';
+            }
+        }
+        
+        return { status: lastStatus, retries: maxRetries };
+    });
+
+    console.log('[ApplicationHandler] Registered 12 application IPC handlers');
 }
 
 module.exports = { registerApplicationHandlers };

@@ -11,6 +11,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { getPaidStatus } = require('../storage');
 
 // Rate limits per provider/model (December 2025)
 const LIMITS = {
@@ -258,6 +259,11 @@ function checkAndResetIfNeeded(provider, model) {
 // Check if a model can be used (under threshold)
 function canUseModel(provider, model) {
     checkAndResetIfNeeded(provider, model);
+
+    // If provider has billing enabled, bypass limit checks
+    if (getPaidStatus(provider)) {
+        return true;
+    }
 
     const usage = getUsage(provider, model);
     const modelLimits = LIMITS[provider]?.[model];

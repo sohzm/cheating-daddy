@@ -141,6 +141,13 @@ const ALLOWED_CHANNELS = {
         description: 'Set specific provider API key',
         rateLimit: { maxCalls: 5, windowMs: 60000 },
     },
+    'storage:set-paid-status': {
+        direction: 'invoke',
+        subsystem: 'storage',
+        payloadValidation: ['string', 'boolean'],
+        sensitivity: 'medium',
+        description: 'Set paid (billing enabled) status for a provider',
+    },
 
     // Usage stats
     'storage:get-usage-stats': {
@@ -512,6 +519,13 @@ const ALLOWED_CHANNELS = {
         sensitivity: 'low',
         description: 'Check if permission granted',
     },
+    'check-mic-permission': {
+        direction: 'invoke',
+        subsystem: 'application',
+        payloadValidation: 'none',
+        sensitivity: 'low',
+        description: 'Quick check if microphone permission is granted (returns boolean)',
+    },
     'request-permission': {
         direction: 'invoke',
         subsystem: 'application',
@@ -532,6 +546,27 @@ const ALLOWED_CHANNELS = {
         payloadValidation: 'none',
         sensitivity: 'low',
         description: 'Get all macOS permission statuses at once',
+    },
+    'check-macos-version': {
+        direction: 'invoke',
+        subsystem: 'application',
+        payloadValidation: 'none',
+        sensitivity: 'low',
+        description: 'Check macOS version and audio capture support',
+    },
+    'get-macos-system-info': {
+        direction: 'invoke',
+        subsystem: 'application',
+        payloadValidation: 'none',
+        sensitivity: 'low',
+        description: 'Get detailed macOS system information for debugging',
+    },
+    'retry-permission-check': {
+        direction: 'invoke',
+        subsystem: 'application',
+        payloadValidation: 'object',
+        sensitivity: 'low',
+        description: 'Retry permission check with configurable retries and delay',
     },
 
     // ========================================================================

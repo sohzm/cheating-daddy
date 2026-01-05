@@ -747,6 +747,8 @@ export class CustomizeView extends LitElement {
         showGroqKey: { type: Boolean },
         geminiKeyStatus: { type: String },
         groqKeyStatus: { type: String },
+        geminiPaid: { type: Boolean },
+        groqPaid: { type: Boolean },
         // Model preferences
         modelPrefs: { type: Object },
         // Usage stats
@@ -767,11 +769,11 @@ export class CustomizeView extends LitElement {
         this.selectedImageQuality = 'medium';
         this.layoutMode = 'normal';
         this.keybinds = this.getDefaultKeybinds();
-        this.onProfileChange = () => {};
-        this.onLanguageChange = () => {};
-        this.onImageQualityChange = () => {};
-        this.onLayoutModeChange = () => {};
-        this.onResponseViewModeChange = () => {};
+        this.onProfileChange = () => { };
+        this.onLanguageChange = () => { };
+        this.onImageQualityChange = () => { };
+        this.onLayoutModeChange = () => { };
+        this.onResponseViewModeChange = () => { };
 
         // Google Search default
         this.googleSearchEnabled = true;
@@ -830,6 +832,8 @@ export class CustomizeView extends LitElement {
         this.showGroqKey = false;
         this.geminiKeyStatus = 'notset';
         this.groqKeyStatus = 'notset';
+        this.geminiPaid = false;
+        this.groqPaid = false;
 
         // Model preferences state
         this.modelPrefs = {};
@@ -1089,6 +1093,10 @@ export class CustomizeView extends LitElement {
             this.geminiApiKey = credentials?.gemini || credentials?.apiKey || '';
             this.groqApiKey = credentials?.groq || '';
 
+            // Load paid status
+            this.geminiPaid = credentials?.geminiPaid || false;
+            this.groqPaid = credentials?.groqPaid || false;
+
             // Set status based on presence only - don't validate on every load to save tokens
             // Validation only happens when user enters/changes a key
             this.geminiKeyStatus = this.geminiApiKey ? 'valid' : 'notset';
@@ -1208,6 +1216,17 @@ export class CustomizeView extends LitElement {
                 await cheatingDaddy.storage.setApiKey('', 'groq'); // Clear it
             }
         }
+        this.requestUpdate();
+    }
+
+    // Paid status toggle handler
+    async handlePaidToggle(provider, isPaid) {
+        if (provider === 'gemini') {
+            this.geminiPaid = isPaid;
+        } else if (provider === 'groq') {
+            this.groqPaid = isPaid;
+        }
+        await cheatingDaddy.storage.setPaidStatus(provider, isPaid);
         this.requestUpdate();
     }
 
@@ -1909,9 +1928,9 @@ export class CustomizeView extends LitElement {
                     <button
                         class="reset-keybinds-button"
                         @click=${() => {
-                            this.isEditingProfile = false;
-                            this.requestUpdate();
-                        }}
+                this.isEditingProfile = false;
+                this.requestUpdate();
+            }}
                     >
                         &larr; Back
                     </button>
@@ -1938,9 +1957,9 @@ export class CustomizeView extends LitElement {
                             <stealth-select
                                 .value=${this.editingProfileTemplates?.persona || 'interview'}
                                 .options=${[
-                                    ...Object.entries(PROMPTS.PERSONAS).map(([key, p]) => ({ value: key, label: p.name })),
-                                    { value: 'custom', label: 'Custom (Edited)' }
-                                ]}
+                ...Object.entries(PROMPTS.PERSONAS).map(([key, p]) => ({ value: key, label: p.name })),
+                { value: 'custom', label: 'Custom (Edited)' }
+            ]}
                                 @change=${e => this.updateComponentTemplate('persona', e.detail.value)}
                             ></stealth-select>
                         </div>
@@ -1950,32 +1969,32 @@ export class CustomizeView extends LitElement {
                                 Advanced: Edit Prompt Instructions
                             </summary>
                             ${renderTextArea(
-                                'Intro Instruction',
-                                this.editingProfileData.settings.persona.intro,
-                                e => {
-                                    this.updateComponentProperty('persona', 'intro', e.target.value);
-                                    this.editingProfileTemplates.persona = 'custom';
-                                },
-                                'Who is the AI?'
-                            )}
+                'Intro Instruction',
+                this.editingProfileData.settings.persona.intro,
+                e => {
+                    this.updateComponentProperty('persona', 'intro', e.target.value);
+                    this.editingProfileTemplates.persona = 'custom';
+                },
+                'Who is the AI?'
+            )}
                             ${renderTextArea(
-                                'Context Instruction',
-                                this.editingProfileData.settings.persona.contextInstruction,
-                                e => {
-                                    this.updateComponentProperty('persona', 'contextInstruction', e.target.value);
-                                    this.editingProfileTemplates.persona = 'custom';
-                                },
-                                'How should user context be used?'
-                            )}
+                'Context Instruction',
+                this.editingProfileData.settings.persona.contextInstruction,
+                e => {
+                    this.updateComponentProperty('persona', 'contextInstruction', e.target.value);
+                    this.editingProfileTemplates.persona = 'custom';
+                },
+                'How should user context be used?'
+            )}
                             ${renderTextArea(
-                                'Search Rules',
-                                this.editingProfileData.settings.persona.searchFocus,
-                                e => {
-                                    this.updateComponentProperty('persona', 'searchFocus', e.target.value);
-                                    this.editingProfileTemplates.persona = 'custom';
-                                },
-                                'When should it search?'
-                            )}
+                'Search Rules',
+                this.editingProfileData.settings.persona.searchFocus,
+                e => {
+                    this.updateComponentProperty('persona', 'searchFocus', e.target.value);
+                    this.editingProfileTemplates.persona = 'custom';
+                },
+                'When should it search?'
+            )}
                         </details>
                     </div>
 
@@ -1988,9 +2007,9 @@ export class CustomizeView extends LitElement {
                             <stealth-select
                                 .value=${this.editingProfileTemplates?.length || 'concise'}
                                 .options=${[
-                                    ...Object.entries(PROMPTS.LENGTHS).map(([key, l]) => ({ value: key, label: l.name })),
-                                    { value: 'custom', label: 'Custom (Edited)' }
-                                ]}
+                ...Object.entries(PROMPTS.LENGTHS).map(([key, l]) => ({ value: key, label: l.name })),
+                { value: 'custom', label: 'Custom (Edited)' }
+            ]}
                                 @change=${e => this.updateComponentTemplate('length', e.detail.value)}
                             ></stealth-select>
                         </div>
@@ -2000,14 +2019,14 @@ export class CustomizeView extends LitElement {
                                 Advanced: Edit Length Rules
                             </summary>
                             ${renderTextArea(
-                                'Length Instruction',
-                                this.editingProfileData.settings.length.instruction,
-                                e => {
-                                    this.updateComponentProperty('length', 'instruction', e.target.value);
-                                    this.editingProfileTemplates.length = 'custom';
-                                },
-                                'How long should responses be?'
-                            )}
+                'Length Instruction',
+                this.editingProfileData.settings.length.instruction,
+                e => {
+                    this.updateComponentProperty('length', 'instruction', e.target.value);
+                    this.editingProfileTemplates.length = 'custom';
+                },
+                'How long should responses be?'
+            )}
                         </details>
                     </div>
 
@@ -2020,9 +2039,9 @@ export class CustomizeView extends LitElement {
                             <stealth-select
                                 .value=${this.editingProfileTemplates?.format || 'teleprompter'}
                                 .options=${[
-                                    ...Object.entries(PROMPTS.FORMATS).map(([key, f]) => ({ value: key, label: f.name })),
-                                    { value: 'custom', label: 'Custom (Edited)' }
-                                ]}
+                ...Object.entries(PROMPTS.FORMATS).map(([key, f]) => ({ value: key, label: f.name })),
+                { value: 'custom', label: 'Custom (Edited)' }
+            ]}
                                 @change=${e => this.updateComponentTemplate('format', e.detail.value)}
                             ></stealth-select>
                         </div>
@@ -2032,14 +2051,14 @@ export class CustomizeView extends LitElement {
                                 Advanced: Edit Formatting Rules
                             </summary>
                             ${renderTextArea(
-                                'Format Instruction',
-                                this.editingProfileData.settings.format.instruction,
-                                e => {
-                                    this.updateComponentProperty('format', 'instruction', e.target.value);
-                                    this.editingProfileTemplates.format = 'custom';
-                                },
-                                'How should text be styled?'
-                            )}
+                'Format Instruction',
+                this.editingProfileData.settings.format.instruction,
+                e => {
+                    this.updateComponentProperty('format', 'instruction', e.target.value);
+                    this.editingProfileTemplates.format = 'custom';
+                },
+                'How should text be styled?'
+            )}
                         </details>
                     </div>
 
@@ -2087,7 +2106,7 @@ export class CustomizeView extends LitElement {
                             <button class="reset-keybinds-button" @click=${this.handleCreateProfile} title="Create New Profile">+</button>
 
                             ${isCustomProfile
-                                ? html`
+                ? html`
                                       <button
                                           class="reset-keybinds-button"
                                           @click=${() => this.handleEditProfile(currentProfile)}
@@ -2104,12 +2123,12 @@ export class CustomizeView extends LitElement {
                                           X
                                       </button>
                                   `
-                                : ''}
+                : ''}
                         </div>
                     </div>
 
                     ${!isCustomProfile
-                        ? html`
+                ? html`
                               <div class="form-group">
                                   <div class="checkbox-group">
                                       <input
@@ -2126,7 +2145,7 @@ export class CustomizeView extends LitElement {
                                   </div>
                               </div>
                           `
-                        : ''}
+                : ''}
 
                     <div class="form-group">
                         <div class="checkbox-group">
@@ -2148,12 +2167,12 @@ export class CustomizeView extends LitElement {
                                     style="width: 150px;"
                                     .value=${String(this.conversationContextCount)}
                                     .options=${[
-                                        { value: '1', label: 'Last 1 Q&A' },
-                                        { value: '2', label: 'Last 2 Q&A' },
-                                        { value: '3', label: 'Last 3 Q&A' },
-                                        { value: '4', label: 'Last 4 Q&A' },
-                                        { value: '5', label: 'Last 5 Q&A' }
-                                    ]}
+                    { value: '1', label: 'Last 1 Q&A' },
+                    { value: '2', label: 'Last 2 Q&A' },
+                    { value: '3', label: 'Last 3 Q&A' },
+                    { value: '4', label: 'Last 4 Q&A' },
+                    { value: '5', label: 'Last 5 Q&A' }
+                ]}
                                     @change=${e => this.handleConversationContextCountChange({ target: { value: e.detail.value } })}
                                 ></stealth-select>
                             </div>
@@ -2190,10 +2209,10 @@ export class CustomizeView extends LitElement {
                     <stealth-select
                         .value=${this.audioMode}
                         .options=${[
-                            { value: 'mic_only', label: 'Microphone Only' },
-                            { value: 'both', label: 'Mic & Speaker (System)' },
-                            { value: 'speaker_only', label: 'Speaker Only' }
-                        ]}
+                { value: 'mic_only', label: 'Microphone Only' },
+                { value: 'both', label: 'Mic & Speaker (System)' },
+                { value: 'speaker_only', label: 'Speaker Only' }
+            ]}
                         @change=${e => this.handleAudioModeSelect({ target: { value: e.detail.value } })}
                     ></stealth-select>
                 </div>
@@ -2252,9 +2271,9 @@ export class CustomizeView extends LitElement {
                     <stealth-select
                         .value=${this.layoutMode}
                         .options=${[
-                            { value: 'normal', label: 'Normal' },
-                            { value: 'compact', label: 'Compact' }
-                        ]}
+                { value: 'normal', label: 'Normal' },
+                { value: 'compact', label: 'Compact' }
+            ]}
                         @change=${e => this.handleLayoutModeSelect({ target: { value: e.detail.value } })}
                     ></stealth-select>
                     <div class="form-description">
@@ -2268,15 +2287,15 @@ export class CustomizeView extends LitElement {
                     <stealth-select
                         .value=${this.responseViewMode}
                         .options=${[
-                            { value: 'paged', label: 'Paged (One at a time)' },
-                            { value: 'continuous', label: 'Continuous (Scrollable list)' }
-                        ]}
+                { value: 'paged', label: 'Paged (One at a time)' },
+                { value: 'continuous', label: 'Continuous (Scrollable list)' }
+            ]}
                         @change=${e => this.handleResponseViewModeSelect({ target: { value: e.detail.value } })}
                     ></stealth-select>
                 </div>
 
                 ${this.responseViewMode === 'continuous'
-                    ? html`
+                ? html`
                           <div class="form-group" style="padding-left: 12px; border-left: 2px solid var(--border-color);">
                               <div class="checkbox-group">
                                   <input
@@ -2291,7 +2310,7 @@ export class CustomizeView extends LitElement {
                               <div class="form-description">Automatically scroll to the bottom when a new response arrives</div>
                           </div>
                       `
-                    : ''}
+                : ''}
 
                 <div class="form-group">
                     <div class="checkbox-group">
@@ -2368,18 +2387,18 @@ export class CustomizeView extends LitElement {
                     <stealth-select
                         .value=${this.selectedImageQuality}
                         .options=${[
-                            { value: 'high', label: 'High Quality' },
-                            { value: 'medium', label: 'Medium Quality' },
-                            { value: 'low', label: 'Low Quality' }
-                        ]}
+                { value: 'high', label: 'High Quality' },
+                { value: 'medium', label: 'Medium Quality' },
+                { value: 'low', label: 'Low Quality' }
+            ]}
                         @change=${e => this.handleImageQualitySelect({ target: { value: e.detail.value } })}
                     ></stealth-select>
                     <div class="form-description">
                         ${this.selectedImageQuality === 'high'
-                            ? 'Best quality, uses more tokens'
-                            : this.selectedImageQuality === 'medium'
-                              ? 'Balanced quality and token usage'
-                              : 'Lower quality, uses fewer tokens'}
+                ? 'Best quality, uses more tokens'
+                : this.selectedImageQuality === 'medium'
+                    ? 'Balanced quality and token usage'
+                    : 'Lower quality, uses fewer tokens'}
                     </div>
                 </div>
             </div>
@@ -2399,7 +2418,7 @@ export class CustomizeView extends LitElement {
                     </thead>
                     <tbody>
                         ${this.getKeybindActions().map(
-                            action => html`
+            action => html`
                                 <tr>
                                     <td>
                                         <div class="action-name">${action.name}</div>
@@ -2419,7 +2438,7 @@ export class CustomizeView extends LitElement {
                                     </td>
                                 </tr>
                             `
-                        )}
+        )}
                         <tr class="table-reset-row">
                             <td colspan="2">
                                 <button class="reset-keybinds-button" @click=${this.resetKeybinds}>Reset to Defaults</button>
@@ -2492,22 +2511,32 @@ export class CustomizeView extends LitElement {
                         <button
                             class="toggle-btn"
                             @click=${() => {
-                                this.showGeminiKey = !this.showGeminiKey;
-                                this.requestUpdate();
-                            }}
+                this.showGeminiKey = !this.showGeminiKey;
+                this.requestUpdate();
+            }}
                         >
                             ${this.showGeminiKey ? 'Hide' : 'Show'}
                         </button>
                     </div>
                     <div class="status-indicator ${this.geminiKeyStatus}">
                         ${this.geminiKeyStatus === 'valid'
-                            ? 'Connected'
-                            : this.geminiKeyStatus === 'invalid'
-                              ? 'Invalid key'
-                              : this.geminiKeyStatus === 'checking'
-                                ? 'Checking...'
-                                : 'Not set'}
+                ? 'Connected'
+                : this.geminiKeyStatus === 'invalid'
+                    ? 'Invalid key'
+                    : this.geminiKeyStatus === 'checking'
+                        ? 'Checking...'
+                        : 'Not set'}
                     </div>
+                    <label style="display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 12px; cursor: pointer;">
+                        <input
+                            type="checkbox"
+                            .checked=${this.geminiPaid}
+                            @change=${e => this.handlePaidToggle('gemini', e.target.checked)}
+                            style="accent-color: var(--accent-primary);"
+                        />
+                        Billing Enabled
+                        <span style="opacity: 0.6; font-size: 11px;">(bypasses rate limits)</span>
+                    </label>
                 </div>
 
                 <div class="form-group">
@@ -2528,22 +2557,32 @@ export class CustomizeView extends LitElement {
                         <button
                             class="toggle-btn"
                             @click=${() => {
-                                this.showGroqKey = !this.showGroqKey;
-                                this.requestUpdate();
-                            }}
+                this.showGroqKey = !this.showGroqKey;
+                this.requestUpdate();
+            }}
                         >
                             ${this.showGroqKey ? 'Hide' : 'Show'}
                         </button>
                     </div>
                     <div class="status-indicator ${this.groqKeyStatus}">
                         ${this.groqKeyStatus === 'valid'
-                            ? 'Connected'
-                            : this.groqKeyStatus === 'invalid'
-                              ? 'Invalid key'
-                              : this.groqKeyStatus === 'checking'
-                                ? 'Checking...'
-                                : 'Not set'}
+                ? 'Connected'
+                : this.groqKeyStatus === 'invalid'
+                    ? 'Invalid key'
+                    : this.groqKeyStatus === 'checking'
+                        ? 'Checking...'
+                        : 'Not set'}
                     </div>
+                    <label style="display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 12px; cursor: pointer;">
+                        <input
+                            type="checkbox"
+                            .checked=${this.groqPaid}
+                            @change=${e => this.handlePaidToggle('groq', e.target.checked)}
+                            style="accent-color: var(--accent-primary);"
+                        />
+                        Billing Enabled
+                        <span style="opacity: 0.6; font-size: 11px;">(bypasses rate limits)</span>
+                    </label>
                 </div>
 
                 <div class="form-description" style="margin-top: 12px; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 8px;">
@@ -2611,17 +2650,17 @@ export class CustomizeView extends LitElement {
                 </div>
 
                 ${this.audioProcessingMode === 'audio-to-text'
-                    ? html`
+                ? html`
                           <div class="form-group">
                               <label class="form-label">Audio Model</label>
                               <stealth-select
                                   .value=${(this.modelPrefs?.audioToText?.primaryProvider || 'groq') +
-                                  ':' +
-                                  (this.modelPrefs?.audioToText?.primaryModel || 'meta-llama/llama-4-maverick-17b-128e-instruct')}
+                    ':' +
+                    (this.modelPrefs?.audioToText?.primaryModel || 'meta-llama/llama-4-maverick-17b-128e-instruct')}
                                   .options=${[
-                                      { value: 'groq:meta-llama/llama-4-maverick-17b-128e-instruct', label: 'Llama 4 Maverick' },
-                                      { value: 'groq:meta-llama/llama-4-scout-17b-16e-instruct', label: 'Llama 4 Scout' }
-                                  ]}
+                        { value: 'groq:meta-llama/llama-4-maverick-17b-128e-instruct', label: 'Llama 4 Maverick' },
+                        { value: 'groq:meta-llama/llama-4-scout-17b-16e-instruct', label: 'Llama 4 Scout' }
+                    ]}
                                   @change=${e => this.handleModelChange('audioToText', 'primary', e.detail.value)}
                               ></stealth-select>
                           </div>
@@ -2631,21 +2670,21 @@ export class CustomizeView extends LitElement {
                               <stealth-select
                                   .value=${this.audioTriggerMethod}
                                   .options=${[
-                                      { value: 'vad', label: 'Auto (Voice Activity)' },
-                                      { value: 'manual', label: 'Manual Trigger' }
-                                  ]}
+                        { value: 'vad', label: 'Auto (Voice Activity)' },
+                        { value: 'manual', label: 'Manual Trigger' }
+                    ]}
                                   @change=${e => this.handleAudioTriggerChange({ target: { value: e.detail.value } })}
                               ></stealth-select>
                               ${this.audioTriggerMethod === 'manual'
-                                  ? html`
+                        ? html`
                                         <div class="form-description" style="margin-top: 5px; color: var(--accent-color);">
                                             <strong>Shortcut:</strong> ${this.keybinds.manualTrigger} (Toggle Rec/Stop)
                                         </div>
                                     `
-                                  : ''}
+                        : ''}
                           </div>
                       `
-                    : html`
+                : html`
                           <div class="form-group">
                               <label class="form-label">Live Audio</label>
                               <div class="form-description">Real-time conversation mode</div>
@@ -2673,10 +2712,10 @@ export class CustomizeView extends LitElement {
                                 style="flex: 1;"
                                 .value=${this.modelPrefs?.textMessage?.primaryProvider + ':' + this.modelPrefs?.textMessage?.primaryModel}
                                 .options=${textModels.filter(m => m.value !== 'none').map(m => ({
-                                    value: m.value,
-                                    label: m.label + (m.recommended ? ' (Rec)' : ''),
-                                    recommended: m.recommended
-                                }))}
+                    value: m.value,
+                    label: m.label + (m.recommended ? ' (Rec)' : ''),
+                    recommended: m.recommended
+                }))}
                                 @change=${e => this.handleModelChange('textMessage', 'primary', e.detail.value)}
                             ></stealth-select>
                         </div>
@@ -2702,10 +2741,10 @@ export class CustomizeView extends LitElement {
                                 style="flex: 1;"
                                 .value=${this.modelPrefs?.screenAnalysis?.primaryProvider + ':' + this.modelPrefs?.screenAnalysis?.primaryModel}
                                 .options=${visionModels.filter(m => m.value !== 'none').map(m => ({
-                                    value: m.value,
-                                    label: m.label + (m.recommended ? ' (Rec)' : ''),
-                                    recommended: m.recommended
-                                }))}
+                    value: m.value,
+                    label: m.label + (m.recommended ? ' (Rec)' : ''),
+                    recommended: m.recommended
+                }))}
                                 @change=${e => this.handleModelChange('screenAnalysis', 'primary', e.detail.value)}
                             ></stealth-select>
                         </div>
@@ -2736,7 +2775,7 @@ export class CustomizeView extends LitElement {
                     <label class="form-label">GROQ</label>
                     <div class="usage-container">
                         ${(this.usageStats?.groq || []).map(
-                            stat => html`
+            stat => html`
                                 <div class="usage-row">
                                     <span class="usage-model">${stat.model.split('/').pop()}</span>
                                     <div class="usage-bar">
@@ -2748,7 +2787,7 @@ export class CustomizeView extends LitElement {
                                     <span class="usage-count">${stat.count}/${stat.limit === Infinity ? 'Unlim' : stat.limit}</span>
                                 </div>
                             `
-                        )}
+        )}
                     </div>
                 </div>
 
@@ -2756,19 +2795,19 @@ export class CustomizeView extends LitElement {
                     <label class="form-label">GEMINI</label>
                     <div class="usage-container">
                         ${(this.usageStats?.gemini || []).map(
-                            stat => html`
+            stat => html`
                                 <div class="usage-row">
                                     <span class="usage-model">${stat.model.replace('gemini-', '')}</span>
                                     <div class="usage-bar">
                                         ${stat.limit === Infinity
-                                            ? html` <span style="font-size: 11px; opacity: 0.7;">Unlimited</span> `
-                                            : html`
+                    ? html` <span style="font-size: 11px; opacity: 0.7;">Unlimited</span> `
+                    : html`
                                                   <div
                                                       class="usage-bar-fill ${stat.percentage >= 90
-                                                          ? 'red'
-                                                          : stat.percentage >= 50
-                                                            ? 'yellow'
-                                                            : 'green'}"
+                            ? 'red'
+                            : stat.percentage >= 50
+                                ? 'yellow'
+                                : 'green'}"
                                                       style="width: ${Math.min(stat.percentage, 100)}%"
                                                   ></div>
                                               `}
@@ -2776,7 +2815,7 @@ export class CustomizeView extends LitElement {
                                     <span class="usage-count">${stat.limit === Infinity ? 'Unlim' : `${stat.count}/${stat.limit}`}</span>
                                 </div>
                             `
-                        )}
+        )}
                     </div>
                 </div>
 
@@ -2803,12 +2842,12 @@ export class CustomizeView extends LitElement {
                         ${this.isClearing ? 'Clearing...' : 'Clear All Local Data'}
                     </button>
                     ${this.clearStatusMessage
-                        ? html`
+                ? html`
                               <div class="status-message ${this.clearStatusType === 'success' ? 'status-success' : 'status-error'}">
                                   ${this.clearStatusMessage}
                               </div>
                           `
-                        : ''}
+                : ''}
                 </div>
             </div>
         `;
@@ -2847,18 +2886,18 @@ export class CustomizeView extends LitElement {
                     </button>
 
                     ${this.updateCheckMessage
-                        ? html`
+                ? html`
                               <div
                                   class="status-message ${this.updateCheckStatus === 'success'
-                                      ? 'status-success'
-                                      : this.updateCheckStatus === 'error'
-                                        ? 'status-error'
-                                        : 'status-success'}"
+                        ? 'status-success'
+                        : this.updateCheckStatus === 'error'
+                            ? 'status-error'
+                            : 'status-success'}"
                               >
                                   ${this.updateCheckMessage}
                               </div>
                           `
-                        : ''}
+                : ''}
                 </div>
 
                 <div class="form-description" style="margin-top: 24px; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 8px;">
@@ -2999,7 +3038,7 @@ export class CustomizeView extends LitElement {
             <div class="settings-layout">
                 <nav class="settings-sidebar">
                     ${sections.map(
-                        section => html`
+            section => html`
                             <button
                                 class="sidebar-item ${this.activeSection === section.id ? 'active' : ''} ${section.danger ? 'danger' : ''}"
                                 @click=${() => this.setActiveSection(section.id)}
@@ -3008,7 +3047,7 @@ export class CustomizeView extends LitElement {
                                 <span>${section.name}</span>
                             </button>
                         `
-                    )}
+        )}
                 </nav>
                 <div class="settings-content">${this.renderSectionContent()}</div>
             </div>

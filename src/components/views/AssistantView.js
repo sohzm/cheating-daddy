@@ -73,6 +73,24 @@ export class AssistantView extends LitElement {
             /* Highlight active item if needed, currently subtle */
         }
 
+        /* Subtle error message styling */
+        .error-message {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--text-muted);
+            font-style: italic;
+            opacity: 0.7;
+            padding: 8px 0;
+        }
+
+        .error-message::before {
+            content: '⚠';
+            font-size: 10px;
+            opacity: 0.6;
+        }
+
         /* Word display (no animation) */
         .response-container [data-word] {
             display: inline-block;
@@ -531,7 +549,7 @@ export class AssistantView extends LitElement {
         this.responses = [];
         this.currentResponseIndex = -1;
         this.selectedProfile = 'interview';
-        this.onSendText = () => {};
+        this.onSendText = () => { };
         this.flashCount = 0;
         this.flashLiteCount = 0;
         this.usageStats = { groq: [], gemini: [] };
@@ -540,7 +558,7 @@ export class AssistantView extends LitElement {
         this._userScrolledUp = false;
         this.isEngineReady = false;
         this.engineStatus = 'Initializing...';
-        
+
         // Start engine initialization check
         this._initializeEngine();
     }
@@ -552,7 +570,7 @@ export class AssistantView extends LitElement {
             let ipcReady = false;
             let attempts = 0;
             const maxAttempts = 20; // 10 seconds max
-            
+
             while (!ipcReady && attempts < maxAttempts) {
                 try {
                     if (window.electronAPI?.storage?.getPreferences) {
@@ -567,21 +585,21 @@ export class AssistantView extends LitElement {
                     attempts++;
                 }
             }
-            
+
             if (!ipcReady) {
                 this.engineStatus = 'Backend connection failed';
                 await new Promise(resolve => setTimeout(resolve, 1000));
                 this.isEngineReady = true;
                 return;
             }
-            
+
             // Step 2: Check for API credentials (existence only, no validation to save tokens)
             this.engineStatus = 'Checking API keys...';
             const credentialsResult = await window.electronAPI.storage.getCredentials();
             const credentials = credentialsResult?.data || credentialsResult || {};
             const geminiKey = credentials?.gemini || credentials?.apiKey || '';
             const groqKey = credentials?.groq || '';
-            
+
             if (!geminiKey && !groqKey) {
                 this.engineStatus = 'No API keys configured';
                 console.log('[Engine] No API keys found - user needs to configure in settings');
@@ -589,23 +607,23 @@ export class AssistantView extends LitElement {
                 this.isEngineReady = true;
                 return;
             }
-            
+
             // Step 3: Engine ready (keys exist, skip validation to save tokens)
             const providers = [];
             if (geminiKey) providers.push('Gemini');
             if (groqKey) providers.push('Groq');
-            
+
             this.engineStatus = 'Engine ready!';
             console.log(`[Engine] Ready with providers: ${providers.join(', ')}`);
-            
+
             await new Promise(resolve => setTimeout(resolve, 600));
-            
+
         } catch (error) {
             console.error('[Engine] Initialization error:', error);
             this.engineStatus = 'Initialization error';
             await new Promise(resolve => setTimeout(resolve, 1000));
         }
-        
+
         this.isEngineReady = true;
     }
 
@@ -630,6 +648,13 @@ export class AssistantView extends LitElement {
     renderMarkdown(content) {
         // Handle object responses (with metadata)
         const text = typeof content === 'object' && content !== null ? content.text : content;
+
+        // Check if this is an error message - render it subtly
+        if (text && (text.startsWith('Error:') || text.startsWith('Error '))) {
+            // Extract just the error message, make it subtle
+            const errorText = text.replace(/^Error:?\s*/i, '').trim();
+            return `<div class="error-message">${errorText}</div>`;
+        }
 
         // Check if marked is available
         if (typeof window !== 'undefined' && window.marked) {
@@ -953,10 +978,10 @@ export class AssistantView extends LitElement {
                 <div class="sidebar-header">Response Navigator</div>
                 <div class="sidebar-content">
                     ${this.responses.map((response, index) => {
-                        const question = typeof response === 'object' && response?.question ? response.question : '';
-                        const previewText = question || '(No question)';
+            const question = typeof response === 'object' && response?.question ? response.question : '';
+            const previewText = question || '(No question)';
 
-                        return html`
+            return html`
                             <div
                                 class="sidebar-item ${index === this.currentResponseIndex ? 'active' : ''}"
                                 @click=${() => this.scrollToResponse(index)}
@@ -968,7 +993,7 @@ export class AssistantView extends LitElement {
                                 <div class="sidebar-item-preview" title="${previewText}">${previewText}</div>
                             </div>
                         `;
-                    })}
+        })}
                 </div>
             </div>
         `;
@@ -999,14 +1024,13 @@ export class AssistantView extends LitElement {
                 ` : ''}
                 <div class="content-area">
                     <div class="response-container" id="responseContainer" @scroll=${this.handleScroll}>
-                        ${
-                            this.viewMode === 'continuous'
-                                ? html`
+                        ${this.viewMode === 'continuous'
+                ? html`
                                       <div class="response-list">
                                           ${this.responses.length === 0
-                                              ? html`<div class="response-item" .innerHTML=${this.renderMarkdown(placeholder)}></div>`
-                                              : this.responses.map(
-                                                    (response, index) => html`
+                        ? html`<div class="response-item" .innerHTML=${this.renderMarkdown(placeholder)}></div>`
+                        : this.responses.map(
+                            (response, index) => html`
                                                         ${index > 0 ? html`<div class="response-checkpoint">Response ${index + 1}</div>` : ''}
                                                         <div
                                                             class="response-item ${index === this.currentResponseIndex ? 'active-item' : ''}"
@@ -1015,11 +1039,11 @@ export class AssistantView extends LitElement {
                                                             <div .innerHTML=${this.renderMarkdown(response)}></div>
                                                         </div>
                                                     `
-                                                )}
+                        )}
                                       </div>
                                   `
-                                : '' // Empty for paged mode, content injected via updateResponseContent
-                        }
+                : '' // Empty for paged mode, content injected via updateResponseContent
+            }
                     </div>
 
                     <div class="text-input-container">

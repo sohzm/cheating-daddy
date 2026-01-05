@@ -1,0 +1,92 @@
+name: Build audiotee Binary
+
+on:
+  workflow_dispatch:  # Manual trigger
+  push:
+    paths:
+      - '.github/workflows/build-audiotee.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build-macos:
+    runs-on: macos-14  # macOS Sonoma with Apple Silicon
+    
+    steps:
+      - name: Checkout main repository
+        uses: actions/checkout@v4
+        with:
+          path: main-repo
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Checkout audiotee
+        uses: actions/checkout@v4
+        with:
+          repository: makeusabrew/audiotee
+          path: audiotee
+      
+      - name: Setup Swift
+        run: |
+          swift --version
+          
+      - name: Build audiotee (Release)
+        working-directory: audiotee
+        run: |
+          swift build -c release
+          
+      - name: Create Universal Binary (arm64 + x86_64)
+        working-directory: audiotee
+        run: |
+          # Build for Intel
+          swift build -c release --arch x86_64
+          
+          # Build for Apple Silicon  
+          swift build -c release --arch arm64
+          
+          # Create universal binary
+          mkdir -p dist
+          lipo -create \
+            .build/arm64-apple-macosx/release/audiotee \
+            .build/x86_64-apple-macosx/release/audiotee \
+            -output dist/audiotee
+          
+          # Verify universal binary
+          file dist/audiotee
+          lipo -info dist/audiotee
+      
+      - name: Copy binary to src/assets
+        run: |
+          cp audiotee/dist/audiotee main-repo/src/assets/audiotee
+          chmod +x main-repo/src/assets/audiotee
+          ls -la main-repo/src/assets/audiotee
+          file main-repo/src/assets/audiotee
+          
+      - name: Commit and push audiotee binary
+        working-directory: main-repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add src/assets/audiotee
+          # Only commit if there are changes
+          if git diff --staged --quiet; then
+            echo "No changes to audiotee binary"
+          else
+            git commit -m "chore: update audiotee binary (universal arm64+x86_64)"
+            git push
+            echo "✅ audiotee binary committed and pushed!"
+          fi
+          
+      - name: Upload audiotee binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: audiotee-universal
+          path: audiotee/dist/audiotee
+          retention-days: 90
+          
+      - name: Show binary info
+        run: |
+          ls -la audiotee/dist/
+          file audiotee/dist/audiotee
+          echo "SHA256:"
+          shasum -a 256 audiotee/dist/audiotee

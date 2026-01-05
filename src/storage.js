@@ -90,7 +90,9 @@ const DEFAULT_CONFIG = {
 const DEFAULT_CREDENTIALS = {
     apiKey: '',  // Legacy - kept for backwards compatibility
     gemini: '',  // Gemini API key
-    groq: ''     // Groq API key
+    groq: '',    // Groq API key
+    geminiPaid: false,  // Whether Gemini key has billing enabled
+    groqPaid: false     // Whether Groq key has billing enabled
 };
 
 const DEFAULT_PREFERENCES = {
@@ -449,7 +451,9 @@ function getCredentials() {
         return {
             apiKey: decryptString(encrypted.apiKey || ''),
             gemini: decryptString(encrypted.gemini || ''),
-            groq: decryptString(encrypted.groq || '')
+            groq: decryptString(encrypted.groq || ''),
+            geminiPaid: encrypted.geminiPaid || false,
+            groqPaid: encrypted.groqPaid || false
         };
     }
 
@@ -488,11 +492,13 @@ function setCredentials(credentials) {
     const current = _readCredentialsRaw();
     const merged = { ...current, ...credentials };
 
-    // Encrypt each credential
+    // Encrypt each credential (paid status is not encrypted, just boolean)
     const encrypted = {
         apiKey: encryptString(merged.apiKey || ''),
         gemini: encryptString(merged.gemini || ''),
-        groq: encryptString(merged.groq || '')
+        groq: encryptString(merged.groq || ''),
+        geminiPaid: merged.geminiPaid || false,
+        groqPaid: merged.groqPaid || false
     };
 
     return writeJsonFile(getEncryptedCredentialsPath(), encrypted);
@@ -517,6 +523,27 @@ function setApiKey(apiKey, provider = null) {
     }
     // Legacy
     return setCredentials({ apiKey, gemini: apiKey });
+}
+
+// Get paid status for a provider
+function getPaidStatus(provider) {
+    const creds = getCredentials();
+    if (provider === 'groq') {
+        return creds.groqPaid || false;
+    } else if (provider === 'gemini') {
+        return creds.geminiPaid || false;
+    }
+    return false;
+}
+
+// Set paid status for a provider
+function setPaidStatus(provider, isPaid) {
+    if (provider === 'groq') {
+        return setCredentials({ groqPaid: isPaid });
+    } else if (provider === 'gemini') {
+        return setCredentials({ geminiPaid: isPaid });
+    }
+    return false;
 }
 
 // ============ PREFERENCES ============
@@ -807,6 +834,8 @@ module.exports = {
     setCredentials,
     getApiKey,
     setApiKey,
+    getPaidStatus,
+    setPaidStatus,
 
     // Preferences
     getPreferences,

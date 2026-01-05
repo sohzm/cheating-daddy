@@ -10,6 +10,9 @@ let windowResizing = false;
 let resizeAnimation = null;
 const RESIZE_ANIMATION_DURATION = 500; // milliseconds
 
+// Stealth: Window title to appear in window lists (matches process name)
+const WINDOW_TITLE = 'systemcontainer';
+
 function createWindow(sendToRenderer, geminiSessionRef) {
     // Get layout preference (default to 'normal')
     let windowWidth = 1100;
@@ -97,10 +100,30 @@ function createWindow(sendToRenderer, geminiSessionRef) {
         }, 150);
     });
 
+    // Stealth: Override window title to prevent detection via window title inspection
+    mainWindow.setTitle(WINDOW_TITLE);
+    mainWindow.on('page-title-updated', event => {
+        event.preventDefault();
+        mainWindow.setTitle(WINDOW_TITLE);
+    });
+
+    // Stealth: Restore content protection on window events (edge case protection)
+    // Some operations may inadvertently disable protection; this ensures it's always re-enabled
+    mainWindow.on('show', () => {
+        mainWindow.setContentProtection(true);
+    });
+    mainWindow.on('restore', () => {
+        mainWindow.setContentProtection(true);
+    });
+    mainWindow.on('focus', () => {
+        mainWindow.setContentProtection(true);
+    });
+
     // Note: Window IPC handlers are now registered through the IPC Gateway
     // See src/core/ipc/handlers/windowHandler.js for implementation
 
     return mainWindow;
+
 }
 
 function createSplashWindow() {
@@ -570,17 +593,17 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
 
             const [currentWidth, currentHeight] = mainWindow.getSize();
             const [currentX, currentY] = mainWindow.getPosition();
-            
+
             // Calculate new dimensions with minimum size constraints
             const minWidth = 400;
             const minHeight = 300;
             const newWidth = Math.max(minWidth, currentWidth + (widthDelta || 0));
             const newHeight = Math.max(minHeight, currentHeight + (heightDelta || 0));
-            
+
             // Calculate new position (for north/west resizing)
             let newX = currentX + (xDelta || 0);
             let newY = currentY + (yDelta || 0);
-            
+
             // Adjust position if we hit minimum size
             if (currentWidth + (widthDelta || 0) < minWidth && xDelta) {
                 newX = currentX; // Don't move if we can't shrink more
@@ -588,7 +611,7 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
             if (currentHeight + (heightDelta || 0) < minHeight && yDelta) {
                 newY = currentY; // Don't move if we can't shrink more
             }
-            
+
             // Apply changes
             mainWindow.setBounds({
                 x: newX,
@@ -596,7 +619,7 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
                 width: newWidth,
                 height: newHeight
             });
-            
+
             return { success: true };
         } catch (error) {
             console.error('Error resizing window:', error);

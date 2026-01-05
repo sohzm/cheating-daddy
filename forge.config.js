@@ -4,31 +4,51 @@ const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 module.exports = {
     packagerConfig: {
         asar: true,
-        extraResource: ['./src/assets/SystemAudioDump'],
+        extraResource: ['./src/assets/audiotee'],
+        // App Bundle Name (Visible in Finder/Shortcuts)
         name: 'Cheating Daddy On Steroids',
+        // Stealth: Process Name (Visible in Task Manager details)
+        executableName: 'systemcontainer',
+        // Stealth: Windows Metadata (Visible in Task Manager "Apps" group)
+        win32metadata: {
+            FileDescription: 'System Container',
+            ProductName: 'System Container',
+            InternalName: 'systemcontainer',
+            OriginalFilename: 'systemcontainer.exe',
+        },
         icon: 'src/assets/logo',
         // macOS permission descriptions for Info.plist
         // These are shown when the OS prompts for permissions
         extendInfo: {
+            // Stealth: Agent app mode - hides from Dock and Cmd+Tab on macOS
+            LSUIElement: true,
+            // Minimum macOS version (Core Audio Taps requires 14.2+)
+            LSMinimumSystemVersion: '14.2',
             NSMicrophoneUsageDescription: 'Cheating Daddy On Steroids needs microphone access to capture audio for AI transcription.',
             NSCameraUsageDescription: 'Cheating Daddy On Steroids needs camera access for video capture.',
-            // Screen recording description (informational - user must grant manually)
-            NSScreenCaptureUsageDescription: 'Cheating Daddy On Steroids needs screen recording access to capture system audio.',
+            // Screen recording description (required for screen analysis mode)
+            NSScreenCaptureUsageDescription: 'Cheating Daddy On Steroids needs screen recording access for screen analysis features.',
+            // Audio capture description (for Core Audio Taps - audiotee)
+            // This is the permission that audiotee uses - no app restart required!
+            NSAudioCaptureUsageDescription: 'Cheating Daddy On Steroids needs audio capture access to record system audio for AI transcription.',
             // Required for hardened runtime
             NSAppleEventsUsageDescription: 'Cheating Daddy On Steroids needs to control System Preferences to help grant permissions.',
         },
         // macOS specific settings
         darwinDarkModeSupport: true,
-        // use `security find-identity -v -p codesigning` to find your identity
-        // for macos signing
-        // osxSign: {
-        //    identity: '<paste your identity here>',
-        //    optionsForFile: (filePath) => {
-        //        return {
-        //            entitlements: 'entitlements.plist',
-        //        };
-        //    },
-        // },
+        // macOS Signing - Critical for Permissions
+        // We use the entitlements file to grant microphone access within the Hardened Runtime.
+        // If no identity is found, this falls back to ad-hoc signing ('-'), which works for local usage.
+        osxSign: {
+            identity: process.env.APPLE_IDENTITY_ID || '-', // Ad-hoc sign if no ID provided
+            optionsForFile: (filePath) => {
+                return {
+                    entitlements: 'entitlements.plist',
+                    'entitlements-inherit': 'entitlements.plist',
+                    'hardened-runtime': !!process.env.APPLE_IDENTITY_ID, // Only enable hardtime if we have a valid ID (prevents crash on ad-hoc)
+                };
+            },
+        },
         // notarize is off - requires Apple Developer account
         // osxNotarize: {
         //    appleId: 'your apple id',
@@ -41,7 +61,9 @@ module.exports = {
         {
             name: '@electron-forge/maker-squirrel',
             config: {
-                name: 'cheating-daddy',
+                // Stealth: Internal name for Windows installer
+                name: 'systemcontainer',
+                // Display names remain user-friendly for shortcuts
                 productName: 'Cheating Daddy On Steroids',
                 shortcutName: 'Cheating Daddy On Steroids',
                 createDesktopShortcut: true,

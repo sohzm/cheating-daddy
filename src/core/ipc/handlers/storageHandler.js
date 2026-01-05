@@ -63,6 +63,8 @@ function registerStorageHandlers(storage, rateLimitManager) {
     const clearAllData = isStorageManager ? () => storage.emergency.clearAll() : () => storage.clearAllData();
     const checkFirstRunOrUpgrade = isStorageManager ? v => storage.initialization.checkFirstRunOrUpgrade(v) : v => storage.checkFirstRunOrUpgrade(v);
     const markVersionSeen = isStorageManager ? v => storage.initialization.markVersionSeen(v) : v => storage.markVersionSeen(v);
+    const setPaidStatus = isStorageManager ? (p, paid) => storage.paidStatus.set(p, paid) : (p, paid) => storage.setPaidStatus(p, paid);
+
     // ============ CONFIG ============
     ipcMain.handle('storage:get-config', async () => {
         try {
@@ -133,6 +135,16 @@ function registerStorageHandlers(storage, rateLimitManager) {
             return { success: true };
         } catch (error) {
             console.error('[StorageHandler] Error setting API key:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('storage:set-paid-status', async (event, provider, isPaid) => {
+        try {
+            setPaidStatus(provider, isPaid);
+            return { success: true };
+        } catch (error) {
+            console.error('[StorageHandler] Error setting paid status:', error);
             return { success: false, error: error.message };
         }
     });
