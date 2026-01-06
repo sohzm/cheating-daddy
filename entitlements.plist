@@ -16,9 +16,7 @@
     <true/>
     <key>com.apple.security.device.microphone</key>
     <true/>
-    <!-- Camera permission (for future use) -->
-    <key>com.apple.security.device.camera</key>
-    <true/>
+
     <!-- Network permissions -->
     <key>com.apple.security.network.client</key>
     <true/>

@@ -25,7 +25,6 @@ module.exports = {
             // Minimum macOS version (Core Audio Taps requires 14.2+)
             LSMinimumSystemVersion: '14.2',
             NSMicrophoneUsageDescription: 'Cheating Daddy On Steroids needs microphone access to capture audio for AI transcription.',
-            NSCameraUsageDescription: 'Cheating Daddy On Steroids needs camera access for video capture.',
             // Screen recording description (required for screen analysis mode)
             NSScreenCaptureUsageDescription: 'Cheating Daddy On Steroids needs screen recording access for screen analysis features.',
             // Audio capture description (for Core Audio Taps - audiotee)

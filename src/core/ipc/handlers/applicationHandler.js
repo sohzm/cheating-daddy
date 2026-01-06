@@ -175,13 +175,13 @@ function registerApplicationHandlers({ mainWindow, createUpdateWindow, stopMacOS
     // For screen permission, use desktopCapturer.getSources() to trigger the system prompt
     ipcMain.handle('request-permission', async (event, type) => {
         console.log(`[ApplicationHandler] request-permission called for: ${type}`);
-        
+
         // On non-macOS platforms, always return true
         if (process.platform !== 'darwin') {
             console.log('[ApplicationHandler] Not macOS, returning true');
             return true;
         }
-        
+
         try {
             // For screen permission, use desktopCapturer.getSources() to trigger prompt
             // This is the same pattern InterviewCoder uses
@@ -196,12 +196,12 @@ function registerApplicationHandlers({ mainWindow, createUpdateWindow, stopMacOS
                     return false;
                 }
             }
-            
-            // For microphone and camera, check status first then request
-            if (type === 'microphone' || type === 'camera') {
+
+            // For microphone, check status first then request
+            if (type === 'microphone') {
                 const currentStatus = systemPreferences.getMediaAccessStatus(type);
                 console.log(`[ApplicationHandler] Current ${type} status: ${currentStatus}`);
-                
+
                 // Only prompt if 'not-determined' - this is key!
                 // If already denied, the system won't show a dialog
                 if (currentStatus === 'not-determined') {
@@ -210,11 +210,11 @@ function registerApplicationHandlers({ mainWindow, createUpdateWindow, stopMacOS
                     console.log(`[ApplicationHandler] askForMediaAccess result: ${result}`);
                     return result;
                 }
-                
+
                 // Return true if already granted, false otherwise
                 return currentStatus === 'granted';
             }
-            
+
             // For other types, just check status
             return systemPreferences.getMediaAccessStatus(type) === 'granted';
         } catch (error) {
@@ -226,7 +226,7 @@ function registerApplicationHandlers({ mainWindow, createUpdateWindow, stopMacOS
     // ============ OPEN SYSTEM PREFERENCES (macOS) ============
     ipcMain.handle('open-system-preferences', async (event, pane) => {
         console.log(`[ApplicationHandler] open-system-preferences called for: ${pane}`);
-        
+
         if (process.platform !== 'darwin') {
             console.log('[ApplicationHandler] Not macOS, returning error');
             return { success: false, error: 'Only available on macOS' };
@@ -238,7 +238,6 @@ function registerApplicationHandlers({ mainWindow, createUpdateWindow, stopMacOS
                 microphone: 'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone',
                 screen: 'x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture',
                 accessibility: 'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility',
-                camera: 'x-apple.systempreferences:com.apple.preference.security?Privacy_Camera',
                 security: 'x-apple.systempreferences:com.apple.preference.security',
             };
 
@@ -259,7 +258,6 @@ function registerApplicationHandlers({ mainWindow, createUpdateWindow, stopMacOS
             return {
                 microphone: 'granted',
                 screen: 'granted',
-                camera: 'granted',
                 isMac: false,
             };
         }
@@ -268,7 +266,6 @@ function registerApplicationHandlers({ mainWindow, createUpdateWindow, stopMacOS
             return {
                 microphone: systemPreferences.getMediaAccessStatus('microphone'),
                 screen: systemPreferences.getMediaAccessStatus('screen'),
-                camera: systemPreferences.getMediaAccessStatus('camera'),
                 isMac: true,
             };
         } catch (error) {
@@ -276,7 +273,6 @@ function registerApplicationHandlers({ mainWindow, createUpdateWindow, stopMacOS
             return {
                 microphone: 'unknown',
                 screen: 'unknown',
-                camera: 'unknown',
                 isMac: true,
                 error: error.message,
             };
@@ -286,12 +282,12 @@ function registerApplicationHandlers({ mainWindow, createUpdateWindow, stopMacOS
     // ============ CHECK MACOS VERSION (macOS) ============
     ipcMain.handle('check-macos-version', async () => {
         console.log('[ApplicationHandler] check-macos-version called');
-        
+
         const support = macOS.checkAudioSupport();
         const statusMessage = macOS.getVersionStatusMessage();
-        
+
         console.log('[ApplicationHandler] macOS audio support:', support);
-        
+
         return {
             ...support,
             ...statusMessage,
@@ -309,22 +305,22 @@ function registerApplicationHandlers({ mainWindow, createUpdateWindow, stopMacOS
     // Useful after user grants permission in System Settings
     ipcMain.handle('retry-permission-check', async (event, { type, maxRetries = 3, delayMs = 1000 }) => {
         console.log(`[ApplicationHandler] retry-permission-check for ${type} (max: ${maxRetries}, delay: ${delayMs}ms)`);
-        
+
         if (process.platform !== 'darwin') {
             return { status: 'granted', retries: 0 };
         }
 
         let lastStatus = 'unknown';
-        
+
         for (let i = 0; i < maxRetries; i++) {
             try {
                 lastStatus = systemPreferences.getMediaAccessStatus(type);
                 console.log(`[ApplicationHandler] Retry ${i + 1}/${maxRetries}: ${type} status = ${lastStatus}`);
-                
+
                 if (lastStatus === 'granted') {
                     return { status: 'granted', retries: i };
                 }
-                
+
                 // Wait before next retry
                 if (i < maxRetries - 1) {
                     await new Promise(resolve => setTimeout(resolve, delayMs));
@@ -334,7 +330,7 @@ function registerApplicationHandlers({ mainWindow, createUpdateWindow, stopMacOS
                 lastStatus = 'error';
             }
         }
-        
+
         return { status: lastStatus, retries: maxRetries };
     });
 

@@ -80,6 +80,39 @@
 
 ---
 
+## 🍎 macOS Installation (Important!)
+
+> **Note:** This app is not signed with an Apple Developer ID. macOS will block it by default. Follow these steps to install:
+
+### Step 1: Remove Quarantine Block
+
+After downloading and copying to Applications, open **Terminal** and run:
+
+```bash
+sudo xattr -dr com.apple.quarantine "/Applications/Cheating Daddy On Steroids.app"
+```
+
+Then right-click the app → **Open** → Click **Open** in the dialog.
+
+### Step 2: Grant Permissions
+
+The app will guide you through granting permissions. If permissions get stuck:
+
+| Issue | Terminal Command |
+|-------|------------------|
+| Microphone not working | `tccutil reset Microphone` |
+| Screen recording stuck | `tccutil reset ScreenCapture` |
+| Audio capture failing | Restart the app after granting permissions |
+
+### Step 3: Restart if Needed
+
+If microphone permission was denied initially, you'll need to:
+1. Open **System Settings → Privacy & Security → Microphone**
+2. Enable the app
+3. Fully quit and restart the app
+
+---
+
 ## 🛠️ Setup
 
 1. **Get API Keys**:

@@ -254,6 +254,74 @@ export class MacPermissionsSetup extends LitElement {
             color: var(--text-color, #e0e0e0);
             font-family: monospace;
         }
+
+        .troubleshoot-section {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border-color, #3a3a3a);
+        }
+
+        .troubleshoot-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-color, #e0e0e0);
+            margin-bottom: 8px;
+        }
+
+        .troubleshoot-desc {
+            font-size: 11px;
+            color: var(--text-muted, #888);
+            margin-bottom: 12px;
+            line-height: 1.4;
+        }
+
+        .command-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .command-label {
+            font-size: 11px;
+            color: var(--text-secondary, #aaa);
+            min-width: 100px;
+        }
+
+        .command-code {
+            flex: 1;
+            background: var(--bg-tertiary, #252525);
+            border: 1px solid var(--border-color, #3a3a3a);
+            padding: 6px 10px;
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 10px;
+            color: var(--text-color, #e0e0e0);
+            overflow-x: auto;
+            white-space: nowrap;
+            user-select: text;
+            cursor: text;
+        }
+
+        .copy-button {
+            padding: 4px 8px;
+            background: transparent;
+            border: 1px solid var(--border-color, #3a3a3a);
+            color: var(--text-secondary, #aaa);
+            font-size: 10px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .copy-button:hover {
+            background: var(--hover-background, #333);
+            color: var(--text-color, #e0e0e0);
+        }
+
+        .copy-button.copied {
+            background: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+            border-color: rgba(34, 197, 94, 0.3);
+        }
     `;
 
     static properties = {
@@ -261,6 +329,7 @@ export class MacPermissionsSetup extends LitElement {
         versionInfo: { type: Object },
         loading: { type: Boolean },
         checking: { type: Boolean },
+        copiedCommand: { type: String },
     };
 
     constructor() {
@@ -269,6 +338,21 @@ export class MacPermissionsSetup extends LitElement {
         this.versionInfo = null;
         this.loading = true;
         this.checking = false;
+        this.copiedCommand = null;
+    }
+
+    async copyCommand(command, label) {
+        try {
+            await navigator.clipboard.writeText(command);
+            this.copiedCommand = label;
+            this.requestUpdate();
+            setTimeout(() => {
+                this.copiedCommand = null;
+                this.requestUpdate();
+            }, 2000);
+        } catch (error) {
+            console.error('[MacPermissions] Failed to copy command:', error);
+        }
     }
 
     connectedCallback() {
@@ -311,14 +395,14 @@ export class MacPermissionsSetup extends LitElement {
             console.log('[MacPermissions] Requesting microphone access...');
             const result = await window.electronAPI.permissions.request('microphone');
             console.log('[MacPermissions] Microphone request result:', result);
-            
+
             // If permission was previously denied, the system won't show a dialog
             // We need to direct users to System Preferences
             if (!result) {
                 // Check if it's denied (not just not-determined)
                 const status = await window.electronAPI.permissions.check('microphone');
                 console.log('[MacPermissions] Microphone status after request:', status);
-                
+
                 if (status === 'denied') {
                     // Permission was denied before - can't re-prompt, must go to settings
                     const confirmed = confirm(
@@ -334,7 +418,7 @@ export class MacPermissionsSetup extends LitElement {
                     }
                 }
             }
-            
+
             // Wait a moment for OS to update, then refresh
             setTimeout(() => this.checkPermissions(), 500);
         } catch (error) {
@@ -348,7 +432,7 @@ export class MacPermissionsSetup extends LitElement {
             console.log('[MacPermissions] Opening System Settings:', pane);
             const result = await window.electronAPI.permissions.openSystemPreferences(pane);
             console.log('[MacPermissions] Open settings result:', result);
-            
+
             if (!result?.success) {
                 console.error('[MacPermissions] Failed to open settings:', result?.error);
                 alert(`Could not open System Settings automatically.\n\nPlease open manually:\nSystem Settings → Privacy & Security → ${pane === 'screen' ? 'Screen Recording' : 'Microphone'}`);
@@ -365,24 +449,24 @@ export class MacPermissionsSetup extends LitElement {
     async startRetryCheck(type) {
         // Wait for user to potentially grant permission
         this.checking = true;
-        
+
         // Retry checking for up to 30 seconds (every 2 seconds)
         const maxRetries = 15;
         const delayMs = 2000;
-        
+
         for (let i = 0; i < maxRetries; i++) {
             await new Promise(resolve => setTimeout(resolve, delayMs));
             await this.checkPermissions();
-            
+
             const status = this.permissions?.[type];
             console.log(`[MacPermissions] Retry ${i + 1}/${maxRetries}: ${type} = ${status}`);
-            
+
             if (status === 'granted') {
                 this.checking = false;
                 return;
             }
         }
-        
+
         this.checking = false;
     }
 
@@ -402,7 +486,7 @@ export class MacPermissionsSetup extends LitElement {
         }
 
         const { severity, title, message } = this.versionInfo;
-        
+
         return html`
             <div class="version-banner ${severity}">
                 <strong>${title}</strong><br>
@@ -444,15 +528,15 @@ export class MacPermissionsSetup extends LitElement {
 
                 ${this.renderVersionBanner()}
 
-                ${versionUnsupported 
-                    ? html`
+                ${versionUnsupported
+                ? html`
                         <div class="restart-note">
                             ⚠️ <strong>Audio capture is not available</strong> on this macOS version. 
                             Please update to macOS 14.2 (Sonoma) or later to use system audio features.
                         </div>
                     `
-                    : allGranted 
-                        ? html`
+                : allGranted
+                    ? html`
                             <div class="all-granted">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
@@ -460,7 +544,7 @@ export class MacPermissionsSetup extends LitElement {
                                 All permissions granted! Audio capture is ready.
                             </div>
                         `
-                        : html`
+                    : html`
                             <!-- Microphone Permission -->
                             <div class="permission-row">
                                 <div class="permission-info">
@@ -469,19 +553,19 @@ export class MacPermissionsSetup extends LitElement {
                                 </div>
                                 <div class="permission-status">
                                     ${this.getStatusBadge(this.permissions.microphone)}
-                                    ${this.permissions.microphone === 'denied' 
-                                        ? html`
+                                    ${this.permissions.microphone === 'denied'
+                            ? html`
                                             <button class="grant-button open-settings" @click=${() => this.openSettings('microphone')} ?disabled=${this.checking}>
                                                 ${this.checking ? 'Checking...' : 'Open Settings'}
                                             </button>
-                                        ` 
-                                        : this.permissions.microphone !== 'granted'
-                                            ? html`
+                                        `
+                            : this.permissions.microphone !== 'granted'
+                                ? html`
                                                 <button class="grant-button request" @click=${this.requestMicrophone}>
                                                     Grant Access
                                                 </button>
-                                            ` 
-                                            : ''}
+                                            `
+                                : ''}
                                 </div>
                             </div>
 
@@ -504,23 +588,23 @@ export class MacPermissionsSetup extends LitElement {
                                 </div>
                                 <div class="permission-status">
                                     ${this.getStatusBadge(this.permissions.screen)}
-                                    ${this.permissions.screen !== 'granted' 
-                                        ? html`
+                                    ${this.permissions.screen !== 'granted'
+                            ? html`
                                             <button class="grant-button open-settings" @click=${() => this.openSettings('screen')} ?disabled=${this.checking}>
                                                 ${this.checking ? 'Checking...' : 'Open Settings'}
                                             </button>
-                                        ` 
-                                        : ''}
+                                        `
+                            : ''}
                                 </div>
                             </div>
                             
                             ${this.permissions.microphone === 'denied'
-                                ? html`
+                            ? html`
                                     <div class="restart-note">
                                         ⚠️ After enabling microphone in System Settings, <strong>restart the app</strong> for changes to take effect.
                                     </div>
-                                ` 
-                                : ''}
+                                `
+                            : ''}
                         `}
 
                 <button class="refresh-button" @click=${() => this.checkAll()}>
@@ -535,6 +619,47 @@ export class MacPermissionsSetup extends LitElement {
                         </div>
                     </div>
                 ` : ''}
+
+                <!-- Troubleshooting Section -->
+                <div class="troubleshoot-section">
+                    <div class="troubleshoot-title">Terminal Commands</div>
+                    <div class="troubleshoot-desc">
+                        If the app won't open or permissions are stuck, run these in Terminal:
+                    </div>
+                    
+                    <div class="command-row">
+                        <span class="command-label">App blocked:</span>
+                        <code class="command-code">sudo xattr -dr com.apple.quarantine "/Applications/Cheating Daddy On Steroids.app"</code>
+                        <button 
+                            class="copy-button ${this.copiedCommand === 'quarantine' ? 'copied' : ''}"
+                            @click=${() => this.copyCommand('sudo xattr -dr com.apple.quarantine "/Applications/Cheating Daddy On Steroids.app"', 'quarantine')}
+                        >
+                            ${this.copiedCommand === 'quarantine' ? '✓' : 'Copy'}
+                        </button>
+                    </div>
+                    
+                    <div class="command-row">
+                        <span class="command-label">Reset mic:</span>
+                        <code class="command-code">tccutil reset Microphone</code>
+                        <button 
+                            class="copy-button ${this.copiedCommand === 'mic' ? 'copied' : ''}"
+                            @click=${() => this.copyCommand('tccutil reset Microphone', 'mic')}
+                        >
+                            ${this.copiedCommand === 'mic' ? '✓' : 'Copy'}
+                        </button>
+                    </div>
+                    
+                    <div class="command-row">
+                        <span class="command-label">Reset screen:</span>
+                        <code class="command-code">tccutil reset ScreenCapture</code>
+                        <button 
+                            class="copy-button ${this.copiedCommand === 'screen' ? 'copied' : ''}"
+                            @click=${() => this.copyCommand('tccutil reset ScreenCapture', 'screen')}
+                        >
+                            ${this.copiedCommand === 'screen' ? '✓' : 'Copy'}
+                        </button>
+                    </div>
+                </div>
             </div>
         `;
     }
