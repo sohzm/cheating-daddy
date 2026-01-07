@@ -359,19 +359,19 @@ const ALLOWED_CHANNELS = {
         description: 'Send text prompt to AI',
         maxPayloadSize: 100 * 1024, // 100KB
     },
-    'start-macos-audio': {
+    'start-audio-capture': {
         direction: 'invoke',
         subsystem: 'assistant',
         payloadValidation: 'none',
         sensitivity: 'medium',
-        description: 'Start macOS audio capture',
+        description: 'Start audio capture',
     },
-    'stop-macos-audio': {
+    'stop-audio-capture': {
         direction: 'invoke',
         subsystem: 'assistant',
         payloadValidation: 'none',
         sensitivity: 'low',
-        description: 'Stop macOS audio capture',
+        description: 'Stop audio capture',
     },
     'close-session': {
         direction: 'invoke',

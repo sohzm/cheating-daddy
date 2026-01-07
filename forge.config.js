@@ -4,6 +4,9 @@ const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 module.exports = {
     packagerConfig: {
         asar: true,
+        // Bundle ID for macOS - ensures no conflict with original Cheating Daddy
+        appBundleId: 'com.cheatingdaddy.onsteroids',
+
         extraResource: ['./src/assets/audiotee'],
         // App Bundle Name (Visible in Finder/Shortcuts)
         name: 'Cheating Daddy On Steroids',
@@ -35,19 +38,17 @@ module.exports = {
         },
         // macOS specific settings
         darwinDarkModeSupport: true,
-        // macOS Signing - Critical for Permissions
-        // We use the entitlements file to grant microphone access within the Hardened Runtime.
-        // If no identity is found, this falls back to ad-hoc signing ('-'), which works for local usage.
-        osxSign: {
-            identity: process.env.APPLE_IDENTITY_ID || '-', // Ad-hoc sign if no ID provided
-            optionsForFile: (filePath) => {
-                return {
-                    entitlements: 'entitlements.plist',
-                    'entitlements-inherit': 'entitlements.plist',
-                    'hardened-runtime': !!process.env.APPLE_IDENTITY_ID, // Only enable hardtime if we have a valid ID (prevents crash on ad-hoc)
-                };
-            },
-        },
+
+        // osxSign: {
+        //     identity: '-',
+        //     optionsForFile: (filePath) => {
+        //         return {
+        //             entitlements: 'entitlements.plist',
+        //             'entitlements-inherit': 'entitlements.plist',
+        //             'hardened-runtime': false,
+        //         };
+        //     },
+        // },
         // notarize is off - requires Apple Developer account
         // osxNotarize: {
         //    appleId: 'your apple id',

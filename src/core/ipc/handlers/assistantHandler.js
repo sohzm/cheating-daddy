@@ -4,7 +4,7 @@
  * Centralizes all assistant-related IPC channels (11 total):
  * - Session management (initialize-gemini, close-session, get-current-session, start-new-session)
  * - Content sending (send-audio-content, send-mic-audio-content, send-image-content, send-text-message)
- * - Audio control (start-macos-audio, stop-macos-audio)
+ * - Audio control (start-audio-capture, stop-audio-capture)
  * - Settings (update-google-search-setting)
  *
  * Architecture Note:
@@ -28,8 +28,8 @@
  * | send-mic-audio-content        | handle | Send mic audio for STT         |
  * | send-image-content            | handle | Send screenshot to AI          |
  * | send-text-message             | handle | Send text message to AI        |
- * | start-macos-audio             | handle | Start macOS system audio       |
- * | stop-macos-audio              | handle | Stop macOS system audio        |
+ * | start-audio-capture           | handle | Start system audio capture     |
+ * | stop-audio-capture            | handle | Stop system audio capture      |
  * | close-session                 | handle | Close Gemini session           |
  * | get-current-session           | handle | Get current session state      |
  * | start-new-session             | handle | Start fresh session            |

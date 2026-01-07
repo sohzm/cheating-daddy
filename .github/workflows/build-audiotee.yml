@@ -55,15 +55,7 @@ jobs:
           file dist/audiotee
           lipo -info dist/audiotee
       
-      - name: Ad-hoc sign audiotee binary
-        working-directory: audiotee
-        run: |
-          # Ad-hoc signing is required for Apple Silicon Macs
-          # This allows the binary to run without an Apple Developer ID
-          # Users will still need to remove quarantine attribute after download
-          codesign --force --deep -s - dist/audiotee
-          codesign -vv dist/audiotee
-          echo "✅ audiotee binary ad-hoc signed successfully"
+
       
       - name: Copy binary to src/assets
         run: |

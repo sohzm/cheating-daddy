@@ -317,7 +317,7 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
             console.log('Starting macOS capture with audiotee (Core Audio Taps)...');
 
             // Start macOS audio capture
-            const audioResult = await window.electronAPI.audio.startMacOSAudio();
+            const audioResult = await window.electronAPI.audio.startCapture();
             if (!audioResult.success) {
                 throw new Error('Failed to start macOS audio capture: ' + audioResult.error);
             }
@@ -784,7 +784,7 @@ function stopCapture() {
 
     // Stop macOS audio capture if running
     if (isMacOS) {
-        window.electronAPI.audio.stopMacOSAudio().catch(err => {
+        window.electronAPI.audio.stopCapture().catch(err => {
             console.error('Error stopping macOS audio:', err);
         });
     }

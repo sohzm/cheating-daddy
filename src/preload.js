@@ -98,8 +98,8 @@ const ALLOWED_INVOKE_CHANNELS = new Set([
     'send-mic-audio-content',
     'send-image-content',
     'send-text-message',
-    'start-macos-audio',
-    'stop-macos-audio',
+    'start-audio-capture',
+    'stop-audio-capture',
     'close-session',
     'get-current-session',
     'start-new-session',
@@ -271,8 +271,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     // ============ AUDIO APIs ============
     audio: {
-        startMacOSAudio: () => secureInvoke('start-macos-audio'),
-        stopMacOSAudio: () => secureInvoke('stop-macos-audio'),
+        startCapture: () => secureInvoke('start-audio-capture'),
+        stopCapture: () => secureInvoke('stop-audio-capture'),
         sendAudioContent: data => secureInvoke('send-audio-content', data),
         sendMicAudioContent: data => secureInvoke('send-mic-audio-content', data),
     },
