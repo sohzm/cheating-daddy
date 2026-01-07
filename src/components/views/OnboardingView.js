@@ -430,6 +430,16 @@ export class OnboardingView extends LitElement {
         if (this.contextText.trim()) {
             localStorage.setItem('customPrompt', this.contextText.trim());
         }
+
+        // Initialize VAD settings with defaults on first run
+        // This ensures VAD works immediately without needing to toggle settings
+        if (localStorage.getItem('vadEnabled') === null) {
+            localStorage.setItem('vadEnabled', 'true');
+        }
+        if (localStorage.getItem('vadMode') === null) {
+            localStorage.setItem('vadMode', 'automatic');
+        }
+
         localStorage.setItem('onboardingCompleted', 'true');
         this.onComplete();
     }

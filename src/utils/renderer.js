@@ -203,6 +203,16 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
     tokenTracker.reset();
     console.log('🎯 Token tracker reset for new capture session');
 
+    // Initialize VAD settings if not set (handles users who completed onboarding before this fix)
+    if (localStorage.getItem('vadEnabled') === null) {
+        localStorage.setItem('vadEnabled', 'true');
+        console.log('🔧 Initialized vadEnabled to true (first run)');
+    }
+    if (localStorage.getItem('vadMode') === null) {
+        localStorage.setItem('vadMode', 'automatic');
+        console.log('🔧 Initialized vadMode to automatic (first run)');
+    }
+
     // Enable microphone if in automatic VAD mode
     const vadEnabled = localStorage.getItem('vadEnabled') === 'true';
     const vadMode = localStorage.getItem('vadMode') || 'automatic';

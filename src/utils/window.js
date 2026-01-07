@@ -72,7 +72,16 @@ function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
     session.defaultSession.setDisplayMediaRequestHandler(
         (request, callback) => {
             desktopCapturer.getSources({ types: ['screen'] }).then(sources => {
-                callback({ video: sources[0], audio: 'loopback' });
+                if (sources && sources.length > 0) {
+                    callback({ video: sources[0], audio: 'loopback' });
+                } else {
+                    console.warn('No screen sources found for capture');
+                    callback({ video: null, audio: 'loopback' });
+                }
+            }).catch(error => {
+                console.error('Failed to get screen sources:', error.message);
+                // Still try to proceed with null video - let renderer handle the error gracefully
+                callback({ video: null, audio: 'loopback' });
             });
         },
         { useSystemPicker: true }
