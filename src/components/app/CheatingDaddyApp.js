@@ -126,7 +126,7 @@ export class CheatingDaddyApp extends LitElement {
         this.sessionActive = false;
         this.selectedProfile = localStorage.getItem('selectedProfile') || 'exam';
         this.selectedLanguage = localStorage.getItem('selectedLanguage') || 'en-US';
-        this.selectedScreenshotInterval = localStorage.getItem('selectedScreenshotInterval') || '5';
+        this.selectedScreenshotInterval = 'manual'; // Always manual to prevent rate limits
         this.selectedImageQuality = localStorage.getItem('selectedImageQuality') || 'high';
         this.layoutMode = localStorage.getItem('layoutMode') || 'compact';
         this.advancedMode = localStorage.getItem('advancedMode') === 'true';
@@ -310,13 +310,10 @@ export class CheatingDaddyApp extends LitElement {
             this.currentModel = selectedModel;
         }
 
-        // For coding/OA mode (exam-assistant), ALWAYS use manual mode to avoid rate limits
-        // For interview mode, use the user's selected interval
-        const screenshotMode = selectedMode === 'coding' ? 'manual' : this.selectedScreenshotInterval;
+        // Always use manual mode to prevent rate limits and token exhaustion
+        const screenshotMode = 'manual';
 
-        if (selectedMode === 'coding') {
-            console.log('💻 Coding/OA mode (Exam Assistant): Manual capture only - Press Ctrl+Enter to analyze screenshot');
-        }
+        console.log('📸 Manual capture mode: Press Ctrl+Enter to capture and analyze screenshot');
 
         cheddar.startCapture(screenshotMode, this.selectedImageQuality);
         this.responses = [];

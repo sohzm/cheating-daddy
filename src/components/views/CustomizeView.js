@@ -453,7 +453,7 @@ export class CustomizeView extends LitElement {
         super();
         this.selectedProfile = 'exam';
         this.selectedLanguage = 'en-US';
-        this.selectedScreenshotInterval = '5';
+        this.selectedScreenshotInterval = 'manual'; // Always manual to prevent rate limits
         this.selectedImageQuality = 'high';
         this.layoutMode = 'compact';
         this.keybinds = this.getDefaultKeybinds();
@@ -1352,36 +1352,7 @@ export class CustomizeView extends LitElement {
                     </div>
 
                     <div class="form-grid">
-                        ${this.selectedProfile !== 'exam' ? html`
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label class="form-label">
-                                        Capture Interval
-                                        <span class="current-selection"
-                                            >${this.selectedScreenshotInterval === 'manual' ? 'Manual' : this.selectedScreenshotInterval + 's'}</span
-                                        >
-                                    </label>
-                                    <custom-dropdown
-                                        .value=${this.selectedScreenshotInterval}
-                                        .options=${[
-                                            { value: 'manual', label: 'Manual (On demand)' },
-                                            { value: '1', label: 'Every 1 second' },
-                                            { value: '2', label: 'Every 2 seconds' },
-                                            { value: '5', label: 'Every 5 seconds' },
-                                            { value: '10', label: 'Every 10 seconds' }
-                                        ]}
-                                        @change=${e => this.handleScreenshotIntervalSelect({ target: { value: e.detail.value } })}
-                                    ></custom-dropdown>
-                                    <div class="form-description">
-                                        ${
-                                            this.selectedScreenshotInterval === 'manual'
-                                                ? 'Screenshots will only be taken when you use the "Ask Next Step" shortcut'
-                                                : 'Automatic screenshots will be taken at the specified interval'
-                                        }
-                                    </div>
-                                </div>
-                            </div>
-                        ` : ''}
+                        <!-- Capture Interval removed - always manual mode to prevent rate limits -->
 
                         <div class="form-row">
                             <div class="form-group">

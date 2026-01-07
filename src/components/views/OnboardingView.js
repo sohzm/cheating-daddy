@@ -440,6 +440,9 @@ export class OnboardingView extends LitElement {
             localStorage.setItem('vadMode', 'automatic');
         }
 
+        // Force manual screenshot mode to prevent rate limits
+        localStorage.setItem('selectedScreenshotInterval', 'manual');
+
         localStorage.setItem('onboardingCompleted', 'true');
         this.onComplete();
     }
