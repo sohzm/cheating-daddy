@@ -274,17 +274,6 @@ export class CheatingDaddyApp extends LitElement {
 
     // Main view event handlers
     async handleStart() {
-        // check if api key is empty do nothing
-        const apiKey = localStorage.getItem('apiKey')?.trim();
-        if (!apiKey || apiKey === '') {
-            // Trigger the red blink animation on the API key input
-            const mainView = this.shadowRoot.querySelector('main-view');
-            if (mainView && mainView.triggerApiKeyError) {
-                mainView.triggerApiKeyError();
-            }
-            return;
-        }
-
         // Auto-set mode based on profile
         let selectedMode;
         if (this.selectedProfile === 'exam') {
@@ -297,25 +286,92 @@ export class CheatingDaddyApp extends LitElement {
             localStorage.setItem('selectedMode', 'interview');
         }
 
-        // Get model from localStorage (only matters for coding mode)
-        const selectedModel = localStorage.getItem('selectedModel') || 'gemini-3-pro-preview';
+        // Get model from localStorage
+        const selectedModel = localStorage.getItem('selectedModel') || (selectedMode === 'coding' ? 'gemini-3-pro-preview' : 'gemini-2.0-flash-exp');
+        const isLlamaModel = selectedModel.startsWith('llama-');
 
-        await cheddar.initializeGemini(this.selectedProfile, this.selectedLanguage, selectedMode, selectedModel);
+        // Check for the correct API key based on model
+        let apiKey;
+        if (selectedMode === 'coding') {
+            // Exam mode always uses Gemini
+            apiKey = (localStorage.getItem('geminiApiKey') || localStorage.getItem('apiKey'))?.trim();
+        } else if (isLlamaModel) {
+            // Interview mode with Llama uses Groq
+            apiKey = localStorage.getItem('groqApiKey')?.trim();
+        } else {
+            // Interview mode with Gemini
+            apiKey = (localStorage.getItem('geminiApiKey') || localStorage.getItem('apiKey'))?.trim();
+        }
+
+        if (!apiKey || apiKey === '') {
+            // Trigger the red blink animation on the API key input
+            const mainView = this.shadowRoot.querySelector('main-view');
+            if (mainView && mainView.triggerApiKeyError) {
+                mainView.triggerApiKeyError();
+            }
+            return;
+        }
+
+        // Store the appropriate API key for the session
+        localStorage.setItem('apiKey', apiKey);
+
+        // Initialize the appropriate API based on mode and model
+        if (selectedMode === 'coding') {
+            // Exam mode: Use Gemini API
+            await cheddar.initializeGemini(this.selectedProfile, this.selectedLanguage, selectedMode, selectedModel);
+        } else if (isLlamaModel) {
+            // Interview mode with Llama: Use Groq API for STT + Llama for response generation
+            await cheddar.initializeGroq(apiKey);
+
+            // Set up Llama config with system prompt from prompts.js (same as Gemini)
+            if (window.require) {
+                const { ipcRenderer } = window.require('electron');
+
+                // Get custom prompt for this profile
+                const customPrompt = localStorage.getItem(`customPrompt_${this.selectedProfile}`) || '';
+
+                // Map model names to Groq model IDs
+                const groqModelMap = {
+                    'llama-4-maverick': 'meta-llama/llama-4-maverick-17b-128e-instruct',
+                    'llama-4-scout': 'meta-llama/llama-4-scout-17b-16e-instruct'
+                };
+                const groqModel = groqModelMap[selectedModel] || groqModelMap['llama-4-maverick'];
+
+                // Set model
+                await ipcRenderer.invoke('groq-set-model', groqModel);
+
+                // Get the SAME system prompt that Gemini uses from prompts.js
+                // Google Search is typically enabled for interview mode
+                const googleSearchEnabled = localStorage.getItem('googleSearchEnabled') !== 'false';
+                const systemPrompt = await ipcRenderer.invoke('get-system-prompt', this.selectedProfile, customPrompt, googleSearchEnabled);
+
+                await ipcRenderer.invoke('groq-set-llama-config', {
+                    profile: this.selectedProfile,
+                    systemPrompt: systemPrompt
+                });
+                console.log(`[GROQ] Llama config set for profile: ${this.selectedProfile}, model: ${groqModel}`);
+            }
+        } else {
+            // Interview mode with Gemini: Use Gemini Live API
+            await cheddar.initializeGemini(this.selectedProfile, this.selectedLanguage, selectedMode, selectedModel);
+        }
 
         // Set current mode and model for header display
         this.currentMode = selectedMode;
-        if (selectedMode === 'interview') {
-            this.currentModel = 'gemini-2.0-flash-exp';
-        } else {
-            this.currentModel = selectedModel;
-        }
+        this.currentModel = selectedModel;
 
         // Always use manual mode to prevent rate limits and token exhaustion
         const screenshotMode = 'manual';
 
-        console.log('📸 Manual capture mode: Press Ctrl+Enter to capture and analyze screenshot');
+        if (selectedMode === 'coding') {
+            console.log('💻 Coding/OA mode (Exam Assistant): Manual capture only - Press Ctrl+Enter to analyze screenshot');
+        } else if (isLlamaModel) {
+            console.log('🎤 Interview mode (Groq Llama): Voice questions are auto-detected via Whisper STT');
+        } else {
+            console.log('🎤 Interview mode (Gemini Live): Voice questions are auto-detected');
+        }
 
-        cheddar.startCapture(screenshotMode, this.selectedImageQuality);
+        cheddar.startCapture(screenshotMode, this.selectedImageQuality, isLlamaModel);
         this.responses = [];
         this.currentResponseIndex = -1;
         this.startTime = Date.now();
