@@ -453,7 +453,7 @@ export class CustomizeView extends LitElement {
         super();
         this.selectedProfile = 'exam';
         this.selectedLanguage = 'en-US';
-        this.selectedScreenshotInterval = 'manual';
+        this.selectedScreenshotInterval = 'manual'; // Always manual to prevent rate limits
         this.selectedImageQuality = 'high';
         this.layoutMode = 'compact';
         this.keybinds = this.getDefaultKeybinds();
