@@ -59,8 +59,6 @@ function handleSquirrelEvent(squirrelCommand) {
 const { app, BrowserWindow, shell, ipcMain } = require('electron');
 const { createWindow, updateGlobalShortcuts } = require('./utils/window');
 const { setupGeminiIpcHandlers, stopMacOSAudioCapture, sendToRenderer } = require('./utils/gemini');
-const { setupGroqIpcHandlers } = require('./utils/groq');
-const { getSystemPrompt } = require('./utils/prompts');
 const { initializeRandomProcessNames } = require('./utils/processRandomizer');
 const { applyAntiAnalysisMeasures } = require('./utils/stealthFeatures');
 const { getLocalConfig, writeConfig } = require('./config');
@@ -116,7 +114,6 @@ if (!gotTheLock) {
 
         createMainWindow();
         setupGeminiIpcHandlers(geminiSessionRef);
-        setupGroqIpcHandlers();
         setupGeneralIpcHandlers();
     });
 }
@@ -288,17 +285,6 @@ function setupGeneralIpcHandlers() {
         } catch (error) {
             console.error('Error updating VAD setting:', error);
             return { success: false, error: error.message };
-        }
-    });
-
-    // Get system prompt for a profile (used by Groq/Llama to get same prompts as Gemini)
-    ipcMain.handle('get-system-prompt', async (event, profile, customPrompt, googleSearchEnabled) => {
-        try {
-            const systemPrompt = getSystemPrompt(profile, customPrompt, googleSearchEnabled);
-            return systemPrompt;
-        } catch (error) {
-            console.error('Error getting system prompt:', error);
-            return '';
         }
     });
 }

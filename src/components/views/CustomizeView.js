@@ -1035,17 +1035,9 @@ export class CustomizeView extends LitElement {
     loadModeSettings() {
         const selectedMode = localStorage.getItem('selectedMode');
         const selectedModel = localStorage.getItem('selectedModel');
-        const selectedProfile = localStorage.getItem('selectedProfile') || 'exam';
 
         this.selectedMode = selectedMode || 'interview';
-
-        // Set default model based on profile
-        if (selectedProfile === 'exam') {
-            this.selectedModel = selectedModel || 'gemini-3-pro-preview';
-        } else {
-            // Interview mode default - can be gemini-2.0-flash-exp or llama models
-            this.selectedModel = selectedModel || 'gemini-2.0-flash-exp';
-        }
+        this.selectedModel = selectedModel || 'gemini-3-pro-preview';
     }
 
     async handleModeChange(e) {
@@ -1073,18 +1065,6 @@ export class CustomizeView extends LitElement {
     async handleModelChange(e) {
         this.selectedModel = e.target.value;
         localStorage.setItem('selectedModel', this.selectedModel);
-
-        this.requestUpdate();
-    }
-
-    async handleInterviewModelChange(e) {
-        this.selectedModel = e.target.value;
-        localStorage.setItem('selectedModel', this.selectedModel);
-
-        // Dispatch a custom event to notify MainView about model change
-        window.dispatchEvent(new CustomEvent('interview-model-changed', {
-            detail: { model: this.selectedModel }
-        }));
 
         this.requestUpdate();
     }
@@ -1178,37 +1158,15 @@ export class CustomizeView extends LitElement {
                                 </div>
                             </div>
                         ` : html`
-                            <!-- Other profiles: Interview mode with model selection -->
+                            <!-- Other profiles: Only Interview mode available -->
                             <div class="form-row">
                                 <div class="form-group">
                                     <label class="form-label">Mode (Fixed for ${this.getProfileNames()[this.selectedProfile]})</label>
                                     <div class="mode-display-box">
-                                        🎤 Interview Mode (Real-time Audio)
+                                        🎤 Interview Mode (Real-time Audio/Video)
                                     </div>
                                     <div class="form-description">
-                                        ${this.getProfileNames()[this.selectedProfile]} profile uses Interview mode for real-time audio processing and live interactions.
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label class="form-label">Model Selection</label>
-                                    <custom-dropdown
-                                        .value=${this.selectedModel}
-                                        .options=${[
-                                            { value: 'gemini-2.0-flash-exp', label: 'Gemini 2.0 Flash Live', icon: './assets/models/500px-Google_Gemini_icon_2025.svg.png' },
-                                            { value: 'llama-4-maverick', label: 'Llama 4 Maverick', icon: './assets/models/meta-llama-logo.svg' },
-                                            { value: 'llama-4-scout', label: 'Llama 4 Scout', icon: './assets/models/meta-llama-logo.svg' }
-                                        ]}
-                                        @change=${e => this.handleInterviewModelChange({ target: { value: e.detail.value } })}
-                                    ></custom-dropdown>
-                                    <div class="form-description">
-                                        ${this.selectedModel === 'gemini-2.0-flash-exp'
-                                            ? 'Gemini 2.0 Flash Live: Google\'s real-time audio API with native speech recognition.'
-                                            : this.selectedModel === 'llama-4-maverick'
-                                                ? 'Llama 4 Maverick: Groq\'s fast inference with Whisper STT. Great for detailed responses.'
-                                                : 'Llama 4 Scout: Groq\'s efficient model with Whisper STT. Good balance of speed and quality.'}
+                                        ${this.getProfileNames()[this.selectedProfile]} profile uses Interview mode with Gemini 2.0 Flash Exp for real-time audio processing and live interactions.
                                     </div>
                                 </div>
                             </div>

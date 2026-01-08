@@ -248,18 +248,12 @@ export class AppHeader extends LitElement {
             'gemini-2.5-flash-native-audio-preview-09-2025': '2.5 Flash Live',
             'gemini-2.5-flash': '2.5 Flash',
             'gemini-3-pro-preview': '3.0 Pro Preview',
-            'llama-4-maverick': 'Llama 4 Maverick',
-            'llama-4-scout': 'Llama 4 Scout',
         };
 
         return modelMap[this.currentModel] || this.currentModel;
     }
 
     getModelBadgeClass() {
-        // Llama models use the same interview style (green)
-        if (this.currentModel?.startsWith('llama-')) {
-            return 'interview';
-        }
         return this.currentMode === 'interview' ? 'interview' : 'coding';
     }
 

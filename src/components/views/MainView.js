@@ -150,8 +150,6 @@ export class MainView extends LitElement {
         onLayoutModeChange: { type: Function },
         showApiKeyError: { type: Boolean },
         onClearAndRestart: { type: Function },
-        selectedProfile: { type: String },
-        selectedModel: { type: String },
     };
 
     constructor() {
@@ -163,9 +161,6 @@ export class MainView extends LitElement {
         this.showApiKeyError = false;
         this.onClearAndRestart = () => {};
         this.boundKeydownHandler = this.handleKeydown.bind(this);
-        // Load selected profile and model from localStorage
-        this.selectedProfile = localStorage.getItem('selectedProfile') || 'exam';
-        this.selectedModel = localStorage.getItem('selectedModel') || 'gemini-2.0-flash-exp';
     }
 
     connectedCallback() {
@@ -181,24 +176,6 @@ export class MainView extends LitElement {
         this.loadLayoutMode();
         // Resize window for this view
         resizeLayout();
-
-        // Listen for model changes from settings
-        this.modelChangeHandler = (e) => {
-            this.selectedModel = e.detail.model;
-            this.requestUpdate();
-        };
-        window.addEventListener('interview-model-changed', this.modelChangeHandler);
-
-        // Also check periodically for profile/model changes
-        this.profileCheckInterval = setInterval(() => {
-            const newProfile = localStorage.getItem('selectedProfile') || 'exam';
-            const newModel = localStorage.getItem('selectedModel') || 'gemini-2.0-flash-exp';
-            if (newProfile !== this.selectedProfile || newModel !== this.selectedModel) {
-                this.selectedProfile = newProfile;
-                this.selectedModel = newModel;
-                this.requestUpdate();
-            }
-        }, 500);
     }
 
     disconnectedCallback() {
@@ -206,13 +183,6 @@ export class MainView extends LitElement {
         window.electron?.ipcRenderer?.removeAllListeners('session-initializing');
         // Remove keyboard event listener
         document.removeEventListener('keydown', this.boundKeydownHandler);
-        // Clean up model change listener
-        if (this.modelChangeHandler) {
-            window.removeEventListener('interview-model-changed', this.modelChangeHandler);
-        }
-        if (this.profileCheckInterval) {
-            clearInterval(this.profileCheckInterval);
-        }
     }
 
     handleKeydown(e) {
@@ -226,70 +196,10 @@ export class MainView extends LitElement {
     }
 
     handleInput(e) {
-        // Store API key based on current model selection
-        const apiKeyName = this.isGroqModel() ? 'groqApiKey' : 'geminiApiKey';
-        localStorage.setItem(apiKeyName, e.target.value);
-        // Also store in legacy 'apiKey' for backward compatibility
         localStorage.setItem('apiKey', e.target.value);
         // Clear error state when user starts typing
         if (this.showApiKeyError) {
             this.showApiKeyError = false;
-        }
-    }
-
-    // Check if current model uses Groq API (Llama models)
-    isGroqModel() {
-        return this.selectedModel?.startsWith('llama-');
-    }
-
-    // Check if current profile is exam mode (uses Gemini API)
-    isExamMode() {
-        return this.selectedProfile === 'exam';
-    }
-
-    // Get the current API key based on model selection
-    getCurrentApiKey() {
-        if (this.isExamMode()) {
-            return localStorage.getItem('geminiApiKey') || localStorage.getItem('apiKey') || '';
-        } else if (this.isGroqModel()) {
-            return localStorage.getItem('groqApiKey') || '';
-        } else {
-            // Gemini interview model
-            return localStorage.getItem('geminiApiKey') || localStorage.getItem('apiKey') || '';
-        }
-    }
-
-    // Get the API key placeholder text
-    getApiKeyPlaceholder() {
-        if (this.isExamMode()) {
-            return 'Enter your Gemini API Key';
-        } else if (this.isGroqModel()) {
-            return 'Enter your Groq API Key';
-        } else {
-            return 'Enter your Gemini API Key';
-        }
-    }
-
-    // Get the help link text
-    getApiKeyHelpText() {
-        if (this.isExamMode()) {
-            return 'Get Gemini API key';
-        } else if (this.isGroqModel()) {
-            return 'Get Groq API key';
-        } else {
-            return 'Get Gemini API key';
-        }
-    }
-
-    // Get the mode/model display text
-    getModeDisplayText() {
-        if (this.isExamMode()) {
-            return 'Exam Assistant (Gemini API)';
-        } else if (this.isGroqModel()) {
-            const modelName = this.selectedModel === 'llama-4-maverick' ? 'Llama 4 Maverick' : 'Llama 4 Scout';
-            return `Interview Mode (${modelName} via Groq)`;
-        } else {
-            return 'Interview Mode (Gemini Live API)';
         }
     }
 
@@ -380,15 +290,12 @@ export class MainView extends LitElement {
     render() {
         return html`
             <div class="welcome">Welcome</div>
-            <p class="description" style="margin-bottom: 12px; font-size: 12px; opacity: 0.7;">
-                Mode: <strong>${this.getModeDisplayText()}</strong>
-            </p>
 
             <div class="input-group">
                 <input
                     type="password"
-                    placeholder="${this.getApiKeyPlaceholder()}"
-                    .value=${this.getCurrentApiKey()}
+                    placeholder="Enter your Gemini API Key"
+                    .value=${localStorage.getItem('apiKey') || ''}
                     @input=${this.handleInput}
                     class="${this.showApiKeyError ? 'api-key-error' : ''}"
                 />
@@ -398,11 +305,11 @@ export class MainView extends LitElement {
             </div>
             <p class="description">
                 dont have an api key?
-                <span @click=${this.handleAPIKeyHelpClick} class="link">${this.getApiKeyHelpText()}</span>
+                <span @click=${this.handleAPIKeyHelpClick} class="link">get one here</span>
             </p>
-            <p class="shortcut-hint">
-                Press <strong>Ctrl+Alt+R</strong> to clear session and automatically restart
-            </p>
+                    <p class="shortcut-hint">
+            Press <strong>Ctrl+Alt+R</strong> to clear session and automatically restart
+        </p>
         `;
     }
 }

@@ -182,68 +182,10 @@ async function initializeGemini(profile = 'interview', language = 'en-US', mode 
     }
 }
 
-// Flag to track if we're using Groq/Llama mode
-let isGroqMode = false;
-
-async function initializeGroq(apiKey) {
-    if (!apiKey) {
-        console.error('[GROQ] No API key provided');
-        cheddar.setStatus('error');
-        return false;
-    }
-
-    try {
-        const result = await ipcRenderer.invoke('initialize-groq', apiKey);
-        if (result.success) {
-            isGroqMode = true;
-            cheddar.setStatus('Ready');
-            console.log('[GROQ] Initialized successfully');
-            return true;
-        } else {
-            console.error('[GROQ] Initialization failed:', result.error);
-            cheddar.setStatus('error');
-            return false;
-        }
-    } catch (error) {
-        console.error('[GROQ] Initialization error:', error);
-        cheddar.setStatus('error');
-        return false;
-    }
-}
-
 // Listen for status updates
 ipcRenderer.on('update-status', (event, status) => {
     console.log('Status update:', status);
     cheddar.setStatus(status);
-});
-
-// Listen for Groq transcription events - generate response with Llama
-ipcRenderer.on('groq-transcription', async (event, transcription) => {
-    if (!transcription || !transcription.trim()) {
-        console.log('[GROQ] Empty transcription received, skipping');
-        return;
-    }
-
-    console.log('[GROQ] Transcription received:', transcription);
-    cheddar.setStatus('Thinking...');
-
-    try {
-        // Generate response with Llama using the transcription
-        const result = await ipcRenderer.invoke('groq-generate-response', {
-            message: transcription,
-            imageBase64: null // Could capture screenshot here if needed
-        });
-
-        if (result.success) {
-            console.log('[GROQ] Llama response generated successfully');
-        } else {
-            console.error('[GROQ] Failed to generate response:', result.error);
-            cheddar.setStatus('Error');
-        }
-    } catch (error) {
-        console.error('[GROQ] Error generating response:', error);
-        cheddar.setStatus('Error');
-    }
 });
 
 // Listen for responses - REMOVED: This is handled in CheatingDaddyApp.js to avoid duplicates
@@ -253,9 +195,7 @@ ipcRenderer.on('groq-transcription', async (event, transcription) => {
 //     // You can add UI elements to display the response if needed
 // });
 
-async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'medium', useGroqMode = false) {
-    // Set Groq mode flag
-    isGroqMode = useGroqMode;
+async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'medium') {
     // Store the image quality for manual screenshots
     currentImageQuality = imageQuality;
 
@@ -418,23 +358,10 @@ function setupLinuxSystemAudioProcessing() {
                             const pcmData16 = convertFloat32ToInt16(audioSegment);
                             const base64Data = arrayBufferToBase64(pcmData16.buffer);
 
-                            if (isGroqMode) {
-                                // Send to Groq for Whisper transcription
-                                await ipcRenderer.invoke('groq-add-audio', {
-                                    data: base64Data,
-                                });
-                                // Process and get transcription
-                                const result = await ipcRenderer.invoke('groq-process-audio');
-                                if (result.transcription) {
-                                    console.log('[GROQ] Transcription received:', result.transcription);
-                                }
-                            } else {
-                                // Send to Gemini
-                                await ipcRenderer.invoke('send-audio-content', {
-                                    data: base64Data,
-                                    mimeType: 'audio/pcm;rate=24000',
-                                });
-                            }
+                            await ipcRenderer.invoke('send-audio-content', {
+                                data: base64Data,
+                                mimeType: 'audio/pcm;rate=24000',
+                            });
 
                             console.log('VAD audio segment sent:', metadata);
                         } catch (error) {
@@ -529,23 +456,10 @@ function setupWindowsLoopbackProcessing() {
                             const pcmData16 = convertFloat32ToInt16(audioSegment);
                             const base64Data = arrayBufferToBase64(pcmData16.buffer);
 
-                            if (isGroqMode) {
-                                // Send to Groq for Whisper transcription
-                                await ipcRenderer.invoke('groq-add-audio', {
-                                    data: base64Data,
-                                });
-                                // Process and get transcription
-                                const result = await ipcRenderer.invoke('groq-process-audio');
-                                if (result.transcription) {
-                                    console.log('[GROQ] Transcription received:', result.transcription);
-                                }
-                            } else {
-                                // Send to Gemini
-                                await ipcRenderer.invoke('send-audio-content', {
-                                    data: base64Data,
-                                    mimeType: 'audio/pcm;rate=24000',
-                                });
-                            }
+                            await ipcRenderer.invoke('send-audio-content', {
+                                data: base64Data,
+                                mimeType: 'audio/pcm;rate=24000',
+                            });
 
                             console.log('VAD audio segment sent:', metadata);
                         } catch (error) {
@@ -728,78 +642,11 @@ async function captureManualScreenshot(imageQuality = null) {
     // Check if we're in coding mode
     const selectedMode = localStorage.getItem('selectedMode') || 'interview';
 
-    if (isGroqMode) {
-        // Groq/Llama mode - capture screenshot and send to Llama for analysis
-        console.log('[GROQ] Manual screenshot - capturing and sending to Llama...');
-
-        if (!mediaStream) {
-            console.error('No media stream available');
-            return;
-        }
-
-        // Lazy init of video element if needed
-        if (!hiddenVideo) {
-            hiddenVideo = document.createElement('video');
-            hiddenVideo.srcObject = mediaStream;
-            hiddenVideo.muted = true;
-            hiddenVideo.playsInline = true;
-            await hiddenVideo.play();
-
-            await new Promise(resolve => {
-                if (hiddenVideo.readyState >= 2) return resolve();
-                hiddenVideo.onloadedmetadata = () => resolve();
-            });
-
-            offscreenCanvas = document.createElement('canvas');
-            offscreenCanvas.width = hiddenVideo.videoWidth;
-            offscreenCanvas.height = hiddenVideo.videoHeight;
-            offscreenContext = offscreenCanvas.getContext('2d');
-        }
-
-        if (hiddenVideo.readyState >= 2) {
-            offscreenContext.drawImage(hiddenVideo, 0, 0, offscreenCanvas.width, offscreenCanvas.height);
-
-            let qualityValue;
-            switch (quality) {
-                case 'high': qualityValue = 0.9; break;
-                case 'medium': qualityValue = 0.7; break;
-                case 'low': qualityValue = 0.5; break;
-                default: qualityValue = 0.7;
-            }
-
-            const blob = await new Promise(resolve => {
-                offscreenCanvas.toBlob(resolve, 'image/jpeg', qualityValue);
-            });
-
-            if (blob) {
-                const reader = new FileReader();
-                const base64data = await new Promise((resolve, reject) => {
-                    reader.onloadend = () => resolve(reader.result.split(',')[1]);
-                    reader.onerror = reject;
-                    reader.readAsDataURL(blob);
-                });
-
-                cheddar.setStatus('Analyzing...');
-
-                // Send screenshot to Llama with a prompt to analyze it
-                const result = await ipcRenderer.invoke('groq-generate-response', {
-                    message: 'Please analyze this screenshot and provide any relevant assistance based on what you see.',
-                    imageBase64: base64data
-                });
-
-                if (result.success) {
-                    console.log('[GROQ] Screenshot analysis complete');
-                } else {
-                    console.error('[GROQ] Failed to analyze screenshot:', result.error);
-                    cheddar.setStatus('Error');
-                }
-            }
-        }
-    } else if (selectedMode === 'coding') {
+    if (selectedMode === 'coding') {
         // For coding mode, ONLY send screenshot - system prompt will handle it
         await captureScreenshot(quality, true);
     } else {
-        // For interview mode with Gemini, just send screenshot
+        // For interview mode, just send screenshot
         await captureScreenshot(quality, true);
     }
 }
@@ -855,8 +702,7 @@ function stopCapture() {
     offscreenContext = null;
 }
 
-// Send text message with automatic screenshot (combined in one request)
-// Routes to either Gemini or Groq based on current mode
+// Send text message to Gemini with automatic screenshot (combined in one request)
 async function sendTextMessage(text) {
     if (!text || text.trim().length === 0) {
         console.warn('Cannot send empty text message');
@@ -867,107 +713,88 @@ async function sendTextMessage(text) {
         // Capture screenshot and get base64 data
         console.log('Capturing screenshot with text message...');
 
-        let base64data = null;
-
-        if (mediaStream) {
-            // Lazy init of video element if needed
-            if (!hiddenVideo) {
-                hiddenVideo = document.createElement('video');
-                hiddenVideo.srcObject = mediaStream;
-                hiddenVideo.muted = true;
-                hiddenVideo.playsInline = true;
-                await hiddenVideo.play();
-
-                await new Promise(resolve => {
-                    if (hiddenVideo.readyState >= 2) return resolve();
-                    hiddenVideo.onloadedmetadata = () => resolve();
-                });
-
-                offscreenCanvas = document.createElement('canvas');
-                offscreenCanvas.width = hiddenVideo.videoWidth;
-                offscreenCanvas.height = hiddenVideo.videoHeight;
-                offscreenContext = offscreenCanvas.getContext('2d');
-            }
-
-            // Check if video is ready
-            if (hiddenVideo.readyState >= 2) {
-                offscreenContext.drawImage(hiddenVideo, 0, 0, offscreenCanvas.width, offscreenCanvas.height);
-
-                // Get quality setting
-                let qualityValue;
-                switch (currentImageQuality) {
-                    case 'high':
-                        qualityValue = 0.9;
-                        break;
-                    case 'medium':
-                        qualityValue = 0.7;
-                        break;
-                    case 'low':
-                        qualityValue = 0.5;
-                        break;
-                    default:
-                        qualityValue = 0.7;
-                }
-
-                // Convert canvas to base64
-                const blob = await new Promise(resolve => {
-                    offscreenCanvas.toBlob(resolve, 'image/jpeg', qualityValue);
-                });
-
-                if (blob) {
-                    const reader = new FileReader();
-                    base64data = await new Promise((resolve, reject) => {
-                        reader.onloadend = () => resolve(reader.result.split(',')[1]);
-                        reader.onerror = reject;
-                        reader.readAsDataURL(blob);
-                    });
-                }
-            }
+        if (!mediaStream) {
+            console.error('No media stream available');
+            return { success: false, error: 'No media stream' };
         }
 
-        // Route to appropriate API based on mode
-        if (isGroqMode) {
-            // Groq/Llama mode - send to Groq for response generation
-            console.log('[GROQ] Sending text message to Llama...');
-            cheddar.setStatus('Thinking...');
+        // Lazy init of video element if needed
+        if (!hiddenVideo) {
+            hiddenVideo = document.createElement('video');
+            hiddenVideo.srcObject = mediaStream;
+            hiddenVideo.muted = true;
+            hiddenVideo.playsInline = true;
+            await hiddenVideo.play();
 
-            const result = await ipcRenderer.invoke('groq-generate-response', {
-                message: text.trim(),
-                imageBase64: base64data
+            await new Promise(resolve => {
+                if (hiddenVideo.readyState >= 2) return resolve();
+                hiddenVideo.onloadedmetadata = () => resolve();
             });
 
-            if (result.success) {
-                console.log('[GROQ] Llama response generated successfully');
-                return { success: true };
-            } else {
-                console.error('[GROQ] Failed to generate response:', result.error);
-                cheddar.setStatus('Error');
-                return { success: false, error: result.error };
-            }
+            offscreenCanvas = document.createElement('canvas');
+            offscreenCanvas.width = hiddenVideo.videoWidth;
+            offscreenCanvas.height = hiddenVideo.videoHeight;
+            offscreenContext = offscreenCanvas.getContext('2d');
+        }
+
+        // Check if video is ready
+        if (hiddenVideo.readyState < 2) {
+            console.warn('Video not ready');
+            return { success: false, error: 'Video not ready' };
+        }
+
+        offscreenContext.drawImage(hiddenVideo, 0, 0, offscreenCanvas.width, offscreenCanvas.height);
+
+        // Get quality setting
+        let qualityValue;
+        switch (currentImageQuality) {
+            case 'high':
+                qualityValue = 0.9;
+                break;
+            case 'medium':
+                qualityValue = 0.7;
+                break;
+            case 'low':
+                qualityValue = 0.5;
+                break;
+            default:
+                qualityValue = 0.7;
+        }
+
+        // Convert canvas to base64
+        const blob = await new Promise(resolve => {
+            offscreenCanvas.toBlob(resolve, 'image/jpeg', qualityValue);
+        });
+
+        if (!blob) {
+            console.error('Failed to create blob');
+            return { success: false, error: 'Failed to create blob' };
+        }
+
+        const reader = new FileReader();
+        const base64data = await new Promise((resolve, reject) => {
+            reader.onloadend = () => resolve(reader.result.split(',')[1]);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+
+        // Send both screenshot and text together in one request
+        const result = await ipcRenderer.invoke('send-screenshot-with-text', {
+            imageData: base64data,
+            text: text.trim()
+        });
+
+        if (result.success) {
+            // Track image tokens
+            const imageTokens = tokenTracker.calculateImageTokens(offscreenCanvas.width, offscreenCanvas.height);
+            tokenTracker.addTokens(imageTokens, 'image');
+            console.log('Screenshot + text sent successfully in one request');
         } else {
-            // Gemini mode - send screenshot with text
-            if (!base64data) {
-                console.error('No screenshot available for Gemini');
-                return { success: false, error: 'No screenshot available' };
-            }
-
-            const result = await ipcRenderer.invoke('send-screenshot-with-text', {
-                imageData: base64data,
-                text: text.trim()
-            });
-
-            if (result.success) {
-                // Track image tokens
-                const imageTokens = tokenTracker.calculateImageTokens(offscreenCanvas.width, offscreenCanvas.height);
-                tokenTracker.addTokens(imageTokens, 'image');
-                console.log('Screenshot + text sent successfully in one request');
-            } else {
-                console.error('Failed to send screenshot with text:', result.error);
-            }
-            return result;
+            console.error('Failed to send screenshot with text:', result.error);
         }
+        return result;
     } catch (error) {
-        console.error('Error sending text message:', error);
+        console.error('Error sending text message with screenshot:', error);
         return { success: false, error: error.message };
     }
 }
@@ -1061,7 +888,6 @@ const cheddar = {
 
     // Core functionality
     initializeGemini,
-    initializeGroq,
     startCapture,
     stopCapture,
     sendTextMessage,
