@@ -150,6 +150,7 @@ export class MainView extends LitElement {
         onLayoutModeChange: { type: Function },
         showApiKeyError: { type: Boolean },
         onClearAndRestart: { type: Function },
+        selectedModel: { type: String },
     };
 
     constructor() {
@@ -161,6 +162,25 @@ export class MainView extends LitElement {
         this.showApiKeyError = false;
         this.onClearAndRestart = () => {};
         this.boundKeydownHandler = this.handleKeydown.bind(this);
+        this.selectedModel = localStorage.getItem('selectedModel') || 'gemini-2.0-flash-exp';
+    }
+
+    // Helper to check if selected model is a Groq/Llama model
+    isGroqModel() {
+        return this.selectedModel && (this.selectedModel.includes('llama') || this.selectedModel.includes('groq'));
+    }
+
+    // Get the appropriate API key based on model
+    getApiKey() {
+        if (this.isGroqModel()) {
+            return localStorage.getItem('groqApiKey') || '';
+        }
+        return localStorage.getItem('apiKey') || '';
+    }
+
+    // Get the appropriate API key storage key
+    getApiKeyStorageKey() {
+        return this.isGroqModel() ? 'groqApiKey' : 'apiKey';
     }
 
     connectedCallback() {
@@ -174,6 +194,19 @@ export class MainView extends LitElement {
 
         // Load and apply layout mode on startup
         this.loadLayoutMode();
+
+        // Load current model selection
+        this.selectedModel = localStorage.getItem('selectedModel') || 'gemini-2.0-flash-exp';
+
+        // Listen for storage changes (when model is changed in settings)
+        this.storageHandler = (e) => {
+            if (e.key === 'selectedModel') {
+                this.selectedModel = e.newValue || 'gemini-2.0-flash-exp';
+                this.requestUpdate();
+            }
+        };
+        window.addEventListener('storage', this.storageHandler);
+
         // Resize window for this view
         resizeLayout();
     }
@@ -183,6 +216,10 @@ export class MainView extends LitElement {
         window.electron?.ipcRenderer?.removeAllListeners('session-initializing');
         // Remove keyboard event listener
         document.removeEventListener('keydown', this.boundKeydownHandler);
+        // Remove storage listener
+        if (this.storageHandler) {
+            window.removeEventListener('storage', this.storageHandler);
+        }
     }
 
     handleKeydown(e) {
@@ -196,7 +233,9 @@ export class MainView extends LitElement {
     }
 
     handleInput(e) {
-        localStorage.setItem('apiKey', e.target.value);
+        // Save to the appropriate key based on selected model
+        const storageKey = this.getApiKeyStorageKey();
+        localStorage.setItem(storageKey, e.target.value);
         // Clear error state when user starts typing
         if (this.showApiKeyError) {
             this.showApiKeyError = false;
@@ -288,14 +327,21 @@ export class MainView extends LitElement {
     }
 
     render() {
+        const isGroq = this.isGroqModel();
+        const apiKeyPlaceholder = isGroq ? 'Enter your Groq API Key' : 'Enter your Gemini API Key';
+        const apiKeyValue = this.getApiKey();
+        const modelName = isGroq
+            ? (this.selectedModel === 'llama-4-maverick' ? 'Llama 4 Maverick' : 'Llama 4 Scout')
+            : 'Gemini';
+
         return html`
             <div class="welcome">Welcome</div>
 
             <div class="input-group">
                 <input
                     type="password"
-                    placeholder="Enter your Gemini API Key"
-                    .value=${localStorage.getItem('apiKey') || ''}
+                    placeholder="${apiKeyPlaceholder}"
+                    .value=${apiKeyValue}
                     @input=${this.handleInput}
                     class="${this.showApiKeyError ? 'api-key-error' : ''}"
                 />
@@ -306,6 +352,7 @@ export class MainView extends LitElement {
             <p class="description">
                 dont have an api key?
                 <span @click=${this.handleAPIKeyHelpClick} class="link">get one here</span>
+                ${isGroq ? html` (Using ${modelName} via Groq)` : html` (Using ${modelName})`}
             </p>
                     <p class="shortcut-hint">
             Press <strong>Ctrl+Alt+R</strong> to clear session and automatically restart

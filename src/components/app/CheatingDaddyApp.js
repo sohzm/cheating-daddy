@@ -325,7 +325,13 @@ export class CheatingDaddyApp extends LitElement {
     async handleAPIKeyHelp() {
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
-            await ipcRenderer.invoke('open-external', 'https://cheatingdaddy.com/help/api-key');
+            // Open different URLs based on selected model
+            const selectedModel = localStorage.getItem('selectedModel') || 'gemini-2.0-flash-exp';
+            const isGroqModel = selectedModel && (selectedModel.includes('llama') || selectedModel.includes('groq'));
+            const url = isGroqModel
+                ? 'https://groq.com/'
+                : 'https://aistudio.google.com/';
+            await ipcRenderer.invoke('open-external', url);
         }
     }
 

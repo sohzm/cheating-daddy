@@ -59,6 +59,7 @@ function handleSquirrelEvent(squirrelCommand) {
 const { app, BrowserWindow, shell, ipcMain } = require('electron');
 const { createWindow, updateGlobalShortcuts } = require('./utils/window');
 const { setupGeminiIpcHandlers, stopMacOSAudioCapture, sendToRenderer } = require('./utils/gemini');
+const { setupGroqIpcHandlers } = require('./utils/groq');
 const { initializeRandomProcessNames } = require('./utils/processRandomizer');
 const { applyAntiAnalysisMeasures } = require('./utils/stealthFeatures');
 const { getLocalConfig, writeConfig } = require('./config');
@@ -114,6 +115,7 @@ if (!gotTheLock) {
 
         createMainWindow();
         setupGeminiIpcHandlers(geminiSessionRef);
+        setupGroqIpcHandlers();
         setupGeneralIpcHandlers();
     });
 }

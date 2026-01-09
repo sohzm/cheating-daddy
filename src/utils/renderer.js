@@ -166,18 +166,41 @@ function arrayBufferToBase64(buffer) {
     return btoa(binary);
 }
 
-async function initializeGemini(profile = 'interview', language = 'en-US', mode = 'interview', model = 'gemini-2.5-flash') {
-    const apiKey = localStorage.getItem('apiKey')?.trim();
-    if (apiKey) {
-        // Get mode and model from localStorage if not provided
-        const selectedMode = mode || localStorage.getItem('selectedMode') || 'interview';
-        const selectedModel = model || localStorage.getItem('selectedModel') || 'gemini-2.5-flash';
+// Helper to check if model is a Groq/Llama model
+function isGroqModel(model) {
+    return model && (model.includes('llama') || model.includes('groq'));
+}
 
-        const success = await ipcRenderer.invoke('initialize-gemini', apiKey, localStorage.getItem('customPrompt') || '', profile, language, selectedMode, selectedModel);
-        if (success) {
-            cheddar.setStatus(selectedMode === 'interview' ? 'Live' : 'Ready');
+async function initializeGemini(profile = 'interview', language = 'en-US', mode = 'interview', model = 'gemini-2.0-flash-exp') {
+    // Get mode and model from localStorage if not provided
+    const selectedMode = mode || localStorage.getItem('selectedMode') || 'interview';
+    const selectedModel = model || localStorage.getItem('selectedModel') || 'gemini-2.0-flash-exp';
+
+    // Check if using Groq/Llama model for interview mode
+    if (selectedMode === 'interview' && isGroqModel(selectedModel)) {
+        // Initialize Groq for Llama models
+        const groqApiKey = localStorage.getItem('groqApiKey')?.trim();
+        if (groqApiKey) {
+            const result = await ipcRenderer.invoke('initialize-groq', groqApiKey, localStorage.getItem('customPrompt') || '', profile, language);
+            if (result.success) {
+                cheddar.setStatus('Listening...');
+                console.log('[RENDERER] Groq initialized for Llama model:', selectedModel);
+            } else {
+                cheddar.setStatus('Error: ' + result.error);
+            }
         } else {
-            cheddar.setStatus('error');
+            cheddar.setStatus('Error: No API key');
+        }
+    } else {
+        // Initialize Gemini for Gemini models
+        const apiKey = localStorage.getItem('apiKey')?.trim();
+        if (apiKey) {
+            const success = await ipcRenderer.invoke('initialize-gemini', apiKey, localStorage.getItem('customPrompt') || '', profile, language, selectedMode, selectedModel);
+            if (success) {
+                cheddar.setStatus(selectedMode === 'interview' ? 'Live' : 'Ready');
+            } else {
+                cheddar.setStatus('error');
+            }
         }
     }
 }
@@ -186,6 +209,16 @@ async function initializeGemini(profile = 'interview', language = 'en-US', mode 
 ipcRenderer.on('update-status', (event, status) => {
     console.log('Status update:', status);
     cheddar.setStatus(status);
+});
+
+// Listen for Groq transcription results
+ipcRenderer.on('groq-transcription', (event, transcription) => {
+    console.log('\n========================================');
+    console.log('[GROQ STT] RECEIVED TRANSCRIPTION:');
+    console.log('----------------------------------------');
+    console.log(transcription);
+    console.log('========================================\n');
+    // The response will be sent via update-response after Llama processes it
 });
 
 // Listen for responses - REMOVED: This is handled in CheatingDaddyApp.js to avoid duplicates
@@ -340,6 +373,13 @@ function setupLinuxSystemAudioProcessing() {
     const source = audioContext.createMediaStreamSource(mediaStream);
     audioProcessor = audioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
 
+    // Check if using Groq/Llama model
+    const selectedMode = localStorage.getItem('selectedMode') || 'interview';
+    const selectedModel = localStorage.getItem('selectedModel') || 'gemini-2.0-flash-exp';
+    const useGroqForSTT = selectedMode === 'interview' && isGroqModel(selectedModel);
+
+    console.log(`[AUDIO] Mode: ${selectedMode}, Model: ${selectedModel}, Using Groq: ${useGroqForSTT}`);
+
     // Initialize VAD if enabled and available
     let isVADEnabled = false;
     if (VADProcessor) {
@@ -358,12 +398,20 @@ function setupLinuxSystemAudioProcessing() {
                             const pcmData16 = convertFloat32ToInt16(audioSegment);
                             const base64Data = arrayBufferToBase64(pcmData16.buffer);
 
-                            await ipcRenderer.invoke('send-audio-content', {
-                                data: base64Data,
-                                mimeType: 'audio/pcm;rate=24000',
-                            });
-
-                            console.log('VAD audio segment sent:', metadata);
+                            if (useGroqForSTT) {
+                                // Send to Groq for Whisper transcription + Llama response
+                                await ipcRenderer.invoke('groq-add-audio', { data: base64Data });
+                                // Trigger processing after VAD commits (end of speech)
+                                await ipcRenderer.invoke('groq-flush-audio', selectedModel);
+                                console.log('[GROQ] VAD audio segment sent for transcription');
+                            } else {
+                                // Send to Gemini Live API
+                                await ipcRenderer.invoke('send-audio-content', {
+                                    data: base64Data,
+                                    mimeType: 'audio/pcm;rate=24000',
+                                });
+                                console.log('VAD audio segment sent to Gemini:', metadata);
+                            }
                         } catch (error) {
                             console.error('Failed to send VAD audio segment:', error);
                         }
@@ -420,10 +468,16 @@ function setupLinuxSystemAudioProcessing() {
                 const pcmData16 = convertFloat32ToInt16(chunk);
                 const base64Data = arrayBufferToBase64(pcmData16.buffer);
 
-                await ipcRenderer.invoke('send-audio-content', {
-                    data: base64Data,
-                    mimeType: 'audio/pcm;rate=24000',
-                });
+                if (useGroqForSTT) {
+                    // Send to Groq for Whisper transcription
+                    await ipcRenderer.invoke('groq-add-audio', { data: base64Data });
+                } else {
+                    // Send to Gemini Live API
+                    await ipcRenderer.invoke('send-audio-content', {
+                        data: base64Data,
+                        mimeType: 'audio/pcm;rate=24000',
+                    });
+                }
             }
         }
     };
@@ -437,6 +491,13 @@ function setupWindowsLoopbackProcessing() {
     audioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
     const source = audioContext.createMediaStreamSource(mediaStream);
     audioProcessor = audioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
+
+    // Check if using Groq/Llama model
+    const selectedMode = localStorage.getItem('selectedMode') || 'interview';
+    const selectedModel = localStorage.getItem('selectedModel') || 'gemini-2.0-flash-exp';
+    const useGroqForSTT = selectedMode === 'interview' && isGroqModel(selectedModel);
+
+    console.log(`[AUDIO] Mode: ${selectedMode}, Model: ${selectedModel}, Using Groq: ${useGroqForSTT}`);
 
     // Initialize VAD if enabled and available
     let isVADEnabled = false;
@@ -456,12 +517,20 @@ function setupWindowsLoopbackProcessing() {
                             const pcmData16 = convertFloat32ToInt16(audioSegment);
                             const base64Data = arrayBufferToBase64(pcmData16.buffer);
 
-                            await ipcRenderer.invoke('send-audio-content', {
-                                data: base64Data,
-                                mimeType: 'audio/pcm;rate=24000',
-                            });
-
-                            console.log('VAD audio segment sent:', metadata);
+                            if (useGroqForSTT) {
+                                // Send to Groq for Whisper transcription + Llama response
+                                await ipcRenderer.invoke('groq-add-audio', { data: base64Data });
+                                // Trigger processing after VAD commits (end of speech)
+                                await ipcRenderer.invoke('groq-flush-audio', selectedModel);
+                                console.log('[GROQ] VAD audio segment sent for transcription');
+                            } else {
+                                // Send to Gemini Live API
+                                await ipcRenderer.invoke('send-audio-content', {
+                                    data: base64Data,
+                                    mimeType: 'audio/pcm;rate=24000',
+                                });
+                                console.log('VAD audio segment sent to Gemini:', metadata);
+                            }
                         } catch (error) {
                             console.error('Failed to send VAD audio segment:', error);
                         }
@@ -518,10 +587,16 @@ function setupWindowsLoopbackProcessing() {
                 const pcmData16 = convertFloat32ToInt16(chunk);
                 const base64Data = arrayBufferToBase64(pcmData16.buffer);
 
-                await ipcRenderer.invoke('send-audio-content', {
-                    data: base64Data,
-                    mimeType: 'audio/pcm;rate=24000',
-                });
+                if (useGroqForSTT) {
+                    // Send to Groq for Whisper transcription
+                    await ipcRenderer.invoke('groq-add-audio', { data: base64Data });
+                } else {
+                    // Send to Gemini Live API
+                    await ipcRenderer.invoke('send-audio-content', {
+                        data: base64Data,
+                        mimeType: 'audio/pcm;rate=24000',
+                    });
+                }
             }
         }
     };
@@ -614,10 +689,27 @@ async function captureScreenshot(imageQuality = 'medium', isManual = false) {
                     return;
                 }
 
-                const result = await ipcRenderer.invoke('send-image-content', {
-                    data: base64data,
-                    isManual: captureIsManual,
-                });
+                // Check if using Groq/Llama model for manual screenshots
+                const selectedMode = localStorage.getItem('selectedMode') || 'interview';
+                const selectedModel = localStorage.getItem('selectedModel') || 'gemini-2.0-flash-exp';
+                const useGroq = selectedMode === 'interview' && isGroqModel(selectedModel) && captureIsManual;
+
+                let result;
+                if (useGroq) {
+                    // Send to Groq for analysis
+                    console.log('[GROQ] Sending manual screenshot for analysis...');
+                    result = await ipcRenderer.invoke('groq-analyze-image', {
+                        text: 'Please analyze this screenshot and provide helpful insights about what you see. If there are any questions visible, help answer them.',
+                        imageData: base64data,
+                        model: selectedModel
+                    });
+                } else {
+                    // Send to Gemini
+                    result = await ipcRenderer.invoke('send-image-content', {
+                        data: base64data,
+                        isManual: captureIsManual,
+                    });
+                }
 
                 if (result.success) {
                     // Track image tokens after successful send
@@ -778,11 +870,27 @@ async function sendTextMessage(text) {
             reader.readAsDataURL(blob);
         });
 
-        // Send both screenshot and text together in one request
-        const result = await ipcRenderer.invoke('send-screenshot-with-text', {
-            imageData: base64data,
-            text: text.trim()
-        });
+        // Check if using Groq/Llama model
+        const selectedMode = localStorage.getItem('selectedMode') || 'interview';
+        const selectedModel = localStorage.getItem('selectedModel') || 'gemini-2.0-flash-exp';
+        const useGroq = selectedMode === 'interview' && isGroqModel(selectedModel);
+
+        let result;
+        if (useGroq) {
+            // Send to Groq for analysis with text
+            console.log('[GROQ] Sending screenshot + text for analysis...');
+            result = await ipcRenderer.invoke('groq-analyze-image', {
+                text: text.trim(),
+                imageData: base64data,
+                model: selectedModel
+            });
+        } else {
+            // Send both screenshot and text together in one request to Gemini
+            result = await ipcRenderer.invoke('send-screenshot-with-text', {
+                imageData: base64data,
+                text: text.trim()
+            });
+        }
 
         if (result.success) {
             // Track image tokens

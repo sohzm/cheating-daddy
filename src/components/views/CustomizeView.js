@@ -482,7 +482,7 @@ export class CustomizeView extends LitElement {
 
         // Mode and model selection defaults
         this.selectedMode = 'interview';
-        this.selectedModel = 'gemini-3-pro-preview';
+        this.selectedModel = 'gemini-2.0-flash-exp';
 
         this.loadKeybinds();
         this.loadGoogleSearchSettings();
@@ -1037,23 +1037,30 @@ export class CustomizeView extends LitElement {
         const selectedModel = localStorage.getItem('selectedModel');
 
         this.selectedMode = selectedMode || 'interview';
-        this.selectedModel = selectedModel || 'gemini-3-pro-preview';
+        this.selectedModel = selectedModel || 'gemini-2.0-flash-exp';
+    }
+
+    // Helper to check if selected model is a Groq/Llama model
+    isGroqModel(model) {
+        return model && (model.includes('llama') || model.includes('groq'));
     }
 
     async handleModeChange(e) {
         this.selectedMode = e.target.value;
         localStorage.setItem('selectedMode', this.selectedMode);
 
-        // In interview mode, always use live API
+        // In interview mode, user can choose between Gemini Live and Groq Llama models
         // In coding mode, user can choose between flash and pro
         if (this.selectedMode === 'interview') {
-            this.selectedModel = 'gemini-2.5-flash';
+            // Keep current model if it's valid for interview mode, otherwise default
+            const validInterviewModels = ['gemini-2.0-flash-exp', 'llama-4-maverick', 'llama-4-scout'];
+            if (!validInterviewModels.includes(this.selectedModel)) {
+                this.selectedModel = 'gemini-2.0-flash-exp';
+            }
         } else {
             // Keep current model selection for coding mode
-            if (this.selectedModel === 'gemini-2.5-flash' || this.selectedModel === 'gemini-3-pro-preview') {
-                // Keep the selection
-            } else {
-                // Default to pro for coding mode
+            const validCodingModels = ['gemini-2.5-flash', 'gemini-3-pro-preview'];
+            if (!validCodingModels.includes(this.selectedModel)) {
                 this.selectedModel = 'gemini-3-pro-preview';
             }
         }
@@ -1158,7 +1165,7 @@ export class CustomizeView extends LitElement {
                                 </div>
                             </div>
                         ` : html`
-                            <!-- Other profiles: Only Interview mode available -->
+                            <!-- Other profiles: Interview mode with model selection -->
                             <div class="form-row">
                                 <div class="form-group">
                                     <label class="form-label">Mode (Fixed for ${this.getProfileNames()[this.selectedProfile]})</label>
@@ -1166,7 +1173,29 @@ export class CustomizeView extends LitElement {
                                         🎤 Interview Mode (Real-time Audio/Video)
                                     </div>
                                     <div class="form-description">
-                                        ${this.getProfileNames()[this.selectedProfile]} profile uses Interview mode with Gemini 2.0 Flash Exp for real-time audio processing and live interactions.
+                                        ${this.getProfileNames()[this.selectedProfile]} profile uses Interview mode for real-time audio processing and live interactions.
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="form-label">Model Selection</label>
+                                    <custom-dropdown
+                                        .value=${this.selectedModel}
+                                        .options=${[
+                                            { value: 'gemini-2.0-flash-exp', label: 'Gemini 2.0 Flash Exp', icon: './assets/models/500px-Google_Gemini_icon_2025.svg.png' },
+                                            { value: 'llama-4-maverick', label: 'Llama 4 Maverick 17B', icon: './assets/models/metalogo.dcf881ba.svg' },
+                                            { value: 'llama-4-scout', label: 'Llama 4 Scout 17B', icon: './assets/models/metalogo.dcf881ba.svg' }
+                                        ]}
+                                        @change=${e => this.handleModelChange({ target: { value: e.detail.value } })}
+                                    ></custom-dropdown>
+                                    <div class="form-description">
+                                        ${this.selectedModel === 'gemini-2.0-flash-exp'
+                                            ? 'Gemini Live API: Real-time audio streaming with speaker diarization. Requires Gemini API key.'
+                                            : this.selectedModel === 'llama-4-maverick'
+                                            ? 'Llama 4 Maverick: Fast responses via Groq. Uses Whisper for STT + Llama for responses. Requires Groq API key.'
+                                            : 'Llama 4 Scout: Efficient model via Groq. Uses Whisper for STT + Llama for responses. Requires Groq API key.'}
                                     </div>
                                 </div>
                             </div>
