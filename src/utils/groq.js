@@ -618,7 +618,7 @@ async function analyzeWithLlama(text, imageData, model = 'llama-4-maverick') {
         return null;
     }
 
-    sendToRenderer('update-status', 'Analyzing screenshot...');
+    sendToRenderer('update-status', 'Analyzing...');
     console.log('[GROQ] Analyzing screenshot with text:', text.substring(0, 100) + '...');
 
     try {
