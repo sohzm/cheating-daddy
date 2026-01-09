@@ -400,10 +400,9 @@ function setupLinuxSystemAudioProcessing() {
 
                             if (useGroqForSTT) {
                                 // Send to Groq for Whisper transcription + Llama response
+                                // Just add audio - let checkAndFlush() timer handle processing
                                 await ipcRenderer.invoke('groq-add-audio', { data: base64Data });
-                                // Trigger processing after VAD commits (end of speech)
-                                await ipcRenderer.invoke('groq-flush-audio', selectedModel);
-                                console.log('[GROQ] VAD audio segment sent for transcription');
+                                console.log('[GROQ] VAD segment added, duration:', metadata?.duration || 'unknown');
                             } else {
                                 // Send to Gemini Live API
                                 await ipcRenderer.invoke('send-audio-content', {
@@ -519,10 +518,9 @@ function setupWindowsLoopbackProcessing() {
 
                             if (useGroqForSTT) {
                                 // Send to Groq for Whisper transcription + Llama response
+                                // Just add audio - let checkAndFlush() timer handle processing
                                 await ipcRenderer.invoke('groq-add-audio', { data: base64Data });
-                                // Trigger processing after VAD commits (end of speech)
-                                await ipcRenderer.invoke('groq-flush-audio', selectedModel);
-                                console.log('[GROQ] VAD audio segment sent for transcription');
+                                console.log('[GROQ] VAD segment added, duration:', metadata?.duration || 'unknown');
                             } else {
                                 // Send to Gemini Live API
                                 await ipcRenderer.invoke('send-audio-content', {

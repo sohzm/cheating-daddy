@@ -25,7 +25,7 @@ let conversationHistory = [];
 let currentSystemPrompt = '';
 
 // Minimum audio duration in seconds before sending to Groq (to avoid sending tiny clips)
-const MIN_AUDIO_DURATION_SECONDS = 2.5; // Increased to avoid cutting off mid-sentence
+const MIN_AUDIO_DURATION_SECONDS = 1.5; // Reduced since we now only buffer speech
 const SAMPLE_RATE = 24000; // 24kHz as used in the app
 const BYTES_PER_SAMPLE = 2; // 16-bit PCM
 
@@ -39,8 +39,8 @@ const SPEECH_RMS_THRESHOLD = 500; // RMS above this is considered speech
 // Speech state tracking for smarter flush
 let lastSpeechTime = 0; // Timestamp of last detected speech
 let isSpeaking = false; // Currently in speech segment
-const SILENCE_AFTER_SPEECH_MS = 2500; // Wait 2.5 seconds of silence after speech before flushing (increased from 1.5s)
-const POST_SPEECH_CONTEXT_MS = 800; // Include 0.8s of silence after speech ends
+const SILENCE_AFTER_SPEECH_MS = 1500; // Wait 1.5 seconds of silence after speech before flushing
+const POST_SPEECH_CONTEXT_MS = 500; // Include 0.5s of silence after speech ends
 
 // Periodic check timer
 let checkTimer = null;
@@ -557,11 +557,12 @@ async function flushAudioBuffer(model = null) {
     const totalBytes = speechBuffer.reduce((sum, buf) => sum + buf.length, 0);
     const totalDuration = totalBytes / (SAMPLE_RATE * BYTES_PER_SAMPLE);
 
-    // Need at least MIN_AUDIO_DURATION_SECONDS for meaningful transcription
-    // This prevents garbage transcriptions from short audio clips
-    if (totalDuration < MIN_AUDIO_DURATION_SECONDS) {
-        console.log(`[GROQ] Flush rejected - audio too short (${totalDuration.toFixed(2)}s < ${MIN_AUDIO_DURATION_SECONDS}s)`);
-        // Don't clear buffers - let more audio accumulate
+    // Need at least 0.5 seconds for meaningful transcription
+    // VAD triggered this flush, so we trust the end-of-speech detection
+    if (totalDuration < 0.5) {
+        // Too short - silently discard
+        speechBuffer = [];
+        contextBuffer = [];
         return null;
     }
 
