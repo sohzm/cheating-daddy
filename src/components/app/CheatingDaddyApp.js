@@ -304,11 +304,8 @@ export class CheatingDaddyApp extends LitElement {
 
         // Set current mode and model for header display
         this.currentMode = selectedMode;
-        if (selectedMode === 'interview') {
-            this.currentModel = 'gemini-2.0-flash-exp';
-        } else {
-            this.currentModel = selectedModel;
-        }
+        // Use the actual selected model (could be Gemini or Llama/Groq)
+        this.currentModel = selectedModel;
 
         // Always use manual mode to prevent rate limits and token exhaustion
         const screenshotMode = 'manual';

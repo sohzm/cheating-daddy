@@ -82,12 +82,19 @@ function initializeGroq(apiKey, customPrompt = '', profile = 'interview', langua
     const googleSearchEnabled = false;
     currentSystemPrompt = getSystemPrompt(profile, customPrompt, googleSearchEnabled);
 
-    // Add language instruction
+    // Add language instruction - matches Gemini's full language support
     const languageMap = {
         'en-US': 'English', 'en-GB': 'English', 'en-AU': 'English', 'en-IN': 'English',
         'es-ES': 'Spanish', 'es-US': 'Spanish', 'fr-FR': 'French', 'fr-CA': 'French',
-        'de-DE': 'German', 'it-IT': 'Italian', 'pt-BR': 'Portuguese', 'hi-IN': 'Hindi',
-        'ja-JP': 'Japanese', 'ko-KR': 'Korean', 'cmn-CN': 'Chinese (Simplified)',
+        'de-DE': 'German', 'it-IT': 'Italian', 'pt-BR': 'Portuguese', 'pt-PT': 'Portuguese',
+        'ru-RU': 'Russian', 'ja-JP': 'Japanese', 'ko-KR': 'Korean',
+        'zh-CN': 'Chinese (Simplified)', 'cmn-CN': 'Chinese (Simplified)', 'zh-TW': 'Chinese (Traditional)',
+        'ar-SA': 'Arabic', 'ar-XA': 'Arabic', 'hi-IN': 'Hindi',
+        'nl-NL': 'Dutch', 'pl-PL': 'Polish', 'tr-TR': 'Turkish',
+        'sv-SE': 'Swedish', 'da-DK': 'Danish', 'fi-FI': 'Finnish', 'no-NO': 'Norwegian',
+        'th-TH': 'Thai', 'te-IN': 'Telugu', 'ta-IN': 'Tamil', 'mr-IN': 'Marathi',
+        'ml-IN': 'Malayalam', 'kn-IN': 'Kannada', 'gu-IN': 'Gujarati', 'bn-IN': 'Bengali',
+        'vi-VN': 'Vietnamese', 'id-ID': 'Indonesian',
     };
 
     const selectedLanguageName = languageMap[language] || 'English';
@@ -519,7 +526,7 @@ async function processAudioBuffer(model = null) {
 
         // Send transcription to renderer
         sendToRenderer('groq-transcription', transcription);
-        sendToRenderer('update-status', 'Generating response...');
+        sendToRenderer('update-status', 'Generating...');
 
         // Step 2: Send transcription to Llama for response
         const response = await chatWithLlama(transcription, chatModel);
@@ -589,7 +596,7 @@ async function flushAudioBuffer(model = null) {
         }
 
         sendToRenderer('groq-transcription', transcription);
-        sendToRenderer('update-status', 'Generating response...');
+        sendToRenderer('update-status', 'Generating...');
 
         // Send to Llama for response
         const response = await chatWithLlama(transcription, chatModel);
