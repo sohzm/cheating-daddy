@@ -1,4 +1,5 @@
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
+import { resizeLayout } from '../../utils/windowResize.js';
 
 export class OnboardingView extends LitElement {
     static styles = css`
@@ -49,59 +50,59 @@ export class OnboardingView extends LitElement {
             top: 0;
             left: 0;
             right: 0;
-            bottom: 60px;
+            bottom: 50px;
             z-index: 1;
             display: flex;
             flex-direction: column;
             justify-content: center;
-            padding: 32px 48px;
-            max-width: 500px;
+            padding: 20px 32px;
+            max-width: 450px;
             color: #e5e5e5;
             overflow: hidden;
         }
 
         .slide-icon {
-            width: 48px;
-            height: 48px;
-            margin-bottom: 16px;
+            width: 36px;
+            height: 36px;
+            margin-bottom: 12px;
             opacity: 0.9;
             display: block;
         }
 
         .slide-title {
-            font-size: 28px;
+            font-size: 24px;
             font-weight: 600;
-            margin-bottom: 12px;
+            margin-bottom: 8px;
             color: #ffffff;
             line-height: 1.3;
         }
 
         .slide-content {
-            font-size: 16px;
+            font-size: 14px;
             line-height: 1.5;
-            margin-bottom: 24px;
+            margin-bottom: 16px;
             color: #b8b8b8;
             font-weight: 400;
         }
 
         .context-textarea {
             width: 100%;
-            height: 100px;
-            padding: 16px;
+            height: 80px;
+            padding: 12px;
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 8px;
             background: rgba(255, 255, 255, 0.05);
             color: #e5e5e5;
-            font-size: 14px;
+            font-size: 13px;
             font-family: inherit;
             resize: vertical;
             transition: all 0.2s ease;
-            margin-bottom: 24px;
+            margin-bottom: 16px;
         }
 
         .context-textarea::placeholder {
             color: rgba(255, 255, 255, 0.4);
-            font-size: 14px;
+            font-size: 13px;
         }
 
         .context-textarea:focus {
@@ -117,14 +118,14 @@ export class OnboardingView extends LitElement {
         .feature-item {
             display: flex;
             align-items: center;
-            margin-bottom: 12px;
-            font-size: 15px;
+            margin-bottom: 8px;
+            font-size: 13px;
             color: #b8b8b8;
         }
 
         .feature-icon {
-            font-size: 16px;
-            margin-right: 12px;
+            font-size: 14px;
+            margin-right: 10px;
             opacity: 0.8;
         }
 
@@ -137,11 +138,11 @@ export class OnboardingView extends LitElement {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 16px 24px;
+            padding: 12px 20px;
             background: rgba(0, 0, 0, 0.3);
             backdrop-filter: blur(10px);
             border-top: 1px solid rgba(255, 255, 255, 0.05);
-            height: 60px;
+            height: 50px;
             box-sizing: border-box;
         }
 
@@ -149,17 +150,17 @@ export class OnboardingView extends LitElement {
             background: rgba(255, 255, 255, 0.08);
             border: 1px solid rgba(255, 255, 255, 0.1);
             color: #e5e5e5;
-            padding: 8px 16px;
+            padding: 6px 12px;
             border-radius: 6px;
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 500;
             cursor: pointer;
             transition: all 0.2s ease;
             display: flex;
             align-items: center;
             justify-content: center;
-            min-width: 36px;
-            min-height: 36px;
+            min-width: 32px;
+            min-height: 32px;
         }
 
         .nav-button:hover {
@@ -184,17 +185,17 @@ export class OnboardingView extends LitElement {
 
         .progress-dots {
             display: flex;
-            gap: 12px;
+            gap: 10px;
             align-items: center;
         }
 
         .dot {
-            width: 8px;
-            height: 8px;
+            width: 6px;
+            height: 6px;
             border-radius: 50%;
             background: rgba(255, 255, 255, 0.2);
             transition: all 0.2s ease;
-            cursor: pointer;
+            cursor: default;
         }
 
         .dot:hover {
@@ -285,6 +286,9 @@ export class OnboardingView extends LitElement {
         this.ctx = this.canvas.getContext('2d');
         this.resizeCanvas();
         this.startGradientAnimation();
+
+        // Resize window to match layout preference (same as main window)
+        resizeLayout();
 
         window.addEventListener('resize', () => this.resizeCanvas());
     }
@@ -453,7 +457,7 @@ export class OnboardingView extends LitElement {
                 icon: 'assets/onboarding/welcome.svg',
                 title: 'Welcome to Cheating Daddy',
                 content:
-                    'Your AI assistant that listens and watches, then provides intelligent suggestions automatically during interviews and meetings.',
+                    'Your AI assistant that listens and watches, then provides intelligent suggestions automatically during interviews and also provide answers in exams.',
             },
             {
                 icon: 'assets/onboarding/security.svg',
@@ -461,10 +465,9 @@ export class OnboardingView extends LitElement {
                 content: 'Invisible to screen sharing apps and recording software. Your secret advantage stays completely hidden from others.',
             },
             {
-                icon: 'assets/onboarding/context.svg',
-                title: 'Add Your Context',
-                content: 'Share relevant information to help the AI provide better, more personalized assistance.',
-                showTextarea: true,
+                icon: 'assets/onboarding/language.svg',
+                title: 'Multiple Languages',
+                content: 'Supports interviews and exam mode in many languages. Select your preferred language in settings to get AI responses in your native tongue.',
             },
             {
                 icon: 'assets/onboarding/customize.svg',
@@ -526,7 +529,7 @@ export class OnboardingView extends LitElement {
 
                 <div class="navigation">
                     <button class="nav-button" @click=${this.prevSlide} ?disabled=${this.currentSlide === 0}>
-                        <svg width="16px" height="16px" stroke-width="2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <svg width="14px" height="14px" stroke-width="2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M15 6L9 12L15 18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"></path>
                         </svg>
                     </button>
@@ -550,7 +553,7 @@ export class OnboardingView extends LitElement {
                         ${this.currentSlide === 4
                             ? 'Get Started'
                             : html`
-                                  <svg width="16px" height="16px" stroke-width="2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                  <svg width="14px" height="14px" stroke-width="2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                       <path d="M9 6L15 12L9 18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"></path>
                                   </svg>
                               `}
