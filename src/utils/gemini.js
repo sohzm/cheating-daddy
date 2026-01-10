@@ -41,6 +41,7 @@ let reconnectionAttempts = 0;
 let maxReconnectionAttempts = 3;
 let reconnectionDelay = 2000; // 2 seconds between attempts
 let lastSessionParams = null;
+let storedLanguageName = 'English'; // Store the selected language name for use in prompts
 
 // macOS VAD tracking variables
 let macVADProcessor = null;
@@ -344,6 +345,7 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
     };
 
     const selectedLanguageName = languageMap[language] || 'English';
+    storedLanguageName = selectedLanguageName; // Store for use in text/screenshot prompts
 
     // Add critical language instruction to system prompt
     systemPrompt += `\n\n=== CRITICAL LANGUAGE INSTRUCTION ===
@@ -668,7 +670,12 @@ RESPONSE FORMAT: [approach sentence] + [code] + [complexity]`;
                             const parts = [];
 
                             if (input.text) {
-                                parts.push({ text: input.text });
+                                // Add language reminder for non-English languages
+                                let finalText = input.text;
+                                if (storedLanguageName !== 'English') {
+                                    finalText = `${input.text} (Remember: Respond in ${storedLanguageName})`;
+                                }
+                                parts.push({ text: finalText });
                             }
 
                             if (input.media) {
@@ -678,6 +685,10 @@ RESPONSE FORMAT: [approach sentence] + [code] + [complexity]`;
                                         data: input.media.data
                                     }
                                 });
+                                // Add language reminder for non-English when only screenshot (no text provided)
+                                if (!input.text && storedLanguageName !== 'English') {
+                                    parts.push({ text: `(Remember: Respond in ${storedLanguageName})` });
+                                }
                             }
 
                             // Build full conversation with history
@@ -1213,8 +1224,14 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
                 return { success: false, error: 'Invalid text message' };
             }
 
-            console.log('Sending text message:', text);
-            await geminiSessionRef.current.sendRealtimeInput({ text: text.trim() });
+            // Add language reminder for non-English languages
+            let finalText = text.trim();
+            if (storedLanguageName !== 'English') {
+                finalText += ` (Remember: Respond in ${storedLanguageName})`;
+            }
+
+            console.log('Sending text message:', finalText);
+            await geminiSessionRef.current.sendRealtimeInput({ text: finalText });
             return { success: true };
         } catch (error) {
             console.error('Error sending text:', error);
@@ -1238,10 +1255,16 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
             // Check current mode to handle differently
             const currentMode = lastSessionParams?.mode || 'interview';
 
+            // Add language reminder for non-English languages
+            let finalText = text.trim();
+            if (storedLanguageName !== 'English') {
+                finalText += ` (Remember: Respond in ${storedLanguageName})`;
+            }
+
             if (currentMode === 'interview') {
                 // Interview mode (Live API): Send screenshot and text SEPARATELY
                 // Live API doesn't support media + text in one request
-                console.log('Interview mode: Sending screenshot + text in TWO separate requests:', text);
+                console.log('Interview mode: Sending screenshot + text in TWO separate requests:', finalText);
 
                 // 1. Send screenshot first
                 process.stdout.write('!');
@@ -1251,15 +1274,15 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
 
                 // 2. Send text prompt second
                 await geminiSessionRef.current.sendRealtimeInput({
-                    text: text.trim()
+                    text: finalText
                 });
             } else {
                 // Exam Assistant mode (Regular API): Send screenshot + text together in ONE request
-                console.log('Exam mode: Sending screenshot + text in one request:', text);
+                console.log('Exam mode: Sending screenshot + text in one request:', finalText);
 
                 await geminiSessionRef.current.sendRealtimeInput({
                     media: { data: imageData, mimeType: 'image/jpeg' },
-                    text: text.trim()
+                    text: finalText
                 });
             }
 

@@ -49,6 +49,9 @@ const CHECK_INTERVAL_MS = 500; // Check every 500ms for faster response
 // Store selected model for chat completion
 let selectedLlamaModel = 'llama-4-maverick';
 
+// Store selected language name for use in prompts
+let storedLanguageName = 'English';
+
 function sendToRenderer(channel, data) {
     const windows = BrowserWindow.getAllWindows();
     if (windows.length > 0) {
@@ -98,6 +101,7 @@ function initializeGroq(apiKey, customPrompt = '', profile = 'interview', langua
     };
 
     const selectedLanguageName = languageMap[language] || 'English';
+    storedLanguageName = selectedLanguageName; // Store for use in text/screenshot prompts
     currentSystemPrompt += `\n\n=== CRITICAL LANGUAGE INSTRUCTION ===
 The user has selected ${selectedLanguageName} as their preferred language.
 YOU MUST respond ONLY in ${selectedLanguageName}, regardless of what language the interviewer uses.`;
@@ -629,7 +633,12 @@ async function analyzeWithLlama(text, imageData, model = 'llama-4-maverick') {
     console.log('[GROQ] Analyzing screenshot with text:', text.substring(0, 100) + '...');
 
     try {
-        const response = await chatWithLlama(text, model, imageData);
+        // Add language reminder for non-English languages
+        let finalText = text;
+        if (storedLanguageName !== 'English') {
+            finalText = `${text} (Remember: Respond in ${storedLanguageName})`;
+        }
+        const response = await chatWithLlama(finalText, model, imageData);
         // Status will be set to 'Listening...' by chatWithLlama on success
         return response;
     } catch (error) {
@@ -738,7 +747,12 @@ function setupGroqIpcHandlers() {
 
     ipcMain.handle('groq-chat', async (event, { message, model, imageData }) => {
         try {
-            const response = await chatWithLlama(message, model, imageData);
+            // Add language reminder for non-English languages
+            let finalMessage = message;
+            if (storedLanguageName !== 'English') {
+                finalMessage = `${message} (Remember: Respond in ${storedLanguageName})`;
+            }
+            const response = await chatWithLlama(finalMessage, model, imageData);
             return { success: true, response };
         } catch (error) {
             console.error('[GROQ] Chat error:', error);
