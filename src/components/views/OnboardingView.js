@@ -124,9 +124,12 @@ export class OnboardingView extends LitElement {
         }
 
         .feature-icon {
-            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             margin-right: 10px;
             opacity: 0.8;
+            color: #b8b8b8;
         }
 
         .navigation {
@@ -457,7 +460,7 @@ export class OnboardingView extends LitElement {
                 icon: 'assets/onboarding/welcome.svg',
                 title: 'Welcome to Cheating Daddy',
                 content:
-                    'Your AI assistant that listens and watches, then provides intelligent suggestions automatically during interviews and also provide answers in exams.',
+                    'Your AI assistant that listens and watches, then provides intelligent suggestions automatically during interviews and also provide accurate answers in exams.',
             },
             {
                 icon: 'assets/onboarding/security.svg',
@@ -478,7 +481,7 @@ export class OnboardingView extends LitElement {
             {
                 icon: 'assets/onboarding/ready.svg',
                 title: 'Ready to Go',
-                content: 'Add your Gemini API key in settings and start getting AI-powered assistance in real-time.',
+                content: 'Add your Gemini or Groq API key in settings and start getting AI-powered assistance in real-time for interviews and exams.',
             },
         ];
 
@@ -511,16 +514,34 @@ export class OnboardingView extends LitElement {
                         ? html`
                               <div class="feature-list">
                                   <div class="feature-item">
-                                      <span class="feature-icon">🎨</span>
+                                      <span class="feature-icon">
+                                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                                              <line x1="8" y1="21" x2="16" y2="21"></line>
+                                              <line x1="12" y1="17" x2="12" y2="21"></line>
+                                          </svg>
+                                      </span>
+                                      Multiple AI models to choose from
+                                  </div>
+                                  <div class="feature-item">
+                                      <span class="feature-icon">
+                                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                              <circle cx="9" cy="7" r="4"></circle>
+                                              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                                          </svg>
+                                      </span>
+                                      Interview and exam modes
+                                  </div>
+                                  <div class="feature-item">
+                                      <span class="feature-icon">
+                                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                              <circle cx="12" cy="12" r="3"></circle>
+                                              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                                          </svg>
+                                      </span>
                                       Customize AI behavior and responses
-                                  </div>
-                                  <div class="feature-item">
-                                      <span class="feature-icon">📚</span>
-                                      Review conversation history
-                                  </div>
-                                  <div class="feature-item">
-                                      <span class="feature-icon">🔧</span>
-                                      Adjust capture settings and intervals
                                   </div>
                               </div>
                           `
