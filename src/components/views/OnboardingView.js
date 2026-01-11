@@ -460,7 +460,7 @@ export class OnboardingView extends LitElement {
                 icon: 'assets/onboarding/welcome.svg',
                 title: 'Welcome to Cheating Daddy',
                 content:
-                    'Your AI assistant that listens and watches, then provides intelligent suggestions automatically during interviews and also provide accurate answers in exams.',
+                    'Your AI assistant that listens and watches, then provides intelligent suggestions automatically during interviews and also provides accurate answers in exams.',
             },
             {
                 icon: 'assets/onboarding/security.svg',

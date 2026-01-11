@@ -22,8 +22,41 @@ export class MainView extends LitElement {
             margin-bottom: 20px;
         }
 
+        .input-group .input-wrapper {
+            flex: 1;
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
         .input-group input {
             flex: 1;
+            padding-right: 40px;
+        }
+
+        .eye-toggle {
+            position: absolute;
+            right: 10px;
+            background: none;
+            border: none;
+            padding: 4px;
+            border-radius: 4px;
+            color: var(--icon-button-color);
+            opacity: 0.6;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.2s ease, background 0.2s ease;
+        }
+
+        .eye-toggle:hover {
+            opacity: 1;
+            background: var(--hover-background);
+        }
+
+        .eye-toggle svg {
+            width: 18px;
+            height: 18px;
         }
 
         input {
@@ -151,6 +184,7 @@ export class MainView extends LitElement {
         showApiKeyError: { type: Boolean },
         onClearAndRestart: { type: Function },
         selectedModel: { type: String },
+        showApiKey: { type: Boolean },
     };
 
     constructor() {
@@ -163,6 +197,11 @@ export class MainView extends LitElement {
         this.onClearAndRestart = () => {};
         this.boundKeydownHandler = this.handleKeydown.bind(this);
         this.selectedModel = localStorage.getItem('selectedModel') || 'gemini-2.0-flash-exp';
+        this.showApiKey = false;
+    }
+
+    toggleApiKeyVisibility() {
+        this.showApiKey = !this.showApiKey;
     }
 
     // Helper to check if selected model is a Groq/Llama model
@@ -338,13 +377,27 @@ export class MainView extends LitElement {
             <div class="welcome">Welcome</div>
 
             <div class="input-group">
-                <input
-                    type="password"
-                    placeholder="${apiKeyPlaceholder}"
-                    .value=${apiKeyValue}
-                    @input=${this.handleInput}
-                    class="${this.showApiKeyError ? 'api-key-error' : ''}"
-                />
+                <div class="input-wrapper">
+                    <input
+                        type="${this.showApiKey ? 'text' : 'password'}"
+                        placeholder="${apiKeyPlaceholder}"
+                        .value=${apiKeyValue}
+                        @input=${this.handleInput}
+                        class="${this.showApiKeyError ? 'api-key-error' : ''}"
+                    />
+                    <button class="eye-toggle" @click=${this.toggleApiKeyVisibility} title="${this.showApiKey ? 'Hide API Key' : 'Show API Key'}">
+                        ${this.showApiKey
+                            ? html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                                <line x1="1" y1="1" x2="23" y2="23"></line>
+                            </svg>`
+                            : html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>`
+                        }
+                    </button>
+                </div>
                 <button @click=${this.handleStartClick} class="start-button ${this.isInitializing ? 'initializing' : ''}">
                     ${this.getStartButtonText()}
                 </button>
