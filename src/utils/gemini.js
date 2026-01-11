@@ -49,6 +49,25 @@ let macVADEnabled = false;
 let macVADMode = 'automatic';
 let macMicrophoneEnabled = false;
 
+// Model generation settings (can be updated via IPC from renderer)
+let generationSettings = {
+    temperature: 0.7,
+    topP: 0.95,
+    maxOutputTokens: 8192,
+};
+
+// Model-specific max output token limits
+const MODEL_MAX_OUTPUT_TOKENS = {
+    'gemini-2.0-flash-exp': 8192,
+    'gemini-2.5-flash': 65536,
+    'gemini-3-pro-preview': 65536,
+};
+
+// Get max output tokens for a specific model
+function getMaxOutputTokensForModel(model) {
+    return MODEL_MAX_OUTPUT_TOKENS[model] || 8192;
+}
+
 function sendToRenderer(channel, data) {
     const windows = BrowserWindow.getAllWindows();
     if (windows.length > 0) {
@@ -703,15 +722,19 @@ RESPONSE FORMAT: [approach sentence] + [code] + [complexity]`;
                             }
 
                             // Use streaming for faster display with context caching
+                            // Ensure maxOutputTokens doesn't exceed model's limit
+                            const modelMaxTokens = getMaxOutputTokensForModel(this.model);
+                            const effectiveMaxTokens = Math.min(generationSettings.maxOutputTokens, modelMaxTokens);
+
                             const streamResult = await this.client.models.generateContentStream({
                                 model: this.model,
                                 contents: contents,
                                 systemInstruction: { parts: [{ text: this.systemPrompt }] },
                                 generationConfig: {
-                                    temperature: 0.7,
+                                    temperature: generationSettings.temperature,
                                     topK: 40,
-                                    topP: 0.95,
-                                    maxOutputTokens: 8192,
+                                    topP: generationSettings.topP,
+                                    maxOutputTokens: effectiveMaxTokens,
                                 },
                                 tools: this.tools.length > 0 ? this.tools : undefined,
                                 // Context caching: Cache system prompt for 5 minutes (one interview session)
@@ -1133,6 +1156,26 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
             return true;
         }
         return false;
+    });
+
+    // Update model generation settings from renderer
+    ipcMain.handle('update-generation-settings', async (event, settings) => {
+        if (settings.temperature !== undefined) {
+            generationSettings.temperature = settings.temperature;
+        }
+        if (settings.topP !== undefined) {
+            generationSettings.topP = settings.topP;
+        }
+        if (settings.maxOutputTokens !== undefined) {
+            generationSettings.maxOutputTokens = settings.maxOutputTokens;
+        }
+        console.log('[GEMINI] Generation settings updated:', generationSettings);
+        return { success: true };
+    });
+
+    // Get model-specific max output tokens
+    ipcMain.handle('get-model-max-tokens', async (event, model) => {
+        return getMaxOutputTokensForModel(model);
     });
 
     ipcMain.handle('send-audio-content', async (event, { data, mimeType }) => {

@@ -603,11 +603,27 @@ export class CustomizeView extends LitElement {
             // Exam Assistant -> Coding/OA mode
             this.selectedMode = 'coding';
             localStorage.setItem('selectedMode', 'coding');
+
+            // Validate model for coding mode
+            const validCodingModels = ['gemini-2.5-flash', 'gemini-3-pro-preview'];
+            if (!validCodingModels.includes(this.selectedModel)) {
+                this.selectedModel = 'gemini-2.5-flash';
+            }
         } else {
             // All other profiles -> Interview mode
             this.selectedMode = 'interview';
             localStorage.setItem('selectedMode', 'interview');
+
+            // Validate model for interview mode
+            const validInterviewModels = ['gemini-2.0-flash-exp', 'llama-4-maverick', 'llama-4-scout'];
+            if (!validInterviewModels.includes(this.selectedModel)) {
+                this.selectedModel = 'gemini-2.0-flash-exp';
+            }
         }
+
+        // Save the validated model and dispatch event
+        localStorage.setItem('selectedModel', this.selectedModel);
+        window.dispatchEvent(new CustomEvent('modelChanged', { detail: { model: this.selectedModel } }));
 
         // Update the textarea value
         this.requestUpdate();
@@ -1065,6 +1081,8 @@ export class CustomizeView extends LitElement {
             }
         }
         localStorage.setItem('selectedModel', this.selectedModel);
+        // Dispatch custom event for same-window listeners (like AdvancedView)
+        window.dispatchEvent(new CustomEvent('modelChanged', { detail: { model: this.selectedModel } }));
 
         this.requestUpdate();
     }
@@ -1072,6 +1090,8 @@ export class CustomizeView extends LitElement {
     async handleModelChange(e) {
         this.selectedModel = e.target.value;
         localStorage.setItem('selectedModel', this.selectedModel);
+        // Dispatch custom event for same-window listeners (like AdvancedView)
+        window.dispatchEvent(new CustomEvent('modelChanged', { detail: { model: this.selectedModel } }));
 
         this.requestUpdate();
     }
