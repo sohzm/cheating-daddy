@@ -358,34 +358,54 @@ export class CustomizeView extends LitElement {
             cursor: default;
         }
 
+        .slider-input::-webkit-slider-runnable-track {
+            height: 4px;
+            border-radius: 2px;
+        }
+
+        .slider-input::-moz-range-track {
+            height: 4px;
+            border-radius: 2px;
+            background: var(--input-background, rgba(0, 0, 0, 0.3));
+        }
+
+        .slider-input::-moz-range-progress {
+            height: 4px;
+            border-radius: 2px;
+            background: rgba(0, 122, 255, 0.6);
+        }
+
         .slider-input::-webkit-slider-thumb {
             -webkit-appearance: none;
             appearance: none;
-            width: 16px;
-            height: 16px;
+            width: 14px;
+            height: 14px;
             border-radius: 50%;
             background: var(--focus-border-color, #007aff);
             cursor: default;
             border: 2px solid var(--text-color, white);
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            margin-top: -5px;
         }
 
         .slider-input::-moz-range-thumb {
-            width: 16px;
-            height: 16px;
+            width: 14px;
+            height: 14px;
             border-radius: 50%;
             background: var(--focus-border-color, #007aff);
             cursor: default;
             border: 2px solid var(--text-color, white);
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
         }
 
         .slider-input:hover::-webkit-slider-thumb {
-            background: var(--text-input-button-hover, #0056b3);
+            background: #0056b3;
+            box-shadow: 0 2px 6px rgba(0, 122, 255, 0.6);
         }
 
         .slider-input:hover::-moz-range-thumb {
-            background: var(--text-input-button-hover, #0056b3);
+            background: #0056b3;
+            box-shadow: 0 2px 6px rgba(0, 122, 255, 0.6);
         }
 
         .slider-labels {
@@ -994,6 +1014,11 @@ export class CustomizeView extends LitElement {
         this.updateBackgroundTransparency();
     }
 
+    getSliderBackground(value, min, max) {
+        const percentage = ((value - min) / (max - min)) * 100;
+        return `linear-gradient(to right, rgba(0, 122, 255, 0.6) 0%, rgba(0, 122, 255, 0.6) ${percentage}%, rgba(0, 0, 0, 0.3) ${percentage}%, rgba(0, 0, 0, 0.3) 100%)`;
+    }
+
     handleBackgroundTransparencyChange(e) {
         this.backgroundTransparency = parseFloat(e.target.value);
         localStorage.setItem('backgroundTransparency', this.backgroundTransparency.toString());
@@ -1353,6 +1378,7 @@ export class CustomizeView extends LitElement {
                                     max="1"
                                     step="0.01"
                                     .value=${this.backgroundTransparency}
+                                    style="background: ${this.getSliderBackground(this.backgroundTransparency, 0, 1)}"
                                     @input=${this.handleBackgroundTransparencyChange}
                                 />
                                 <div class="slider-labels">
@@ -1378,6 +1404,7 @@ export class CustomizeView extends LitElement {
                                     max="32"
                                     step="1"
                                     .value=${this.fontSize}
+                                    style="background: ${this.getSliderBackground(this.fontSize, 12, 32)}"
                                     @input=${this.handleFontSizeChange}
                                 />
                                 <div class="slider-labels">
