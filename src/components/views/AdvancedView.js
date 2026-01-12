@@ -97,7 +97,7 @@ export class AdvancedView extends LitElement {
             font-size: 11px;
             color: var(--danger-color, #ef4444);
             display: flex;
-            align-items: flex-start;
+            align-items: center;
             gap: 8px;
             line-height: 1.4;
         }
@@ -428,7 +428,7 @@ export class AdvancedView extends LitElement {
         .model-badge {
             font-size: 11px;
             padding: 3px 10px;
-            border-radius: 10px;
+            border-radius: 6px;
             background: var(--success-background, rgba(52, 211, 153, 0.1));
             color: var(--success-color, #34d399);
             border: 1px solid var(--success-border, rgba(52, 211, 153, 0.2));
@@ -465,10 +465,20 @@ export class AdvancedView extends LitElement {
 
     // Model-specific max output token limits
     static MODEL_MAX_TOKENS = {
+        // Gemini models
         'gemini-2.0-flash-exp': 8192,
         'gemini-2.5-flash': 65536,
         'gemini-3-pro-preview': 65536,
+        // Groq Llama models
+        'llama-4-maverick': 8192,
+        'llama-4-scout': 8192,
     };
+
+    // Default temperature for all models
+    static DEFAULT_TEMPERATURE = 0.7;
+
+    // Default top_p for all models
+    static DEFAULT_TOP_P = 0.95;
 
     constructor() {
         super();
@@ -479,10 +489,10 @@ export class AdvancedView extends LitElement {
         // Content protection default
         this.contentProtection = true;
 
-        // Model generation defaults (Gemini optimized values)
-        this.temperature = 0.7;
-        this.topP = 0.95;
+        // Model generation defaults (model-specific values)
         this.selectedModel = localStorage.getItem('selectedModel') || 'gemini-2.0-flash-exp';
+        this.temperature = this.getDefaultTemperature();
+        this.topP = this.getDefaultTopP();
         this.maxOutputTokens = this.getDefaultMaxTokens();
 
         this.loadContentProtectionSetting();
@@ -499,12 +509,24 @@ export class AdvancedView extends LitElement {
         return AdvancedView.MODEL_MAX_TOKENS[this.selectedModel] || 65536;
     }
 
+    // Get default temperature (same for all models)
+    getDefaultTemperature() {
+        return AdvancedView.DEFAULT_TEMPERATURE;
+    }
+
+    // Get default top_p (same for all models)
+    getDefaultTopP() {
+        return AdvancedView.DEFAULT_TOP_P;
+    }
+
     // Get display name for the current model
     getModelDisplayName() {
         const modelNames = {
             'gemini-2.0-flash-exp': 'Gemini 2.0 Flash',
             'gemini-2.5-flash': 'Gemini 2.5 Flash',
             'gemini-3-pro-preview': 'Gemini 3.0 Pro',
+            'llama-4-maverick': 'Llama 4 Maverick',
+            'llama-4-scout': 'Llama 4 Scout',
         };
         return modelNames[this.selectedModel] || this.selectedModel;
     }
@@ -512,6 +534,16 @@ export class AdvancedView extends LitElement {
     // Check if model should have orange badge (exam mode models)
     isExamModeModel() {
         return this.selectedModel === 'gemini-2.5-flash' || this.selectedModel === 'gemini-3-pro-preview';
+    }
+
+    // Check if current model is a Groq Llama model
+    isGroqModel() {
+        return this.selectedModel === 'llama-4-maverick' || this.selectedModel === 'llama-4-scout';
+    }
+
+    // Get provider name for display
+    getProviderName() {
+        return this.isGroqModel() ? 'Groq Llama' : 'Gemini';
     }
 
     connectedCallback() {
@@ -710,8 +742,9 @@ export class AdvancedView extends LitElement {
     }
 
     async resetModelSettings() {
-        this.temperature = 0.7;
-        this.topP = 0.95;
+        // Use model-specific defaults
+        this.temperature = this.getDefaultTemperature();
+        this.topP = this.getDefaultTopP();
         this.maxOutputTokens = this.getDefaultMaxTokens();
 
         localStorage.removeItem('geminiTemperature');
@@ -778,7 +811,7 @@ export class AdvancedView extends LitElement {
                         <span>Model Generation Settings</span>
                     </div>
                     <div class="advanced-description">
-                        Adjust how Gemini models generate responses. These settings affect creativity, randomness, and response length.
+                        Adjust how ${this.getProviderName()} models generate responses. These settings affect creativity, randomness, and response length.
                     </div>
 
                     <div class="settings-grid">
@@ -859,7 +892,7 @@ export class AdvancedView extends LitElement {
                             Reset to Defaults
                         </button>
                         <div class="form-description" style="margin-top: 8px;">
-                            <span class="defaults-label">Default:</span> <span class="defaults-values">Temperature 0.7, Top P 0.95, Output Length ${this.getDefaultMaxTokens()}</span>
+                            <span class="defaults-label">Default:</span> <span class="defaults-values">Temperature ${this.getDefaultTemperature()}, Top P ${this.getDefaultTopP()}, Output Length ${this.getDefaultMaxTokens()}</span>
                         </div>
                     </div>
                 </div>
@@ -876,7 +909,7 @@ export class AdvancedView extends LitElement {
 
                     <div>
                         <button class="action-button danger-button" @click=${this.clearLocalData} ?disabled=${this.isClearing}>
-                            ${this.isClearing ? '🔄 Clearing...' : '🗑️ Clear All Local Data'}
+                            ${this.isClearing ? 'Clearing...' : 'Clear All Local Data'}
                         </button>
 
                         ${this.statusMessage

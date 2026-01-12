@@ -58,9 +58,13 @@ let generationSettings = {
 
 // Model-specific max output token limits
 const MODEL_MAX_OUTPUT_TOKENS = {
+    // Gemini models
     'gemini-2.0-flash-exp': 8192,
     'gemini-2.5-flash': 65536,
     'gemini-3-pro-preview': 65536,
+    // Groq Llama models
+    'llama-4-maverick': 8192,
+    'llama-4-scout': 8192,
 };
 
 // Get max output tokens for a specific model
