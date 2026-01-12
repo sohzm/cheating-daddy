@@ -98,6 +98,22 @@ export class AppHeader extends LitElement {
             opacity: 1;
         }
 
+        .update-button-wrapper {
+            position: relative;
+            display: inline-flex;
+        }
+
+        .update-dot {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            width: 8px;
+            height: 8px;
+            background: #ef4444;
+            border-radius: 50%;
+            border: 2px solid var(--header-background);
+        }
+
         .button:hover {
             background: var(--hover-background);
         }
@@ -131,6 +147,8 @@ export class AppHeader extends LitElement {
         isClickThrough: { type: Boolean, reflect: true },
         advancedMode: { type: Boolean },
         onAdvancedClick: { type: Function },
+        onUpdateCheckClick: { type: Function },
+        updateAvailable: { type: Boolean },
     };
 
     constructor() {
@@ -149,6 +167,8 @@ export class AppHeader extends LitElement {
         this.isClickThrough = false;
         this.advancedMode = false;
         this.onAdvancedClick = () => {};
+        this.onUpdateCheckClick = () => {};
+        this.updateAvailable = false;
         this._timerInterval = null;
     }
 
@@ -335,6 +355,42 @@ export class AppHeader extends LitElement {
                                         </button>
                                     `
                                   : ''}
+                              <div class="update-button-wrapper">
+                                  <button class="icon-button" @click=${this.onUpdateCheckClick}>
+                                      <svg
+                                          width="24px"
+                                          height="24px"
+                                          stroke-width="1.7"
+                                          viewBox="0 0 24 24"
+                                          fill="none"
+                                          xmlns="http://www.w3.org/2000/svg"
+                                          color="currentColor"
+                                      >
+                                          <path
+                                              d="M22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C14.663 22 17.0766 20.9743 18.8556 19.2857"
+                                              stroke="currentColor"
+                                              stroke-width="1.7"
+                                              stroke-linecap="round"
+                                              stroke-linejoin="round"
+                                          ></path>
+                                          <path
+                                              d="M12 8V12L15 15"
+                                              stroke="currentColor"
+                                              stroke-width="1.7"
+                                              stroke-linecap="round"
+                                              stroke-linejoin="round"
+                                          ></path>
+                                          <path
+                                              d="M19 19L22 22"
+                                              stroke="currentColor"
+                                              stroke-width="1.7"
+                                              stroke-linecap="round"
+                                              stroke-linejoin="round"
+                                          ></path>
+                                      </svg>
+                                  </button>
+                                  ${this.updateAvailable ? html`<span class="update-dot"></span>` : ''}
+                              </div>
                               <button class="icon-button" @click=${this.onCustomizeClick}>
                                   <?xml version="1.0" encoding="UTF-8"?><svg
                                       width="24px"

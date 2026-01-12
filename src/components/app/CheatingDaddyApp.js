@@ -115,6 +115,7 @@ export class CheatingDaddyApp extends LitElement {
         _isClickThrough: { state: true },
         _awaitingNewResponse: { state: true },
         shouldAnimateResponse: { type: Boolean },
+        updateAvailable: { type: Boolean },
     };
 
     constructor() {
@@ -139,6 +140,7 @@ export class CheatingDaddyApp extends LitElement {
         this._awaitingNewResponse = false;
         this._currentResponseIsComplete = true;
         this.shouldAnimateResponse = false;
+        this.updateAvailable = false;
 
         // Apply layout mode to document root
         this.updateLayoutMode();
@@ -159,6 +161,9 @@ export class CheatingDaddyApp extends LitElement {
             ipcRenderer.on('click-through-toggled', (_, isEnabled) => {
                 this._isClickThrough = isEnabled;
             });
+            ipcRenderer.on('update-available', (_, available) => {
+                this.updateAvailable = available;
+            });
         }
 
         // Add global keyboard event listener for Ctrl+G
@@ -173,6 +178,7 @@ export class CheatingDaddyApp extends LitElement {
             ipcRenderer.removeAllListeners('update-response');
             ipcRenderer.removeAllListeners('update-status');
             ipcRenderer.removeAllListeners('click-through-toggled');
+            ipcRenderer.removeAllListeners('update-available');
         }
         
         // Remove global keyboard event listener
@@ -240,6 +246,18 @@ export class CheatingDaddyApp extends LitElement {
     handleAdvancedClick() {
         this.currentView = 'advanced';
         this.requestUpdate();
+    }
+
+    async handleUpdateCheckClick() {
+        if (window.require) {
+            const { ipcRenderer } = window.require('electron');
+            const result = await ipcRenderer.invoke('check-for-updates');
+            if (result && result.updateAvailable) {
+                this.updateAvailable = true;
+            } else {
+                this.updateAvailable = false;
+            }
+        }
     }
 
     async handleClose() {
@@ -553,9 +571,11 @@ export class CheatingDaddyApp extends LitElement {
                         .currentMode=${this.currentMode}
                         .currentModel=${this.currentModel}
                         .advancedMode=${this.advancedMode}
+                        .updateAvailable=${this.updateAvailable}
                         .onCustomizeClick=${() => this.handleCustomizeClick()}
                         .onHelpClick=${() => this.handleHelpClick()}
                         .onAdvancedClick=${() => this.handleAdvancedClick()}
+                        .onUpdateCheckClick=${() => this.handleUpdateCheckClick()}
                         .onCloseClick=${() => this.handleClose()}
                         .onBackClick=${() => this.handleBackClick()}
                         .onHideToggleClick=${() => this.handleHideToggle()}

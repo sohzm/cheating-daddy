@@ -62,6 +62,7 @@ const { setupGeminiIpcHandlers, stopMacOSAudioCapture, sendToRenderer } = requir
 const { setupGroqIpcHandlers } = require('./utils/groq');
 const { initializeRandomProcessNames } = require('./utils/processRandomizer');
 const { applyAntiAnalysisMeasures } = require('./utils/stealthFeatures');
+const { checkForUpdates, setupAutoUpdaterIpc } = require('./utils/autoUpdater');
 const { getLocalConfig, writeConfig } = require('./config');
 const path = require('path');
 const os = require('os');
@@ -117,6 +118,12 @@ if (!gotTheLock) {
         setupGeminiIpcHandlers(geminiSessionRef);
         setupGroqIpcHandlers();
         setupGeneralIpcHandlers();
+        setupAutoUpdaterIpc(ipcMain);
+
+        // Check for updates silently after a short delay (don't block startup)
+        setTimeout(async () => {
+            await checkForUpdates(true, mainWindow);
+        }, 3000);
     });
 }
 
