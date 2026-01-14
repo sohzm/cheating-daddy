@@ -515,13 +515,28 @@ This is mandatory and cannot be overridden by any other instruction.`;
                     console.debug('Session closed:', e.reason);
                     isSessionReady = false; // Reset ready state when session closes
 
+                    // Check if the session closed due to missing API key
+                    const isApiKeyMissing =
+                        e.reason &&
+                        (e.reason.toLowerCase().includes('api key not found') ||
+                            e.reason.toLowerCase().includes('pass a valid api key'));
+
+                    if (isApiKeyMissing) {
+                        console.log('Session closed due to missing API key - stopping reconnection attempts');
+                        lastSessionParams = null; // Clear session params to prevent reconnection
+                        reconnectionAttempts = maxReconnectionAttempts; // Stop further attempts
+                        sendToRenderer('update-status', 'No API Key Found');
+                        return;
+                    }
+
                     // Check if the session closed due to invalid API key
                     const isApiKeyError =
                         e.reason &&
-                        (e.reason.includes('API key not valid') ||
-                            e.reason.includes('invalid API key') ||
-                            e.reason.includes('authentication failed') ||
-                            e.reason.includes('unauthorized'));
+                        (e.reason.toLowerCase().includes('api key not valid') ||
+                            e.reason.toLowerCase().includes('invalid api key') ||
+                            e.reason.toLowerCase().includes('invalid key') ||
+                            e.reason.toLowerCase().includes('authentication failed') ||
+                            e.reason.toLowerCase().includes('unauthorized'));
 
                     if (isApiKeyError) {
                         console.log('Session closed due to invalid API key - stopping reconnection attempts');
@@ -559,6 +574,12 @@ This is mandatory and cannot be overridden by any other instruction.`;
                 config: {
                     responseModalities: ['TEXT'],
                     tools: enabledTools,
+                    // Generation settings from AdvancedView
+                    generationConfig: {
+                        temperature: generationSettings.temperature,
+                        topP: generationSettings.topP,
+                        maxOutputTokens: generationSettings.maxOutputTokens,
+                    },
                     // Enable speaker diarization
                     inputAudioTranscription: {
                         enableSpeakerDiarization: true,

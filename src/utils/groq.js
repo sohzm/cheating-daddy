@@ -52,6 +52,13 @@ let selectedLlamaModel = 'llama-4-maverick';
 // Store selected language name for use in prompts
 let storedLanguageName = 'English';
 
+// Generation settings (can be updated from AdvancedView like Gemini)
+let generationSettings = {
+    temperature: 0.7,
+    topP: 0.95,
+    maxOutputTokens: 4096,
+};
+
 function sendToRenderer(channel, data) {
     const windows = BrowserWindow.getAllWindows();
     if (windows.length > 0) {
@@ -284,8 +291,9 @@ async function chatWithLlama(userMessage, model = 'llama-4-maverick', imageData 
         const requestBody = JSON.stringify({
             model: modelId,
             messages: messages,
-            temperature: 0.7,
-            max_tokens: 4096,
+            temperature: generationSettings.temperature,
+            top_p: generationSettings.topP,
+            max_tokens: generationSettings.maxOutputTokens,
             stream: true
         });
 
@@ -694,6 +702,21 @@ function getConversationHistory() {
 }
 
 /**
+ * Update generation settings (temperature, topP, maxOutputTokens)
+ */
+function updateGenerationSettings(settings) {
+    if (settings.temperature !== undefined) {
+        generationSettings.temperature = settings.temperature;
+    }
+    if (settings.topP !== undefined) {
+        generationSettings.topP = settings.topP;
+    }
+    if (settings.maxOutputTokens !== undefined) {
+        generationSettings.maxOutputTokens = settings.maxOutputTokens;
+    }
+    console.log('[GROQ] Generation settings updated:', generationSettings);
+}
+/**
  * Setup IPC handlers for Groq
  */
 function setupGroqIpcHandlers() {
@@ -779,6 +802,16 @@ function setupGroqIpcHandlers() {
         return { success: true, history: getConversationHistory() };
     });
 
+    ipcMain.handle('groq-update-generation-settings', async (event, settings) => {
+        try {
+            updateGenerationSettings(settings);
+            return { success: true };
+        } catch (error) {
+            console.error('[GROQ] Update settings error:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
     console.log('[GROQ] IPC handlers registered');
 }
 
@@ -795,6 +828,7 @@ module.exports = {
     clearConversationHistory,
     getBufferDuration,
     isGroqInitialized,
+    updateGenerationSettings,
     getConversationHistory,
     setupGroqIpcHandlers,
     sendToRenderer,

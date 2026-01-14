@@ -483,7 +483,7 @@ export class AdvancedView extends LitElement {
         selectedModel: { type: String },
     };
 
-    // Model-specific max output token limits
+    // Model-specific max output token limits (maximum allowed)
     static MODEL_MAX_TOKENS = {
         // Gemini models
         'gemini-2.0-flash-exp': 8192,
@@ -494,11 +494,46 @@ export class AdvancedView extends LitElement {
         'llama-4-scout': 8192,
     };
 
-    // Default temperature for all models
-    static DEFAULT_TEMPERATURE = 0.7;
+    // Model-specific default settings based on 2025/2026 documentation
+    // Interview models: concise responses (lower tokens, balanced temp)
+    // Coding models: detailed responses (higher tokens, lower temp for accuracy)
+    static MODEL_DEFAULTS = {
+        // Gemini 2.0 Flash Exp - Interview mode (concise, conversational)
+        'gemini-2.0-flash-exp': {
+            temperature: 0.7,
+            topP: 0.95,
+            maxOutputTokens: 2048,
+        },
+        // Gemini 2.5 Flash - Coding mode (detailed code, more deterministic)
+        'gemini-2.5-flash': {
+            temperature: 0.5,
+            topP: 0.95,
+            maxOutputTokens: 8192,
+        },
+        // Gemini 3 Pro - Coding mode (very detailed, most accurate)
+        'gemini-3-pro-preview': {
+            temperature: 0.4,
+            topP: 0.95,
+            maxOutputTokens: 16384,
+        },
+        // Groq Llama 4 Maverick - Interview mode (concise, balanced)
+        'llama-4-maverick': {
+            temperature: 0.7,
+            topP: 0.95,
+            maxOutputTokens: 2048,
+        },
+        // Groq Llama 4 Scout - Interview mode (concise, balanced)
+        'llama-4-scout': {
+            temperature: 0.7,
+            topP: 0.95,
+            maxOutputTokens: 2048,
+        },
+    };
 
-    // Default top_p for all models
+    // Fallback defaults
+    static DEFAULT_TEMPERATURE = 0.7;
     static DEFAULT_TOP_P = 0.95;
+    static DEFAULT_MAX_TOKENS = 4096;
 
     constructor() {
         super();
@@ -521,7 +556,20 @@ export class AdvancedView extends LitElement {
 
     // Get default max tokens based on selected model
     getDefaultMaxTokens() {
-        return AdvancedView.MODEL_MAX_TOKENS[this.selectedModel] || 8192;
+        const defaults = AdvancedView.MODEL_DEFAULTS[this.selectedModel];
+        return defaults ? defaults.maxOutputTokens : AdvancedView.DEFAULT_MAX_TOKENS;
+    }
+
+    // Get default temperature based on selected model
+    getDefaultTemperature() {
+        const defaults = AdvancedView.MODEL_DEFAULTS[this.selectedModel];
+        return defaults ? defaults.temperature : AdvancedView.DEFAULT_TEMPERATURE;
+    }
+
+    // Get default topP based on selected model
+    getDefaultTopP() {
+        const defaults = AdvancedView.MODEL_DEFAULTS[this.selectedModel];
+        return defaults ? defaults.topP : AdvancedView.DEFAULT_TOP_P;
     }
 
     // Get max allowed tokens for current model
@@ -576,9 +624,8 @@ export class AdvancedView extends LitElement {
         const currentModel = localStorage.getItem('selectedModel') || 'gemini-2.0-flash-exp';
         if (currentModel !== this.selectedModel) {
             this.selectedModel = currentModel;
-            // Update max output tokens to the new model's default
-            this.maxOutputTokens = this.getDefaultMaxTokens();
-            this.loadModelSettings(); // Reload saved settings with new model limits
+            // Load this model's saved settings (or defaults if none saved)
+            this.loadModelSettings();
         }
 
         // Sync current settings to main process
@@ -589,9 +636,8 @@ export class AdvancedView extends LitElement {
             const newModel = e.detail?.model || 'gemini-2.0-flash-exp';
             if (newModel !== this.selectedModel) {
                 this.selectedModel = newModel;
-                // Update max output tokens to the new model's default
-                this.maxOutputTokens = this.getDefaultMaxTokens();
-                localStorage.setItem('geminiMaxOutputTokens', this.maxOutputTokens.toString());
+                // Load this model's saved settings (preserves custom values per model)
+                this.loadModelSettings();
                 this.syncSettingsToMain();
                 this.requestUpdate();
             }
@@ -604,9 +650,8 @@ export class AdvancedView extends LitElement {
                 const newModel = e.newValue || 'gemini-2.0-flash-exp';
                 if (newModel !== this.selectedModel) {
                     this.selectedModel = newModel;
-                    // Update max output tokens to the new model's default
-                    this.maxOutputTokens = this.getDefaultMaxTokens();
-                    localStorage.setItem('geminiMaxOutputTokens', this.maxOutputTokens.toString());
+                    // Load this model's saved settings (preserves custom values per model)
+                    this.loadModelSettings();
                     this.syncSettingsToMain();
                     this.requestUpdate();
                 }
@@ -711,23 +756,71 @@ export class AdvancedView extends LitElement {
     }
 
     // Model generation settings methods
-    loadModelSettings() {
-        const temperature = localStorage.getItem('geminiTemperature');
-        const topP = localStorage.getItem('geminiTopP');
-        const maxOutputTokens = localStorage.getItem('geminiMaxOutputTokens');
+    // Settings are now stored PER MODEL to preserve custom values when switching
+    getStorageKey(setting) {
+        return `modelSettings_${this.selectedModel}_${setting}`;
+    }
 
+    loadModelSettings() {
+        const model = this.selectedModel;
+
+        // Load model-specific settings (each model has its own saved values)
+        const temperature = localStorage.getItem(this.getStorageKey('temperature'));
+        const topP = localStorage.getItem(this.getStorageKey('topP'));
+        const maxOutputTokens = localStorage.getItem(this.getStorageKey('maxOutputTokens'));
+
+        // If this model has saved settings, use them
         if (temperature !== null) {
             this.temperature = parseFloat(temperature);
+        } else {
+            // No saved settings for this model, use model defaults
+            this.temperature = this.getDefaultTemperature();
         }
+
         if (topP !== null) {
             this.topP = parseFloat(topP);
+        } else {
+            this.topP = this.getDefaultTopP();
         }
+
         if (maxOutputTokens !== null) {
             let loadedTokens = parseInt(maxOutputTokens, 10);
             const maxAllowed = this.getMaxAllowedTokens();
             // Cap to current model's max limit
             this.maxOutputTokens = Math.min(loadedTokens, maxAllowed);
+        } else {
+            this.maxOutputTokens = this.getDefaultMaxTokens();
         }
+
+        console.log(`[AdvancedView] Loaded settings for ${model}: temp=${this.temperature}, topP=${this.topP}, maxTokens=${this.maxOutputTokens}`);
+    }
+
+    // Save current settings for the current model
+    saveModelSettings() {
+        localStorage.setItem(this.getStorageKey('temperature'), this.temperature.toString());
+        localStorage.setItem(this.getStorageKey('topP'), this.topP.toString());
+        localStorage.setItem(this.getStorageKey('maxOutputTokens'), this.maxOutputTokens.toString());
+        console.log(`[AdvancedView] Saved settings for ${this.selectedModel}: temp=${this.temperature}, topP=${this.topP}, maxTokens=${this.maxOutputTokens}`);
+    }
+
+    // Apply model-specific defaults and save to localStorage
+    applyModelDefaults() {
+        this.temperature = this.getDefaultTemperature();
+        this.topP = this.getDefaultTopP();
+        this.maxOutputTokens = this.getDefaultMaxTokens();
+
+        // Save defaults to model-specific localStorage keys
+        this.saveModelSettings();
+
+        // Sync to main process
+        this.syncSettingsToMain();
+    }
+
+    // Reset current model to its documentation defaults
+    async resetToModelDefaults() {
+        this.applyModelDefaults();
+        await this.syncSettingsToMain();
+        this.requestUpdate();
     }
 
     getSliderBackground(value, min, max) {
@@ -737,14 +830,14 @@ export class AdvancedView extends LitElement {
 
     async handleTemperatureChange(e) {
         this.temperature = parseFloat(e.target.value);
-        localStorage.setItem('geminiTemperature', this.temperature.toString());
+        localStorage.setItem(this.getStorageKey('temperature'), this.temperature.toString());
         await this.syncSettingsToMain();
         this.requestUpdate();
     }
 
     async handleTopPChange(e) {
         this.topP = parseFloat(e.target.value);
-        localStorage.setItem('geminiTopP', this.topP.toString());
+        localStorage.setItem(this.getStorageKey('topP'), this.topP.toString());
         await this.syncSettingsToMain();
         this.requestUpdate();
     }
@@ -761,35 +854,30 @@ export class AdvancedView extends LitElement {
         }
 
         this.maxOutputTokens = value;
-        localStorage.setItem('geminiMaxOutputTokens', this.maxOutputTokens.toString());
+        localStorage.setItem(this.getStorageKey('maxOutputTokens'), this.maxOutputTokens.toString());
         await this.syncSettingsToMain();
         this.requestUpdate();
     }
 
     async resetModelSettings() {
-        // Use model-specific defaults
-        this.temperature = this.getDefaultTemperature();
-        this.topP = this.getDefaultTopP();
-        this.maxOutputTokens = this.getDefaultMaxTokens();
-
-        localStorage.removeItem('geminiTemperature');
-        localStorage.removeItem('geminiTopP');
-        localStorage.removeItem('geminiMaxOutputTokens');
-
-        await this.syncSettingsToMain();
-        this.requestUpdate();
+        // Apply model-specific defaults from documentation
+        await this.resetToModelDefaults();
     }
 
-    // Sync settings to main process
+    // Sync settings to main process (both Gemini and Groq - global settings for all models)
     async syncSettingsToMain() {
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
+            const settings = {
+                temperature: this.temperature,
+                topP: this.topP,
+                maxOutputTokens: this.maxOutputTokens,
+            };
             try {
-                await ipcRenderer.invoke('update-generation-settings', {
-                    temperature: this.temperature,
-                    topP: this.topP,
-                    maxOutputTokens: this.maxOutputTokens,
-                });
+                // Update Gemini settings (applies to both interview and coding mode)
+                await ipcRenderer.invoke('update-generation-settings', settings);
+                // Update Groq Llama settings
+                await ipcRenderer.invoke('groq-update-generation-settings', settings);
             } catch (error) {
                 console.error('Failed to sync generation settings:', error);
             }
