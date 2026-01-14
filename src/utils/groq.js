@@ -56,7 +56,7 @@ let storedLanguageName = 'English';
 let generationSettings = {
     temperature: 0.7,
     topP: 0.95,
-    maxOutputTokens: 4096,
+    maxOutputTokens: 4096, // Default for interview mode, allows detailed technical answers
 };
 
 function sendToRenderer(channel, data) {

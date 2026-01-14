@@ -495,14 +495,14 @@ export class AdvancedView extends LitElement {
     };
 
     // Model-specific default settings based on 2025/2026 documentation
-    // Interview models: concise responses (lower tokens, balanced temp)
+    // Interview models: balanced responses (enough tokens for technical explanations + code)
     // Coding models: detailed responses (higher tokens, lower temp for accuracy)
     static MODEL_DEFAULTS = {
-        // Gemini 2.0 Flash Exp - Interview mode (concise, conversational)
+        // Gemini 2.0 Flash Exp - Interview mode (balanced, enough for code + explanation)
         'gemini-2.0-flash-exp': {
             temperature: 0.7,
             topP: 0.95,
-            maxOutputTokens: 2048,
+            maxOutputTokens: 4096,
         },
         // Gemini 2.5 Flash - Coding mode (detailed code, more deterministic)
         'gemini-2.5-flash': {
@@ -516,17 +516,17 @@ export class AdvancedView extends LitElement {
             topP: 0.95,
             maxOutputTokens: 16384,
         },
-        // Groq Llama 4 Maverick - Interview mode (concise, balanced)
+        // Groq Llama 4 Maverick - Interview mode (balanced, enough for code + explanation)
         'llama-4-maverick': {
             temperature: 0.7,
             topP: 0.95,
-            maxOutputTokens: 2048,
+            maxOutputTokens: 4096,
         },
-        // Groq Llama 4 Scout - Interview mode (concise, balanced)
+        // Groq Llama 4 Scout - Interview mode (balanced, enough for code + explanation)
         'llama-4-scout': {
             temperature: 0.7,
             topP: 0.95,
-            maxOutputTokens: 2048,
+            maxOutputTokens: 4096,
         },
     };
 
