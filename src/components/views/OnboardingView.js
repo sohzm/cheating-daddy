@@ -1,4 +1,5 @@
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
+import { resizeLayout } from '../../utils/windowResize.js';
 
 export class OnboardingView extends LitElement {
     static styles = css`
@@ -49,59 +50,59 @@ export class OnboardingView extends LitElement {
             top: 0;
             left: 0;
             right: 0;
-            bottom: 60px;
+            bottom: 50px;
             z-index: 1;
             display: flex;
             flex-direction: column;
             justify-content: center;
-            padding: 32px 48px;
-            max-width: 500px;
+            padding: 20px 32px;
+            max-width: 450px;
             color: #e5e5e5;
             overflow: hidden;
         }
 
         .slide-icon {
-            width: 48px;
-            height: 48px;
-            margin-bottom: 16px;
+            width: 36px;
+            height: 36px;
+            margin-bottom: 12px;
             opacity: 0.9;
             display: block;
         }
 
         .slide-title {
-            font-size: 28px;
+            font-size: 24px;
             font-weight: 600;
-            margin-bottom: 12px;
+            margin-bottom: 8px;
             color: #ffffff;
             line-height: 1.3;
         }
 
         .slide-content {
-            font-size: 16px;
+            font-size: 14px;
             line-height: 1.5;
-            margin-bottom: 24px;
+            margin-bottom: 16px;
             color: #b8b8b8;
             font-weight: 400;
         }
 
         .context-textarea {
             width: 100%;
-            height: 100px;
-            padding: 16px;
+            height: 80px;
+            padding: 12px;
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 8px;
             background: rgba(255, 255, 255, 0.05);
             color: #e5e5e5;
-            font-size: 14px;
+            font-size: 13px;
             font-family: inherit;
             resize: vertical;
             transition: all 0.2s ease;
-            margin-bottom: 24px;
+            margin-bottom: 16px;
         }
 
         .context-textarea::placeholder {
             color: rgba(255, 255, 255, 0.4);
-            font-size: 14px;
+            font-size: 13px;
         }
 
         .context-textarea:focus {
@@ -117,15 +118,18 @@ export class OnboardingView extends LitElement {
         .feature-item {
             display: flex;
             align-items: center;
-            margin-bottom: 12px;
-            font-size: 15px;
+            margin-bottom: 8px;
+            font-size: 13px;
             color: #b8b8b8;
         }
 
         .feature-icon {
-            font-size: 16px;
-            margin-right: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 10px;
             opacity: 0.8;
+            color: #b8b8b8;
         }
 
         .navigation {
@@ -137,11 +141,11 @@ export class OnboardingView extends LitElement {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 16px 24px;
+            padding: 12px 20px;
             background: rgba(0, 0, 0, 0.3);
             backdrop-filter: blur(10px);
             border-top: 1px solid rgba(255, 255, 255, 0.05);
-            height: 60px;
+            height: 50px;
             box-sizing: border-box;
         }
 
@@ -149,17 +153,17 @@ export class OnboardingView extends LitElement {
             background: rgba(255, 255, 255, 0.08);
             border: 1px solid rgba(255, 255, 255, 0.1);
             color: #e5e5e5;
-            padding: 8px 16px;
+            padding: 6px 12px;
             border-radius: 6px;
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 500;
             cursor: pointer;
             transition: all 0.2s ease;
             display: flex;
             align-items: center;
             justify-content: center;
-            min-width: 36px;
-            min-height: 36px;
+            min-width: 32px;
+            min-height: 32px;
         }
 
         .nav-button:hover {
@@ -184,17 +188,17 @@ export class OnboardingView extends LitElement {
 
         .progress-dots {
             display: flex;
-            gap: 12px;
+            gap: 10px;
             align-items: center;
         }
 
         .dot {
-            width: 8px;
-            height: 8px;
+            width: 6px;
+            height: 6px;
             border-radius: 50%;
             background: rgba(255, 255, 255, 0.2);
             transition: all 0.2s ease;
-            cursor: pointer;
+            cursor: default;
         }
 
         .dot:hover {
@@ -285,6 +289,9 @@ export class OnboardingView extends LitElement {
         this.ctx = this.canvas.getContext('2d');
         this.resizeCanvas();
         this.startGradientAnimation();
+
+        // Resize window to match layout preference (same as main window)
+        resizeLayout();
 
         window.addEventListener('resize', () => this.resizeCanvas());
     }
@@ -430,6 +437,19 @@ export class OnboardingView extends LitElement {
         if (this.contextText.trim()) {
             localStorage.setItem('customPrompt', this.contextText.trim());
         }
+
+        // Initialize VAD settings with defaults on first run
+        // This ensures VAD works immediately without needing to toggle settings
+        if (localStorage.getItem('vadEnabled') === null) {
+            localStorage.setItem('vadEnabled', 'true');
+        }
+        if (localStorage.getItem('vadMode') === null) {
+            localStorage.setItem('vadMode', 'automatic');
+        }
+
+        // Force manual screenshot mode to prevent rate limits
+        localStorage.setItem('selectedScreenshotInterval', 'manual');
+
         localStorage.setItem('onboardingCompleted', 'true');
         this.onComplete();
     }
@@ -440,7 +460,7 @@ export class OnboardingView extends LitElement {
                 icon: 'assets/onboarding/welcome.svg',
                 title: 'Welcome to Cheating Daddy',
                 content:
-                    'Your AI assistant that listens and watches, then provides intelligent suggestions automatically during interviews and meetings.',
+                    'Your AI assistant that listens and watches, then provides intelligent suggestions automatically during interviews and also provides accurate answers in exams.',
             },
             {
                 icon: 'assets/onboarding/security.svg',
@@ -448,10 +468,9 @@ export class OnboardingView extends LitElement {
                 content: 'Invisible to screen sharing apps and recording software. Your secret advantage stays completely hidden from others.',
             },
             {
-                icon: 'assets/onboarding/context.svg',
-                title: 'Add Your Context',
-                content: 'Share relevant information to help the AI provide better, more personalized assistance.',
-                showTextarea: true,
+                icon: 'assets/onboarding/language.svg',
+                title: 'Multiple Languages',
+                content: 'Supports interviews and exam mode in many languages. Select your preferred language in settings to get AI responses in your native tongue.',
             },
             {
                 icon: 'assets/onboarding/customize.svg',
@@ -462,7 +481,7 @@ export class OnboardingView extends LitElement {
             {
                 icon: 'assets/onboarding/ready.svg',
                 title: 'Ready to Go',
-                content: 'Add your Gemini API key in settings and start getting AI-powered assistance in real-time.',
+                content: 'Add your Gemini or Groq API key in settings and start getting AI-powered assistance in real-time for interviews and exams.',
             },
         ];
 
@@ -495,16 +514,34 @@ export class OnboardingView extends LitElement {
                         ? html`
                               <div class="feature-list">
                                   <div class="feature-item">
-                                      <span class="feature-icon">🎨</span>
+                                      <span class="feature-icon">
+                                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                                              <line x1="8" y1="21" x2="16" y2="21"></line>
+                                              <line x1="12" y1="17" x2="12" y2="21"></line>
+                                          </svg>
+                                      </span>
+                                      Multiple AI models to choose from
+                                  </div>
+                                  <div class="feature-item">
+                                      <span class="feature-icon">
+                                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                              <circle cx="9" cy="7" r="4"></circle>
+                                              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                                          </svg>
+                                      </span>
+                                      Interview and exam modes
+                                  </div>
+                                  <div class="feature-item">
+                                      <span class="feature-icon">
+                                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                              <circle cx="12" cy="12" r="3"></circle>
+                                              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                                          </svg>
+                                      </span>
                                       Customize AI behavior and responses
-                                  </div>
-                                  <div class="feature-item">
-                                      <span class="feature-icon">📚</span>
-                                      Review conversation history
-                                  </div>
-                                  <div class="feature-item">
-                                      <span class="feature-icon">🔧</span>
-                                      Adjust capture settings and intervals
                                   </div>
                               </div>
                           `
@@ -513,7 +550,7 @@ export class OnboardingView extends LitElement {
 
                 <div class="navigation">
                     <button class="nav-button" @click=${this.prevSlide} ?disabled=${this.currentSlide === 0}>
-                        <svg width="16px" height="16px" stroke-width="2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <svg width="14px" height="14px" stroke-width="2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M15 6L9 12L15 18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"></path>
                         </svg>
                     </button>
@@ -537,7 +574,7 @@ export class OnboardingView extends LitElement {
                         ${this.currentSlide === 4
                             ? 'Get Started'
                             : html`
-                                  <svg width="16px" height="16px" stroke-width="2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                  <svg width="14px" height="14px" stroke-width="2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                       <path d="M9 6L15 12L9 18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"></path>
                                   </svg>
                               `}

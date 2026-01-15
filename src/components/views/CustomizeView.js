@@ -358,34 +358,54 @@ export class CustomizeView extends LitElement {
             cursor: default;
         }
 
+        .slider-input::-webkit-slider-runnable-track {
+            height: 4px;
+            border-radius: 2px;
+        }
+
+        .slider-input::-moz-range-track {
+            height: 4px;
+            border-radius: 2px;
+            background: var(--input-background, rgba(0, 0, 0, 0.3));
+        }
+
+        .slider-input::-moz-range-progress {
+            height: 4px;
+            border-radius: 2px;
+            background: rgba(0, 122, 255, 0.6);
+        }
+
         .slider-input::-webkit-slider-thumb {
             -webkit-appearance: none;
             appearance: none;
-            width: 16px;
-            height: 16px;
+            width: 14px;
+            height: 14px;
             border-radius: 50%;
             background: var(--focus-border-color, #007aff);
             cursor: default;
             border: 2px solid var(--text-color, white);
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            margin-top: -5px;
         }
 
         .slider-input::-moz-range-thumb {
-            width: 16px;
-            height: 16px;
+            width: 14px;
+            height: 14px;
             border-radius: 50%;
             background: var(--focus-border-color, #007aff);
             cursor: default;
             border: 2px solid var(--text-color, white);
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
         }
 
         .slider-input:hover::-webkit-slider-thumb {
-            background: var(--text-input-button-hover, #0056b3);
+            background: #0056b3;
+            box-shadow: 0 2px 6px rgba(0, 122, 255, 0.6);
         }
 
         .slider-input:hover::-moz-range-thumb {
-            background: var(--text-input-button-hover, #0056b3);
+            background: #0056b3;
+            box-shadow: 0 2px 6px rgba(0, 122, 255, 0.6);
         }
 
         .slider-labels {
@@ -453,7 +473,7 @@ export class CustomizeView extends LitElement {
         super();
         this.selectedProfile = 'exam';
         this.selectedLanguage = 'en-US';
-        this.selectedScreenshotInterval = '5';
+        this.selectedScreenshotInterval = 'manual';
         this.selectedImageQuality = 'high';
         this.layoutMode = 'compact';
         this.keybinds = this.getDefaultKeybinds();
@@ -482,7 +502,7 @@ export class CustomizeView extends LitElement {
 
         // Mode and model selection defaults
         this.selectedMode = 'interview';
-        this.selectedModel = 'gemini-3-pro-preview';
+        this.selectedModel = 'gemini-2.0-flash-exp';
 
         this.loadKeybinds();
         this.loadGoogleSearchSettings();
@@ -603,11 +623,27 @@ export class CustomizeView extends LitElement {
             // Exam Assistant -> Coding/OA mode
             this.selectedMode = 'coding';
             localStorage.setItem('selectedMode', 'coding');
+
+            // Validate model for coding mode
+            const validCodingModels = ['gemini-2.5-flash', 'gemini-3-pro-preview'];
+            if (!validCodingModels.includes(this.selectedModel)) {
+                this.selectedModel = 'gemini-2.5-flash';
+            }
         } else {
             // All other profiles -> Interview mode
             this.selectedMode = 'interview';
             localStorage.setItem('selectedMode', 'interview');
+
+            // Validate model for interview mode
+            const validInterviewModels = ['gemini-2.0-flash-exp', 'llama-4-maverick', 'llama-4-scout'];
+            if (!validInterviewModels.includes(this.selectedModel)) {
+                this.selectedModel = 'gemini-2.0-flash-exp';
+            }
         }
+
+        // Save the validated model and dispatch event
+        localStorage.setItem('selectedModel', this.selectedModel);
+        window.dispatchEvent(new CustomEvent('modelChanged', { detail: { model: this.selectedModel } }));
 
         // Update the textarea value
         this.requestUpdate();
@@ -978,6 +1014,11 @@ export class CustomizeView extends LitElement {
         this.updateBackgroundTransparency();
     }
 
+    getSliderBackground(value, min, max) {
+        const percentage = ((value - min) / (max - min)) * 100;
+        return `linear-gradient(to right, rgba(0, 122, 255, 0.6) 0%, rgba(0, 122, 255, 0.6) ${percentage}%, rgba(0, 0, 0, 0.3) ${percentage}%, rgba(0, 0, 0, 0.3) 100%)`;
+    }
+
     handleBackgroundTransparencyChange(e) {
         this.backgroundTransparency = parseFloat(e.target.value);
         localStorage.setItem('backgroundTransparency', this.backgroundTransparency.toString());
@@ -1037,27 +1078,36 @@ export class CustomizeView extends LitElement {
         const selectedModel = localStorage.getItem('selectedModel');
 
         this.selectedMode = selectedMode || 'interview';
-        this.selectedModel = selectedModel || 'gemini-3-pro-preview';
+        this.selectedModel = selectedModel || 'gemini-2.0-flash-exp';
+    }
+
+    // Helper to check if selected model is a Groq/Llama model
+    isGroqModel(model) {
+        return model && (model.includes('llama') || model.includes('groq'));
     }
 
     async handleModeChange(e) {
         this.selectedMode = e.target.value;
         localStorage.setItem('selectedMode', this.selectedMode);
 
-        // In interview mode, always use live API
+        // In interview mode, user can choose between Gemini Live and Groq Llama models
         // In coding mode, user can choose between flash and pro
         if (this.selectedMode === 'interview') {
-            this.selectedModel = 'gemini-2.5-flash';
+            // Keep current model if it's valid for interview mode, otherwise default
+            const validInterviewModels = ['gemini-2.0-flash-exp', 'llama-4-maverick', 'llama-4-scout'];
+            if (!validInterviewModels.includes(this.selectedModel)) {
+                this.selectedModel = 'gemini-2.0-flash-exp';
+            }
         } else {
             // Keep current model selection for coding mode
-            if (this.selectedModel === 'gemini-2.5-flash' || this.selectedModel === 'gemini-3-pro-preview') {
-                // Keep the selection
-            } else {
-                // Default to pro for coding mode
+            const validCodingModels = ['gemini-2.5-flash', 'gemini-3-pro-preview'];
+            if (!validCodingModels.includes(this.selectedModel)) {
                 this.selectedModel = 'gemini-3-pro-preview';
             }
         }
         localStorage.setItem('selectedModel', this.selectedModel);
+        // Dispatch custom event for same-window listeners (like AdvancedView)
+        window.dispatchEvent(new CustomEvent('modelChanged', { detail: { model: this.selectedModel } }));
 
         this.requestUpdate();
     }
@@ -1065,6 +1115,8 @@ export class CustomizeView extends LitElement {
     async handleModelChange(e) {
         this.selectedModel = e.target.value;
         localStorage.setItem('selectedModel', this.selectedModel);
+        // Dispatch custom event for same-window listeners (like AdvancedView)
+        window.dispatchEvent(new CustomEvent('modelChanged', { detail: { model: this.selectedModel } }));
 
         this.requestUpdate();
     }
@@ -1133,9 +1185,7 @@ export class CustomizeView extends LitElement {
                                     <div class="mode-display-box">
                                         💻 Coding/OA Mode (Screenshot-based)
                                     </div>
-                                    <div class="form-description">
-                                        Exam Assistant profile uses Gemini API 2.5 Flash or 2.5 Pro for better problem-solving responses.
-                                    </div>
+                                    <div class="form-description">Uses Gemini API for screenshot analysis and code generation. Best for online assessments and coding challenges.</div>
                                 </div>
                             </div>
 
@@ -1158,16 +1208,30 @@ export class CustomizeView extends LitElement {
                                 </div>
                             </div>
                         ` : html`
-                            <!-- Other profiles: Only Interview mode available -->
+                            <!-- Other profiles: Interview mode with model selection -->
                             <div class="form-row">
                                 <div class="form-group">
                                     <label class="form-label">Mode (Fixed for ${this.getProfileNames()[this.selectedProfile]})</label>
                                     <div class="mode-display-box">
                                         🎤 Interview Mode (Real-time Audio/Video)
                                     </div>
-                                    <div class="form-description">
-                                        ${this.getProfileNames()[this.selectedProfile]} profile uses Interview mode with Gemini 2.0 Flash Exp for real-time audio processing and live interactions.
-                                    </div>
+                                    <div class="form-description">${this.getProfileNames()[this.selectedProfile]} profile uses real-time audio processing for live interview interactions.</div>
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="form-label">Model Selection</label>
+                                    <custom-dropdown
+                                        .value=${this.selectedModel}
+                                        .options=${[
+                                            { value: 'gemini-2.0-flash-exp', label: 'Gemini 2.0 Flash Exp', icon: './assets/models/500px-Google_Gemini_icon_2025.svg.png' },
+                                            { value: 'llama-4-maverick', label: 'Llama 4 Maverick 17B', icon: './assets/models/metalogo.dcf881ba.svg' },
+                                            { value: 'llama-4-scout', label: 'Llama 4 Scout 17B', icon: './assets/models/metalogo.dcf881ba.svg' }
+                                        ]}
+                                        @change=${e => this.handleModelChange({ target: { value: e.detail.value } })}
+                                    ></custom-dropdown>
+                                    <div class="form-description">${this.selectedModel === 'gemini-2.0-flash-exp' ? 'Gemini Live API: Real-time audio streaming with speaker diarization. Requires Gemini API key.' : this.selectedModel === 'llama-4-maverick' ? 'Groq Whisper STT + Llama 4 Maverick for fast interview responses. Requires Groq API key.' : 'Groq Whisper STT + Llama 4 Scout for efficient interview responses. Requires Groq API key.'}</div>
                                 </div>
                             </div>
                         `}
@@ -1304,6 +1368,7 @@ export class CustomizeView extends LitElement {
                                     max="1"
                                     step="0.01"
                                     .value=${this.backgroundTransparency}
+                                    style="background: ${this.getSliderBackground(this.backgroundTransparency, 0, 1)}"
                                     @input=${this.handleBackgroundTransparencyChange}
                                 />
                                 <div class="slider-labels">
@@ -1329,6 +1394,7 @@ export class CustomizeView extends LitElement {
                                     max="32"
                                     step="1"
                                     .value=${this.fontSize}
+                                    style="background: ${this.getSliderBackground(this.fontSize, 12, 32)}"
                                     @input=${this.handleFontSizeChange}
                                 />
                                 <div class="slider-labels">
@@ -1352,36 +1418,7 @@ export class CustomizeView extends LitElement {
                     </div>
 
                     <div class="form-grid">
-                        ${this.selectedProfile !== 'exam' ? html`
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label class="form-label">
-                                        Capture Interval
-                                        <span class="current-selection"
-                                            >${this.selectedScreenshotInterval === 'manual' ? 'Manual' : this.selectedScreenshotInterval + 's'}</span
-                                        >
-                                    </label>
-                                    <custom-dropdown
-                                        .value=${this.selectedScreenshotInterval}
-                                        .options=${[
-                                            { value: 'manual', label: 'Manual (On demand)' },
-                                            { value: '1', label: 'Every 1 second' },
-                                            { value: '2', label: 'Every 2 seconds' },
-                                            { value: '5', label: 'Every 5 seconds' },
-                                            { value: '10', label: 'Every 10 seconds' }
-                                        ]}
-                                        @change=${e => this.handleScreenshotIntervalSelect({ target: { value: e.detail.value } })}
-                                    ></custom-dropdown>
-                                    <div class="form-description">
-                                        ${
-                                            this.selectedScreenshotInterval === 'manual'
-                                                ? 'Screenshots will only be taken when you use the "Ask Next Step" shortcut'
-                                                : 'Automatic screenshots will be taken at the specified interval'
-                                        }
-                                    </div>
-                                </div>
-                            </div>
-                        ` : ''}
+                        <!-- Capture Interval removed - always manual mode to prevent rate limits -->
 
                         <div class="form-row">
                             <div class="form-group">

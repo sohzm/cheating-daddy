@@ -229,18 +229,111 @@ export class HelpView extends LitElement {
             color: var(--text-color);
             user-select: text;
         }
+
+        /* Advanced Mode Section Styles */
+        .advanced-section {
+            border-color: var(--danger-border, rgba(239, 68, 68, 0.3));
+            background: var(--danger-background, rgba(239, 68, 68, 0.05));
+        }
+
+        .advanced-label {
+            color: var(--danger-color, #ef4444);
+        }
+
+        .advanced-label::before {
+            background: var(--danger-color, #ef4444) !important;
+        }
+
+        .feature-cards {
+            display: grid;
+            gap: 10px;
+            margin-top: 8px;
+        }
+
+        .feature-card {
+            background: var(--input-background, rgba(0, 0, 0, 0.2));
+            border: 1px solid var(--input-border, rgba(255, 255, 255, 0.1));
+            border-radius: 6px;
+            padding: 12px;
+        }
+
+        .feature-card-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            font-weight: 600;
+            font-size: 12px;
+            color: var(--text-color);
+        }
+
+        .feature-card-icon {
+            font-size: 14px;
+        }
+
+        .feature-card-list {
+            margin: 0;
+            padding-left: 20px;
+            font-size: 11px;
+            color: var(--description-color, rgba(255, 255, 255, 0.7));
+            line-height: 1.5;
+        }
+
+        .feature-card-list li {
+            margin-bottom: 4px;
+        }
+
+        .feature-card-list li:last-child {
+            margin-bottom: 0;
+        }
+
+        .feature-card-list strong {
+            color: var(--text-color);
+        }
+
+        .advanced-warning {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            margin-top: 12px;
+            padding: 10px;
+            background: var(--danger-background, rgba(239, 68, 68, 0.1));
+            border: 1px solid var(--danger-border, rgba(239, 68, 68, 0.2));
+            border-radius: 4px;
+            font-size: 11px;
+            color: var(--danger-color, #ef4444);
+            line-height: 1.4;
+        }
+
+        .advanced-warning-icon {
+            flex-shrink: 0;
+        }
+
+        .advanced-intro {
+            font-size: 12px;
+            color: var(--description-color, rgba(255, 255, 255, 0.75));
+            margin-bottom: 12px;
+            line-height: 1.4;
+        }
+
+        .advanced-intro strong {
+            color: var(--accent-color, #007aff);
+        }
     `;
 
     static properties = {
         onExternalLinkClick: { type: Function },
         keybinds: { type: Object },
+        advancedModeEnabled: { type: Boolean },
     };
 
     constructor() {
         super();
         this.onExternalLinkClick = () => {};
         this.keybinds = this.getDefaultKeybinds();
+        this.advancedModeEnabled = false;
         this.loadKeybinds();
+        this.loadAdvancedModeSettings();
     }
 
     connectedCallback() {
@@ -278,6 +371,11 @@ export class HelpView extends LitElement {
                 this.keybinds = this.getDefaultKeybinds();
             }
         }
+    }
+
+    loadAdvancedModeSettings() {
+        const savedAdvancedMode = localStorage.getItem('advancedMode');
+        this.advancedModeEnabled = savedAdvancedMode === 'true';
     }
 
     formatKeybind(keybind) {
@@ -471,6 +569,61 @@ export class HelpView extends LitElement {
                         • <strong>Manual Mode:</strong> You control when the microphone is active. Use ${this.formatKeybind(this.keybinds.toggleMicrophone)} to toggle the mic ON/OFF during interview sessions. When toggled OFF, the AI generates a response based on the complete recorded question.<br /><br />
                     </div>
                 </div>
+
+                ${this.advancedModeEnabled ? html`
+                <div class="option-group advanced-section">
+                    <div class="option-label advanced-label">
+                        <span>Advanced Mode</span>
+                    </div>
+                    <div class="advanced-intro">
+                        <strong>Advanced Mode is enabled.</strong> Access the <strong>Advanced</strong> tab in the navigation bar to configure these features.
+                    </div>
+
+                    <div class="feature-cards">
+                        <div class="feature-card">
+                            <div class="feature-card-header">
+                                <span class="feature-card-icon"></span>
+                                <span>Content Protection</span>
+                            </div>
+                            <ul class="feature-card-list">
+                                <li>Makes the app <strong>invisible to screen sharing</strong> and recording software</li>
+                                <li>Useful for <strong>privacy during screen share</strong> sessions</li>
+                                <li>Can be toggled on/off (may need restart for some display setups)</li>
+                            </ul>
+                        </div>
+
+                        <div class="feature-card">
+                            <div class="feature-card-header">
+                                <span class="feature-card-icon"></span>
+                                <span>Model Generation Settings</span>
+                            </div>
+                            <ul class="feature-card-list">
+                                <li><strong>Temperature:</strong> Controls response randomness (0 = precise, 2 = creative)</li>
+                                <li><strong>Top-P:</strong> Controls token diversity via nucleus sampling</li>
+                                <li><strong>Max Output Tokens:</strong> Set maximum response length per model</li>
+                                <li>Settings are <strong>saved per-model</strong> (Gemini 2.5 Flash, Gemini 3 Pro, Llama 4, etc.)</li>
+                            </ul>
+                        </div>
+
+                        <div class="feature-card">
+                            <div class="feature-card-header">
+                                <span class="feature-card-icon"></span>
+                                <span>Data Management</span>
+                            </div>
+                            <ul class="feature-card-list">
+                                <li><strong>Clear All Local Data:</strong> Permanently erase all settings, API keys, and cached data</li>
+                                <li>Useful for <strong>privacy or troubleshooting</strong></li>
+                                <li>App will close automatically after clearing</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="advanced-warning">
+                        <span class="advanced-warning-icon">⚠️</span>
+                        <span>Changing model parameters may affect AI response quality. Use "Reset to Defaults" if unsure.</span>
+                    </div>
+                </div>
+                ` : ''}
             </div>
         `;
     }

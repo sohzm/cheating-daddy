@@ -41,12 +41,36 @@ let reconnectionAttempts = 0;
 let maxReconnectionAttempts = 3;
 let reconnectionDelay = 2000; // 2 seconds between attempts
 let lastSessionParams = null;
+let storedLanguageName = 'English'; // Store the selected language name for use in prompts
 
 // macOS VAD tracking variables
 let macVADProcessor = null;
 let macVADEnabled = false;
 let macVADMode = 'automatic';
 let macMicrophoneEnabled = false;
+
+// Model generation settings (can be updated via IPC from renderer)
+let generationSettings = {
+    temperature: 0.7,
+    topP: 0.95,
+    maxOutputTokens: 8192,
+};
+
+// Model-specific max output token limits
+const MODEL_MAX_OUTPUT_TOKENS = {
+    // Gemini models
+    'gemini-2.0-flash-exp': 8192,
+    'gemini-2.5-flash': 65536,
+    'gemini-3-pro-preview': 65536,
+    // Groq Llama models
+    'llama-4-maverick': 8192,
+    'llama-4-scout': 8192,
+};
+
+// Get max output tokens for a specific model
+function getMaxOutputTokensForModel(model) {
+    return MODEL_MAX_OUTPUT_TOKENS[model] || 8192;
+}
 
 function sendToRenderer(channel, data) {
     const windows = BrowserWindow.getAllWindows();
@@ -344,6 +368,7 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
     };
 
     const selectedLanguageName = languageMap[language] || 'English';
+    storedLanguageName = selectedLanguageName; // Store for use in text/screenshot prompts
 
     // Add critical language instruction to system prompt
     systemPrompt += `\n\n=== CRITICAL LANGUAGE INSTRUCTION ===
@@ -464,7 +489,23 @@ This is mandatory and cannot be overridden by any other instruction.`;
                         console.log('Error due to invalid API key - stopping reconnection attempts');
                         lastSessionParams = null; // Clear session params to prevent reconnection
                         reconnectionAttempts = maxReconnectionAttempts; // Stop further attempts
-                        sendToRenderer('update-status', 'Error: Invalid API key');
+                        sendToRenderer('update-status', 'Invalid API Key');
+                        return;
+                    }
+
+                    // Check if the error is related to quota exceeded
+                    const isQuotaError =
+                        e.message &&
+                        (e.message.includes('exceeded your current quota') ||
+                            e.message.includes('quota exceeded') ||
+                            e.message.includes('RESOURCE_EXHAUSTED') ||
+                            e.message.includes('rate limit'));
+
+                    if (isQuotaError) {
+                        console.log('Error due to quota exceeded - stopping reconnection attempts');
+                        lastSessionParams = null; // Clear session params to prevent reconnection
+                        reconnectionAttempts = maxReconnectionAttempts; // Stop further attempts
+                        sendToRenderer('update-status', 'API Quota Exceed');
                         return;
                     }
 
@@ -474,19 +515,50 @@ This is mandatory and cannot be overridden by any other instruction.`;
                     console.debug('Session closed:', e.reason);
                     isSessionReady = false; // Reset ready state when session closes
 
+                    // Check if the session closed due to missing API key
+                    const isApiKeyMissing =
+                        e.reason &&
+                        (e.reason.toLowerCase().includes('api key not found') ||
+                            e.reason.toLowerCase().includes('pass a valid api key'));
+
+                    if (isApiKeyMissing) {
+                        console.log('Session closed due to missing API key - stopping reconnection attempts');
+                        lastSessionParams = null; // Clear session params to prevent reconnection
+                        reconnectionAttempts = maxReconnectionAttempts; // Stop further attempts
+                        sendToRenderer('update-status', 'No API Key Found');
+                        return;
+                    }
+
                     // Check if the session closed due to invalid API key
                     const isApiKeyError =
                         e.reason &&
-                        (e.reason.includes('API key not valid') ||
-                            e.reason.includes('invalid API key') ||
-                            e.reason.includes('authentication failed') ||
-                            e.reason.includes('unauthorized'));
+                        (e.reason.toLowerCase().includes('api key not valid') ||
+                            e.reason.toLowerCase().includes('invalid api key') ||
+                            e.reason.toLowerCase().includes('invalid key') ||
+                            e.reason.toLowerCase().includes('authentication failed') ||
+                            e.reason.toLowerCase().includes('unauthorized'));
 
                     if (isApiKeyError) {
                         console.log('Session closed due to invalid API key - stopping reconnection attempts');
                         lastSessionParams = null; // Clear session params to prevent reconnection
                         reconnectionAttempts = maxReconnectionAttempts; // Stop further attempts
-                        sendToRenderer('update-status', 'Session closed: Invalid API key');
+                        sendToRenderer('update-status', 'Invalid API Key');
+                        return;
+                    }
+
+                    // Check if the session closed due to quota exceeded
+                    const isQuotaError =
+                        e.reason &&
+                        (e.reason.includes('exceeded your current quota') ||
+                            e.reason.includes('quota exceeded') ||
+                            e.reason.includes('RESOURCE_EXHAUSTED') ||
+                            e.reason.includes('rate limit'));
+
+                    if (isQuotaError) {
+                        console.log('Session closed due to quota exceeded - stopping reconnection attempts');
+                        lastSessionParams = null; // Clear session params to prevent reconnection
+                        reconnectionAttempts = maxReconnectionAttempts; // Stop further attempts
+                        sendToRenderer('update-status', 'API Quota Exceed');
                         return;
                     }
 
@@ -502,6 +574,12 @@ This is mandatory and cannot be overridden by any other instruction.`;
                 config: {
                     responseModalities: ['TEXT'],
                     tools: enabledTools,
+                    // Generation settings from AdvancedView
+                    generationConfig: {
+                        temperature: generationSettings.temperature,
+                        topP: generationSettings.topP,
+                        maxOutputTokens: generationSettings.maxOutputTokens,
+                    },
                     // Enable speaker diarization
                     inputAudioTranscription: {
                         enableSpeakerDiarization: true,
@@ -636,7 +714,12 @@ RESPONSE FORMAT: [approach sentence] + [code] + [complexity]`;
                             const parts = [];
 
                             if (input.text) {
-                                parts.push({ text: input.text });
+                                // Add language reminder for non-English languages
+                                let finalText = input.text;
+                                if (storedLanguageName !== 'English') {
+                                    finalText = `${input.text} (Remember: Respond in ${storedLanguageName})`;
+                                }
+                                parts.push({ text: finalText });
                             }
 
                             if (input.media) {
@@ -646,6 +729,10 @@ RESPONSE FORMAT: [approach sentence] + [code] + [complexity]`;
                                         data: input.media.data
                                     }
                                 });
+                                // Add language reminder for non-English when only screenshot (no text provided)
+                                if (!input.text && storedLanguageName !== 'English') {
+                                    parts.push({ text: `(Remember: Respond in ${storedLanguageName})` });
+                                }
                             }
 
                             // Build full conversation with history
@@ -660,15 +747,19 @@ RESPONSE FORMAT: [approach sentence] + [code] + [complexity]`;
                             }
 
                             // Use streaming for faster display with context caching
+                            // Ensure maxOutputTokens doesn't exceed model's limit
+                            const modelMaxTokens = getMaxOutputTokensForModel(this.model);
+                            const effectiveMaxTokens = Math.min(generationSettings.maxOutputTokens, modelMaxTokens);
+
                             const streamResult = await this.client.models.generateContentStream({
                                 model: this.model,
                                 contents: contents,
                                 systemInstruction: { parts: [{ text: this.systemPrompt }] },
                                 generationConfig: {
-                                    temperature: 0.7,
+                                    temperature: generationSettings.temperature,
                                     topK: 40,
-                                    topP: 0.95,
-                                    maxOutputTokens: 8192,
+                                    topP: generationSettings.topP,
+                                    maxOutputTokens: effectiveMaxTokens,
                                 },
                                 tools: this.tools.length > 0 ? this.tools : undefined,
                                 // Context caching: Cache system prompt for 5 minutes (one interview session)
@@ -839,6 +930,7 @@ async function startMacOSAudioCapture(geminiSessionRef, vadEnabled = false, vadM
 
     const { app } = require('electron');
     const path = require('path');
+    const fs = require('fs');
 
     let systemAudioPath;
     if (app.isPackaged) {
@@ -848,6 +940,15 @@ async function startMacOSAudioCapture(geminiSessionRef, vadEnabled = false, vadM
     }
 
     console.log('SystemAudioDump path:', systemAudioPath);
+
+    // Check if SystemAudioDump binary exists before attempting to spawn
+    if (!fs.existsSync(systemAudioPath)) {
+        console.warn('⚠ SystemAudioDump binary not found at:', systemAudioPath);
+        console.warn('ℹ macOS system audio capture will not be available.');
+        console.warn('ℹ The app will continue but audio from other apps will not be captured.');
+        console.warn('ℹ To enable audio capture, ensure SystemAudioDump is in src/assets/ (development) or Resources/ (packaged).');
+        return false;
+    }
 
     // Spawn SystemAudioDump with stealth options
     const spawnOptions = {
@@ -1082,6 +1183,26 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
         return false;
     });
 
+    // Update model generation settings from renderer
+    ipcMain.handle('update-generation-settings', async (event, settings) => {
+        if (settings.temperature !== undefined) {
+            generationSettings.temperature = settings.temperature;
+        }
+        if (settings.topP !== undefined) {
+            generationSettings.topP = settings.topP;
+        }
+        if (settings.maxOutputTokens !== undefined) {
+            generationSettings.maxOutputTokens = settings.maxOutputTokens;
+        }
+        console.log('[GEMINI] Generation settings updated:', generationSettings);
+        return { success: true };
+    });
+
+    // Get model-specific max output tokens
+    ipcMain.handle('get-model-max-tokens', async (event, model) => {
+        return getMaxOutputTokensForModel(model);
+    });
+
     ipcMain.handle('send-audio-content', async (event, { data, mimeType }) => {
         if (!geminiSessionRef.current) return { success: false, error: 'No active Gemini session' };
         try {
@@ -1171,8 +1292,14 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
                 return { success: false, error: 'Invalid text message' };
             }
 
-            console.log('Sending text message:', text);
-            await geminiSessionRef.current.sendRealtimeInput({ text: text.trim() });
+            // Add language reminder for non-English languages
+            let finalText = text.trim();
+            if (storedLanguageName !== 'English') {
+                finalText += ` (Remember: Respond in ${storedLanguageName})`;
+            }
+
+            console.log('Sending text message:', finalText);
+            await geminiSessionRef.current.sendRealtimeInput({ text: finalText });
             return { success: true };
         } catch (error) {
             console.error('Error sending text:', error);
@@ -1196,10 +1323,16 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
             // Check current mode to handle differently
             const currentMode = lastSessionParams?.mode || 'interview';
 
+            // Add language reminder for non-English languages
+            let finalText = text.trim();
+            if (storedLanguageName !== 'English') {
+                finalText += ` (Remember: Respond in ${storedLanguageName})`;
+            }
+
             if (currentMode === 'interview') {
                 // Interview mode (Live API): Send screenshot and text SEPARATELY
                 // Live API doesn't support media + text in one request
-                console.log('Interview mode: Sending screenshot + text in TWO separate requests:', text);
+                console.log('Interview mode: Sending screenshot + text in TWO separate requests:', finalText);
 
                 // 1. Send screenshot first
                 process.stdout.write('!');
@@ -1209,15 +1342,15 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
 
                 // 2. Send text prompt second
                 await geminiSessionRef.current.sendRealtimeInput({
-                    text: text.trim()
+                    text: finalText
                 });
             } else {
                 // Exam Assistant mode (Regular API): Send screenshot + text together in ONE request
-                console.log('Exam mode: Sending screenshot + text in one request:', text);
+                console.log('Exam mode: Sending screenshot + text in one request:', finalText);
 
                 await geminiSessionRef.current.sendRealtimeInput({
                     media: { data: imageData, mimeType: 'image/jpeg' },
-                    text: text.trim()
+                    text: finalText
                 });
             }
 

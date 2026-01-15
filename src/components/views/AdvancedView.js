@@ -97,7 +97,7 @@ export class AdvancedView extends LitElement {
             font-size: 11px;
             color: var(--danger-color, #ef4444);
             display: flex;
-            align-items: flex-start;
+            align-items: center;
             gap: 8px;
             line-height: 1.4;
         }
@@ -282,52 +282,258 @@ export class AdvancedView extends LitElement {
             user-select: none;
         }
 
-        .rate-limit-controls {
-            margin-left: 22px;
-            opacity: 0.7;
-            transition: opacity 0.15s ease;
+        /* Slider styles */
+        .slider-container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 16px;
         }
 
-        .rate-limit-controls.enabled {
-            opacity: 1;
+        .slider-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
-        .rate-limit-reset {
-            margin-top: 10px;
-            padding-top: 10px;
+        .slider-label {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--label-color, rgba(255, 255, 255, 0.9));
+        }
+
+        .slider-value {
+            font-size: 11px;
+            color: var(--success-color, #34d399);
+            background: var(--success-background, rgba(52, 211, 153, 0.1));
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-weight: 500;
+            border: 1px solid var(--success-border, rgba(52, 211, 153, 0.2));
+            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace;
+        }
+
+        .slider-input {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 4px;
+            border-radius: 2px;
+            background: var(--input-background, rgba(0, 0, 0, 0.3));
+            outline: none;
+            border: 1px solid var(--input-border, rgba(255, 255, 255, 0.15));
+            cursor: default;
+        }
+
+        .slider-input::-webkit-slider-runnable-track {
+            height: 4px;
+            border-radius: 2px;
+        }
+
+        .slider-input::-moz-range-track {
+            height: 4px;
+            border-radius: 2px;
+            background: var(--input-background, rgba(0, 0, 0, 0.3));
+        }
+
+        .slider-input::-moz-range-progress {
+            height: 4px;
+            border-radius: 2px;
+            background: rgba(0, 122, 255, 0.6);
+        }
+
+        .slider-input::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: var(--focus-border-color, #007aff);
+            cursor: default;
+            border: 2px solid var(--text-color, white);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            margin-top: -5px;
+        }
+
+        .slider-input::-moz-range-thumb {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: var(--focus-border-color, #007aff);
+            cursor: default;
+            border: 2px solid var(--text-color, white);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .slider-input:hover::-webkit-slider-thumb {
+            background: #0056b3;
+            box-shadow: 0 2px 6px rgba(0, 122, 255, 0.6);
+        }
+
+        .slider-input:hover::-moz-range-thumb {
+            background: #0056b3;
+            box-shadow: 0 2px 6px rgba(0, 122, 255, 0.6);
+        }
+
+        .slider-labels {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 4px;
+            font-size: 10px;
+            color: var(--description-color, rgba(255, 255, 255, 0.5));
+        }
+
+        .slider-description {
+            font-size: 11px;
+            color: var(--description-color, rgba(255, 255, 255, 0.5));
+            margin-top: 4px;
+            line-height: 1.3;
+        }
+
+        .settings-grid {
+            display: grid;
+            gap: 16px;
+        }
+
+        .reset-button {
+            margin-top: 12px;
+            padding-top: 12px;
             border-top: 1px solid var(--table-border, rgba(255, 255, 255, 0.08));
         }
 
-        .rate-limit-warning {
-            background: var(--warning-background, rgba(251, 191, 36, 0.08));
-            border: 1px solid var(--warning-border, rgba(251, 191, 36, 0.2));
-            border-radius: 4px;
-            padding: 10px;
-            margin-bottom: 12px;
-            font-size: 11px;
-            color: var(--warning-color, #fbbf24);
+        /* Number input for max output tokens */
+        .number-input-container {
             display: flex;
-            align-items: flex-start;
+            flex-direction: column;
             gap: 8px;
-            line-height: 1.4;
+            margin-bottom: 16px;
         }
 
-        .rate-limit-warning-icon {
-            flex-shrink: 0;
-            font-size: 12px;
-            margin-top: 1px;
+        .number-input-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
+
+        .number-input-label {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--label-color, rgba(255, 255, 255, 0.9));
+        }
+
+        .number-input {
+            background: var(--input-background, rgba(0, 0, 0, 0.3));
+            color: var(--text-color);
+            border: 1px solid var(--input-border, rgba(255, 255, 255, 0.15));
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 13px;
+            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace;
+            width: 140px;
+            transition: all 0.15s ease;
+        }
+
+        .number-input:focus {
+            outline: none;
+            border-color: var(--focus-border-color, #007aff);
+            box-shadow: 0 0 0 2px var(--focus-shadow, rgba(0, 122, 255, 0.1));
+            background: var(--input-focus-background, rgba(0, 0, 0, 0.4));
+        }
+
+        .number-input:hover:not(:focus) {
+            border-color: var(--input-hover-border, rgba(255, 255, 255, 0.2));
+            background: var(--input-hover-background, rgba(0, 0, 0, 0.35));
+        }
+
+        .model-badge {
+            font-size: 11px;
+            padding: 3px 10px;
+            border-radius: 6px;
+            background: var(--success-background, rgba(52, 211, 153, 0.1));
+            color: var(--success-color, #34d399);
+            border: 1px solid var(--success-border, rgba(52, 211, 153, 0.2));
+            font-weight: 500;
+        }
+
+        .model-badge.orange {
+            background: rgba(251, 146, 60, 0.1);
+            color: #fb923c;
+            border: 1px solid rgba(251, 146, 60, 0.2);
+        }
+
+        .defaults-label {
+            color: var(--description-color, rgba(255, 255, 255, 0.5));
+        }
+
+        .defaults-values {
+            color: var(--text-color, #ffffff);
+        }
+
     `;
 
     static properties = {
         isClearing: { type: Boolean },
         statusMessage: { type: String },
         statusType: { type: String },
-        throttleTokens: { type: Boolean },
-        maxTokensPerMin: { type: Number },
-        throttleAtPercent: { type: Number },
         contentProtection: { type: Boolean },
+        // Model generation settings
+        temperature: { type: Number },
+        topP: { type: Number },
+        maxOutputTokens: { type: Number },
+        selectedModel: { type: String },
     };
+
+    // Model-specific max output token limits (maximum allowed)
+    static MODEL_MAX_TOKENS = {
+        // Gemini models
+        'gemini-2.0-flash-exp': 8192,
+        'gemini-2.5-flash': 65536,
+        'gemini-3-pro-preview': 65536,
+        // Groq Llama models
+        'llama-4-maverick': 8192,
+        'llama-4-scout': 8192,
+    };
+
+    // Model-specific default settings based on 2025/2026 documentation
+    // Interview models: balanced responses (enough tokens for technical explanations + code)
+    // Coding models: detailed responses (higher tokens, lower temp for accuracy)
+    static MODEL_DEFAULTS = {
+        // Gemini 2.0 Flash Exp - Interview mode (balanced, enough for code + explanation)
+        'gemini-2.0-flash-exp': {
+            temperature: 0.7,
+            topP: 0.95,
+            maxOutputTokens: 4096,
+        },
+        // Gemini 2.5 Flash - Coding mode (detailed code, more deterministic)
+        'gemini-2.5-flash': {
+            temperature: 0.5,
+            topP: 0.95,
+            maxOutputTokens: 8192,
+        },
+        // Gemini 3 Pro - Coding mode (very detailed, most accurate)
+        'gemini-3-pro-preview': {
+            temperature: 0.4,
+            topP: 0.95,
+            maxOutputTokens: 16384,
+        },
+        // Groq Llama 4 Maverick - Interview mode (balanced, enough for code + explanation)
+        'llama-4-maverick': {
+            temperature: 0.7,
+            topP: 0.95,
+            maxOutputTokens: 4096,
+        },
+        // Groq Llama 4 Scout - Interview mode (balanced, enough for code + explanation)
+        'llama-4-scout': {
+            temperature: 0.7,
+            topP: 0.95,
+            maxOutputTokens: 4096,
+        },
+    };
+
+    // Fallback defaults
+    static DEFAULT_TEMPERATURE = 0.7;
+    static DEFAULT_TOP_P = 0.95;
+    static DEFAULT_MAX_TOKENS = 4096;
 
     constructor() {
         super();
@@ -335,22 +541,133 @@ export class AdvancedView extends LitElement {
         this.statusMessage = '';
         this.statusType = '';
 
-        // Rate limiting defaults
-        this.throttleTokens = true;
-        this.maxTokensPerMin = 1000000;
-        this.throttleAtPercent = 75;
-
         // Content protection default
         this.contentProtection = true;
 
-        this.loadRateLimitSettings();
+        // Model generation defaults (model-specific values)
+        this.selectedModel = localStorage.getItem('selectedModel') || 'gemini-2.0-flash-exp';
+        this.temperature = this.getDefaultTemperature();
+        this.topP = this.getDefaultTopP();
+        this.maxOutputTokens = this.getDefaultMaxTokens();
+
         this.loadContentProtectionSetting();
+        this.loadModelSettings();
+    }
+
+    // Get default max tokens based on selected model
+    getDefaultMaxTokens() {
+        const defaults = AdvancedView.MODEL_DEFAULTS[this.selectedModel];
+        return defaults ? defaults.maxOutputTokens : AdvancedView.DEFAULT_MAX_TOKENS;
+    }
+
+    // Get default temperature based on selected model
+    getDefaultTemperature() {
+        const defaults = AdvancedView.MODEL_DEFAULTS[this.selectedModel];
+        return defaults ? defaults.temperature : AdvancedView.DEFAULT_TEMPERATURE;
+    }
+
+    // Get default topP based on selected model
+    getDefaultTopP() {
+        const defaults = AdvancedView.MODEL_DEFAULTS[this.selectedModel];
+        return defaults ? defaults.topP : AdvancedView.DEFAULT_TOP_P;
+    }
+
+    // Get max allowed tokens for current model
+    getMaxAllowedTokens() {
+        return AdvancedView.MODEL_MAX_TOKENS[this.selectedModel] || 65536;
+    }
+
+    // Get default temperature (same for all models)
+    getDefaultTemperature() {
+        return AdvancedView.DEFAULT_TEMPERATURE;
+    }
+
+    // Get default top_p (same for all models)
+    getDefaultTopP() {
+        return AdvancedView.DEFAULT_TOP_P;
+    }
+
+    // Get display name for the current model
+    getModelDisplayName() {
+        const modelNames = {
+            'gemini-2.0-flash-exp': 'Gemini 2.0 Flash',
+            'gemini-2.5-flash': 'Gemini 2.5 Flash',
+            'gemini-3-pro-preview': 'Gemini 3.0 Pro',
+            'llama-4-maverick': 'Llama 4 Maverick',
+            'llama-4-scout': 'Llama 4 Scout',
+        };
+        return modelNames[this.selectedModel] || this.selectedModel;
+    }
+
+    // Check if model should have orange badge (exam mode models)
+    isExamModeModel() {
+        return this.selectedModel === 'gemini-2.5-flash' || this.selectedModel === 'gemini-3-pro-preview';
+    }
+
+    // Check if current model is a Groq Llama model
+    isGroqModel() {
+        return this.selectedModel === 'llama-4-maverick' || this.selectedModel === 'llama-4-scout';
+    }
+
+    // Get provider name for display
+    getProviderName() {
+        return this.isGroqModel() ? 'Groq Llama' : 'Gemini';
     }
 
     connectedCallback() {
         super.connectedCallback();
         // Resize window for this view
         resizeLayout();
+
+        // Always re-read selected model from localStorage when component connects
+        // This ensures we have the latest model after navigating from CustomizeView
+        const currentModel = localStorage.getItem('selectedModel') || 'gemini-2.0-flash-exp';
+        if (currentModel !== this.selectedModel) {
+            this.selectedModel = currentModel;
+            // Load this model's saved settings (or defaults if none saved)
+            this.loadModelSettings();
+        }
+
+        // Sync current settings to main process
+        this.syncSettingsToMain();
+
+        // Listen for model changes from CustomizeView (same window)
+        this.modelChangeHandler = (e) => {
+            const newModel = e.detail?.model || 'gemini-2.0-flash-exp';
+            if (newModel !== this.selectedModel) {
+                this.selectedModel = newModel;
+                // Load this model's saved settings (preserves custom values per model)
+                this.loadModelSettings();
+                this.syncSettingsToMain();
+                this.requestUpdate();
+            }
+        };
+        window.addEventListener('modelChanged', this.modelChangeHandler);
+
+        // Listen for model changes from other windows/tabs
+        this.storageHandler = (e) => {
+            if (e.key === 'selectedModel') {
+                const newModel = e.newValue || 'gemini-2.0-flash-exp';
+                if (newModel !== this.selectedModel) {
+                    this.selectedModel = newModel;
+                    // Load this model's saved settings (preserves custom values per model)
+                    this.loadModelSettings();
+                    this.syncSettingsToMain();
+                    this.requestUpdate();
+                }
+            }
+        };
+        window.addEventListener('storage', this.storageHandler);
+    }
+
+    disconnectedCallback() {
+        super.disconnectedCallback();
+        if (this.modelChangeHandler) {
+            window.removeEventListener('modelChanged', this.modelChangeHandler);
+        }
+        if (this.storageHandler) {
+            window.removeEventListener('storage', this.storageHandler);
+        }
     }
 
     async clearLocalData() {
@@ -415,57 +732,6 @@ export class AdvancedView extends LitElement {
         }
     }
 
-    // Rate limiting methods
-    loadRateLimitSettings() {
-        const throttleTokens = localStorage.getItem('throttleTokens');
-        const maxTokensPerMin = localStorage.getItem('maxTokensPerMin');
-        const throttleAtPercent = localStorage.getItem('throttleAtPercent');
-
-        if (throttleTokens !== null) {
-            this.throttleTokens = throttleTokens === 'true';
-        }
-        if (maxTokensPerMin !== null) {
-            this.maxTokensPerMin = parseInt(maxTokensPerMin, 10) || 1000000;
-        }
-        if (throttleAtPercent !== null) {
-            this.throttleAtPercent = parseInt(throttleAtPercent, 10) || 75;
-        }
-    }
-
-    handleThrottleTokensChange(e) {
-        this.throttleTokens = e.target.checked;
-        localStorage.setItem('throttleTokens', this.throttleTokens.toString());
-        this.requestUpdate();
-    }
-
-    handleMaxTokensChange(e) {
-        const value = parseInt(e.target.value, 10);
-        if (!isNaN(value) && value > 0) {
-            this.maxTokensPerMin = value;
-            localStorage.setItem('maxTokensPerMin', this.maxTokensPerMin.toString());
-        }
-    }
-
-    handleThrottlePercentChange(e) {
-        const value = parseInt(e.target.value, 10);
-        if (!isNaN(value) && value >= 0 && value <= 100) {
-            this.throttleAtPercent = value;
-            localStorage.setItem('throttleAtPercent', this.throttleAtPercent.toString());
-        }
-    }
-
-    resetRateLimitSettings() {
-        this.throttleTokens = true;
-        this.maxTokensPerMin = 1000000;
-        this.throttleAtPercent = 75;
-
-        localStorage.removeItem('throttleTokens');
-        localStorage.removeItem('maxTokensPerMin');
-        localStorage.removeItem('throttleAtPercent');
-
-        this.requestUpdate();
-    }
-
     // Content protection methods
     loadContentProtectionSetting() {
         const contentProtection = localStorage.getItem('contentProtection');
@@ -489,16 +755,145 @@ export class AdvancedView extends LitElement {
         this.requestUpdate();
     }
 
+    // Model generation settings methods
+    // Settings are now stored PER MODEL to preserve custom values when switching
+    getStorageKey(setting) {
+        return `modelSettings_${this.selectedModel}_${setting}`;
+    }
+
+    loadModelSettings() {
+        const model = this.selectedModel;
+
+        // Load model-specific settings (each model has its own saved values)
+        const temperature = localStorage.getItem(this.getStorageKey('temperature'));
+        const topP = localStorage.getItem(this.getStorageKey('topP'));
+        const maxOutputTokens = localStorage.getItem(this.getStorageKey('maxOutputTokens'));
+
+        // If this model has saved settings, use them
+        if (temperature !== null) {
+            this.temperature = parseFloat(temperature);
+        } else {
+            // No saved settings for this model, use model defaults
+            this.temperature = this.getDefaultTemperature();
+        }
+
+        if (topP !== null) {
+            this.topP = parseFloat(topP);
+        } else {
+            this.topP = this.getDefaultTopP();
+        }
+
+        if (maxOutputTokens !== null) {
+            let loadedTokens = parseInt(maxOutputTokens, 10);
+            const maxAllowed = this.getMaxAllowedTokens();
+            // Cap to current model's max limit
+            this.maxOutputTokens = Math.min(loadedTokens, maxAllowed);
+        } else {
+            this.maxOutputTokens = this.getDefaultMaxTokens();
+        }
+
+        console.log(`[AdvancedView] Loaded settings for ${model}: temp=${this.temperature}, topP=${this.topP}, maxTokens=${this.maxOutputTokens}`);
+    }
+
+    // Save current settings for the current model
+    saveModelSettings() {
+        localStorage.setItem(this.getStorageKey('temperature'), this.temperature.toString());
+        localStorage.setItem(this.getStorageKey('topP'), this.topP.toString());
+        localStorage.setItem(this.getStorageKey('maxOutputTokens'), this.maxOutputTokens.toString());
+        console.log(`[AdvancedView] Saved settings for ${this.selectedModel}: temp=${this.temperature}, topP=${this.topP}, maxTokens=${this.maxOutputTokens}`);
+    }
+
+    // Apply model-specific defaults and save to localStorage
+    applyModelDefaults() {
+        this.temperature = this.getDefaultTemperature();
+        this.topP = this.getDefaultTopP();
+        this.maxOutputTokens = this.getDefaultMaxTokens();
+
+        // Save defaults to model-specific localStorage keys
+        this.saveModelSettings();
+
+        // Sync to main process
+        this.syncSettingsToMain();
+    }
+
+    // Reset current model to its documentation defaults
+    async resetToModelDefaults() {
+        this.applyModelDefaults();
+        await this.syncSettingsToMain();
+        this.requestUpdate();
+    }
+
+    getSliderBackground(value, min, max) {
+        const percentage = ((value - min) / (max - min)) * 100;
+        return `linear-gradient(to right, rgba(0, 122, 255, 0.6) 0%, rgba(0, 122, 255, 0.6) ${percentage}%, rgba(0, 0, 0, 0.3) ${percentage}%, rgba(0, 0, 0, 0.3) 100%)`;
+    }
+
+    async handleTemperatureChange(e) {
+        this.temperature = parseFloat(e.target.value);
+        localStorage.setItem(this.getStorageKey('temperature'), this.temperature.toString());
+        await this.syncSettingsToMain();
+        this.requestUpdate();
+    }
+
+    async handleTopPChange(e) {
+        this.topP = parseFloat(e.target.value);
+        localStorage.setItem(this.getStorageKey('topP'), this.topP.toString());
+        await this.syncSettingsToMain();
+        this.requestUpdate();
+    }
+
+    async handleMaxOutputTokensChange(e) {
+        let value = parseInt(e.target.value, 10);
+        const maxAllowed = this.getMaxAllowedTokens();
+
+        // Clamp value to valid range
+        if (isNaN(value) || value < 256) {
+            value = 256;
+        } else if (value > maxAllowed) {
+            value = maxAllowed;
+        }
+
+        this.maxOutputTokens = value;
+        localStorage.setItem(this.getStorageKey('maxOutputTokens'), this.maxOutputTokens.toString());
+        await this.syncSettingsToMain();
+        this.requestUpdate();
+    }
+
+    async resetModelSettings() {
+        // Apply model-specific defaults from documentation
+        await this.resetToModelDefaults();
+    }
+
+    // Sync settings to main process (both Gemini and Groq - global settings for all models)
+    async syncSettingsToMain() {
+        if (window.require) {
+            const { ipcRenderer } = window.require('electron');
+            const settings = {
+                temperature: this.temperature,
+                topP: this.topP,
+                maxOutputTokens: this.maxOutputTokens,
+            };
+            try {
+                // Update Gemini settings (applies to both interview and coding mode)
+                await ipcRenderer.invoke('update-generation-settings', settings);
+                // Update Groq Llama settings
+                await ipcRenderer.invoke('groq-update-generation-settings', settings);
+            } catch (error) {
+                console.error('Failed to sync generation settings:', error);
+            }
+        }
+    }
+
     render() {
         return html`
             <div class="advanced-container">
                 <!-- Content Protection Section -->
                 <div class="advanced-section">
                     <div class="section-title">
-                        <span>🔒 Content Protection</span>
+                        <span>Content Protection</span>
                     </div>
                     <div class="advanced-description">
-                        Content protection makes the application window invisible to screen sharing and recording software. 
+                        Content protection makes the application window invisible to screen sharing and recording software.
                         This is useful for privacy when sharing your screen, but may interfere with certain display setups like DisplayLink.
                     </div>
 
@@ -516,91 +911,111 @@ export class AdvancedView extends LitElement {
                             </label>
                         </div>
                         <div class="form-description" style="margin-left: 22px;">
-                            ${this.contentProtection 
-                                ? 'The application is currently invisible to screen sharing and recording software.' 
+                            ${this.contentProtection
+                                ? 'The application is currently invisible to screen sharing and recording software.'
                                 : 'The application is currently visible to screen sharing and recording software.'}
                         </div>
                     </div>
                 </div>
 
-                <!-- Rate Limiting Section -->
+                <!-- Model Generation Settings Section -->
                 <div class="advanced-section">
                     <div class="section-title">
-                        <span>⏱️ Rate Limiting</span>
+                        <span>Model Generation Settings</span>
+                    </div>
+                    <div class="advanced-description">
+                        Adjust how ${this.getProviderName()} models generate responses. These settings affect creativity, randomness, and response length.
                     </div>
 
-                    <div class="rate-limit-warning">
-                        <span class="rate-limit-warning-icon">⚠️</span>
-                        <span
-                            ><strong>Warning:</strong> Don't mess with these settings if you don't know what this is about. Incorrect rate limiting
-                            settings may cause the application to stop working properly or hit API limits unexpectedly.</span
-                        >
-                    </div>
-
-                    <div class="form-grid">
-                        <div class="checkbox-group">
+                    <div class="settings-grid">
+                        <!-- Temperature Slider -->
+                        <div class="slider-container">
+                            <div class="slider-header">
+                                <span class="slider-label">Temperature</span>
+                                <span class="slider-value">${this.temperature.toFixed(2)}</span>
+                            </div>
                             <input
-                                type="checkbox"
-                                class="checkbox-input"
-                                id="throttle-tokens"
-                                .checked=${this.throttleTokens}
-                                @change=${this.handleThrottleTokensChange}
+                                type="range"
+                                class="slider-input"
+                                min="0"
+                                max="2"
+                                step="0.05"
+                                .value=${this.temperature}
+                                style="background: ${this.getSliderBackground(this.temperature, 0, 2)}"
+                                @input=${this.handleTemperatureChange}
                             />
-                            <label for="throttle-tokens" class="checkbox-label"> Throttle tokens when close to rate limit </label>
+                            <div class="slider-labels">
+                                <span>Precise (0)</span>
+                                <span>Balanced (1)</span>
+                                <span>Creative (2)</span>
+                            </div>
+                            <div class="slider-description">
+                                Controls randomness. Lower values make responses more focused and deterministic, higher values make them more creative.
+                            </div>
                         </div>
 
-                        <div class="rate-limit-controls ${this.throttleTokens ? 'enabled' : ''}">
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label class="form-label">Max Allowed Tokens Per Minute</label>
-                                    <input
-                                        type="number"
-                                        class="form-control"
-                                        .value=${this.maxTokensPerMin}
-                                        min="1000"
-                                        max="10000000"
-                                        step="1000"
-                                        @input=${this.handleMaxTokensChange}
-                                        ?disabled=${!this.throttleTokens}
-                                    />
-                                    <div class="form-description">Maximum number of tokens allowed per minute before throttling kicks in</div>
-                                </div>
-
-                                <div class="form-group">
-                                    <label class="form-label">Throttle At Percent</label>
-                                    <input
-                                        type="number"
-                                        class="form-control"
-                                        .value=${this.throttleAtPercent}
-                                        min="1"
-                                        max="99"
-                                        step="1"
-                                        @input=${this.handleThrottlePercentChange}
-                                        ?disabled=${!this.throttleTokens}
-                                    />
-                                    <div class="form-description">
-                                        Start throttling when this percentage of the limit is reached (${this.throttleAtPercent}% =
-                                        ${Math.floor((this.maxTokensPerMin * this.throttleAtPercent) / 100)} tokens)
-                                    </div>
-                                </div>
+                        <!-- Top P Slider -->
+                        <div class="slider-container">
+                            <div class="slider-header">
+                                <span class="slider-label">Top P</span>
+                                <span class="slider-value">${this.topP.toFixed(2)}</span>
                             </div>
-
-                            <div class="rate-limit-reset">
-                                <button class="action-button" @click=${this.resetRateLimitSettings} ?disabled=${!this.throttleTokens}>
-                                    Reset to Defaults
-                                </button>
-                                <div class="form-description" style="margin-top: 8px;">Reset rate limiting settings to default values</div>
+                            <input
+                                type="range"
+                                class="slider-input"
+                                min="0"
+                                max="1"
+                                step="0.05"
+                                .value=${this.topP}
+                                style="background: ${this.getSliderBackground(this.topP, 0, 1)}"
+                                @input=${this.handleTopPChange}
+                            />
+                            <div class="slider-labels">
+                                <span>Focused (0)</span>
+                                <span>Diverse (1)</span>
                             </div>
+                            <div class="slider-description">
+                                Controls diversity via nucleus sampling. Lower values consider fewer token choices, higher values allow more variety.
+                            </div>
+                        </div>
+
+                        <!-- Max Output Tokens Input -->
+                        <div class="number-input-container">
+                            <div class="number-input-header">
+                                <span class="number-input-label">Output Length (Max Tokens)</span>
+                                <span class="model-badge ${this.isExamModeModel() ? 'orange' : ''}">${this.getModelDisplayName()}</span>
+                            </div>
+                            <input
+                                type="number"
+                                class="number-input"
+                                min="256"
+                                max="${this.getMaxAllowedTokens()}"
+                                step="256"
+                                .value=${this.maxOutputTokens}
+                                @input=${this.handleMaxOutputTokensChange}
+                                placeholder="Enter max tokens (256 - ${this.getMaxAllowedTokens()})"
+                            />
+                            <div class="slider-description">
+                                Maximum tokens in response. Current model limit: ${this.getMaxAllowedTokens()} tokens.
+                                Value will auto-adjust when you switch models.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="reset-button">
+                        <button class="action-button" @click=${this.resetModelSettings}>
+                            Reset to Defaults
+                        </button>
+                        <div class="form-description" style="margin-top: 8px;">
+                            <span class="defaults-label">Default:</span> <span class="defaults-values">Temperature ${this.getDefaultTemperature()}, Top P ${this.getDefaultTopP()}, Output Length ${this.getDefaultMaxTokens()}</span>
                         </div>
                     </div>
                 </div>
 
-
-
                 <!-- Data Management Section -->
                 <div class="advanced-section danger-section">
                     <div class="section-title danger">
-                        <span>🗑️ Data Management</span>
+                        <span>Data Management</span>
                     </div>
                     <div class="danger-box">
                         <span class="danger-icon">⚠️</span>
@@ -609,7 +1024,7 @@ export class AdvancedView extends LitElement {
 
                     <div>
                         <button class="action-button danger-button" @click=${this.clearLocalData} ?disabled=${this.isClearing}>
-                            ${this.isClearing ? '🔄 Clearing...' : '🗑️ Clear All Local Data'}
+                            ${this.isClearing ? 'Clearing...' : 'Clear All Local Data'}
                         </button>
 
                         ${this.statusMessage

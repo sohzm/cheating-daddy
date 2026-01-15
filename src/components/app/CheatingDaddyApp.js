@@ -115,6 +115,7 @@ export class CheatingDaddyApp extends LitElement {
         _isClickThrough: { state: true },
         _awaitingNewResponse: { state: true },
         shouldAnimateResponse: { type: Boolean },
+        updateAvailable: { type: Boolean },
     };
 
     constructor() {
@@ -126,7 +127,7 @@ export class CheatingDaddyApp extends LitElement {
         this.sessionActive = false;
         this.selectedProfile = localStorage.getItem('selectedProfile') || 'exam';
         this.selectedLanguage = localStorage.getItem('selectedLanguage') || 'en-US';
-        this.selectedScreenshotInterval = localStorage.getItem('selectedScreenshotInterval') || '5';
+        this.selectedScreenshotInterval = 'manual'; // Always manual to prevent rate limits
         this.selectedImageQuality = localStorage.getItem('selectedImageQuality') || 'high';
         this.layoutMode = localStorage.getItem('layoutMode') || 'compact';
         this.advancedMode = localStorage.getItem('advancedMode') === 'true';
@@ -139,6 +140,7 @@ export class CheatingDaddyApp extends LitElement {
         this._awaitingNewResponse = false;
         this._currentResponseIsComplete = true;
         this.shouldAnimateResponse = false;
+        this.updateAvailable = false;
 
         // Apply layout mode to document root
         this.updateLayoutMode();
@@ -159,6 +161,9 @@ export class CheatingDaddyApp extends LitElement {
             ipcRenderer.on('click-through-toggled', (_, isEnabled) => {
                 this._isClickThrough = isEnabled;
             });
+            ipcRenderer.on('update-available', (_, available) => {
+                this.updateAvailable = available;
+            });
         }
 
         // Add global keyboard event listener for Ctrl+G
@@ -173,6 +178,7 @@ export class CheatingDaddyApp extends LitElement {
             ipcRenderer.removeAllListeners('update-response');
             ipcRenderer.removeAllListeners('update-status');
             ipcRenderer.removeAllListeners('click-through-toggled');
+            ipcRenderer.removeAllListeners('update-available');
         }
         
         // Remove global keyboard event listener
@@ -183,9 +189,10 @@ export class CheatingDaddyApp extends LitElement {
 
     setStatus(text) {
         this.statusText = text;
-        
+
         // Mark response as complete when we get certain status messages
-        if (text.includes('Ready') || text.includes('Listening') || text.includes('Error')) {
+        if (text.includes('Ready') || text.includes('Listening') || text.includes('Error') ||
+            text.includes('Quota') || text.includes('Session closed')) {
             this._currentResponseIsComplete = true;
             console.log('[setStatus] Marked current response as complete');
         }
@@ -239,6 +246,18 @@ export class CheatingDaddyApp extends LitElement {
     handleAdvancedClick() {
         this.currentView = 'advanced';
         this.requestUpdate();
+    }
+
+    async handleUpdateCheckClick() {
+        if (window.require) {
+            const { ipcRenderer } = window.require('electron');
+            const result = await ipcRenderer.invoke('check-for-updates');
+            if (result && result.updateAvailable) {
+                this.updateAvailable = true;
+            } else {
+                this.updateAvailable = false;
+            }
+        }
     }
 
     async handleClose() {
@@ -303,19 +322,13 @@ export class CheatingDaddyApp extends LitElement {
 
         // Set current mode and model for header display
         this.currentMode = selectedMode;
-        if (selectedMode === 'interview') {
-            this.currentModel = 'gemini-2.0-flash-exp';
-        } else {
-            this.currentModel = selectedModel;
-        }
+        // Use the actual selected model (could be Gemini or Llama/Groq)
+        this.currentModel = selectedModel;
 
-        // For coding/OA mode (exam-assistant), ALWAYS use manual mode to avoid rate limits
-        // For interview mode, use the user's selected interval
-        const screenshotMode = selectedMode === 'coding' ? 'manual' : this.selectedScreenshotInterval;
+        // Always use manual mode to prevent rate limits and token exhaustion
+        const screenshotMode = 'manual';
 
-        if (selectedMode === 'coding') {
-            console.log('💻 Coding/OA mode (Exam Assistant): Manual capture only - Press Ctrl+Enter to analyze screenshot');
-        }
+        console.log('📸 Manual capture mode: Press Ctrl+Enter to capture and analyze screenshot');
 
         cheddar.startCapture(screenshotMode, this.selectedImageQuality);
         this.responses = [];
@@ -327,7 +340,13 @@ export class CheatingDaddyApp extends LitElement {
     async handleAPIKeyHelp() {
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
-            await ipcRenderer.invoke('open-external', 'https://cheatingdaddy.com/help/api-key');
+            // Open different URLs based on selected model
+            const selectedModel = localStorage.getItem('selectedModel') || 'gemini-2.0-flash-exp';
+            const isGroqModel = selectedModel && (selectedModel.includes('llama') || selectedModel.includes('groq'));
+            const url = isGroqModel
+                ? 'https://groq.com/'
+                : 'https://aistudio.google.com/';
+            await ipcRenderer.invoke('open-external', url);
         }
     }
 
@@ -552,9 +571,11 @@ export class CheatingDaddyApp extends LitElement {
                         .currentMode=${this.currentMode}
                         .currentModel=${this.currentModel}
                         .advancedMode=${this.advancedMode}
+                        .updateAvailable=${this.updateAvailable}
                         .onCustomizeClick=${() => this.handleCustomizeClick()}
                         .onHelpClick=${() => this.handleHelpClick()}
                         .onAdvancedClick=${() => this.handleAdvancedClick()}
+                        .onUpdateCheckClick=${() => this.handleUpdateCheckClick()}
                         .onCloseClick=${() => this.handleClose()}
                         .onBackClick=${() => this.handleBackClick()}
                         .onHideToggleClick=${() => this.handleHideToggle()}
