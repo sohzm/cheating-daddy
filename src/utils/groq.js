@@ -2,7 +2,7 @@
 const { BrowserWindow, ipcMain } = require('electron');
 const https = require('https');
 const { URL } = require('url');
-const { getSystemPrompt } = require('./prompts');
+const { getCondensedSystemPrompt } = require('./prompts');
 
 // Groq API configuration
 const GROQ_API_BASE = 'https://api.groq.com/openai/v1';
@@ -88,9 +88,9 @@ function initializeGroq(apiKey, customPrompt = '', profile = 'interview', langua
     groqApiKey = apiKey;
     conversationHistory = [];
 
-    // Get system prompt (Groq doesn't support Google Search tool)
-    const googleSearchEnabled = false;
-    currentSystemPrompt = getSystemPrompt(profile, customPrompt, googleSearchEnabled);
+    // Use CONDENSED system prompt for Groq (strict HTTP body size limit ~20KB)
+    // Full prompt is ~27KB which exceeds Groq's limit
+    currentSystemPrompt = getCondensedSystemPrompt(profile, customPrompt);
 
     // Add language instruction - matches Gemini's full language support
     const languageMap = {
@@ -298,7 +298,7 @@ async function chatWithLlama(userMessage, model = 'llama-4-maverick', imageData 
             messages.push({ role: 'user', content: userMessage });
         }
 
-        const requestBody = JSON.stringify({
+        let requestBody = JSON.stringify({
             model: modelId,
             messages: messages,
             temperature: generationSettings.temperature,
@@ -306,6 +306,46 @@ async function chatWithLlama(userMessage, model = 'llama-4-maverick', imageData 
             max_tokens: generationSettings.maxOutputTokens,
             stream: true
         });
+
+        // Log request size for debugging
+        let requestSizeKB = (Buffer.byteLength(requestBody) / 1024).toFixed(1);
+        console.log(`[GROQ] Request body size: ${requestSizeKB}KB (${messages.length} messages, ${conversationHistory.length} history turns)`);
+
+        // Groq has ~4MB request limit, but we should stay well under for performance
+        // If request is too large, clear history and retry with just current message
+        const MAX_REQUEST_SIZE = 500 * 1024; // 500KB safety limit (system prompt is already huge)
+        if (Buffer.byteLength(requestBody) > MAX_REQUEST_SIZE) {
+            console.warn(`[GROQ] Request too large (${requestSizeKB}KB > 500KB limit), clearing history and retrying...`);
+            conversationHistory = []; // Clear history
+            
+            // Rebuild messages with just system prompt and current message
+            const trimmedMessages = [
+                { role: 'system', content: currentSystemPrompt }
+            ];
+            if (imageData) {
+                trimmedMessages.push({
+                    role: 'user',
+                    content: [
+                        { type: 'image_url', image_url: { url: `data:image/png;base64,${imageData}` } },
+                        { type: 'text', text: userMessage }
+                    ]
+                });
+            } else {
+                trimmedMessages.push({ role: 'user', content: userMessage });
+            }
+            
+            // Recreate request body with trimmed messages
+            requestBody = JSON.stringify({
+                model: modelId,
+                messages: trimmedMessages,
+                temperature: generationSettings.temperature,
+                top_p: generationSettings.topP,
+                max_tokens: generationSettings.maxOutputTokens,
+                stream: true
+            });
+            requestSizeKB = (Buffer.byteLength(requestBody) / 1024).toFixed(1);
+            console.log(`[GROQ] Trimmed request size: ${requestSizeKB}KB`);
+        }
 
         const url = new URL(`${GROQ_API_BASE}/chat/completions`);
 
@@ -359,7 +399,9 @@ async function chatWithLlama(userMessage, model = 'llama-4-maverick', imageData 
                         assistantResponse: responseText
                     });
 
-                    // Limit history to last 10 turns to prevent context overflow
+                    // Limit history to last 10 turns for better context
+                    // Size budget: Prompt ~2KB + 10 turns × ~3KB avg = ~32KB (well under 500KB limit)
+                    // Even with screenshots, we have room since images aren't stored in history
                     if (conversationHistory.length > 10) {
                         conversationHistory = conversationHistory.slice(-10);
                     }

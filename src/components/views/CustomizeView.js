@@ -1185,9 +1185,7 @@ export class CustomizeView extends LitElement {
                                     <div class="mode-display-box">
                                         💻 Coding/OA Mode (Screenshot-based)
                                     </div>
-                                    <div class="form-description">
-                                        Exam Assistant profile uses Gemini API 2.5 Flash or 2.5 Pro for better problem-solving responses.
-                                    </div>
+                                    <div class="form-description">Uses Gemini API for screenshot analysis and code generation. Best for online assessments and coding challenges.</div>
                                 </div>
                             </div>
 
@@ -1217,9 +1215,7 @@ export class CustomizeView extends LitElement {
                                     <div class="mode-display-box">
                                         🎤 Interview Mode (Real-time Audio/Video)
                                     </div>
-                                    <div class="form-description">
-                                        ${this.getProfileNames()[this.selectedProfile]} profile uses Interview mode for real-time audio processing and live interactions.
-                                    </div>
+                                    <div class="form-description">${this.getProfileNames()[this.selectedProfile]} profile uses real-time audio processing for live interview interactions.</div>
                                 </div>
                             </div>
 
@@ -1235,13 +1231,7 @@ export class CustomizeView extends LitElement {
                                         ]}
                                         @change=${e => this.handleModelChange({ target: { value: e.detail.value } })}
                                     ></custom-dropdown>
-                                    <div class="form-description">
-                                        ${this.selectedModel === 'gemini-2.0-flash-exp'
-                                            ? 'Gemini Live API: Real-time audio streaming with speaker diarization. Requires Gemini API key.'
-                                            : this.selectedModel === 'llama-4-maverick'
-                                            ? 'Llama 4 Maverick: Fast responses via Groq. Uses Whisper for STT + Llama for responses. Requires Groq API key.'
-                                            : 'Llama 4 Scout: Efficient model via Groq. Uses Whisper for STT + Llama for responses. Requires Groq API key.'}
-                                    </div>
+                                    <div class="form-description">${this.selectedModel === 'gemini-2.0-flash-exp' ? 'Gemini Live API: Real-time audio streaming with speaker diarization. Requires Gemini API key.' : this.selectedModel === 'llama-4-maverick' ? 'Groq Whisper STT + Llama 4 Maverick for fast interview responses. Requires Groq API key.' : 'Groq Whisper STT + Llama 4 Scout for efficient interview responses. Requires Groq API key.'}</div>
                                 </div>
                             </div>
                         `}
