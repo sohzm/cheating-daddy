@@ -10,22 +10,22 @@ module.exports = {
         name: 'Cheating Daddy',
         icon: 'src/assets/logo',
         // Set executable permissions for SystemAudioDump on macOS
-          // afterCopy: [
-        //     (buildPath, electronVersion, platform, arch, callback) => {
-        //         if (platform === 'darwin') {
-        //             const fs = require('fs');
-        //             const path = require('path');
-        //             const binaryPath = path.join(buildPath, '../SystemAudioDump');
-        //             try {
-        //                 fs.chmodSync(binaryPath, 0o755); // rwxr-xr-x
-        //                 console.log(' Set execute permissions for SystemAudioDump');
-        //             } catch (error) {
-        //                 console.warn(' Failed to set permissions for SystemAudioDump:', error.message);
-        //             }
-        //         }
-        //         callback();
-        //     }
-        // ],
+        afterCopy: [
+            (buildPath, electronVersion, platform, arch, callback) => {
+                if (platform === 'darwin') {
+                    const fs = require('fs');
+                    const path = require('path');
+                    const binaryPath = path.join(buildPath, '../SystemAudioDump');
+                    try {
+                        fs.chmodSync(binaryPath, 0o755); // rwxr-xr-x
+                        console.log(' Set execute permissions for SystemAudioDump');
+                    } catch (error) {
+                        console.warn(' Failed to set permissions for SystemAudioDump:', error.message);
+                    }
+                }
+                callback();
+            }
+        ],
         // use `security find-identity -v -p codesigning` to find your identity
         // for macos signing
         // also fuck apple
