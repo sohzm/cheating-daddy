@@ -280,6 +280,12 @@ export class AppHeader extends LitElement {
         return this.currentModel && (this.currentModel.includes('llama') || this.currentModel.includes('groq'));
     }
 
+    // Check if status is an error message (hide Hide button during errors)
+    isErrorStatus() {
+        const errorKeywords = ['Invalid API Key', 'API Quota', 'Audio too long', 'Error', 'Connection', 'No API Key'];
+        return errorKeywords.some(err => this.statusText && this.statusText.includes(err));
+    }
+
     getModelBadgeClass() {
         return this.currentMode === 'interview' ? 'interview' : 'coding';
     }
@@ -300,14 +306,14 @@ export class AppHeader extends LitElement {
                     ${modelName && this.currentView === 'assistant'
                         ? html`<span class="model-badge ${this.getModelBadgeClass()}">${modelName}</span>`
                         : ''}
-                </div>
-                <div class="header-actions">
                     ${this.currentView === 'assistant'
                         ? html`
-                              <span>${elapsedTime}</span>
-                              <span>${this.statusText}</span>
+                              <span style="font-size: var(--header-font-size-small); color: var(--header-actions-color); margin-left: 8px;">${elapsedTime}</span>
+                              <span style="font-size: var(--header-font-size-small); color: var(--header-actions-color);">${this.statusText}</span>
                           `
                         : ''}
+                </div>
+                <div class="header-actions">
                     ${this.currentView === 'main'
                         ? html`
                               ${this.advancedMode
@@ -454,10 +460,6 @@ export class AppHeader extends LitElement {
                         : ''}
                     ${this.currentView === 'assistant'
                         ? html`
-                              <button @click=${this.onHideToggleClick} class="button">
-                                  Hide&nbsp;&nbsp;<span class="key" style="pointer-events: none;">${cheddar.isMacOS ? 'Cmd' : 'Ctrl'}</span
-                                  >&nbsp;&nbsp;<span class="key">&bsol;</span>
-                              </button>
                               <button @click=${this.onRestartClick} class="button">
                                   Restart session&nbsp;&nbsp;<span class="key" style="pointer-events: none;">${cheddar.isMacOS ? 'Cmd' : 'Ctrl'}</span
                                   >+<span class="key" style="pointer-events: none;">Alt</span>+<span class="key">R</span>

@@ -227,15 +227,25 @@ async function transcribeWithGroq(wavBuffer) {
                     }
                 } else {
                     console.error('[GROQ] Whisper API Error:', res.statusCode, data);
-                    // Handle specific error codes like Gemini does
+                    // Handle specific error codes like Gemini does - user-friendly messages
                     if (res.statusCode === 401) {
                         sendToRenderer('update-status', 'Invalid API Key');
                         reject(new Error('Invalid API Key'));
                     } else if (res.statusCode === 429) {
                         sendToRenderer('update-status', 'API Quota Exceeded');
                         reject(new Error('API Quota Exceeded'));
+                    } else if (res.statusCode === 413) {
+                        sendToRenderer('update-status', 'Audio too long');
+                        reject(new Error('Audio too long'));
+                    } else if (res.statusCode === 400) {
+                        sendToRenderer('update-status', 'Invalid request');
+                        reject(new Error('Invalid request'));
+                    } else if (res.statusCode >= 500) {
+                        sendToRenderer('update-status', 'Server error');
+                        reject(new Error('Server error'));
                     } else {
-                        reject(new Error(`Groq API error: ${res.statusCode}`));
+                        sendToRenderer('update-status', 'Connection error');
+                        reject(new Error('Connection error'));
                     }
                 }
             });
@@ -365,9 +375,18 @@ async function chatWithLlama(userMessage, model = 'llama-4-maverick', imageData 
                     } else if (res.statusCode === 429) {
                         sendToRenderer('update-status', 'API Quota Exceeded');
                         reject(new Error('API Quota Exceeded'));
+                    } else if (res.statusCode === 413) {
+                        sendToRenderer('update-status', 'Request too large');
+                        reject(new Error('Request too large'));
+                    } else if (res.statusCode === 400) {
+                        sendToRenderer('update-status', 'Invalid request');
+                        reject(new Error('Invalid request'));
+                    } else if (res.statusCode >= 500) {
+                        sendToRenderer('update-status', 'Server error');
+                        reject(new Error('Server error'));
                     } else {
-                        sendToRenderer('update-status', 'Error: Chat failed');
-                        reject(new Error(`Groq Chat API error: ${res.statusCode}`));
+                        sendToRenderer('update-status', 'Connection error');
+                        reject(new Error('Connection error'));
                     }
                 } else {
                     resolve(responseText);
@@ -550,7 +569,10 @@ async function processAudioBuffer(model = null) {
         return { transcription, response };
     } catch (error) {
         console.error('[GROQ] Error processing audio:', error);
-        sendToRenderer('update-status', 'Error: ' + error.message);
+        // Only update status if it's not already showing a user-friendly error
+        if (!['Invalid API Key', 'API Quota Exceeded', 'Audio too long', 'Request too large', 'Server error', 'Connection error', 'Invalid request'].includes(error.message)) {
+            sendToRenderer('update-status', 'Processing failed');
+        }
         isSpeaking = false;
         lastSpeechTime = 0;
         return null;
@@ -620,7 +642,10 @@ async function flushAudioBuffer(model = null) {
         return { transcription, response };
     } catch (error) {
         console.error('[GROQ] Error flushing audio:', error);
-        sendToRenderer('update-status', 'Error: ' + error.message);
+        // Only update status if it's not already showing a user-friendly error
+        if (!['Invalid API Key', 'API Quota Exceeded', 'Audio too long', 'Request too large', 'Server error', 'Connection error', 'Invalid request'].includes(error.message)) {
+            sendToRenderer('update-status', 'Processing failed');
+        }
         return null;
     } finally {
         isProcessing = false;
@@ -633,7 +658,7 @@ async function flushAudioBuffer(model = null) {
 async function analyzeWithLlama(text, imageData, model = 'llama-4-maverick') {
     if (!groqApiKey) {
         console.error('[GROQ] No API key initialized');
-        sendToRenderer('update-status', 'Error: Groq not initialized');
+        sendToRenderer('update-status', 'No API Key Found');
         return null;
     }
 
@@ -651,7 +676,10 @@ async function analyzeWithLlama(text, imageData, model = 'llama-4-maverick') {
         return response;
     } catch (error) {
         console.error('[GROQ] Error analyzing:', error);
-        sendToRenderer('update-status', 'Error: ' + error.message);
+        // Only update status if it's not already showing a user-friendly error
+        if (!['Invalid API Key', 'API Quota Exceeded', 'Audio too long', 'Request too large', 'Server error', 'Connection error', 'Invalid request'].includes(error.message)) {
+            sendToRenderer('update-status', 'Analysis failed');
+        }
         return null;
     }
 }
