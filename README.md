@@ -16,36 +16,60 @@ A real-time AI assistant that provides contextual help during video calls, inter
 
 ## Features
 
-- **Dual Mode Support**: Interview Mode (with live audio) & Exam Assistant Mode (screenshot + text only)
-- **Smart Model Selection**: Choose between Gemini 2.5 Flash and Gemini 2.5 Pro for better accuracy
+### AI & Model Features
+- **Dual Mode Support**: Interview Mode (with live audio) & Exam Assistant Mode 
+- **Multi-Model Support**:
+  - **Gemini Models**: Gemini 2.0 Flash Exp (Live API), Gemini 2.5 Flash, Gemini 3 Pro Preview
+  - **Groq Llama Models**: Llama 4 Maverick, Llama 4 Scout (for interview mode)
+- **Model Generation Settings**: Customize Temperature, Top P, and Max Output Tokens per model
+- **Per-Model Settings Persistence**: Your custom settings are saved separately for each model
+- **Model-Specific Defaults**: Optimized default values based on 2025/2026 documentation
+- **Live AI Assistance**: Real-time help powered by Google Gemini Live API with optimized streaming
+- **Multiple Profiles**: Interview, Exam Assistant, Sales Call, Business Meeting, Presentation, Negotiation
+
+### VAD (Voice Activity Detection)
 - **Dual VAD Modes**:
   - **Automatic Smart Detection** - Continuously detects and processes speech automatically
   - **Manual Push-to-Talk** - User-controlled mic toggle for interviews with frequent pauses
-- **Live AI Assistance**: Real-time help powered by Google Gemini Live API with optimized streaming
-- **Screen & Audio Capture**: Analyzes what you see and hear for contextual responses
-- **Multiple Profiles**: Interview, Exam Assistant, Sales Call, Business Meeting, Presentation, Negotiation
+
+### Code & Response Features
 - **Enhanced Code Generation**: LeetCode-style structured answers with Approach, Intuition, Implementation, Complexity Analysis, and Algorithm sections
 - **Beautiful Code Formatting**: Clean markdown and syntax highlighting for code blocks
+
+### UI & Stealth Features
 - **Transparent Overlay**: Always-on-top window with adjustable transparency
 - **Click-through Mode**: Make window transparent to clicks when needed
+- **Content Protection**: Hide app from screen sharing and recording software (configurable)
 - **Global Shortcuts**: Works even when app is not focused
 - **macOS Stealth Features**: Dock hiding, Panel window type, Screen saver level visibility
+
+### System Features
+- **Auto-Update Notifications**: Get notified when new versions are available on GitHub
+- **Manual Update Check**: Check for updates anytime with the header button
+- **Screen & Audio Capture**: Analyzes what you see and hear for contextual responses
 - **Cross-platform**: Works on macOS, Windows, and Linux
 
 ## Setup
 
-1. **Get a Gemini API Key**: Visit [Google AI Studio](https://aistudio.google.com/apikey)
+1. **Get API Keys**:
+   - **Gemini API Key**: Visit [Google AI Studio](https://aistudio.google.com/apikey)
+   - **Groq API Key**: Visit [Groq Console](https://console.groq.com/keys) for Llama models
 2. **Install Dependencies**: `npm install`
 3. **Run the App**: `npm start`
 
 ## Usage
 
-1. Enter your Gemini API key in the main window
+1. Enter your API key(s) in the main window:
+   - Gemini API key for Gemini models
+   - Groq API key for Llama 4 Maverick/Scout models
 2. Choose your profile and language in settings
-3. Select your preferred VAD mode (Automatic or Manual) in Interview Mode
-4. Click "Start Session" to begin
-5. Position the window using keyboard shortcuts
-6. The AI will provide real-time assistance based on your screen and what interview asks
+3. Select your preferred model:
+   - **Interview Mode**: Gemini 2.0 Flash Exp (Live API) or Groq Llama models
+   - **Exam Mode**: Gemini 2.5 Flash or Gemini 3 Pro Preview
+4. Select your preferred VAD mode (Automatic or Manual) in Interview Mode
+5. Click "Start Session" to begin
+6. Position the window using keyboard shortcuts
+7. The AI will provide real-time assistance based on your screen and what interviewer asks
 
 ## Performance & Optimizations
 
