@@ -244,18 +244,16 @@ function setupGeneralIpcHandlers() {
         }
     });
 
-    ipcMain.handle('update-content-protection', async (event, contentProtection) => {
+    ipcMain.handle('update-content-protection', async (event, contentProtectionValue) => {
         try {
             if (mainWindow) {
-
-                // Get content protection setting from localStorage via cheddar
-                const contentProtection = await mainWindow.webContents.executeJavaScript('cheddar.getContentProtection()');
-                mainWindow.setContentProtection(contentProtection);
-                console.log('Content protection updated:', contentProtection);
+                // Use the passed value directly (from renderer's localStorage)
+                mainWindow.setContentProtection(contentProtectionValue);
+                console.log('[Main] Content protection updated:', contentProtectionValue);
             }
             return { success: true };
         } catch (error) {
-            console.error('Error updating content protection:', error);
+            console.error('[Main] Error updating content protection:', error);
             return { success: false, error: error.message };
         }
     });

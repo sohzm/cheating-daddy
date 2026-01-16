@@ -1024,4 +1024,17 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log('App reference set for global shortcuts');
         }
     }, 100);
+
+    // CRITICAL: Sync content protection state to main process on startup
+    // This ensures the saved setting is applied when the app reopens
+    // (The main process sets contentProtection=true by default, we need to override if user disabled it)
+    setTimeout(async () => {
+        const contentProtection = cheddar.getContentProtection();
+        console.log('[Renderer] Syncing content protection to main on startup:', contentProtection);
+        try {
+            await ipcRenderer.invoke('update-content-protection', contentProtection);
+        } catch (error) {
+            console.error('[Renderer] Failed to sync content protection:', error);
+        }
+    }, 200);
 });
