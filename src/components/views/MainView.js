@@ -127,25 +127,31 @@ export class MainView extends LitElement {
     static properties = {
         onStart: { type: Function },
         onAPIKeyHelp: { type: Function },
+        onGroqAPIKeyHelp: { type: Function },
         isInitializing: { type: Boolean },
         onLayoutModeChange: { type: Function },
         showApiKeyError: { type: Boolean },
+        showGroqApiKeyError: { type: Boolean },
     };
 
     constructor() {
         super();
         this.onStart = () => {};
         this.onAPIKeyHelp = () => {};
+        this.onGroqAPIKeyHelp = () => {};
         this.isInitializing = false;
         this.onLayoutModeChange = () => {};
         this.showApiKeyError = false;
+        this.showGroqApiKeyError = false;
         this.boundKeydownHandler = this.handleKeydown.bind(this);
         this.apiKey = '';
-        this._loadApiKey();
+        this.groqApiKey = '';
+        this._loadApiKeys();
     }
 
-    async _loadApiKey() {
+    async _loadApiKeys() {
         this.apiKey = await cheatingDaddy.storage.getApiKey();
+        this.groqApiKey = await cheatingDaddy.storage.getGroqApiKey();
         this.requestUpdate();
     }
 
@@ -188,6 +194,15 @@ export class MainView extends LitElement {
         }
     }
 
+    async handleGroqInput(e) {
+        this.groqApiKey = e.target.value;
+        await cheatingDaddy.storage.setGroqApiKey(e.target.value);
+        // Clear error state when user starts typing
+        if (this.showGroqApiKeyError) {
+            this.showGroqApiKeyError = false;
+        }
+    }
+
     handleStartClick() {
         if (this.isInitializing) {
             return;
@@ -197,6 +212,10 @@ export class MainView extends LitElement {
 
     handleAPIKeyHelpClick() {
         this.onAPIKeyHelp();
+    }
+
+    handleGroqAPIKeyHelpClick() {
+        this.onGroqAPIKeyHelp();
     }
 
     // Method to trigger the red blink animation
@@ -221,18 +240,29 @@ export class MainView extends LitElement {
             <div class="input-group">
                 <input
                     type="password"
-                    placeholder="Enter your Gemini API Key"
+                    placeholder="Gemini API Key (for transcription)"
                     .value=${this.apiKey}
                     @input=${this.handleInput}
                     class="${this.showApiKeyError ? 'api-key-error' : ''}"
+                />
+            </div>
+            <div class="input-group">
+                <input
+                    type="password"
+                    placeholder="Groq API Key (for fast responses)"
+                    .value=${this.groqApiKey}
+                    @input=${this.handleGroqInput}
+                    class="${this.showGroqApiKeyError ? 'api-key-error' : ''}"
                 />
                 <button @click=${this.handleStartClick} class="start-button ${this.isInitializing ? 'initializing' : ''}">
                     ${this.getStartButtonText()}
                 </button>
             </div>
             <p class="description">
-                dont have an api key?
-                <span @click=${this.handleAPIKeyHelpClick} class="link">get one here</span>
+                get api keys:
+                <span @click=${this.handleAPIKeyHelpClick} class="link">gemini</span>
+                |
+                <span @click=${this.handleGroqAPIKeyHelpClick} class="link">groq</span>
             </p>
         `;
     }

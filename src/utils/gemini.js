@@ -3,7 +3,10 @@ const { BrowserWindow, ipcMain } = require('electron');
 const { spawn } = require('child_process');
 const { saveDebugAudio } = require('../audioUtils');
 const { getSystemPrompt } = require('./prompts');
-const { getAvailableModel, incrementLimitCount, getApiKey } = require('../storage');
+const { getAvailableModel, incrementLimitCount, getApiKey, getGroqApiKey } = require('../storage');
+
+// Groq conversation history for context
+let groqConversationHistory = [];
 
 // Conversation tracking variables
 let currentSessionId = null;
@@ -13,6 +16,7 @@ let screenAnalysisHistory = [];
 let currentProfile = null;
 let currentCustomPrompt = null;
 let isInitializingSession = false;
+let currentSystemPrompt = null;
 
 function formatSpeakerResults(results) {
     let text = '';
@@ -27,9 +31,115 @@ function formatSpeakerResults(results) {
 
 module.exports.formatSpeakerResults = formatSpeakerResults;
 
+// Send transcription to Groq and stream response
+async function sendToGroq(transcription) {
+    const groqApiKey = getGroqApiKey();
+    if (!groqApiKey) {
+        console.log('No Groq API key configured, skipping Groq response');
+        return;
+    }
+
+    if (!transcription || transcription.trim() === '') {
+        console.log('Empty transcription, skipping Groq');
+        return;
+    }
+
+    console.log('Sending to Groq:', transcription.substring(0, 100) + '...');
+
+    // Add user message to conversation history
+    groqConversationHistory.push({
+        role: 'user',
+        content: transcription.trim()
+    });
+
+    // Keep only last 20 messages to avoid context overflow
+    if (groqConversationHistory.length > 20) {
+        groqConversationHistory = groqConversationHistory.slice(-20);
+    }
+
+    try {
+        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${groqApiKey}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                model: 'llama-3.1-8b-instant',
+                messages: [
+                    { role: 'system', content: currentSystemPrompt || 'You are a helpful assistant.' },
+                    ...groqConversationHistory
+                ],
+                stream: true,
+                temperature: 0.7,
+                max_tokens: 1024
+            })
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Groq API error:', response.status, errorText);
+            sendToRenderer('update-status', `Groq error: ${response.status}`);
+            return;
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let fullText = '';
+        let isFirst = true;
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split('\n').filter(line => line.trim() !== '');
+
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    const data = line.slice(6);
+                    if (data === '[DONE]') continue;
+
+                    try {
+                        const json = JSON.parse(data);
+                        const token = json.choices?.[0]?.delta?.content || '';
+                        if (token) {
+                            fullText += token;
+                            // Stream to renderer - same pattern as Gemini
+                            sendToRenderer(isFirst ? 'new-response' : 'update-response', fullText);
+                            isFirst = false;
+                        }
+                    } catch (parseError) {
+                        // Skip invalid JSON chunks
+                    }
+                }
+            }
+        }
+
+        // Add assistant response to conversation history
+        if (fullText.trim()) {
+            groqConversationHistory.push({
+                role: 'assistant',
+                content: fullText.trim()
+            });
+
+            // Save conversation turn
+            saveConversationTurn(transcription, fullText);
+        }
+
+        console.log('Groq response completed');
+        sendToRenderer('update-status', 'Listening...');
+
+    } catch (error) {
+        console.error('Error calling Groq API:', error);
+        sendToRenderer('update-status', 'Groq error: ' + error.message);
+    }
+}
+
 // Audio capture variables
 let systemAudioProc = null;
 let messageBuffer = '';
+
 
 // Reconnection variables
 let isUserClosing = false;
@@ -65,6 +175,7 @@ function initializeNewSession(profile = null, customPrompt = null) {
     currentTranscription = '';
     conversationHistory = [];
     screenAnalysisHistory = [];
+    groqConversationHistory = [];
     currentProfile = profile;
     currentCustomPrompt = customPrompt;
     console.log('New conversation session started:', currentSessionId, 'profile:', profile);
@@ -211,6 +322,7 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
     const googleSearchEnabled = enabledTools.some(tool => tool.googleSearch);
 
     const systemPrompt = getSystemPrompt(profile, customPrompt, googleSearchEnabled);
+    currentSystemPrompt = systemPrompt; // Store for Groq
 
     // Initialize new conversation session only on first connect
     if (!isReconnect) {
@@ -237,25 +349,14 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                         }
                     }
 
-                    // Handle AI model response via output transcription (native audio model)
-                    if (message.serverContent?.outputTranscription?.text) {
-                        const text = message.serverContent.outputTranscription.text;
-                        if (text.trim() === '') return; // Ignore empty transcriptions
-                        const isNewResponse = messageBuffer === '';
-                        messageBuffer += text;
-                        sendToRenderer(isNewResponse ? 'new-response' : 'update-response', messageBuffer);
-                    }
+                    // DISABLED: Gemini's outputTranscription - using Groq for faster responses instead
+                    // if (message.serverContent?.outputTranscription?.text) { ... }
 
+                    // When Gemini detects speech end, send accumulated transcription to Groq
                     if (message.serverContent?.generationComplete) {
-                        // Only send/save if there's actual content
-                        if (messageBuffer.trim() !== '') {
-                            sendToRenderer('update-response', messageBuffer);
-
-                            // Save conversation turn when we have both transcription and AI response
-                            if (currentTranscription) {
-                                saveConversationTurn(currentTranscription, messageBuffer);
-                                currentTranscription = ''; // Reset for next turn
-                            }
+                        if (currentTranscription.trim() !== '') {
+                            sendToGroq(currentTranscription);
+                            currentTranscription = '';
                         }
                         messageBuffer = '';
                     }
@@ -327,6 +428,7 @@ async function attemptReconnect() {
     // Clear stale buffers
     messageBuffer = '';
     currentTranscription = '';
+    // Don't reset groqConversationHistory to preserve context across reconnects
 
     sendToRenderer('update-status', `Reconnecting... (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
 
@@ -663,6 +765,11 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
             }
 
             console.log('Sending text message:', text);
+
+            // Send to Groq directly for text messages (bypasses Gemini's slow response)
+            sendToGroq(text.trim());
+
+            // Still send to Gemini to maintain session context (but we ignore its response)
             await geminiSessionRef.current.sendRealtimeInput({ text: text.trim() });
             return { success: true };
         } catch (error) {

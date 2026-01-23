@@ -359,6 +359,13 @@ export class CheatingDaddyApp extends LitElement {
         }
     }
 
+    async handleGroqAPIKeyHelp() {
+        if (window.require) {
+            const { ipcRenderer } = window.require('electron');
+            await ipcRenderer.invoke('open-external', 'https://console.groq.com/keys');
+        }
+    }
+
     // Customize view event handlers
     async handleProfileChange(profile) {
         this.selectedProfile = profile;
@@ -455,6 +462,7 @@ export class CheatingDaddyApp extends LitElement {
                     <main-view
                         .onStart=${() => this.handleStart()}
                         .onAPIKeyHelp=${() => this.handleAPIKeyHelp()}
+                        .onGroqAPIKeyHelp=${() => this.handleGroqAPIKeyHelp()}
                         .onLayoutModeChange=${layoutMode => this.handleLayoutModeChange(layoutMode)}
                     ></main-view>
                 `;

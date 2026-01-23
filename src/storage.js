@@ -12,7 +12,8 @@ const DEFAULT_CONFIG = {
 };
 
 const DEFAULT_CREDENTIALS = {
-    apiKey: ''
+    apiKey: '',
+    groqApiKey: ''
 };
 
 const DEFAULT_PREFERENCES = {
@@ -190,6 +191,14 @@ function getApiKey() {
 
 function setApiKey(apiKey) {
     return setCredentials({ apiKey });
+}
+
+function getGroqApiKey() {
+    return getCredentials().groqApiKey || '';
+}
+
+function setGroqApiKey(groqApiKey) {
+    return setCredentials({ groqApiKey });
 }
 
 // ============ PREFERENCES ============
@@ -426,6 +435,8 @@ module.exports = {
     setCredentials,
     getApiKey,
     setApiKey,
+    getGroqApiKey,
+    setGroqApiKey,
 
     // Preferences
     getPreferences,
