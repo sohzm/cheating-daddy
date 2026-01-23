@@ -1,4 +1,5 @@
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
+import { t } from '../../utils/i18n.js';
 
 export class OnboardingView extends LitElement {
     static styles = css`
@@ -241,6 +242,7 @@ export class OnboardingView extends LitElement {
         contextText: { type: String },
         onComplete: { type: Function },
         onClose: { type: Function },
+        lang: { type: String },
     };
 
     constructor() {
@@ -249,6 +251,8 @@ export class OnboardingView extends LitElement {
         this.contextText = '';
         this.onComplete = () => {};
         this.onClose = () => {};
+        this.lang = 'ru';
+        this._loadLanguage();
         this.canvas = null;
         this.ctx = null;
         this.animationId = null;
@@ -307,6 +311,12 @@ export class OnboardingView extends LitElement {
                 [15, 10, 5], // Almost black
             ],
         ];
+    }
+
+    async _loadLanguage() {
+        const prefs = await cheatingDaddy.storage.getPreferences();
+        this.lang = prefs?.uiLanguage || 'ru';
+        this.requestUpdate();
     }
 
     firstUpdated() {

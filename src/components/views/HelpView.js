@@ -1,5 +1,6 @@
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
 import { resizeLayout } from '../../utils/windowResize.js';
+import { t } from '../../utils/i18n.js';
 
 export class HelpView extends LitElement {
     static styles = css`
@@ -209,24 +210,30 @@ export class HelpView extends LitElement {
     static properties = {
         onExternalLinkClick: { type: Function },
         keybinds: { type: Object },
+        lang: { type: String },
     };
 
     constructor() {
         super();
         this.onExternalLinkClick = () => {};
         this.keybinds = this.getDefaultKeybinds();
-        this._loadKeybinds();
+        this.lang = 'ru';
+        this._loadSettings();
     }
 
-    async _loadKeybinds() {
+    async _loadSettings() {
         try {
-            const keybinds = await cheatingDaddy.storage.getKeybinds();
+            const [keybinds, prefs] = await Promise.all([
+                cheatingDaddy.storage.getKeybinds(),
+                cheatingDaddy.storage.getPreferences()
+            ]);
             if (keybinds) {
                 this.keybinds = { ...this.getDefaultKeybinds(), ...keybinds };
-                this.requestUpdate();
             }
+            this.lang = prefs?.uiLanguage || 'ru';
+            this.requestUpdate();
         } catch (error) {
-            console.error('Error loading keybinds:', error);
+            console.error('Error loading settings:', error);
         }
     }
 
@@ -269,7 +276,7 @@ export class HelpView extends LitElement {
             <div class="help-container">
                 <div class="option-group">
                     <div class="option-label">
-                        <span>Community & Support</span>
+                        <span>${t(this.lang, 'help.community', 'Community & Support')}</span>
                     </div>
                     <div class="community-links">
                         <div class="community-link" @click=${() => this.handleExternalLinkClick('https://cheatingdaddy.com')}>
@@ -301,7 +308,7 @@ export class HelpView extends LitElement {
 
                 <div class="option-group">
                     <div class="option-label">
-                        <span>Keyboard Shortcuts</span>
+                        <span>${t(this.lang, 'help.shortcuts', 'Keyboard Shortcuts')}</span>
                     </div>
                     <div class="keyboard-section">
                         <div class="keyboard-group">

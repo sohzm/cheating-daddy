@@ -1,5 +1,6 @@
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
 import { resizeLayout } from '../../utils/windowResize.js';
+import { t } from '../../utils/i18n.js';
 
 export class MainView extends LitElement {
     static styles = css`
@@ -130,6 +131,7 @@ export class MainView extends LitElement {
         isInitializing: { type: Boolean },
         onLayoutModeChange: { type: Function },
         showApiKeyError: { type: Boolean },
+        lang: { type: String },
     };
 
     constructor() {
@@ -141,11 +143,14 @@ export class MainView extends LitElement {
         this.showApiKeyError = false;
         this.boundKeydownHandler = this.handleKeydown.bind(this);
         this.apiKey = '';
-        this._loadApiKey();
+        this.lang = 'ru';
+        this._loadSettings();
     }
 
-    async _loadApiKey() {
+    async _loadSettings() {
         this.apiKey = await cheatingDaddy.storage.getApiKey();
+        const prefs = await cheatingDaddy.storage.getPreferences();
+        this.lang = prefs.uiLanguage || 'ru';
         this.requestUpdate();
     }
 
@@ -211,17 +216,18 @@ export class MainView extends LitElement {
     getStartButtonText() {
         const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
         const shortcut = isMac ? 'Cmd+Enter' : 'Ctrl+Enter';
-        return html`Start <span class="shortcut-hint">${shortcut}</span>`;
+        const startText = this.isInitializing ? t(this.lang, 'main.starting', 'Starting...') : t(this.lang, 'main.start', 'Start');
+        return html`${startText} <span class="shortcut-hint">${shortcut}</span>`;
     }
 
     render() {
         return html`
-            <div class="welcome">Welcome</div>
+            <div class="welcome">${t(this.lang, 'main.welcome', 'Welcome')}</div>
 
             <div class="input-group">
                 <input
                     type="password"
-                    placeholder="Enter your Gemini API Key"
+                    placeholder="${t(this.lang, 'main.apiKeyPlaceholder', 'Enter your Gemini API Key')}"
                     .value=${this.apiKey}
                     @input=${this.handleInput}
                     class="${this.showApiKeyError ? 'api-key-error' : ''}"
@@ -231,8 +237,8 @@ export class MainView extends LitElement {
                 </button>
             </div>
             <p class="description">
-                dont have an api key?
-                <span @click=${this.handleAPIKeyHelpClick} class="link">get one here</span>
+                ${t(this.lang, 'main.helpLink', "don't have an api key?")}
+                <span @click=${this.handleAPIKeyHelpClick} class="link">${t(this.lang, 'main.getKeyHere', 'get one here')}</span>
             </p>
         `;
     }

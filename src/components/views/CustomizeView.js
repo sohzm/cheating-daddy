@@ -1,5 +1,6 @@
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
 import { resizeLayout } from '../../utils/windowResize.js';
+import { t } from '../../utils/i18n.js';
 
 export class CustomizeView extends LitElement {
     static styles = css`
@@ -533,6 +534,38 @@ export class CustomizeView extends LitElement {
             color: var(--error-color);
             border-left: 2px solid var(--error-color);
         }
+
+        .start-button {
+            background: var(--start-button-background, #ffffff);
+            color: var(--start-button-color, #000000);
+            border: none;
+            padding: 8px 16px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.1s ease;
+        }
+
+        .start-button:hover {
+            background: var(--start-button-hover-background, #f0f0f0);
+        }
+
+        .button {
+            background: transparent;
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            padding: 8px 14px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.1s ease;
+        }
+
+        .button:hover {
+            background: var(--hover-background);
+        }
     `;
 
     static properties = {
@@ -553,6 +586,14 @@ export class CustomizeView extends LitElement {
         isClearing: { type: Boolean },
         clearStatusMessage: { type: String },
         clearStatusType: { type: String },
+        lang: { type: String },
+        editingPromptProfile: { type: String },
+        promptIntro: { type: String },
+        promptFormat: { type: String },
+        promptSearch: { type: String },
+        promptContent: { type: String },
+        promptOutput: { type: String },
+        promptSaveStatus: { type: String },
     };
 
     constructor() {
@@ -593,6 +634,18 @@ export class CustomizeView extends LitElement {
         // Theme default
         this.theme = 'dark';
 
+        // UI Language
+        this.lang = 'ru';
+
+        // Prompt editing
+        this.editingPromptProfile = 'interview';
+        this.promptIntro = '';
+        this.promptFormat = '';
+        this.promptSearch = '';
+        this.promptContent = '';
+        this.promptOutput = '';
+        this.promptSaveStatus = '';
+
         this._loadFromStorage();
     }
 
@@ -602,19 +655,23 @@ export class CustomizeView extends LitElement {
 
     setActiveSection(section) {
         this.activeSection = section;
+        if (section === 'prompts') {
+            this.loadPromptForProfile(this.editingPromptProfile);
+        }
         this.requestUpdate();
     }
 
     getSidebarSections() {
         return [
-            { id: 'profile', name: 'Profile', icon: 'user' },
-            { id: 'appearance', name: 'Appearance', icon: 'display' },
-            { id: 'audio', name: 'Audio', icon: 'mic' },
-            { id: 'language', name: 'Language', icon: 'globe' },
-            { id: 'capture', name: 'Capture', icon: 'camera' },
-            { id: 'keyboard', name: 'Keyboard', icon: 'keyboard' },
-            { id: 'search', name: 'Search', icon: 'search' },
-            { id: 'advanced', name: 'Advanced', icon: 'warning', danger: true },
+            { id: 'profile', name: t(this.lang, 'settings.profile', 'Profile'), icon: 'user' },
+            { id: 'prompts', name: t(this.lang, 'settings.prompts', 'Prompts'), icon: 'edit' },
+            { id: 'appearance', name: t(this.lang, 'settings.appearance', 'Appearance'), icon: 'display' },
+            { id: 'audio', name: t(this.lang, 'settings.audio', 'Audio'), icon: 'mic' },
+            { id: 'language', name: t(this.lang, 'settings.language', 'Language'), icon: 'globe' },
+            { id: 'capture', name: t(this.lang, 'settings.capture', 'Capture'), icon: 'camera' },
+            { id: 'keyboard', name: t(this.lang, 'settings.keyboard', 'Keyboard'), icon: 'keyboard' },
+            { id: 'search', name: t(this.lang, 'settings.search', 'Search'), icon: 'search' },
+            { id: 'advanced', name: t(this.lang, 'settings.advanced', 'Advanced'), icon: 'warning', danger: true },
         ];
     }
 
@@ -664,6 +721,10 @@ export class CustomizeView extends LitElement {
                 <line x1="12" y1="9" x2="12" y2="13"></line>
                 <line x1="12" y1="17" x2="12.01" y2="17"></line>
             </svg>`,
+            edit: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+            </svg>`,
         };
         return icons[icon] || '';
     }
@@ -681,6 +742,7 @@ export class CustomizeView extends LitElement {
             this.audioMode = prefs.audioMode ?? 'speaker_only';
             this.customPrompt = prefs.customPrompt ?? '';
             this.theme = prefs.theme ?? 'dark';
+            this.lang = prefs.uiLanguage ?? 'ru';
 
             if (keybinds) {
                 this.keybinds = { ...this.getDefaultKeybinds(), ...keybinds };
@@ -704,39 +766,40 @@ export class CustomizeView extends LitElement {
         return [
             {
                 value: 'interview',
-                name: 'Job Interview',
-                description: 'Get help with answering interview questions',
+                name: t(this.lang, 'profile.interview', 'Job Interview'),
+                description: t(this.lang, 'profile.interview.desc', 'Get help with answering interview questions'),
             },
             {
                 value: 'sales',
-                name: 'Sales Call',
-                description: 'Assist with sales conversations and objection handling',
+                name: t(this.lang, 'profile.sales', 'Sales Call'),
+                description: t(this.lang, 'profile.sales.desc', 'Assist with sales conversations and objection handling'),
             },
             {
                 value: 'meeting',
-                name: 'Business Meeting',
-                description: 'Support for professional meetings and discussions',
+                name: t(this.lang, 'profile.meeting', 'Business Meeting'),
+                description: t(this.lang, 'profile.meeting.desc', 'Support for professional meetings and discussions'),
             },
             {
                 value: 'presentation',
-                name: 'Presentation',
-                description: 'Help with presentations and public speaking',
+                name: t(this.lang, 'profile.presentation', 'Presentation'),
+                description: t(this.lang, 'profile.presentation.desc', 'Help with presentations and public speaking'),
             },
             {
                 value: 'negotiation',
-                name: 'Negotiation',
-                description: 'Guidance for business negotiations and deals',
+                name: t(this.lang, 'profile.negotiation', 'Negotiation'),
+                description: t(this.lang, 'profile.negotiation.desc', 'Guidance for business negotiations and deals'),
             },
             {
                 value: 'exam',
-                name: 'Exam Assistant',
-                description: 'Academic assistance for test-taking and exam questions',
+                name: t(this.lang, 'profile.exam', 'Exam Assistant'),
+                description: t(this.lang, 'profile.exam.desc', 'Academic assistance for test-taking and exam questions'),
             },
         ];
     }
 
     getLanguages() {
         return [
+            { value: 'ru-RU', name: 'Russian (Русский)' },
             { value: 'en-US', name: 'English (US)' },
             { value: 'en-GB', name: 'English (UK)' },
             { value: 'en-AU', name: 'English (Australia)' },
@@ -789,6 +852,12 @@ export class CustomizeView extends LitElement {
     handleLanguageSelect(e) {
         this.selectedLanguage = e.target.value;
         this.onLanguageChange(this.selectedLanguage);
+    }
+
+    async handleUiLanguageChange(e) {
+        this.lang = e.target.value;
+        await cheatingDaddy.storage.updatePreference('uiLanguage', this.lang);
+        this.requestUpdate();
     }
 
     handleImageQualitySelect(e) {
@@ -865,58 +934,58 @@ export class CustomizeView extends LitElement {
         return [
             {
                 key: 'moveUp',
-                name: 'Move Window Up',
-                description: 'Move the application window up',
+                name: t(this.lang, 'keybind.moveUp', 'Move Window Up'),
+                description: t(this.lang, 'keybind.moveUp.desc', 'Move the application window up'),
             },
             {
                 key: 'moveDown',
-                name: 'Move Window Down',
-                description: 'Move the application window down',
+                name: t(this.lang, 'keybind.moveDown', 'Move Window Down'),
+                description: t(this.lang, 'keybind.moveDown.desc', 'Move the application window down'),
             },
             {
                 key: 'moveLeft',
-                name: 'Move Window Left',
-                description: 'Move the application window left',
+                name: t(this.lang, 'keybind.moveLeft', 'Move Window Left'),
+                description: t(this.lang, 'keybind.moveLeft.desc', 'Move the application window left'),
             },
             {
                 key: 'moveRight',
-                name: 'Move Window Right',
-                description: 'Move the application window right',
+                name: t(this.lang, 'keybind.moveRight', 'Move Window Right'),
+                description: t(this.lang, 'keybind.moveRight.desc', 'Move the application window right'),
             },
             {
                 key: 'toggleVisibility',
-                name: 'Toggle Window Visibility',
-                description: 'Show/hide the application window',
+                name: t(this.lang, 'keybind.toggleVisibility', 'Toggle Window Visibility'),
+                description: t(this.lang, 'keybind.toggleVisibility.desc', 'Show/hide the application window'),
             },
             {
                 key: 'toggleClickThrough',
-                name: 'Toggle Click-through Mode',
-                description: 'Enable/disable click-through functionality',
+                name: t(this.lang, 'keybind.toggleClickThrough', 'Toggle Click-through Mode'),
+                description: t(this.lang, 'keybind.toggleClickThrough.desc', 'Enable/disable click-through functionality'),
             },
             {
                 key: 'nextStep',
-                name: 'Ask Next Step',
-                description: 'Take screenshot and ask AI for the next step suggestion',
+                name: t(this.lang, 'keybind.nextStep', 'Ask Next Step'),
+                description: t(this.lang, 'keybind.nextStep.desc', 'Take screenshot and ask AI for the next step suggestion'),
             },
             {
                 key: 'previousResponse',
-                name: 'Previous Response',
-                description: 'Navigate to the previous AI response',
+                name: t(this.lang, 'keybind.previousResponse', 'Previous Response'),
+                description: t(this.lang, 'keybind.previousResponse.desc', 'Navigate to the previous AI response'),
             },
             {
                 key: 'nextResponse',
-                name: 'Next Response',
-                description: 'Navigate to the next AI response',
+                name: t(this.lang, 'keybind.nextResponse', 'Next Response'),
+                description: t(this.lang, 'keybind.nextResponse.desc', 'Navigate to the next AI response'),
             },
             {
                 key: 'scrollUp',
-                name: 'Scroll Response Up',
-                description: 'Scroll the AI response content up',
+                name: t(this.lang, 'keybind.scrollUp', 'Scroll Response Up'),
+                description: t(this.lang, 'keybind.scrollUp.desc', 'Scroll the AI response content up'),
             },
             {
                 key: 'scrollDown',
-                name: 'Scroll Response Down',
-                description: 'Scroll the AI response content down',
+                name: t(this.lang, 'keybind.scrollDown', 'Scroll Response Down'),
+                description: t(this.lang, 'keybind.scrollDown.desc', 'Scroll the AI response content down'),
             },
         ];
     }
@@ -1086,11 +1155,11 @@ export class CustomizeView extends LitElement {
 
         return html`
             <div class="profile-section">
-                <div class="content-header">AI Profile</div>
+                <div class="content-header">${t(this.lang, 'settings.profile.title', 'AI Profile')}</div>
                 <div class="form-grid">
                     <div class="form-group">
                         <label class="form-label">
-                            Profile Type
+                            ${t(this.lang, 'settings.profile.type', 'Profile Type')}
                             <span class="current-selection">${currentProfile?.name || 'Unknown'}</span>
                         </label>
                         <select class="form-control" .value=${this.selectedProfile} @change=${this.handleProfileSelect}>
@@ -1105,17 +1174,15 @@ export class CustomizeView extends LitElement {
                     </div>
 
                     <div class="form-group expand">
-                        <label class="form-label">Custom AI Instructions</label>
+                        <label class="form-label">${t(this.lang, 'settings.profile.customInstructions', 'Custom AI Instructions')}</label>
                         <textarea
                             class="form-control"
-                            placeholder="Add specific instructions for how you want the AI to behave during ${
-                                profileNames[this.selectedProfile] || 'this interaction'
-                            }..."
+                            placeholder="${t(this.lang, 'settings.profile.customPlaceholder', 'Add specific instructions for the AI...')}"
                             .value=${this.customPrompt}
                             @input=${this.handleCustomPromptInput}
                         ></textarea>
                         <div class="form-description">
-                            Personalize the AI's behavior with specific instructions
+                            ${t(this.lang, 'settings.profile.customDesc', "Personalize the AI's behavior with specific instructions")}
                         </div>
                     </div>
                 </div>
@@ -1125,17 +1192,17 @@ export class CustomizeView extends LitElement {
 
     renderAudioSection() {
         return html`
-            <div class="content-header">Audio Settings</div>
+            <div class="content-header">${t(this.lang, 'settings.audio.title', 'Audio Settings')}</div>
             <div class="form-grid">
                 <div class="form-group">
-                    <label class="form-label">Audio Mode</label>
+                    <label class="form-label">${t(this.lang, 'settings.audio.mode', 'Audio Mode')}</label>
                     <select class="form-control" .value=${this.audioMode} @change=${this.handleAudioModeSelect}>
-                        <option value="speaker_only">Speaker Only (Interviewer)</option>
-                        <option value="mic_only">Microphone Only (Me)</option>
-                        <option value="both">Both Speaker & Microphone</option>
+                        <option value="speaker_only">${t(this.lang, 'settings.audio.speakerOnly', 'Speaker Only (Interviewer)')}</option>
+                        <option value="mic_only">${t(this.lang, 'settings.audio.micOnly', 'Microphone Only (Me)')}</option>
+                        <option value="both">${t(this.lang, 'settings.audio.both', 'Both Speaker & Microphone')}</option>
                     </select>
                     <div class="form-description">
-                        Choose which audio sources to capture for the AI.
+                        ${t(this.lang, 'settings.audio.desc', 'Choose which audio sources to capture for the AI.')}
                     </div>
                 </div>
             </div>
@@ -1145,13 +1212,34 @@ export class CustomizeView extends LitElement {
     renderLanguageSection() {
         const languages = this.getLanguages();
         const currentLanguage = languages.find(l => l.value === this.selectedLanguage);
+        const uiLanguages = [
+            { value: 'ru', name: 'Русский' },
+            { value: 'en', name: 'English' },
+        ];
+        const currentUiLang = uiLanguages.find(l => l.value === this.lang);
 
         return html`
-            <div class="content-header">Language</div>
+            <div class="content-header">${t(this.lang, 'settings.language', 'Language')}</div>
             <div class="form-grid">
                 <div class="form-group">
                     <label class="form-label">
-                        Speech Language
+                        ${t(this.lang, 'settings.uiLanguage', 'Interface Language')}
+                        <span class="current-selection">${currentUiLang?.name || 'Русский'}</span>
+                    </label>
+                    <select class="form-control" .value=${this.lang} @change=${this.handleUiLanguageChange}>
+                        ${uiLanguages.map(
+                            language => html`
+                                <option value=${language.value} ?selected=${this.lang === language.value}>
+                                    ${language.name}
+                                </option>
+                            `
+                        )}
+                    </select>
+                    <div class="form-description">${t(this.lang, 'settings.uiLanguage.desc', 'Language for buttons and menus')}</div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">
+                        ${t(this.lang, 'settings.speechLanguage', 'Speech Language')}
                         <span class="current-selection">${currentLanguage?.name || 'Unknown'}</span>
                     </label>
                     <select class="form-control" .value=${this.selectedLanguage} @change=${this.handleLanguageSelect}>
@@ -1163,7 +1251,7 @@ export class CustomizeView extends LitElement {
                             `
                         )}
                     </select>
-                    <div class="form-description">Language for speech recognition and AI responses</div>
+                    <div class="form-description">${t(this.lang, 'settings.speechLanguage.desc', 'Language for speech recognition and AI responses')}</div>
                 </div>
             </div>
         `;
@@ -1174,11 +1262,11 @@ export class CustomizeView extends LitElement {
         const currentTheme = themes.find(t => t.value === this.theme);
 
         return html`
-            <div class="content-header">Appearance</div>
+            <div class="content-header">${t(this.lang, 'settings.appearance.title', 'Appearance')}</div>
             <div class="form-grid">
                 <div class="form-group">
                     <label class="form-label">
-                        Theme
+                        ${t(this.lang, 'settings.appearance.theme', 'Theme')}
                         <span class="current-selection">${currentTheme?.name || 'Dark'}</span>
                     </label>
                     <select class="form-control" .value=${this.theme} @change=${this.handleThemeChange}>
@@ -1191,23 +1279,23 @@ export class CustomizeView extends LitElement {
                         )}
                     </select>
                     <div class="form-description">
-                        Choose a color theme for the interface
+                        ${t(this.lang, 'settings.appearance.themeDesc', 'Choose a color theme for the interface')}
                     </div>
                 </div>
 
                 <div class="form-group">
                     <label class="form-label">
-                        Layout Mode
-                        <span class="current-selection">${this.layoutMode === 'compact' ? 'Compact' : 'Normal'}</span>
+                        ${t(this.lang, 'settings.appearance.layout', 'Layout Mode')}
+                        <span class="current-selection">${this.layoutMode === 'compact' ? t(this.lang, 'settings.appearance.compact', 'Compact') : t(this.lang, 'settings.appearance.normal', 'Normal')}</span>
                     </label>
                     <select class="form-control" .value=${this.layoutMode} @change=${this.handleLayoutModeSelect}>
-                        <option value="normal" ?selected=${this.layoutMode === 'normal'}>Normal</option>
-                        <option value="compact" ?selected=${this.layoutMode === 'compact'}>Compact</option>
+                        <option value="normal" ?selected=${this.layoutMode === 'normal'}>${t(this.lang, 'settings.appearance.normal', 'Normal')}</option>
+                        <option value="compact" ?selected=${this.layoutMode === 'compact'}>${t(this.lang, 'settings.appearance.compact', 'Compact')}</option>
                     </select>
                     <div class="form-description">
                         ${this.layoutMode === 'compact'
-                            ? 'Smaller window with reduced padding'
-                            : 'Standard layout with comfortable spacing'
+                            ? t(this.lang, 'settings.appearance.compactDesc', 'Smaller window with reduced padding')
+                            : t(this.lang, 'settings.appearance.normalDesc', 'Standard layout with comfortable spacing')
                         }
                     </div>
                 </div>
@@ -1215,7 +1303,7 @@ export class CustomizeView extends LitElement {
                 <div class="form-group">
                     <div class="slider-container">
                         <div class="slider-header">
-                            <label class="form-label">Background Transparency</label>
+                            <label class="form-label">${t(this.lang, 'settings.appearance.transparency', 'Background Transparency')}</label>
                             <span class="slider-value">${Math.round(this.backgroundTransparency * 100)}%</span>
                         </div>
                         <input
@@ -1228,8 +1316,8 @@ export class CustomizeView extends LitElement {
                             @input=${this.handleBackgroundTransparencyChange}
                         />
                         <div class="slider-labels">
-                            <span>Transparent</span>
-                            <span>Opaque</span>
+                            <span>${t(this.lang, 'settings.appearance.transparent', 'Transparent')}</span>
+                            <span>${t(this.lang, 'settings.appearance.opaque', 'Opaque')}</span>
                         </div>
                     </div>
                 </div>
@@ -1237,7 +1325,7 @@ export class CustomizeView extends LitElement {
                 <div class="form-group">
                     <div class="slider-container">
                         <div class="slider-header">
-                            <label class="form-label">Response Font Size</label>
+                            <label class="form-label">${t(this.lang, 'settings.appearance.fontSize', 'Response Font Size')}</label>
                             <span class="slider-value">${this.fontSize}px</span>
                         </div>
                         <input
@@ -1261,24 +1349,24 @@ export class CustomizeView extends LitElement {
 
     renderCaptureSection() {
         return html`
-            <div class="content-header">Screen Capture</div>
+            <div class="content-header">${t(this.lang, 'settings.capture.title', 'Screen Capture')}</div>
             <div class="form-grid">
                 <div class="form-group">
                     <label class="form-label">
-                        Image Quality
+                        ${t(this.lang, 'settings.capture.quality', 'Image Quality')}
                         <span class="current-selection">${this.selectedImageQuality.charAt(0).toUpperCase() + this.selectedImageQuality.slice(1)}</span>
                     </label>
                     <select class="form-control" .value=${this.selectedImageQuality} @change=${this.handleImageQualitySelect}>
-                        <option value="high" ?selected=${this.selectedImageQuality === 'high'}>High Quality</option>
-                        <option value="medium" ?selected=${this.selectedImageQuality === 'medium'}>Medium Quality</option>
-                        <option value="low" ?selected=${this.selectedImageQuality === 'low'}>Low Quality</option>
+                        <option value="high" ?selected=${this.selectedImageQuality === 'high'}>${t(this.lang, 'settings.capture.high', 'High Quality')}</option>
+                        <option value="medium" ?selected=${this.selectedImageQuality === 'medium'}>${t(this.lang, 'settings.capture.medium', 'Medium Quality')}</option>
+                        <option value="low" ?selected=${this.selectedImageQuality === 'low'}>${t(this.lang, 'settings.capture.low', 'Low Quality')}</option>
                     </select>
                     <div class="form-description">
                         ${this.selectedImageQuality === 'high'
-                            ? 'Best quality, uses more tokens'
+                            ? t(this.lang, 'settings.capture.highDesc', 'Best quality, uses more tokens')
                             : this.selectedImageQuality === 'medium'
-                              ? 'Balanced quality and token usage'
-                              : 'Lower quality, uses fewer tokens'
+                              ? t(this.lang, 'settings.capture.mediumDesc', 'Balanced quality and token usage')
+                              : t(this.lang, 'settings.capture.lowDesc', 'Lower quality, uses fewer tokens')
                         }
                     </div>
                 </div>
@@ -1288,13 +1376,13 @@ export class CustomizeView extends LitElement {
 
     renderKeyboardSection() {
         return html`
-            <div class="content-header">Keyboard Shortcuts</div>
+            <div class="content-header">${t(this.lang, 'settings.keyboard.title', 'Keyboard Shortcuts')}</div>
             <div class="form-grid">
                 <table class="keybinds-table">
                     <thead>
                         <tr>
-                            <th>Action</th>
-                            <th>Shortcut</th>
+                            <th>${t(this.lang, 'settings.keyboard.action', 'Action')}</th>
+                            <th>${t(this.lang, 'settings.keyboard.shortcut', 'Shortcut')}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -1310,7 +1398,7 @@ export class CustomizeView extends LitElement {
                                             type="text"
                                             class="form-control keybind-input"
                                             .value=${this.keybinds[action.key]}
-                                            placeholder="Press keys..."
+                                            placeholder="${t(this.lang, 'settings.keyboard.pressKeys', 'Press keys...')}"
                                             data-action=${action.key}
                                             @keydown=${this.handleKeybindInput}
                                             @focus=${this.handleKeybindFocus}
@@ -1322,7 +1410,7 @@ export class CustomizeView extends LitElement {
                         )}
                         <tr class="table-reset-row">
                             <td colspan="2">
-                                <button class="reset-keybinds-button" @click=${this.resetKeybinds}>Reset to Defaults</button>
+                                <button class="reset-keybinds-button" @click=${this.resetKeybinds}>${t(this.lang, 'settings.keyboard.reset', 'Reset to Defaults')}</button>
                             </td>
                         </tr>
                     </tbody>
@@ -1333,7 +1421,7 @@ export class CustomizeView extends LitElement {
 
     renderSearchSection() {
         return html`
-            <div class="content-header">Search</div>
+            <div class="content-header">${t(this.lang, 'settings.search.title', 'Search')}</div>
             <div class="form-grid">
                 <div class="checkbox-group">
                     <input
@@ -1343,11 +1431,11 @@ export class CustomizeView extends LitElement {
                         .checked=${this.googleSearchEnabled}
                         @change=${this.handleGoogleSearchChange}
                     />
-                    <label for="google-search-enabled" class="checkbox-label">Enable Google Search</label>
+                    <label for="google-search-enabled" class="checkbox-label">${t(this.lang, 'settings.search.enable', 'Enable Google Search')}</label>
                 </div>
                 <div class="form-description" style="margin-left: 24px; margin-top: -8px;">
-                    Allow the AI to search Google for up-to-date information during conversations.
-                    <br /><strong>Note:</strong> Changes take effect when starting a new AI session.
+                    ${t(this.lang, 'settings.search.desc', 'Allow the AI to search Google for up-to-date information during conversations.')}
+                    <br /><strong>${t(this.lang, 'settings.search.note', 'Note')}:</strong> ${t(this.lang, 'settings.search.noteText', 'Changes take effect when starting a new AI session.')}
                 </div>
             </div>
         `;
@@ -1355,19 +1443,19 @@ export class CustomizeView extends LitElement {
 
     renderAdvancedSection() {
         return html`
-            <div class="content-header" style="color: var(--error-color);">Advanced</div>
+            <div class="content-header" style="color: var(--error-color);">${t(this.lang, 'settings.advanced.title', 'Advanced')}</div>
             <div class="form-grid">
                 <div class="form-group">
-                    <label class="form-label" style="color: var(--error-color);">Data Management</label>
+                    <label class="form-label" style="color: var(--error-color);">${t(this.lang, 'settings.advanced.dataManagement', 'Data Management')}</label>
                     <div class="form-description" style="margin-bottom: 12px;">
-                        <strong>Warning:</strong> This action will permanently delete all local data including API keys, preferences, and session history. This cannot be undone.
+                        <strong>${t(this.lang, 'settings.advanced.warning', 'Warning')}:</strong> ${t(this.lang, 'settings.advanced.warningText', 'This action will permanently delete all local data including API keys, preferences, and session history. This cannot be undone.')}
                     </div>
                     <button
                         class="danger-button"
                         @click=${this.clearLocalData}
                         ?disabled=${this.isClearing}
                     >
-                        ${this.isClearing ? 'Clearing...' : 'Clear All Local Data'}
+                        ${this.isClearing ? t(this.lang, 'settings.advanced.clearing', 'Clearing...') : t(this.lang, 'settings.advanced.clearAll', 'Clear All Local Data')}
                     </button>
                     ${this.clearStatusMessage ? html`
                         <div class="status-message ${this.clearStatusType === 'success' ? 'status-success' : 'status-error'}">
@@ -1379,10 +1467,163 @@ export class CustomizeView extends LitElement {
         `;
     }
 
+    async loadPromptForProfile(profileKey) {
+        this.editingPromptProfile = profileKey;
+        try {
+            // Try to load custom prompt first, then fall back to default
+            const { ipcRenderer } = window.require('electron');
+            const result = await ipcRenderer.invoke('get-prompt-profile', profileKey);
+            if (result) {
+                this.promptIntro = result.intro || '';
+                this.promptFormat = result.formatRequirements || '';
+                this.promptSearch = result.searchUsage || '';
+                this.promptContent = result.content || '';
+                this.promptOutput = result.outputInstructions || '';
+            }
+        } catch (error) {
+            console.error('Error loading prompt:', error);
+        }
+        this.requestUpdate();
+    }
+
+    async saveCurrentPrompt() {
+        try {
+            const { ipcRenderer } = window.require('electron');
+            const promptData = {
+                intro: this.promptIntro,
+                formatRequirements: this.promptFormat,
+                searchUsage: this.promptSearch,
+                content: this.promptContent,
+                outputInstructions: this.promptOutput,
+            };
+            await ipcRenderer.invoke('save-custom-prompt', this.editingPromptProfile, promptData);
+            this.promptSaveStatus = 'success';
+            setTimeout(() => {
+                this.promptSaveStatus = '';
+                this.requestUpdate();
+            }, 2000);
+        } catch (error) {
+            console.error('Error saving prompt:', error);
+            this.promptSaveStatus = 'error';
+        }
+        this.requestUpdate();
+    }
+
+    async resetCurrentPrompt() {
+        try {
+            const { ipcRenderer } = window.require('electron');
+            await ipcRenderer.invoke('reset-custom-prompt', this.editingPromptProfile);
+            await this.loadPromptForProfile(this.editingPromptProfile);
+            this.promptSaveStatus = 'reset';
+            setTimeout(() => {
+                this.promptSaveStatus = '';
+                this.requestUpdate();
+            }, 2000);
+        } catch (error) {
+            console.error('Error resetting prompt:', error);
+        }
+        this.requestUpdate();
+    }
+
+    handlePromptProfileChange(e) {
+        this.loadPromptForProfile(e.target.value);
+    }
+
+    renderPromptsSection() {
+        const profiles = this.getProfiles();
+
+        return html`
+            <div class="content-header">${t(this.lang, 'settings.prompts.title', 'System Prompts')}</div>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label class="form-label">${t(this.lang, 'settings.prompts.selectProfile', 'Select Profile to Edit')}</label>
+                    <select class="form-control" .value=${this.editingPromptProfile} @change=${this.handlePromptProfileChange}>
+                        ${profiles.map(
+                            profile => html`
+                                <option value=${profile.value} ?selected=${this.editingPromptProfile === profile.value}>
+                                    ${profile.name}
+                                </option>
+                            `
+                        )}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">${t(this.lang, 'settings.prompts.intro', 'Introduction')}</label>
+                    <textarea
+                        class="form-control"
+                        style="min-height: 80px;"
+                        placeholder="${t(this.lang, 'settings.prompts.introPlaceholder', 'AI role and behavior description...')}"
+                        .value=${this.promptIntro}
+                        @input=${(e) => { this.promptIntro = e.target.value; }}
+                    ></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">${t(this.lang, 'settings.prompts.format', 'Format Requirements')}</label>
+                    <textarea
+                        class="form-control"
+                        style="min-height: 60px;"
+                        placeholder="${t(this.lang, 'settings.prompts.formatPlaceholder', 'Response format instructions...')}"
+                        .value=${this.promptFormat}
+                        @input=${(e) => { this.promptFormat = e.target.value; }}
+                    ></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">${t(this.lang, 'settings.prompts.search', 'Search Usage')}</label>
+                    <textarea
+                        class="form-control"
+                        style="min-height: 60px;"
+                        placeholder="${t(this.lang, 'settings.prompts.searchPlaceholder', 'When to use Google search...')}"
+                        .value=${this.promptSearch}
+                        @input=${(e) => { this.promptSearch = e.target.value; }}
+                    ></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">${t(this.lang, 'settings.prompts.content', 'Main Content')}</label>
+                    <textarea
+                        class="form-control"
+                        style="min-height: 100px;"
+                        placeholder="${t(this.lang, 'settings.prompts.contentPlaceholder', 'Main instructions and examples...')}"
+                        .value=${this.promptContent}
+                        @input=${(e) => { this.promptContent = e.target.value; }}
+                    ></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">${t(this.lang, 'settings.prompts.output', 'Output Instructions')}</label>
+                    <textarea
+                        class="form-control"
+                        style="min-height: 60px;"
+                        placeholder="${t(this.lang, 'settings.prompts.outputPlaceholder', 'How to format the final output...')}"
+                        .value=${this.promptOutput}
+                        @input=${(e) => { this.promptOutput = e.target.value; }}
+                    ></textarea>
+                </div>
+
+                <div class="form-group" style="display: flex; gap: 12px; align-items: center;">
+                    <button class="start-button" @click=${this.saveCurrentPrompt}>
+                        ${t(this.lang, 'settings.prompts.save', 'Save Prompt')}
+                    </button>
+                    <button class="button" @click=${this.resetCurrentPrompt}>
+                        ${t(this.lang, 'settings.prompts.reset', 'Reset to Default')}
+                    </button>
+                    ${this.promptSaveStatus === 'success' ? html`<span style="color: var(--success-color);">✓ ${t(this.lang, 'settings.prompts.saved', 'Saved!')}</span>` : ''}
+                    ${this.promptSaveStatus === 'reset' ? html`<span style="color: var(--text-secondary);">↺ ${t(this.lang, 'settings.prompts.resetDone', 'Reset done')}</span>` : ''}
+                    ${this.promptSaveStatus === 'error' ? html`<span style="color: var(--error-color);">✗ ${t(this.lang, 'settings.prompts.error', 'Error')}</span>` : ''}
+                </div>
+            </div>
+        `;
+    }
+
     renderSectionContent() {
         switch (this.activeSection) {
             case 'profile':
                 return this.renderProfileSection();
+            case 'prompts':
+                return this.renderPromptsSection();
             case 'appearance':
                 return this.renderAppearanceSection();
             case 'audio':

@@ -1,4 +1,5 @@
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
+import { t } from '../../utils/i18n.js';
 
 export class AppHeader extends LitElement {
     static styles = css`
@@ -134,6 +135,7 @@ export class AppHeader extends LitElement {
         onHideToggleClick: { type: Function },
         isClickThrough: { type: Boolean, reflect: true },
         updateAvailable: { type: Boolean },
+        lang: { type: String },
     };
 
     constructor() {
@@ -150,6 +152,13 @@ export class AppHeader extends LitElement {
         this.isClickThrough = false;
         this.updateAvailable = false;
         this._timerInterval = null;
+        this.lang = 'ru';
+        this._loadLanguage();
+    }
+
+    async _loadLanguage() {
+        const prefs = await cheatingDaddy.storage.getPreferences();
+        this.lang = prefs.uiLanguage || 'ru';
     }
 
     connectedCallback() {
@@ -241,7 +250,16 @@ export class AppHeader extends LitElement {
     }
 
     getViewTitle() {
-        const titles = {
+        const titleKeys = {
+            onboarding: 'header.title.onboarding',
+            main: 'header.title.main',
+            customize: 'header.title.customize',
+            help: 'header.title.help',
+            history: 'header.title.history',
+            advanced: 'header.title.advanced',
+            assistant: 'header.title.assistant',
+        };
+        const defaults = {
             onboarding: 'Welcome to Cheating Daddy',
             main: 'Cheating Daddy',
             customize: 'Customize',
@@ -250,7 +268,8 @@ export class AppHeader extends LitElement {
             advanced: 'Advanced Tools',
             assistant: 'Cheating Daddy',
         };
-        return titles[this.currentView] || 'Cheating Daddy';
+        const key = titleKeys[this.currentView] || 'header.title.main';
+        return t(this.lang, key, defaults[this.currentView] || 'Cheating Daddy');
     }
 
     getElapsedTime() {
@@ -282,7 +301,7 @@ export class AppHeader extends LitElement {
                         ? html`
                               <span>${elapsedTime}</span>
                               <span>${this.statusText}</span>
-                              ${this.isClickThrough ? html`<span class="click-through-indicator">click-through</span>` : ''}
+                              ${this.isClickThrough ? html`<span class="click-through-indicator">${t(this.lang, 'header.clickThrough', 'click-through')}</span>` : ''}
                           `
                         : ''}
                     ${this.currentView === 'main'
@@ -292,7 +311,7 @@ export class AppHeader extends LitElement {
                                       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor">
                                           <path fill-rule="evenodd" d="M13.836 2.477a.75.75 0 0 1 .75.75v3.182a.75.75 0 0 1-.75.75h-3.182a.75.75 0 0 1 0-1.5h1.37l-.84-.841a4.5 4.5 0 0 0-7.08.932.75.75 0 0 1-1.3-.75 6 6 0 0 1 9.44-1.242l.842.84V3.227a.75.75 0 0 1 .75-.75Zm-.911 7.5A.75.75 0 0 1 13.199 11a6 6 0 0 1-9.44 1.241l-.84-.84v1.371a.75.75 0 0 1-1.5 0V9.591a.75.75 0 0 1 .75-.75H5.35a.75.75 0 0 1 0 1.5H3.98l.841.841a4.5 4.5 0 0 0 7.08-.932.75.75 0 0 1 1.025-.273Z" clip-rule="evenodd" />
                                       </svg>
-                                      Update available
+                                      ${t(this.lang, 'header.updateAvailable', 'Update available')}
                                   </button>
                               ` : ''}
                               <button class="icon-button" @click=${this.onHistoryClick}>
@@ -315,7 +334,7 @@ export class AppHeader extends LitElement {
                     ${this.currentView === 'assistant'
                         ? html`
                               <button @click=${this.onHideToggleClick} class="button">
-                                  Hide&nbsp;&nbsp;<span class="key" style="pointer-events: none;">${cheatingDaddy.isMacOS ? 'Cmd' : 'Ctrl'}</span
+                                  ${t(this.lang, 'header.button.hide', 'Hide')}&nbsp;&nbsp;<span class="key" style="pointer-events: none;">${cheatingDaddy.isMacOS ? 'Cmd' : 'Ctrl'}</span
                                   >&nbsp;&nbsp;<span class="key">&bsol;</span>
                               </button>
                               <button @click=${this.onCloseClick} class="icon-button window-close">

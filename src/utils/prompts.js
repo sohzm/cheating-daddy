@@ -214,12 +214,59 @@ function buildSystemPrompt(promptParts, customPrompt = '', googleSearchEnabled =
     return sections.join('');
 }
 
+// Get prompt profiles merged with custom prompts from storage
+function getPromptProfiles() {
+    try {
+        const storage = require('../storage');
+        const customPrompts = storage.getCustomPrompts();
+        return { ...profilePrompts, ...customPrompts };
+    } catch (error) {
+        console.error('Error loading custom prompts:', error);
+        return profilePrompts;
+    }
+}
+
 function getSystemPrompt(profile, customPrompt = '', googleSearchEnabled = true) {
-    const promptParts = profilePrompts[profile] || profilePrompts.interview;
+    const allProfiles = getPromptProfiles();
+    const promptParts = allProfiles[profile] || profilePrompts.interview;
     return buildSystemPrompt(promptParts, customPrompt, googleSearchEnabled);
+}
+
+// Validate prompt data structure
+function validatePromptShape(promptData) {
+    const requiredKeys = ['intro', 'formatRequirements', 'searchUsage', 'content', 'outputInstructions'];
+    return (
+        promptData &&
+        typeof promptData === 'object' &&
+        requiredKeys.every(key => typeof promptData[key] === 'string' && promptData[key].trim().length > 0)
+    );
+}
+
+// Save custom prompt profile to storage
+function saveCustomPromptProfile(profileKey, promptData) {
+    if (!profileKey || typeof profileKey !== 'string') {
+        throw new Error('Invalid profile key');
+    }
+    if (!validatePromptShape(promptData)) {
+        throw new Error('Prompt data is missing required fields');
+    }
+    const storage = require('../storage');
+    storage.saveCustomPrompt(profileKey, promptData);
+    return promptData;
+}
+
+// Reset custom prompt profile (remove from storage)
+function resetCustomPromptProfile(profileKey) {
+    const storage = require('../storage');
+    storage.deleteCustomPrompt(profileKey);
+    return profilePrompts[profileKey] || profilePrompts.interview;
 }
 
 module.exports = {
     profilePrompts,
     getSystemPrompt,
+    getPromptProfiles,
+    saveCustomPromptProfile,
+    resetCustomPromptProfile,
+    validatePromptShape,
 };

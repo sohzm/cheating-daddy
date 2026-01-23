@@ -219,7 +219,7 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
 
     try {
         const session = await client.live.connect({
-            model: 'gemini-2.5-flash-native-audio-preview-09-2025',
+            model: 'gemini-2.5-flash-native-audio-preview-12-2025',
             callbacks: {
                 onopen: function () {
                     sendToRenderer('update-status', 'Live session connected');
@@ -747,6 +747,40 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
             return { success: true };
         } catch (error) {
             console.error('Error updating Google Search setting:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    // Prompt editing handlers
+    ipcMain.handle('get-prompt-profile', async (event, profileKey) => {
+        try {
+            const { getPromptProfiles, profilePrompts } = require('./prompts');
+            const allProfiles = getPromptProfiles();
+            return allProfiles[profileKey] || profilePrompts[profileKey] || null;
+        } catch (error) {
+            console.error('Error getting prompt profile:', error);
+            return null;
+        }
+    });
+
+    ipcMain.handle('save-custom-prompt', async (event, profileKey, promptData) => {
+        try {
+            const { saveCustomPromptProfile } = require('./prompts');
+            saveCustomPromptProfile(profileKey, promptData);
+            return { success: true };
+        } catch (error) {
+            console.error('Error saving custom prompt:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('reset-custom-prompt', async (event, profileKey) => {
+        try {
+            const { resetCustomPromptProfile } = require('./prompts');
+            resetCustomPromptProfile(profileKey);
+            return { success: true };
+        } catch (error) {
+            console.error('Error resetting custom prompt:', error);
             return { success: false, error: error.message };
         }
     });

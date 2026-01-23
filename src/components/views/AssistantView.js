@@ -1,4 +1,5 @@
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
+import { t } from '../../utils/i18n.js';
 
 export class AssistantView extends LitElement {
     static styles = css`
@@ -324,6 +325,7 @@ export class AssistantView extends LitElement {
         shouldAnimateResponse: { type: Boolean },
         flashCount: { type: Number },
         flashLiteCount: { type: Number },
+        lang: { type: String },
     };
 
     constructor() {
@@ -334,16 +336,23 @@ export class AssistantView extends LitElement {
         this.onSendText = () => {};
         this.flashCount = 0;
         this.flashLiteCount = 0;
+        this.lang = 'ru';
+        this._loadLanguage();
+    }
+
+    async _loadLanguage() {
+        const prefs = await cheatingDaddy.storage.getPreferences();
+        this.lang = prefs.uiLanguage || 'ru';
     }
 
     getProfileNames() {
         return {
-            interview: 'Job Interview',
-            sales: 'Sales Call',
-            meeting: 'Business Meeting',
-            presentation: 'Presentation',
-            negotiation: 'Negotiation',
-            exam: 'Exam Assistant',
+            interview: t(this.lang, 'profile.interview', 'Job Interview'),
+            sales: t(this.lang, 'profile.sales', 'Sales Call'),
+            meeting: t(this.lang, 'profile.meeting', 'Business Meeting'),
+            presentation: t(this.lang, 'profile.presentation', 'Presentation'),
+            negotiation: t(this.lang, 'profile.negotiation', 'Negotiation'),
+            exam: t(this.lang, 'profile.exam', 'Exam Assistant'),
         };
     }
 
@@ -351,7 +360,7 @@ export class AssistantView extends LitElement {
         const profileNames = this.getProfileNames();
         return this.responses.length > 0 && this.currentResponseIndex >= 0
             ? this.responses[this.currentResponseIndex]
-            : `Hey, Im listening to your ${profileNames[this.selectedProfile] || 'session'}?`;
+            : t(this.lang, 'assistant.listening', `Hey, I'm listening to your ${profileNames[this.selectedProfile] || 'session'}...`);
     }
 
     renderMarkdown(content) {
@@ -606,7 +615,7 @@ export class AssistantView extends LitElement {
                     </svg>
                 </button>
 
-                <input type="text" id="textInput" placeholder="Type a message to the AI..." @keydown=${this.handleTextKeydown} />
+                <input type="text" id="textInput" placeholder="${t(this.lang, 'assistant.placeholder', 'Type a message to the AI...')}" @keydown=${this.handleTextKeydown} />
 
                 <div class="screen-answer-btn-wrapper">
                     <div class="tooltip">
@@ -618,13 +627,13 @@ export class AssistantView extends LitElement {
                             <span class="tooltip-label">Flash Lite</span>
                             <span class="tooltip-value">${this.flashLiteCount}/20</span>
                         </div>
-                        <div class="tooltip-note">Resets every 24 hours</div>
+                        <div class="tooltip-note">${t(this.lang, 'assistant.limitsReset', 'Resets every 24 hours')}</div>
                     </div>
                     <button class="screen-answer-btn" @click=${this.handleScreenAnswer}>
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                             <path d="M15.98 1.804a1 1 0 0 0-1.96 0l-.24 1.192a1 1 0 0 1-.784.785l-1.192.238a1 1 0 0 0 0 1.962l1.192.238a1 1 0 0 1 .785.785l.238 1.192a1 1 0 0 0 1.962 0l.238-1.192a1 1 0 0 1 .785-.785l1.192-.238a1 1 0 0 0 0-1.962l-1.192-.238a1 1 0 0 1-.785-.785l-.238-1.192ZM6.949 5.684a1 1 0 0 0-1.898 0l-.683 2.051a1 1 0 0 1-.633.633l-2.051.683a1 1 0 0 0 0 1.898l2.051.684a1 1 0 0 1 .633.632l.683 2.051a1 1 0 0 0 1.898 0l.683-2.051a1 1 0 0 1 .633-.633l2.051-.683a1 1 0 0 0 0-1.898l-2.051-.683a1 1 0 0 1-.633-.633L6.95 5.684ZM13.949 13.684a1 1 0 0 0-1.898 0l-.184.551a1 1 0 0 1-.632.633l-.551.183a1 1 0 0 0 0 1.898l.551.183a1 1 0 0 1 .633.633l.183.551a1 1 0 0 0 1.898 0l.184-.551a1 1 0 0 1 .632-.633l.551-.183a1 1 0 0 0 0-1.898l-.551-.184a1 1 0 0 1-.633-.632l-.183-.551Z" />
                         </svg>
-                        <span>Analyze screen</span>
+                        <span>${t(this.lang, 'assistant.analyzeScreen', 'Analyze screen')}</span>
                         <span class="usage-count">(${this.getTotalUsed()}/${this.getTotalAvailable()})</span>
                     </button>
                 </div>

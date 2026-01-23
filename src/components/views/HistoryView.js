@@ -1,5 +1,6 @@
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
 import { resizeLayout } from '../../utils/windowResize.js';
+import { t } from '../../utils/i18n.js';
 
 export class HistoryView extends LitElement {
     static styles = css`
@@ -356,6 +357,7 @@ export class HistoryView extends LitElement {
         selectedSession: { type: Object },
         loading: { type: Boolean },
         activeTab: { type: String },
+        lang: { type: String },
     };
 
     constructor() {
@@ -364,7 +366,15 @@ export class HistoryView extends LitElement {
         this.selectedSession = null;
         this.loading = true;
         this.activeTab = 'conversation'; // 'conversation' or 'screen'
+        this.lang = 'ru';
+        this._loadSettings();
         this.loadSessions();
+    }
+
+    async _loadSettings() {
+        const prefs = await cheatingDaddy.storage.getPreferences();
+        this.lang = prefs?.uiLanguage || 'ru';
+        this.requestUpdate();
     }
 
     connectedCallback() {

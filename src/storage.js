@@ -19,6 +19,7 @@ const DEFAULT_PREFERENCES = {
     customPrompt: '',
     selectedProfile: 'interview',
     selectedLanguage: 'en-US',
+    uiLanguage: 'ru',
     selectedScreenshotInterval: '5',
     selectedImageQuality: 'medium',
     advancedMode: false,
@@ -404,6 +405,28 @@ function deleteAllSessions() {
     }
 }
 
+// ============ CUSTOM PROMPTS ============
+
+function getCustomPromptsPath() {
+    return path.join(getConfigDir(), 'custom-prompts.json');
+}
+
+function getCustomPrompts() {
+    return readJsonFile(getCustomPromptsPath(), {});
+}
+
+function saveCustomPrompt(profileKey, promptData) {
+    const prompts = getCustomPrompts();
+    prompts[profileKey] = promptData;
+    return writeJsonFile(getCustomPromptsPath(), prompts);
+}
+
+function deleteCustomPrompt(profileKey) {
+    const prompts = getCustomPrompts();
+    delete prompts[profileKey];
+    return writeJsonFile(getCustomPromptsPath(), prompts);
+}
+
 // ============ CLEAR ALL DATA ============
 
 function clearAllData() {
@@ -449,6 +472,11 @@ module.exports = {
     getAllSessions,
     deleteSession,
     deleteAllSessions,
+
+    // Custom Prompts
+    getCustomPrompts,
+    saveCustomPrompt,
+    deleteCustomPrompt,
 
     // Clear all
     clearAllData
