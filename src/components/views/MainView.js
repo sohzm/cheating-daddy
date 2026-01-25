@@ -240,7 +240,7 @@ export class MainView extends LitElement {
             <div class="input-group">
                 <input
                     type="password"
-                    placeholder="Gemini API Key"
+                    placeholder="Gemini API Key (required)"
                     .value=${this.apiKey}
                     @input=${this.handleInput}
                     class="${this.showApiKeyError ? 'api-key-error' : ''}"
@@ -249,7 +249,7 @@ export class MainView extends LitElement {
             <div class="input-group">
                 <input
                     type="password"
-                    placeholder="Groq API Key"
+                    placeholder="Groq API Key (optional)"
                     .value=${this.groqApiKey}
                     @input=${this.handleGroqInput}
                     class="${this.showGroqApiKeyError ? 'api-key-error' : ''}"
