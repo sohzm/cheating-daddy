@@ -308,7 +308,13 @@ async function sendToGroq(transcription) {
 
         const cleanedResponse = stripThinkingTags(fullText);
         const modelKey = modelToUse.split('/').pop();
-        incrementCharUsage('groq', modelKey, cleanedResponse.length);
+
+        const systemPromptChars = (currentSystemPrompt || 'You are a helpful assistant.').length;
+        const historyChars = groqConversationHistory.reduce((sum, msg) => sum + (msg.content || '').length, 0);
+        const inputChars = systemPromptChars + historyChars;
+        const outputChars = cleanedResponse.length;
+
+        incrementCharUsage('groq', modelKey, inputChars + outputChars);
 
         if (cleanedResponse) {
             groqConversationHistory.push({
@@ -381,7 +387,12 @@ async function sendToGemma(transcription) {
             }
         }
 
-        incrementCharUsage('gemini', 'gemma-3-27b-it', fullText.length);
+        const systemPromptChars = (currentSystemPrompt || 'You are a helpful assistant.').length;
+        const historyChars = trimmedHistory.reduce((sum, msg) => sum + (msg.content || '').length, 0);
+        const inputChars = systemPromptChars + historyChars;
+        const outputChars = fullText.length;
+
+        incrementCharUsage('gemini', 'gemma-3-27b-it', inputChars + outputChars);
 
         if (fullText.trim()) {
             groqConversationHistory.push({
