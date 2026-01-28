@@ -251,6 +251,36 @@ export class AssistantView extends LitElement {
             font-family: 'SF Mono', Monaco, monospace;
         }
 
+        .play-pause-btn {
+            background: var(--btn-primary-bg);
+            color: var(--btn-primary-text);
+            border: none;
+            border-radius: 8px;
+            padding: 8px 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            margin-right: 8px;
+        }
+
+        .play-pause-btn:hover {
+            background: var(--btn-primary-hover);
+            transform: translateY(-1px);
+        }
+
+        .play-pause-btn:active {
+            transform: translateY(0);
+        }
+
+        .play-pause-btn svg {
+            width: 16px;
+            height: 16px;
+        }
+
         .screen-answer-btn-wrapper {
             position: relative;
         }
@@ -324,6 +354,7 @@ export class AssistantView extends LitElement {
         shouldAnimateResponse: { type: Boolean },
         flashCount: { type: Number },
         flashLiteCount: { type: Number },
+        isConversationPaused: { type: Boolean },
     };
 
     constructor() {
@@ -334,6 +365,7 @@ export class AssistantView extends LitElement {
         this.onSendText = () => {};
         this.flashCount = 0;
         this.flashLiteCount = 0;
+        this.isConversationPaused = false;
     }
 
     getProfileNames() {
@@ -546,6 +578,15 @@ export class AssistantView extends LitElement {
         }
     }
 
+    handlePlayPauseToggle() {
+        const app = document.querySelector('cheating-daddy-app');
+        if (app && app.toggleConversationPlayback) {
+            const newState = app.toggleConversationPlayback();
+            this.isConversationPaused = newState;
+            this.requestUpdate();
+        }
+    }
+
     scrollToBottom() {
         setTimeout(() => {
             const container = this.shadowRoot.querySelector('.response-container');
@@ -607,6 +648,18 @@ export class AssistantView extends LitElement {
                 </button>
 
                 <input type="text" id="textInput" placeholder="Type a message to the AI..." @keydown=${this.handleTextKeydown} />
+
+                <button class="play-pause-btn" @click=${this.handlePlayPauseToggle} title="${this.isConversationPaused ? 'Resume' : 'Pause'} conversation (Alt+X)">
+                    ${this.isConversationPaused 
+                        ? html`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M8 6.82v10.36c0 .79.87 1.27 1.54.84l8.14-5.18a1 1 0 0 0 0-1.69L9.54 5.98A1 1 0 0 0 8 6.82Z"/>
+                            </svg>`
+                        : html`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
+                            </svg>`
+                    }
+                    <span>${this.isConversationPaused ? 'Resume' : 'Pause'}</span>
+                </button>
 
                 <div class="screen-answer-btn-wrapper">
                     <div class="tooltip">

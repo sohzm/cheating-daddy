@@ -719,6 +719,15 @@ ipcRenderer.on('clear-sensitive-data', async () => {
     await storage.clearAll();
 });
 
+// Listen for toggle conversation playback command from main process
+ipcRenderer.on('toggle-conversation-playback', async () => {
+    console.log('Toggle conversation playback triggered');
+    const app = document.querySelector('cheating-daddy-app');
+    if (app && app.toggleConversationPlayback) {
+        app.toggleConversationPlayback();
+    }
+});
+
 // Handle shortcuts based on current view
 function handleShortcut(shortcutKey) {
     const currentView = cheatingDaddy.getCurrentView();
@@ -945,6 +954,24 @@ const cheatingDaddy = {
     initializeGemini,
     startCapture,
     stopCapture,
+    pauseCapture: () => {
+        console.log('Pausing audio capture...');
+        if (audioContext) {
+            audioContext.suspend();
+        }
+        if (currentGeminiSession && currentGeminiSession.binaryStream) {
+            currentGeminiSession.binaryStream.pause();
+        }
+    },
+    resumeCapture: () => {
+        console.log('Resuming audio capture...');
+        if (audioContext) {
+            audioContext.resume();
+        }
+        if (currentGeminiSession && currentGeminiSession.binaryStream) {
+            currentGeminiSession.binaryStream.resume();
+        }
+    },
     sendTextMessage,
     handleShortcut,
 
