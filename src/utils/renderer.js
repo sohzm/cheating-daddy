@@ -49,6 +49,13 @@ const storage = {
     async setApiKey(apiKey) {
         return ipcRenderer.invoke('storage:set-api-key', apiKey);
     },
+    async getGroqApiKey() {
+        const result = await ipcRenderer.invoke('storage:get-groq-api-key');
+        return result.success ? result.data : '';
+    },
+    async setGroqApiKey(groqApiKey) {
+        return ipcRenderer.invoke('storage:set-groq-api-key', groqApiKey);
+    },
 
     // Preferences
     async getPreferences() {

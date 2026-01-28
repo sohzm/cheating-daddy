@@ -112,6 +112,25 @@ function setupStorageIpcHandlers() {
         }
     });
 
+    ipcMain.handle('storage:get-groq-api-key', async () => {
+        try {
+            return { success: true, data: storage.getGroqApiKey() };
+        } catch (error) {
+            console.error('Error getting Groq API key:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('storage:set-groq-api-key', async (event, groqApiKey) => {
+        try {
+            storage.setGroqApiKey(groqApiKey);
+            return { success: true };
+        } catch (error) {
+            console.error('Error setting Groq API key:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
     // ============ PREFERENCES ============
     ipcMain.handle('storage:get-preferences', async () => {
         try {
