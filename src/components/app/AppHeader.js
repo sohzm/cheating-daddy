@@ -460,10 +460,6 @@ export class AppHeader extends LitElement {
                         : ''}
                     ${this.currentView === 'assistant'
                         ? html`
-                              <button @click=${this.onRestartClick} class="button">
-                                  Restart session&nbsp;&nbsp;<span class="key" style="pointer-events: none;">${cheddar.isMacOS ? 'Cmd' : 'Ctrl'}</span
-                                  >+<span class="key" style="pointer-events: none;">Alt</span>+<span class="key">R</span>
-                              </button>
                               <button @click=${this.onCloseClick} class="icon-button window-close">
                                   <?xml version="1.0" encoding="UTF-8"?><svg
                                       width="24px"

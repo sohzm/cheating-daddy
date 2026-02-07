@@ -74,19 +74,64 @@ function sendToRenderer(channel, data) {
  * Groq free tier rate limits reset per minute, so after 60s
  * we reset the status back to 'Listening...' so the user knows they can continue.
  */
-function scheduleRateLimitRecovery() {
+function scheduleRateLimitRecovery(recoveryMs = 60 * 1000) {
     // Clear any existing recovery timer to avoid duplicates
     if (rateLimitRecoveryTimer) {
         clearTimeout(rateLimitRecoveryTimer);
     }
 
-    console.log('[GROQ] Rate limit hit - will auto-recover status in 60 seconds');
+    console.log(`[GROQ] Rate limit hit - will auto-recover status in ${recoveryMs / 1000}s`);
 
     rateLimitRecoveryTimer = setTimeout(() => {
         rateLimitRecoveryTimer = null;
         console.log('[GROQ] Rate limit recovery - resetting status to Listening...');
         sendToRenderer('update-status', 'Listening...');
-    }, 60 * 1000);
+    }, recoveryMs);
+}
+
+/**
+ * Parse the Groq 429 error response to determine rate limit type and extract the actual retry wait time.
+ * Groq error messages contain "Please try again in XX.XXs" with the exact wait time.
+ */
+function parseRateLimitError(errorBody) {
+    let statusMessage = 'API Quota Exceeded';
+    let recoveryMs = 30 * 1000; // Fallback 30s if we can't parse
+
+    try {
+        const parsed = JSON.parse(errorBody);
+        const msg = parsed.error?.message || '';
+        const msgLower = msg.toLowerCase();
+
+        // Extract the exact retry time from "Please try again in XX.XXs"
+        const retryMatch = msg.match(/try again in (\d+\.?\d*)s/i);
+        if (retryMatch) {
+            const retrySec = parseFloat(retryMatch[1]);
+            // Add 2s buffer to ensure the limit has fully reset
+            recoveryMs = Math.ceil((retrySec + 2) * 1000);
+        }
+
+        // Determine the rate limit type for the status message
+        if (msgLower.includes('tokens per minute') || msgLower.includes('tpm')) {
+            statusMessage = 'Rate Limit: Tokens/min exceeded';
+        } else if (msgLower.includes('tokens per day') || msgLower.includes('tpd')) {
+            statusMessage = 'Rate Limit: Daily token limit reached';
+        } else if (msgLower.includes('requests per minute') || msgLower.includes('rpm')) {
+            statusMessage = 'Rate Limit: Requests/min exceeded';
+        } else if (msgLower.includes('requests per day') || msgLower.includes('rpd')) {
+            statusMessage = 'Rate Limit: Daily request limit reached';
+        } else if (msgLower.includes('tokens per hour') || msgLower.includes('tph')) {
+            statusMessage = 'Rate Limit: Tokens/hour exceeded';
+        } else if (msgLower.includes('requests per hour') || msgLower.includes('rph')) {
+            statusMessage = 'Rate Limit: Requests/hour exceeded';
+        }
+
+        console.log(`[GROQ] Rate limit details: ${msg}`);
+    } catch (e) {
+        // Failed to parse error body, use default message
+        console.warn('[GROQ] Could not parse 429 error body:', errorBody);
+    }
+
+    return { statusMessage, recoveryMs };
 }
 
 /**
@@ -255,9 +300,10 @@ async function transcribeWithGroq(wavBuffer) {
                         sendToRenderer('update-status', 'Invalid API Key');
                         reject(new Error('Invalid API Key'));
                     } else if (res.statusCode === 429) {
-                        sendToRenderer('update-status', 'API Quota Exceeded');
-                        scheduleRateLimitRecovery();
-                        reject(new Error('API Quota Exceeded'));
+                        const rateLimit = parseRateLimitError(data);
+                        sendToRenderer('update-status', rateLimit.statusMessage);
+                        scheduleRateLimitRecovery(rateLimit.recoveryMs);
+                        reject(new Error(rateLimit.statusMessage));
                     } else if (res.statusCode === 413) {
                         sendToRenderer('update-status', 'Audio too long');
                         reject(new Error('Audio too long'));
@@ -386,9 +432,15 @@ async function chatWithLlama(userMessage, model = 'llama-4-maverick', imageData 
         };
 
         let responseText = '';
+        let rawErrorBody = '';
 
         const req = https.request(options, (res) => {
             res.on('data', (chunk) => {
+                if (res.statusCode !== 200) {
+                    // Accumulate error response body for detailed error messages
+                    rawErrorBody += chunk.toString();
+                    return;
+                }
                 const lines = chunk.toString().split('\n');
                 for (const line of lines) {
                     if (line.startsWith('data: ')) {
@@ -433,15 +485,16 @@ async function chatWithLlama(userMessage, model = 'llama-4-maverick', imageData 
                     sendToRenderer('update-status', 'Listening...');
                     resolve(responseText);
                 } else if (res.statusCode !== 200) {
-                    console.error('[GROQ] Chat API Error:', res.statusCode);
+                    console.error('[GROQ] Chat API Error:', res.statusCode, rawErrorBody);
                     // Handle specific error codes like Gemini does
                     if (res.statusCode === 401) {
                         sendToRenderer('update-status', 'Invalid API Key');
                         reject(new Error('Invalid API Key'));
                     } else if (res.statusCode === 429) {
-                        sendToRenderer('update-status', 'API Quota Exceeded');
-                        scheduleRateLimitRecovery();
-                        reject(new Error('API Quota Exceeded'));
+                        const rateLimit = parseRateLimitError(rawErrorBody);
+                        sendToRenderer('update-status', rateLimit.statusMessage);
+                        scheduleRateLimitRecovery(rateLimit.recoveryMs);
+                        reject(new Error(rateLimit.statusMessage));
                     } else if (res.statusCode === 413) {
                         sendToRenderer('update-status', 'Request too large');
                         reject(new Error('Request too large'));
@@ -637,7 +690,7 @@ async function processAudioBuffer(model = null) {
     } catch (error) {
         console.error('[GROQ] Error processing audio:', error);
         // Only update status if it's not already showing a user-friendly error
-        if (!['Invalid API Key', 'API Quota Exceeded', 'Audio too long', 'Request too large', 'Server error', 'Connection error', 'Invalid request'].includes(error.message)) {
+        if (!['Invalid API Key', 'API Quota Exceeded', 'Audio too long', 'Request too large', 'Server error', 'Connection error', 'Invalid request'].includes(error.message) && !error.message.startsWith('Rate Limit:')) {
             sendToRenderer('update-status', 'Processing failed');
         }
         isSpeaking = false;
@@ -710,7 +763,7 @@ async function flushAudioBuffer(model = null) {
     } catch (error) {
         console.error('[GROQ] Error flushing audio:', error);
         // Only update status if it's not already showing a user-friendly error
-        if (!['Invalid API Key', 'API Quota Exceeded', 'Audio too long', 'Request too large', 'Server error', 'Connection error', 'Invalid request'].includes(error.message)) {
+        if (!['Invalid API Key', 'API Quota Exceeded', 'Audio too long', 'Request too large', 'Server error', 'Connection error', 'Invalid request'].includes(error.message) && !error.message.startsWith('Rate Limit:')) {
             sendToRenderer('update-status', 'Processing failed');
         }
         return null;
@@ -744,7 +797,7 @@ async function analyzeWithLlama(text, imageData, model = 'llama-4-maverick') {
     } catch (error) {
         console.error('[GROQ] Error analyzing:', error);
         // Only update status if it's not already showing a user-friendly error
-        if (!['Invalid API Key', 'API Quota Exceeded', 'Audio too long', 'Request too large', 'Server error', 'Connection error', 'Invalid request'].includes(error.message)) {
+        if (!['Invalid API Key', 'API Quota Exceeded', 'Audio too long', 'Request too large', 'Server error', 'Connection error', 'Invalid request'].includes(error.message) && !error.message.startsWith('Rate Limit:')) {
             sendToRenderer('update-status', 'Analysis failed');
         }
         return null;
