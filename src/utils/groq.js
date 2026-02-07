@@ -49,6 +49,9 @@ const CHECK_INTERVAL_MS = 500; // Check every 500ms for faster response
 // Store selected model for chat completion
 let selectedLlamaModel = 'llama-4-maverick';
 
+// Rate limit recovery timer - auto-reset status after 429 errors (Groq free tier resets per minute)
+let rateLimitRecoveryTimer = null;
+
 // Store selected language name for use in prompts
 let storedLanguageName = 'English';
 
@@ -64,6 +67,26 @@ function sendToRenderer(channel, data) {
     if (windows.length > 0) {
         windows[0].webContents.send(channel, data);
     }
+}
+
+/**
+ * Schedule auto-recovery after a 429 rate limit error.
+ * Groq free tier rate limits reset per minute, so after 60s
+ * we reset the status back to 'Listening...' so the user knows they can continue.
+ */
+function scheduleRateLimitRecovery() {
+    // Clear any existing recovery timer to avoid duplicates
+    if (rateLimitRecoveryTimer) {
+        clearTimeout(rateLimitRecoveryTimer);
+    }
+
+    console.log('[GROQ] Rate limit hit - will auto-recover status in 60 seconds');
+
+    rateLimitRecoveryTimer = setTimeout(() => {
+        rateLimitRecoveryTimer = null;
+        console.log('[GROQ] Rate limit recovery - resetting status to Listening...');
+        sendToRenderer('update-status', 'Listening...');
+    }, 60 * 1000);
 }
 
 /**
@@ -233,6 +256,7 @@ async function transcribeWithGroq(wavBuffer) {
                         reject(new Error('Invalid API Key'));
                     } else if (res.statusCode === 429) {
                         sendToRenderer('update-status', 'API Quota Exceeded');
+                        scheduleRateLimitRecovery();
                         reject(new Error('API Quota Exceeded'));
                     } else if (res.statusCode === 413) {
                         sendToRenderer('update-status', 'Audio too long');
@@ -416,6 +440,7 @@ async function chatWithLlama(userMessage, model = 'llama-4-maverick', imageData 
                         reject(new Error('Invalid API Key'));
                     } else if (res.statusCode === 429) {
                         sendToRenderer('update-status', 'API Quota Exceeded');
+                        scheduleRateLimitRecovery();
                         reject(new Error('API Quota Exceeded'));
                     } else if (res.statusCode === 413) {
                         sendToRenderer('update-status', 'Request too large');
