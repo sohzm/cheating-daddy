@@ -59,7 +59,7 @@ export class MainView extends LitElement {
 
         .switch-cloud-btn {
             background: var(--accent);
-            color: #fff;
+            color: var(--btn-primary-text, #fff);
             border: none;
             padding: var(--space-sm) var(--space-md);
             border-radius: var(--radius-sm);
@@ -90,16 +90,10 @@ export class MainView extends LitElement {
             letter-spacing: 0.5px;
         }
 
-        .input-row {
-            display: flex;
-            align-items: center;
-            gap: var(--space-sm);
-        }
-
         input, select, textarea {
             background: var(--bg-elevated);
             color: var(--text-primary);
-            border: 1px solid var(--border-strong);
+            border: 1px solid var(--border);
             padding: 10px 12px;
             width: 100%;
             border-radius: var(--radius-sm);
@@ -123,28 +117,7 @@ export class MainView extends LitElement {
         }
 
         input.error {
-            border-color: var(--danger);
-        }
-
-        .toggle-vis {
-            background: none;
-            border: none;
-            color: var(--text-muted);
-            cursor: pointer;
-            padding: var(--space-xs);
-            display: flex;
-            align-items: center;
-            flex-shrink: 0;
-            transition: color var(--transition);
-        }
-
-        .toggle-vis:hover {
-            color: var(--text-primary);
-        }
-
-        .toggle-vis svg {
-            width: 16px;
-            height: 16px;
+            border-color: var(--danger, #EF4444);
         }
 
         select {
@@ -182,7 +155,7 @@ export class MainView extends LitElement {
 
         .start-button {
             background: var(--accent);
-            color: #fff;
+            color: var(--btn-primary-text, #fff);
             border: none;
             padding: 12px var(--space-md);
             border-radius: var(--radius-sm);
@@ -268,12 +241,10 @@ export class MainView extends LitElement {
         isInitializing: { type: Boolean },
         // Internal state
         _mode: { state: true },
-        _tokenVisible: { state: true },
         _token: { state: true },
         _geminiKey: { state: true },
         _groqKey: { state: true },
         _openaiKey: { state: true },
-        _context: { state: true },
         _tokenError: { state: true },
         _keyError: { state: true },
     };
@@ -287,12 +258,10 @@ export class MainView extends LitElement {
         this.isInitializing = false;
 
         this._mode = 'cloud';
-        this._tokenVisible = false;
         this._token = '';
         this._geminiKey = '';
         this._groqKey = '';
         this._openaiKey = '';
-        this._context = '';
         this._tokenError = false;
         this._keyError = false;
 
@@ -307,7 +276,6 @@ export class MainView extends LitElement {
                 cheatingDaddy.storage.getCredentials().catch(() => ({})),
             ]);
 
-            this._context = prefs.customPrompt || '';
             this._mode = prefs.providerMode || 'cloud';
 
             // Load keys
@@ -382,11 +350,6 @@ export class MainView extends LitElement {
         this.requestUpdate();
     }
 
-    async _saveContext(val) {
-        this._context = val;
-        await cheatingDaddy.storage.updatePreference('customPrompt', val);
-    }
-
     _handleProfileChange(e) {
         this.onProfileChange(e.target.value);
     }
@@ -429,37 +392,6 @@ export class MainView extends LitElement {
 
     // ── Render helpers ──
 
-    _renderProfileAndContext() {
-        const profiles = [
-            { value: 'interview', label: 'Interview' },
-            { value: 'sales', label: 'Sales Call' },
-            { value: 'meeting', label: 'Meeting' },
-            { value: 'presentation', label: 'Presentation' },
-            { value: 'negotiation', label: 'Negotiation' },
-            { value: 'exam', label: 'Exam' },
-        ];
-
-        return html`
-            <div class="form-group">
-                <label class="form-label">Profile</label>
-                <select .value=${this.selectedProfile} @change=${this._handleProfileChange}>
-                    ${profiles.map(p => html`
-                        <option value=${p.value} ?selected=${this.selectedProfile === p.value}>${p.label}</option>
-                    `)}
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Context</label>
-                <textarea
-                    placeholder="Paste your resume, job description, or relevant context..."
-                    .value=${this._context}
-                    @input=${e => this._saveContext(e.target.value)}
-                ></textarea>
-            </div>
-        `;
-    }
-
     _renderStartButton() {
         const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
         const shortcut = isMac ? '⌘↵' : 'Ctrl+↵';
@@ -491,21 +423,13 @@ export class MainView extends LitElement {
         return html`
             <div class="form-group">
                 <label class="form-label">Token</label>
-                <div class="input-row">
-                    <input
-                        type=${this._tokenVisible ? 'text' : 'password'}
-                        placeholder="Enter your access token"
-                        .value=${this._token}
-                        @input=${e => this._saveToken(e.target.value)}
-                        class=${this._tokenError ? 'error' : ''}
-                    />
-                    <button class="toggle-vis" @click=${() => { this._tokenVisible = !this._tokenVisible; this.requestUpdate(); }} title="${this._tokenVisible ? 'Hide' : 'Show'}">
-                        ${this._tokenVisible
-                            ? html`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M3.28 2.22a.75.75 0 0 0-1.06 1.06l14.5 14.5a.75.75 0 1 0 1.06-1.06l-1.745-1.745a10.029 10.029 0 0 0 3.3-4.38 1.651 1.651 0 0 0 0-1.185A10.004 10.004 0 0 0 9.999 3a9.956 9.956 0 0 0-4.744 1.194L3.28 2.22ZM7.752 6.69l1.092 1.092a2.5 2.5 0 0 1 3.374 3.373l1.092 1.092a4 4 0 0 0-5.558-5.558Z" /><path d="M10.748 13.93l2.523 2.523A9.987 9.987 0 0 1 10 17a10.004 10.004 0 0 1-9.335-6.41 1.651 1.651 0 0 1 0-1.186A10.007 10.007 0 0 1 4.052 5.99L5.62 7.56a4 4 0 0 0 5.13 5.13l.75.75-.752.49Z" /></svg>`
-                            : html`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z" /><path fill-rule="evenodd" d="M.664 10.59a1.651 1.651 0 0 1 0-1.186A10.004 10.004 0 0 1 10 3c4.257 0 7.893 2.66 9.336 6.41.147.381.146.804 0 1.186A10.004 10.004 0 0 1 10 17c-4.257 0-7.893-2.66-9.336-6.41ZM14 10a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z" clip-rule="evenodd" /></svg>`
-                        }
-                    </button>
-                </div>
+                <input
+                    type="password"
+                    placeholder="Enter your access token"
+                    .value=${this._token}
+                    @input=${e => this._saveToken(e.target.value)}
+                    class=${this._tokenError ? 'error' : ''}
+                />
                 <div class="form-hint">
                     <span class="link" @click=${() => this.onExternalLink('https://cheatingdaddy.com/token')}>Get a token</span>
                 </div>

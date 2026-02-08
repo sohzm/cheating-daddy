@@ -4,6 +4,10 @@ const { spawn } = require('child_process');
 const { saveDebugAudio } = require('../audioUtils');
 const { getSystemPrompt } = require('./prompts');
 const { getAvailableModel, incrementLimitCount, getApiKey, getGroqApiKey, incrementCharUsage, getModelForToday } = require('../storage');
+const { connectCloud, sendCloudAudio, sendCloudText, closeCloud, isCloudActive } = require('./cloud');
+
+// Provider mode: 'byok' or 'cloud'
+let currentProviderMode = 'byok';
 
 // Groq conversation history for context
 let groqConversationHistory = [];
@@ -690,8 +694,13 @@ async function startMacOSAudioCapture(geminiSessionRef) {
             audioBuffer = audioBuffer.slice(CHUNK_SIZE);
 
             const monoChunk = CHANNELS === 2 ? convertStereoToMono(chunk) : chunk;
-            const base64Data = monoChunk.toString('base64');
-            sendAudioToGemini(base64Data, geminiSessionRef);
+
+            if (currentProviderMode === 'cloud') {
+                sendCloudAudio(monoChunk);
+            } else {
+                const base64Data = monoChunk.toString('base64');
+                sendAudioToGemini(base64Data, geminiSessionRef);
+            }
 
             if (process.env.DEBUG_AUDIO) {
                 console.log(`Processed audio chunk: ${chunk.length} bytes`);
@@ -818,7 +827,23 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
     // Store the geminiSessionRef globally for reconnection access
     global.geminiSessionRef = geminiSessionRef;
 
+    ipcMain.handle('initialize-cloud', async (event, token, profile, userContext) => {
+        try {
+            currentProviderMode = 'cloud';
+            sendToRenderer('session-initializing', true);
+            await connectCloud(token, profile, userContext);
+            sendToRenderer('session-initializing', false);
+            return true;
+        } catch (err) {
+            console.error('[Cloud] Init error:', err);
+            currentProviderMode = 'byok';
+            sendToRenderer('session-initializing', false);
+            return false;
+        }
+    });
+
     ipcMain.handle('initialize-gemini', async (event, apiKey, customPrompt, profile = 'interview', language = 'en-US') => {
+        currentProviderMode = 'byok';
         const session = await initializeGeminiSession(apiKey, customPrompt, profile, language);
         if (session) {
             geminiSessionRef.current = session;
@@ -828,6 +853,16 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
     });
 
     ipcMain.handle('send-audio-content', async (event, { data, mimeType }) => {
+        if (currentProviderMode === 'cloud') {
+            try {
+                const pcmBuffer = Buffer.from(data, 'base64');
+                sendCloudAudio(pcmBuffer);
+                return { success: true };
+            } catch (error) {
+                console.error('Error sending cloud audio:', error);
+                return { success: false, error: error.message };
+            }
+        }
         if (!geminiSessionRef.current) return { success: false, error: 'No active Gemini session' };
         try {
             process.stdout.write('.');
@@ -843,6 +878,16 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
 
     // Handle microphone audio on a separate channel
     ipcMain.handle('send-mic-audio-content', async (event, { data, mimeType }) => {
+        if (currentProviderMode === 'cloud') {
+            try {
+                const pcmBuffer = Buffer.from(data, 'base64');
+                sendCloudAudio(pcmBuffer);
+                return { success: true };
+            } catch (error) {
+                console.error('Error sending cloud mic audio:', error);
+                return { success: false, error: error.message };
+            }
+        }
         if (!geminiSessionRef.current) return { success: false, error: 'No active Gemini session' };
         try {
             process.stdout.write(',');
@@ -882,13 +927,24 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
     });
 
     ipcMain.handle('send-text-message', async (event, text) => {
+        if (!text || typeof text !== 'string' || text.trim().length === 0) {
+            return { success: false, error: 'Invalid text message' };
+        }
+
+        if (currentProviderMode === 'cloud') {
+            try {
+                console.log('Sending text to cloud:', text);
+                sendCloudText(text.trim());
+                return { success: true };
+            } catch (error) {
+                console.error('Error sending cloud text:', error);
+                return { success: false, error: error.message };
+            }
+        }
+
         if (!geminiSessionRef.current) return { success: false, error: 'No active Gemini session' };
 
         try {
-            if (!text || typeof text !== 'string' || text.trim().length === 0) {
-                return { success: false, error: 'Invalid text message' };
-            }
-
             console.log('Sending text message:', text);
 
             if (hasGroqKey()) {
@@ -935,6 +991,12 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
     ipcMain.handle('close-session', async event => {
         try {
             stopMacOSAudioCapture();
+
+            if (currentProviderMode === 'cloud') {
+                closeCloud();
+                currentProviderMode = 'byok';
+                return { success: true };
+            }
 
             // Set flag to prevent reconnection attempts
             isUserClosing = true;

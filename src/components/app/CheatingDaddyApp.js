@@ -511,16 +511,40 @@ export class CheatingDaddyApp extends LitElement {
     // ── Session start ──
 
     async handleStart() {
-        const apiKey = await cheatingDaddy.storage.getApiKey();
-        if (!apiKey || apiKey === '') {
-            const mainView = this.shadowRoot.querySelector('main-view');
-            if (mainView && mainView.triggerApiKeyError) {
-                mainView.triggerApiKeyError();
+        const prefs = await cheatingDaddy.storage.getPreferences();
+        const providerMode = prefs.providerMode || 'cloud';
+
+        if (providerMode === 'cloud') {
+            const creds = await cheatingDaddy.storage.getCredentials();
+            if (!creds.cloudToken || creds.cloudToken.trim() === '') {
+                const mainView = this.shadowRoot.querySelector('main-view');
+                if (mainView && mainView.triggerApiKeyError) {
+                    mainView.triggerApiKeyError();
+                }
+                return;
             }
-            return;
+
+            const success = await cheatingDaddy.initializeCloud(this.selectedProfile);
+            if (!success) {
+                const mainView = this.shadowRoot.querySelector('main-view');
+                if (mainView && mainView.triggerApiKeyError) {
+                    mainView.triggerApiKeyError();
+                }
+                return;
+            }
+        } else {
+            const apiKey = await cheatingDaddy.storage.getApiKey();
+            if (!apiKey || apiKey === '') {
+                const mainView = this.shadowRoot.querySelector('main-view');
+                if (mainView && mainView.triggerApiKeyError) {
+                    mainView.triggerApiKeyError();
+                }
+                return;
+            }
+
+            await cheatingDaddy.initializeGemini(this.selectedProfile, this.selectedLanguage);
         }
 
-        await cheatingDaddy.initializeGemini(this.selectedProfile, this.selectedLanguage);
         cheatingDaddy.startCapture(this.selectedScreenshotInterval, this.selectedImageQuality);
         this.responses = [];
         this.currentResponseIndex = -1;

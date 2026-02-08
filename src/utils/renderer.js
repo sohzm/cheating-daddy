@@ -153,6 +153,25 @@ async function initializeGemini(profile = 'interview', language = 'en-US') {
     }
 }
 
+async function initializeCloud(profile = 'interview') {
+    const creds = await storage.getCredentials();
+    const token = creds.cloudToken;
+    if (!token || !token.trim()) {
+        cheatingDaddy.setStatus('error');
+        return false;
+    }
+
+    const prefs = await storage.getPreferences();
+    const success = await ipcRenderer.invoke('initialize-cloud', token, profile, prefs.customPrompt || '');
+    if (success) {
+        cheatingDaddy.setStatus('Live');
+        return true;
+    } else {
+        cheatingDaddy.setStatus('error');
+        return false;
+    }
+}
+
 // Listen for status updates
 ipcRenderer.on('update-status', (event, status) => {
     console.log('Status update:', status);
@@ -977,6 +996,7 @@ const cheatingDaddy = {
 
     // Core functionality
     initializeGemini,
+    initializeCloud,
     startCapture,
     stopCapture,
     sendTextMessage,
