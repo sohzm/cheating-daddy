@@ -625,7 +625,7 @@ export class CustomizeView extends LitElement {
             localStorage.setItem('selectedMode', 'coding');
 
             // Validate model for coding mode
-            const validCodingModels = ['gemini-2.5-flash', 'gemini-3-pro-preview'];
+            const validCodingModels = ['gemini-2.5-flash', 'gemini-3-flash-preview', 'gemini-3-pro-preview'];
             if (!validCodingModels.includes(this.selectedModel)) {
                 this.selectedModel = 'gemini-2.5-flash';
             }
@@ -1100,7 +1100,7 @@ export class CustomizeView extends LitElement {
             }
         } else {
             // Keep current model selection for coding mode
-            const validCodingModels = ['gemini-2.5-flash', 'gemini-3-pro-preview'];
+            const validCodingModels = ['gemini-2.5-flash', 'gemini-3-flash-preview', 'gemini-3-pro-preview'];
             if (!validCodingModels.includes(this.selectedModel)) {
                 this.selectedModel = 'gemini-3-pro-preview';
             }
@@ -1196,14 +1196,17 @@ export class CustomizeView extends LitElement {
                                         .value=${this.selectedModel}
                                         .options=${[
                                             { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (Faster, Balanced)', icon: './assets/models/500px-Google_Gemini_icon_2025.svg.png' },
-                                            { value: 'gemini-3-pro-preview', label: 'Gemini 3 Pro Preview (Slower, More Accurate)', icon: './assets/models/500px-Google_Gemini_icon_2025.svg.png' }
+                                            { value: 'gemini-3-flash-preview', label: 'Gemini 3 Flash Preview (Fast, Smart)', icon: './assets/models/500px-Google_Gemini_icon_2025.svg.png' },
+                                            { value: 'gemini-3-pro-preview', label: 'Gemini 3 Pro Preview (Slower, Most Accurate)', icon: './assets/models/500px-Google_Gemini_icon_2025.svg.png' }
                                         ]}
                                         @change=${e => this.handleModelChange({ target: { value: e.detail.value } })}
                                     ></custom-dropdown>
                                     <div class="form-description">
                                         ${this.selectedModel === 'gemini-2.5-flash'
                                             ? 'Gemini 2.5 Flash: Faster responses, good for time-sensitive coding assessments.'
-                                            : 'Gemini 3 Pro Preview: More accurate and detailed responses, better for complex problems.'}
+                                            : this.selectedModel === 'gemini-3-flash-preview'
+                                                ? 'Gemini 3 Flash Preview: Pro-level intelligence at Flash speed. Low thinking for fastest responses.'
+                                                : 'Gemini 3 Pro Preview: Most accurate and detailed responses, better for complex problems.'}
                                     </div>
                                 </div>
                             </div>

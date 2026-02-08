@@ -488,6 +488,7 @@ export class AdvancedView extends LitElement {
         // Gemini models
         'gemini-2.0-flash-exp': 8192,
         'gemini-2.5-flash': 65536,
+        'gemini-3-flash-preview': 65536,
         'gemini-3-pro-preview': 65536,
         // Groq Llama models
         'llama-4-maverick': 8192,
@@ -507,6 +508,12 @@ export class AdvancedView extends LitElement {
         // Gemini 2.5 Flash - Coding mode (detailed code, more deterministic)
         'gemini-2.5-flash': {
             temperature: 0.5,
+            topP: 0.95,
+            maxOutputTokens: 8192,
+        },
+        // Gemini 3 Flash - Coding mode (fast, low thinking for speed)
+        'gemini-3-flash-preview': {
+            temperature: 1.0,
             topP: 0.95,
             maxOutputTokens: 8192,
         },
@@ -592,6 +599,7 @@ export class AdvancedView extends LitElement {
         const modelNames = {
             'gemini-2.0-flash-exp': 'Gemini 2.0 Flash',
             'gemini-2.5-flash': 'Gemini 2.5 Flash',
+            'gemini-3-flash-preview': 'Gemini 3.0 Flash',
             'gemini-3-pro-preview': 'Gemini 3.0 Pro',
             'llama-4-maverick': 'Llama 4 Maverick',
             'llama-4-scout': 'Llama 4 Scout',
@@ -601,7 +609,7 @@ export class AdvancedView extends LitElement {
 
     // Check if model should have orange badge (exam mode models)
     isExamModeModel() {
-        return this.selectedModel === 'gemini-2.5-flash' || this.selectedModel === 'gemini-3-pro-preview';
+        return this.selectedModel === 'gemini-2.5-flash' || this.selectedModel === 'gemini-3-flash-preview' || this.selectedModel === 'gemini-3-pro-preview';
     }
 
     // Check if current model is a Groq Llama model

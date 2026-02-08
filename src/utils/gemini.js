@@ -61,6 +61,7 @@ const MODEL_MAX_OUTPUT_TOKENS = {
     // Gemini models
     'gemini-2.0-flash-exp': 8192,
     'gemini-2.5-flash': 65536,
+    'gemini-3-flash-preview': 65536,
     'gemini-3-pro-preview': 65536,
     // Groq Llama models
     'llama-4-maverick': 8192,
@@ -751,6 +752,14 @@ RESPONSE FORMAT: [approach sentence] + [code] + [complexity]`;
                             const modelMaxTokens = getMaxOutputTokensForModel(this.model);
                             const effectiveMaxTokens = Math.min(generationSettings.maxOutputTokens, modelMaxTokens);
 
+                            // Gemini 3 Flash: use 'low' thinking for fastest responses
+                            // Gemini 3 Pro: use default 'high' thinking for best accuracy
+                            const thinkingConfig = this.model === 'gemini-3-flash-preview'
+                                ? { thinkingLevel: 'low' }
+                                : this.model === 'gemini-3-pro-preview'
+                                    ? { thinkingLevel: 'high' }
+                                    : undefined;
+
                             const streamResult = await this.client.models.generateContentStream({
                                 model: this.model,
                                 contents: contents,
@@ -760,6 +769,7 @@ RESPONSE FORMAT: [approach sentence] + [code] + [complexity]`;
                                     topK: 40,
                                     topP: generationSettings.topP,
                                     maxOutputTokens: effectiveMaxTokens,
+                                    ...(thinkingConfig ? { thinkingConfig } : {}),
                                 },
                                 tools: this.tools.length > 0 ? this.tools : undefined,
                                 // Context caching: Cache system prompt for 5 minutes (one interview session)
