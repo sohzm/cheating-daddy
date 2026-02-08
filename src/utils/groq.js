@@ -49,8 +49,8 @@ const CHECK_INTERVAL_MS = 500; // Check every 500ms for faster response
 // Store selected model for chat completion
 let selectedLlamaModel = 'llama-4-maverick';
 
-// Rate limit recovery timer - auto-reset status after 429 errors (Groq free tier resets per minute)
-let rateLimitRecoveryTimer = null;
+// Rate limit countdown - auto-reset status after 429 errors with live countdown in header
+let rateLimitCountdownInterval = null;
 
 // Store selected language name for use in prompts
 let storedLanguageName = 'English';
@@ -70,23 +70,35 @@ function sendToRenderer(channel, data) {
 }
 
 /**
- * Schedule auto-recovery after a 429 rate limit error.
- * Groq free tier rate limits reset per minute, so after 60s
- * we reset the status back to 'Listening...' so the user knows they can continue.
+ * Start a live countdown in the header after a 429 rate limit error.
+ * Updates the status every second: "Rate Limit: Tokens/min exceeded (15s)" → (14s) → ... → "Listening..."
+ * Edge case: if user restarts app and hits 429 again, Groq returns fresh retry time and countdown restarts.
  */
-function scheduleRateLimitRecovery(recoveryMs = 60 * 1000) {
-    // Clear any existing recovery timer to avoid duplicates
-    if (rateLimitRecoveryTimer) {
-        clearTimeout(rateLimitRecoveryTimer);
+function scheduleRateLimitRecovery(statusMessage, recoveryMs = 30 * 1000) {
+    // Clear any existing countdown to avoid duplicates
+    if (rateLimitCountdownInterval) {
+        clearInterval(rateLimitCountdownInterval);
+        rateLimitCountdownInterval = null;
     }
 
-    console.log(`[GROQ] Rate limit hit - will auto-recover status in ${recoveryMs / 1000}s`);
+    let remainingSec = Math.ceil(recoveryMs / 1000);
+    console.log(`[GROQ] Rate limit hit - countdown ${remainingSec}s`);
 
-    rateLimitRecoveryTimer = setTimeout(() => {
-        rateLimitRecoveryTimer = null;
-        console.log('[GROQ] Rate limit recovery - resetting status to Listening...');
-        sendToRenderer('update-status', 'Listening...');
-    }, recoveryMs);
+    // Show initial status with countdown
+    sendToRenderer('update-status', `${statusMessage} (${remainingSec}s)`);
+
+    rateLimitCountdownInterval = setInterval(() => {
+        remainingSec--;
+
+        if (remainingSec <= 0) {
+            clearInterval(rateLimitCountdownInterval);
+            rateLimitCountdownInterval = null;
+            console.log('[GROQ] Rate limit countdown done - resetting to Listening...');
+            sendToRenderer('update-status', 'Listening...');
+        } else {
+            sendToRenderer('update-status', `${statusMessage} (${remainingSec}s)`);
+        }
+    }, 1000);
 }
 
 /**
@@ -301,8 +313,7 @@ async function transcribeWithGroq(wavBuffer) {
                         reject(new Error('Invalid API Key'));
                     } else if (res.statusCode === 429) {
                         const rateLimit = parseRateLimitError(data);
-                        sendToRenderer('update-status', rateLimit.statusMessage);
-                        scheduleRateLimitRecovery(rateLimit.recoveryMs);
+                        scheduleRateLimitRecovery(rateLimit.statusMessage, rateLimit.recoveryMs);
                         reject(new Error(rateLimit.statusMessage));
                     } else if (res.statusCode === 413) {
                         sendToRenderer('update-status', 'Audio too long');
@@ -492,8 +503,7 @@ async function chatWithLlama(userMessage, model = 'llama-4-maverick', imageData 
                         reject(new Error('Invalid API Key'));
                     } else if (res.statusCode === 429) {
                         const rateLimit = parseRateLimitError(rawErrorBody);
-                        sendToRenderer('update-status', rateLimit.statusMessage);
-                        scheduleRateLimitRecovery(rateLimit.recoveryMs);
+                        scheduleRateLimitRecovery(rateLimit.statusMessage, rateLimit.recoveryMs);
                         reject(new Error(rateLimit.statusMessage));
                     } else if (res.statusCode === 413) {
                         sendToRenderer('update-status', 'Request too large');
