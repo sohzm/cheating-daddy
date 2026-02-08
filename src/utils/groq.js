@@ -168,6 +168,12 @@ function initializeGroq(apiKey, customPrompt = '', profile = 'interview', langua
     groqApiKey = apiKey;
     conversationHistory = [];
 
+    // Clear any active rate limit countdown from previous session
+    if (rateLimitCountdownInterval) {
+        clearInterval(rateLimitCountdownInterval);
+        rateLimitCountdownInterval = null;
+    }
+
     // Use CONDENSED system prompt for Groq (strict HTTP body size limit ~20KB)
     // Full prompt is ~27KB which exceeds Groq's limit
     currentSystemPrompt = getCondensedSystemPrompt(profile, customPrompt);
