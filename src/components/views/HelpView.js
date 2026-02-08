@@ -1,71 +1,89 @@
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
-import { resizeLayout } from '../../utils/windowResize.js';
 
 export class HelpView extends LitElement {
     static styles = css`
         * {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family: var(--font);
             cursor: default;
             user-select: none;
+            box-sizing: border-box;
         }
 
         :host {
-            display: block;
-            padding: 0;
-        }
-
-        .help-container {
             display: flex;
             flex-direction: column;
+            align-items: center;
+            padding: var(--space-xl) var(--space-lg);
+            overflow-y: auto;
+            height: 100%;
         }
 
-        .option-group {
-            padding: 16px 12px;
-            border-bottom: 1px solid var(--border-color);
+        .page-wrapper {
+            width: 100%;
+            max-width: 640px;
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-md);
         }
 
-        .option-group:last-child {
-            border-bottom: none;
+        .page-title {
+            font-size: var(--font-size-xl);
+            font-weight: var(--font-weight-semibold);
+            color: var(--text-primary);
+            margin-bottom: var(--space-xs);
         }
 
-        .option-label {
-            font-size: 11px;
-            font-weight: 600;
+        .page-subtitle {
+            font-size: var(--font-size-sm);
+            color: var(--text-muted);
+            margin-bottom: var(--space-sm);
+        }
+
+        .card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: var(--space-lg);
+        }
+
+        .card-title {
+            font-size: var(--font-size-xs);
+            font-weight: var(--font-weight-semibold);
             color: var(--text-muted);
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            margin-bottom: 12px;
+            margin-bottom: var(--space-md);
         }
 
         .description {
             color: var(--text-secondary);
-            font-size: 12px;
-            line-height: 1.4;
+            font-size: var(--font-size-sm);
+            line-height: var(--line-height);
             user-select: text;
             cursor: text;
         }
 
         .description strong {
-            color: var(--text-color);
-            font-weight: 500;
+            color: var(--text-primary);
+            font-weight: var(--font-weight-medium);
         }
 
         .link {
-            color: var(--text-color);
+            color: var(--accent);
             text-decoration: underline;
             text-underline-offset: 2px;
             cursor: pointer;
         }
 
         .key {
-            background: var(--bg-tertiary);
-            color: var(--text-color);
-            border: 1px solid var(--border-color);
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-size: 10px;
-            font-family: 'SF Mono', Monaco, monospace;
-            font-weight: 500;
+            background: var(--bg-elevated);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+            padding: 2px var(--space-xs);
+            border-radius: var(--radius-sm);
+            font-size: var(--font-size-xs);
+            font-family: var(--font-mono);
+            font-weight: var(--font-weight-medium);
             margin: 0 1px;
             white-space: nowrap;
         }
@@ -73,32 +91,30 @@ export class HelpView extends LitElement {
         .keyboard-section {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 12px;
-            margin-top: 8px;
+            gap: var(--space-md);
         }
 
         .keyboard-group {
-            padding: 10px 0;
-            border-bottom: 1px solid var(--border-color);
+            padding: var(--space-sm) 0;
         }
 
         .keyboard-group:last-child {
-            border-bottom: none;
+            padding-bottom: 0;
         }
 
         .keyboard-group-title {
-            font-weight: 600;
-            font-size: 12px;
-            color: var(--text-color);
-            margin-bottom: 8px;
+            font-weight: var(--font-weight-semibold);
+            font-size: var(--font-size-sm);
+            color: var(--text-primary);
+            margin-bottom: var(--space-sm);
         }
 
         .shortcut-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 4px 0;
-            font-size: 11px;
+            padding: var(--space-xs) 0;
+            font-size: var(--font-size-xs);
         }
 
         .shortcut-description {
@@ -113,55 +129,56 @@ export class HelpView extends LitElement {
         .profiles-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 8px;
-            margin-top: 8px;
+            gap: var(--space-sm);
         }
 
         .profile-item {
-            padding: 8px 0;
-            border-bottom: 1px solid var(--border-color);
+            padding: var(--space-sm) 0;
+            border-bottom: 1px solid var(--border);
         }
 
         .profile-item:last-child {
             border-bottom: none;
+            padding-bottom: 0;
         }
 
         .profile-name {
-            font-weight: 500;
-            font-size: 12px;
-            color: var(--text-color);
+            font-weight: var(--font-weight-medium);
+            font-size: var(--font-size-sm);
+            color: var(--text-primary);
             margin-bottom: 2px;
         }
 
         .profile-description {
-            font-size: 11px;
+            font-size: var(--font-size-xs);
             color: var(--text-muted);
-            line-height: 1.3;
+            line-height: var(--line-height);
         }
 
         .community-links {
             display: flex;
-            gap: 8px;
+            gap: var(--space-lg);
             flex-wrap: wrap;
         }
 
         .community-link {
             display: flex;
             align-items: center;
-            gap: 6px;
-            padding: 6px 10px;
-            background: transparent;
-            border: 1px solid var(--border-color);
-            border-radius: 3px;
-            color: var(--text-color);
-            font-size: 11px;
-            font-weight: 500;
-            transition: background 0.1s ease;
+            gap: var(--space-xs);
+            background: none;
+            border: none;
+            color: var(--accent);
+            font-size: var(--font-size-sm);
+            font-weight: var(--font-weight-medium);
             cursor: pointer;
+            text-decoration: underline;
+            text-underline-offset: 2px;
+            transition: color var(--transition);
+            padding: 0;
         }
 
         .community-link:hover {
-            background: var(--hover-background);
+            color: var(--accent-hover);
         }
 
         .community-link svg {
@@ -177,11 +194,15 @@ export class HelpView extends LitElement {
         .usage-step {
             counter-increment: step-counter;
             position: relative;
-            padding-left: 24px;
-            margin-bottom: 8px;
-            font-size: 11px;
-            line-height: 1.4;
+            padding-left: var(--space-xl);
+            margin-bottom: var(--space-sm);
+            font-size: var(--font-size-xs);
+            line-height: var(--line-height);
             color: var(--text-secondary);
+        }
+
+        .usage-step:last-child {
+            margin-bottom: 0;
         }
 
         .usage-step::before {
@@ -191,18 +212,25 @@ export class HelpView extends LitElement {
             top: 0;
             width: 16px;
             height: 16px;
-            background: var(--bg-tertiary);
-            color: var(--text-color);
-            border-radius: 3px;
+            background: var(--bg-elevated);
+            color: var(--text-primary);
+            border-radius: var(--radius-sm);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 10px;
-            font-weight: 600;
+            font-size: var(--font-size-xs);
+            font-weight: var(--font-weight-semibold);
         }
 
         .usage-step strong {
-            color: var(--text-color);
+            color: var(--text-primary);
+        }
+
+        .shortcuts-hint {
+            font-size: var(--font-size-xs);
+            color: var(--text-muted);
+            text-align: center;
+            margin-top: var(--space-md);
         }
     `;
 
@@ -232,8 +260,6 @@ export class HelpView extends LitElement {
 
     connectedCallback() {
         super.connectedCallback();
-        // Resize window for this view
-        resizeLayout();
     }
 
     getDefaultKeybinds() {
@@ -266,11 +292,12 @@ export class HelpView extends LitElement {
         const isLinux = cheatingDaddy.isLinux || false;
 
         return html`
-            <div class="help-container">
-                <div class="option-group">
-                    <div class="option-label">
-                        <span>Community & Support</span>
-                    </div>
+            <div class="page-wrapper">
+                <div class="page-title">Help & Shortcuts</div>
+                <div class="page-subtitle">Keyboard shortcuts, usage guide, and community links</div>
+
+                <div class="card">
+                    <div class="card-title">Community & Support</div>
                     <div class="community-links">
                         <div class="community-link" @click=${() => this.handleExternalLinkClick('https://cheatingdaddy.com')}>
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -299,10 +326,8 @@ export class HelpView extends LitElement {
                     </div>
                 </div>
 
-                <div class="option-group">
-                    <div class="option-label">
-                        <span>Keyboard Shortcuts</span>
-                    </div>
+                <div class="card">
+                    <div class="card-title">Keyboard Shortcuts</div>
                     <div class="keyboard-section">
                         <div class="keyboard-group">
                             <div class="keyboard-group-title">Window Movement</div>
@@ -376,15 +401,13 @@ export class HelpView extends LitElement {
                             </div>
                         </div>
                     </div>
-                    <div class="description" style="margin-top: 12px; text-align: center;">
+                    <div class="shortcuts-hint">
                         You can customize these shortcuts in Settings.
                     </div>
                 </div>
 
-                <div class="option-group">
-                    <div class="option-label">
-                        <span>How to Use</span>
-                    </div>
+                <div class="card">
+                    <div class="card-title">How to Use</div>
                     <div class="usage-steps">
                         <div class="usage-step"><strong>Start a Session:</strong> Enter your Gemini API key and click "Start Session"</div>
                         <div class="usage-step"><strong>Customize:</strong> Choose your profile and language in the settings</div>
@@ -404,10 +427,8 @@ export class HelpView extends LitElement {
                     </div>
                 </div>
 
-                <div class="option-group">
-                    <div class="option-label">
-                        <span>Supported Profiles</span>
-                    </div>
+                <div class="card">
+                    <div class="card-title">Supported Profiles</div>
                     <div class="profiles-grid">
                         <div class="profile-item">
                             <div class="profile-name">Job Interview</div>
@@ -436,10 +457,8 @@ export class HelpView extends LitElement {
                     </div>
                 </div>
 
-                <div class="option-group">
-                    <div class="option-label">
-                        <span>Audio Input</span>
-                    </div>
+                <div class="card">
+                    <div class="card-title">Audio Input</div>
                     <div class="description">The AI listens to conversations and provides contextual assistance based on what it hears.</div>
                 </div>
             </div>

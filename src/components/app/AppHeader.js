@@ -3,7 +3,7 @@ import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
 export class AppHeader extends LitElement {
     static styles = css`
         * {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family: var(--font);
             cursor: default;
             user-select: none;
         }
@@ -14,14 +14,14 @@ export class AppHeader extends LitElement {
             align-items: center;
             padding: var(--header-padding);
             background: var(--header-background);
-            border-bottom: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--border);
         }
 
         .header-title {
             flex: 1;
             font-size: var(--header-font-size);
             font-weight: 500;
-            color: var(--text-color);
+            color: var(--text-primary);
             -webkit-app-region: drag;
         }
 
@@ -39,8 +39,8 @@ export class AppHeader extends LitElement {
 
         .button {
             background: transparent;
-            color: var(--text-color);
-            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
             padding: var(--header-button-padding);
             border-radius: 3px;
             font-size: var(--header-font-size-small);
@@ -73,7 +73,7 @@ export class AppHeader extends LitElement {
 
         .icon-button:hover {
             background: var(--hover-background);
-            color: var(--text-color);
+            color: var(--text-primary);
         }
 
         :host([isclickthrough]) .button:hover,
@@ -86,7 +86,7 @@ export class AppHeader extends LitElement {
             padding: 2px 6px;
             border-radius: 3px;
             font-size: 11px;
-            font-family: 'SF Mono', Monaco, monospace;
+            font-family: var(--font-mono);
         }
 
         .click-through-indicator {
@@ -95,7 +95,7 @@ export class AppHeader extends LitElement {
             background: var(--key-background);
             padding: 2px 6px;
             border-radius: 3px;
-            font-family: 'SF Mono', Monaco, monospace;
+            font-family: var(--font-mono);
         }
 
         .update-button {

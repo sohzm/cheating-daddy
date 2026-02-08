@@ -856,16 +856,27 @@ const theme = {
         const tertiary = adjust(baseRgb, 15);
         const hover = adjust(baseRgb, 20);
 
-        root.style.setProperty('--header-background', `rgba(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}, ${alpha})`);
-        root.style.setProperty('--main-content-background', `rgba(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}, ${alpha})`);
-        root.style.setProperty('--bg-primary', `rgba(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}, ${alpha})`);
-        root.style.setProperty('--bg-secondary', `rgba(${secondary.r}, ${secondary.g}, ${secondary.b}, ${alpha})`);
-        root.style.setProperty('--bg-tertiary', `rgba(${tertiary.r}, ${tertiary.g}, ${tertiary.b}, ${alpha})`);
-        root.style.setProperty('--bg-hover', `rgba(${hover.r}, ${hover.g}, ${hover.b}, ${alpha})`);
-        root.style.setProperty('--input-background', `rgba(${tertiary.r}, ${tertiary.g}, ${tertiary.b}, ${alpha})`);
-        root.style.setProperty('--input-focus-background', `rgba(${tertiary.r}, ${tertiary.g}, ${tertiary.b}, ${alpha})`);
-        root.style.setProperty('--hover-background', `rgba(${hover.r}, ${hover.g}, ${hover.b}, ${alpha})`);
-        root.style.setProperty('--scrollbar-background', `rgba(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}, ${alpha})`);
+        const bgBase = `rgba(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}, ${alpha})`;
+        const bgSurface = `rgba(${secondary.r}, ${secondary.g}, ${secondary.b}, ${alpha})`;
+        const bgElevated = `rgba(${tertiary.r}, ${tertiary.g}, ${tertiary.b}, ${alpha})`;
+        const bgHover = `rgba(${hover.r}, ${hover.g}, ${hover.b}, ${alpha})`;
+
+        // New design tokens (used by components)
+        root.style.setProperty('--bg-app', bgBase);
+        root.style.setProperty('--bg-surface', bgSurface);
+        root.style.setProperty('--bg-elevated', bgElevated);
+        root.style.setProperty('--bg-hover', bgHover);
+
+        // Legacy aliases
+        root.style.setProperty('--header-background', bgBase);
+        root.style.setProperty('--main-content-background', bgBase);
+        root.style.setProperty('--bg-primary', bgBase);
+        root.style.setProperty('--bg-secondary', bgSurface);
+        root.style.setProperty('--bg-tertiary', bgElevated);
+        root.style.setProperty('--input-background', bgElevated);
+        root.style.setProperty('--input-focus-background', bgElevated);
+        root.style.setProperty('--hover-background', bgHover);
+        root.style.setProperty('--scrollbar-background', bgBase);
     },
 
     apply(themeName, alpha = 0.8) {
@@ -873,14 +884,19 @@ const theme = {
         this.current = themeName;
         const root = document.documentElement;
 
-        // Text colors
-        root.style.setProperty('--text-color', colors.text);
+        // New design tokens (used by components)
+        root.style.setProperty('--text-primary', colors.text);
         root.style.setProperty('--text-secondary', colors.textSecondary);
         root.style.setProperty('--text-muted', colors.textMuted);
-        // Border colors
+        root.style.setProperty('--border', colors.border);
+        root.style.setProperty('--border-strong', colors.accent);
+        root.style.setProperty('--accent', colors.btnPrimaryBg);
+        root.style.setProperty('--accent-hover', colors.btnPrimaryHover);
+
+        // Legacy aliases
+        root.style.setProperty('--text-color', colors.text);
         root.style.setProperty('--border-color', colors.border);
         root.style.setProperty('--border-default', colors.accent);
-        // Misc
         root.style.setProperty('--placeholder-color', colors.textMuted);
         root.style.setProperty('--scrollbar-thumb', colors.border);
         root.style.setProperty('--scrollbar-thumb-hover', colors.textMuted);

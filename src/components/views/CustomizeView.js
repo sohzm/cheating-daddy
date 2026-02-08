@@ -1,10 +1,9 @@
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
-import { resizeLayout } from '../../utils/windowResize.js';
 
 export class CustomizeView extends LitElement {
     static styles = css`
         * {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family: var(--font);
             cursor: default;
             user-select: none;
         }
@@ -23,8 +22,8 @@ export class CustomizeView extends LitElement {
         .settings-sidebar {
             width: 160px;
             min-width: 160px;
-            border-right: 1px solid var(--border-color);
-            padding: 8px 0;
+            border-right: 1px solid var(--border);
+            padding: var(--space-sm) 0;
             display: flex;
             flex-direction: column;
             gap: 2px;
@@ -33,28 +32,28 @@ export class CustomizeView extends LitElement {
         .sidebar-item {
             display: flex;
             align-items: center;
-            gap: 10px;
-            padding: 8px 12px;
-            margin: 0 8px;
-            border-radius: 3px;
-            font-size: 12px;
+            gap: var(--space-sm);
+            padding: var(--space-sm) var(--space-md);
+            margin: 0 var(--space-sm);
+            border-radius: var(--radius-md);
+            font-size: var(--font-size-sm);
             color: var(--text-secondary);
             cursor: pointer;
-            transition: all 0.1s ease;
+            transition: color var(--transition), background var(--transition);
             border: none;
             background: transparent;
             text-align: left;
-            width: calc(100% - 16px);
+            width: calc(100% - var(--space-md));
         }
 
         .sidebar-item:hover {
-            background: var(--hover-background);
-            color: var(--text-color);
+            background: var(--bg-hover);
+            color: var(--text-primary);
         }
 
         .sidebar-item.active {
-            background: var(--bg-tertiary);
-            color: var(--text-color);
+            background: var(--bg-elevated);
+            color: var(--text-primary);
         }
 
         .sidebar-item svg {
@@ -64,18 +63,18 @@ export class CustomizeView extends LitElement {
         }
 
         .sidebar-item.danger {
-            color: var(--error-color);
+            color: var(--danger);
         }
 
         .sidebar-item.danger:hover,
         .sidebar-item.danger.active {
-            color: var(--error-color);
+            color: var(--danger);
         }
 
         /* Main content */
         .settings-content {
             flex: 1;
-            padding: 16px 0;
+            padding: var(--space-md) 0;
             overflow-y: auto;
             display: flex;
             flex-direction: column;
@@ -99,46 +98,46 @@ export class CustomizeView extends LitElement {
         }
 
         .settings-content::-webkit-scrollbar-thumb {
-            background: var(--scrollbar-thumb);
+            background: var(--border-strong);
             border-radius: 4px;
         }
 
         .settings-content::-webkit-scrollbar-thumb:hover {
-            background: var(--scrollbar-thumb-hover);
+            background: #444444;
         }
 
         .content-header {
-            font-size: 16px;
-            font-weight: 600;
-            color: var(--text-color);
-            margin-bottom: 16px;
-            padding: 0 16px 12px 16px;
-            border-bottom: 1px solid var(--border-color);
+            font-size: var(--font-size-xl);
+            font-weight: var(--font-weight-semibold);
+            color: var(--text-primary);
+            margin-bottom: var(--space-md);
+            padding: 0 var(--space-md) var(--space-sm) var(--space-md);
+            border-bottom: 1px solid var(--border);
         }
 
         .settings-section {
-            padding: 12px 16px;
+            padding: var(--space-sm) var(--space-md);
         }
 
         .section-title {
-            font-size: 11px;
-            font-weight: 600;
+            font-size: var(--font-size-xs);
+            font-weight: var(--font-weight-semibold);
             color: var(--text-muted);
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            margin-bottom: 12px;
+            margin-bottom: var(--space-sm);
         }
 
         .form-grid {
             display: grid;
-            gap: 12px;
-            padding: 0 16px;
+            gap: var(--space-md);
+            padding: 0 var(--space-md);
         }
 
         .form-row {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 12px;
+            gap: var(--space-md);
             align-items: start;
         }
 
@@ -151,7 +150,7 @@ export class CustomizeView extends LitElement {
         .form-group {
             display: flex;
             flex-direction: column;
-            gap: 6px;
+            gap: var(--space-xs);
         }
 
         .form-group.full-width {
@@ -159,38 +158,41 @@ export class CustomizeView extends LitElement {
         }
 
         .form-label {
-            font-weight: 500;
-            font-size: 12px;
-            color: var(--text-color);
+            font-weight: var(--font-weight-medium);
+            font-size: var(--font-size-xs);
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: var(--space-xs);
         }
 
         .form-description {
-            font-size: 11px;
+            font-size: var(--font-size-xs);
             color: var(--text-muted);
-            line-height: 1.4;
+            line-height: var(--line-height);
             margin-top: 2px;
         }
 
         .form-control {
-            background: var(--input-background);
-            color: var(--text-color);
-            border: 1px solid var(--border-color);
-            padding: 8px 10px;
-            border-radius: 3px;
-            font-size: 12px;
-            transition: border-color 0.1s ease;
+            background: var(--bg-elevated);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+            padding: 10px 12px;
+            border-radius: var(--radius-sm);
+            font-size: var(--font-size-sm);
+            transition: border-color var(--transition), box-shadow var(--transition);
         }
 
         .form-control:focus {
             outline: none;
-            border-color: var(--border-default);
+            border-color: var(--accent);
+            box-shadow: 0 0 0 1px var(--accent);
         }
 
         .form-control:hover:not(:focus) {
-            border-color: var(--border-default);
+            border-color: var(--border-strong);
         }
 
         select.form-control {
@@ -235,23 +237,25 @@ export class CustomizeView extends LitElement {
         }
 
         textarea.form-control::placeholder {
-            color: var(--placeholder-color);
+            color: var(--text-muted);
         }
 
         .current-selection {
             display: inline-flex;
             align-items: center;
-            font-size: 10px;
+            font-size: var(--font-size-xs);
             color: var(--text-secondary);
-            background: var(--bg-tertiary);
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-weight: 500;
+            background: var(--bg-elevated);
+            padding: 2px var(--space-xs);
+            border-radius: var(--radius-sm);
+            font-weight: var(--font-weight-medium);
+            text-transform: none;
+            letter-spacing: 0;
         }
 
         .keybind-input {
             cursor: pointer;
-            font-family: 'SF Mono', Monaco, monospace;
+            font-family: var(--font-mono);
             text-align: center;
             letter-spacing: 0.5px;
             font-weight: 500;
@@ -262,42 +266,42 @@ export class CustomizeView extends LitElement {
         }
 
         .keybind-input::placeholder {
-            color: var(--placeholder-color);
+            color: var(--text-muted);
             font-style: italic;
         }
 
         .reset-keybinds-button {
             background: transparent;
-            color: var(--text-color);
-            border: 1px solid var(--border-color);
-            padding: 6px 10px;
-            border-radius: 3px;
-            font-size: 11px;
-            font-weight: 500;
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+            padding: var(--space-xs) var(--space-sm);
+            border-radius: var(--radius-sm);
+            font-size: var(--font-size-xs);
+            font-weight: var(--font-weight-medium);
             cursor: pointer;
-            transition: background 0.1s ease;
+            transition: background var(--transition);
         }
 
         .reset-keybinds-button:hover {
-            background: var(--hover-background);
+            background: var(--bg-hover);
         }
 
         .keybinds-table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 8px;
+            margin-top: var(--space-sm);
         }
 
         .keybinds-table th,
         .keybinds-table td {
-            padding: 8px 0;
+            padding: var(--space-sm) 0;
             text-align: left;
-            border-bottom: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--border);
         }
 
         .keybinds-table th {
-            font-weight: 600;
-            font-size: 11px;
+            font-weight: var(--font-weight-semibold);
+            font-size: var(--font-size-xs);
             color: var(--text-muted);
             text-transform: uppercase;
             letter-spacing: 0.5px;
@@ -308,26 +312,26 @@ export class CustomizeView extends LitElement {
         }
 
         .keybinds-table .action-name {
-            font-weight: 500;
-            color: var(--text-color);
-            font-size: 12px;
+            font-weight: var(--font-weight-medium);
+            color: var(--text-primary);
+            font-size: var(--font-size-sm);
         }
 
         .keybinds-table .action-description {
-            font-size: 10px;
+            font-size: var(--font-size-xs);
             color: var(--text-muted);
             margin-top: 1px;
         }
 
         .keybinds-table .keybind-input {
             min-width: 100px;
-            padding: 4px 8px;
+            padding: var(--space-xs) var(--space-sm);
             margin: 0;
-            font-size: 11px;
+            font-size: var(--font-size-xs);
         }
 
         .keybinds-table tr:hover {
-            background: var(--hover-background);
+            background: var(--bg-hover);
         }
 
         .keybinds-table tr:last-child td {
@@ -335,12 +339,12 @@ export class CustomizeView extends LitElement {
         }
 
         .table-reset-row {
-            border-top: 1px solid var(--border-color);
+            border-top: 1px solid var(--border);
         }
 
         .table-reset-row td {
-            padding-top: 10px;
-            padding-bottom: 8px;
+            padding-top: var(--space-sm);
+            padding-bottom: var(--space-sm);
             border-bottom: none;
         }
 
@@ -349,32 +353,32 @@ export class CustomizeView extends LitElement {
         }
 
         .settings-note {
-            font-size: 11px;
+            font-size: var(--font-size-xs);
             color: var(--text-muted);
             text-align: center;
-            margin-top: 16px;
-            padding: 12px;
-            border-top: 1px solid var(--border-color);
+            margin-top: var(--space-md);
+            padding: var(--space-sm);
+            border-top: 1px solid var(--border);
         }
 
         .checkbox-group {
             display: flex;
             align-items: center;
-            gap: 8px;
-            padding: 8px 0;
+            gap: var(--space-sm);
+            padding: var(--space-sm) 0;
         }
 
         .checkbox-input {
             width: 14px;
             height: 14px;
-            accent-color: var(--text-color);
+            accent-color: var(--text-primary);
             cursor: pointer;
         }
 
         .checkbox-label {
-            font-weight: 500;
-            font-size: 12px;
-            color: var(--text-color);
+            font-weight: var(--font-weight-medium);
+            font-size: var(--font-size-sm);
+            color: var(--text-primary);
             cursor: pointer;
             user-select: none;
         }
@@ -383,7 +387,7 @@ export class CustomizeView extends LitElement {
         .slider-container {
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: var(--space-sm);
         }
 
         .slider-header {
@@ -393,13 +397,13 @@ export class CustomizeView extends LitElement {
         }
 
         .slider-value {
-            font-size: 11px;
+            font-size: var(--font-size-xs);
             color: var(--text-secondary);
-            background: var(--bg-tertiary);
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-weight: 500;
-            font-family: 'SF Mono', Monaco, monospace;
+            background: var(--bg-elevated);
+            padding: 2px var(--space-xs);
+            border-radius: var(--radius-sm);
+            font-weight: var(--font-weight-medium);
+            font-family: var(--font-mono);
         }
 
         .slider-input {
@@ -408,7 +412,7 @@ export class CustomizeView extends LitElement {
             width: 100%;
             height: 4px;
             border-radius: 2px;
-            background: var(--border-color);
+            background: var(--border);
             outline: none;
             cursor: pointer;
         }
@@ -419,7 +423,7 @@ export class CustomizeView extends LitElement {
             width: 14px;
             height: 14px;
             border-radius: 50%;
-            background: var(--text-color);
+            background: var(--text-primary);
             cursor: pointer;
             border: none;
         }
@@ -428,7 +432,7 @@ export class CustomizeView extends LitElement {
             width: 14px;
             height: 14px;
             border-radius: 50%;
-            background: var(--text-color);
+            background: var(--text-primary);
             cursor: pointer;
             border: none;
         }
@@ -436,8 +440,8 @@ export class CustomizeView extends LitElement {
         .slider-labels {
             display: flex;
             justify-content: space-between;
-            margin-top: 4px;
-            font-size: 10px;
+            margin-top: var(--space-xs);
+            font-size: var(--font-size-xs);
             color: var(--text-muted);
         }
 
@@ -445,7 +449,7 @@ export class CustomizeView extends LitElement {
         .color-picker-container {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: var(--space-sm);
         }
 
         .color-picker-input {
@@ -453,11 +457,11 @@ export class CustomizeView extends LitElement {
             appearance: none;
             width: 40px;
             height: 32px;
-            border: 1px solid var(--border-color);
-            border-radius: 3px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
             cursor: pointer;
             padding: 2px;
-            background: var(--input-background);
+            background: var(--bg-elevated);
         }
 
         .color-picker-input::-webkit-color-swatch-wrapper {
@@ -471,38 +475,38 @@ export class CustomizeView extends LitElement {
 
         .color-hex-input {
             width: 80px;
-            font-family: 'SF Mono', Monaco, monospace;
+            font-family: var(--font-mono);
             text-transform: uppercase;
         }
 
         .reset-color-button {
             background: transparent;
             color: var(--text-secondary);
-            border: 1px solid var(--border-color);
-            padding: 6px 10px;
-            border-radius: 3px;
-            font-size: 11px;
-            font-weight: 500;
+            border: 1px solid var(--border);
+            padding: var(--space-xs) var(--space-sm);
+            border-radius: var(--radius-sm);
+            font-size: var(--font-size-xs);
+            font-weight: var(--font-weight-medium);
             cursor: pointer;
-            transition: all 0.1s ease;
+            transition: all var(--transition);
         }
 
         .reset-color-button:hover {
-            background: var(--hover-background);
-            color: var(--text-color);
+            background: var(--bg-hover);
+            color: var(--text-primary);
         }
 
         /* Danger button and status */
         .danger-button {
             background: transparent;
-            color: var(--error-color);
-            border: 1px solid var(--error-color);
-            padding: 8px 14px;
-            border-radius: 3px;
-            font-size: 11px;
-            font-weight: 500;
+            color: var(--danger);
+            border: 1px solid var(--danger);
+            padding: var(--space-sm) var(--space-md);
+            border-radius: var(--radius-sm);
+            font-size: var(--font-size-xs);
+            font-weight: var(--font-weight-medium);
             cursor: pointer;
-            transition: background 0.1s ease;
+            transition: background var(--transition);
         }
 
         .danger-button:hover {
@@ -515,23 +519,23 @@ export class CustomizeView extends LitElement {
         }
 
         .status-message {
-            margin-top: 12px;
-            padding: 8px 12px;
-            border-radius: 3px;
-            font-size: 11px;
-            font-weight: 500;
+            margin-top: var(--space-sm);
+            padding: var(--space-sm) var(--space-md);
+            border-radius: var(--radius-sm);
+            font-size: var(--font-size-xs);
+            font-weight: var(--font-weight-medium);
         }
 
         .status-success {
-            background: var(--bg-secondary);
-            color: var(--success-color);
-            border-left: 2px solid var(--success-color);
+            background: var(--bg-surface);
+            color: var(--success);
+            border-left: 2px solid var(--success);
         }
 
         .status-error {
-            background: var(--bg-secondary);
-            color: var(--error-color);
-            border-left: 2px solid var(--error-color);
+            background: var(--bg-surface);
+            color: var(--danger);
+            border-left: 2px solid var(--danger);
         }
     `;
 
@@ -620,50 +624,14 @@ export class CustomizeView extends LitElement {
 
     renderSidebarIcon(icon) {
         const icons = {
-            user: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M19 21V19C19 17.9391 18.5786 16.9217 17.8284 16.1716C17.0783 15.4214 16.0609 15 15 15H9C7.93913 15 6.92172 15.4214 6.17157 16.1716C5.42143 16.9217 5 17.9391 5 19V21"></path>
-                <circle cx="12" cy="7" r="4"></circle>
-            </svg>`,
-            mic: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-                <line x1="12" y1="19" x2="12" y2="23"></line>
-                <line x1="8" y1="23" x2="16" y2="23"></line>
-            </svg>`,
-            globe: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10"></circle>
-                <line x1="2" y1="12" x2="22" y2="12"></line>
-                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
-            </svg>`,
-            display: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-                <line x1="8" y1="21" x2="16" y2="21"></line>
-                <line x1="12" y1="17" x2="12" y2="21"></line>
-            </svg>`,
-            camera: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-                <circle cx="12" cy="13" r="4"></circle>
-            </svg>`,
-            keyboard: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect>
-                <path d="M6 8h.001"></path>
-                <path d="M10 8h.001"></path>
-                <path d="M14 8h.001"></path>
-                <path d="M18 8h.001"></path>
-                <path d="M8 12h.001"></path>
-                <path d="M12 12h.001"></path>
-                <path d="M16 12h.001"></path>
-                <path d="M7 16h10"></path>
-            </svg>`,
-            search: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="11" cy="11" r="8"></circle>
-                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-            </svg>`,
-            warning: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-                <line x1="12" y1="9" x2="12" y2="13"></line>
-                <line x1="12" y1="17" x2="12.01" y2="17"></line>
-            </svg>`,
+            user: html`<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0-8 0M6 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/></svg>`,
+            mic: html`<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12.9A5 5 0 1 0 11.098 9M15 12.9l-3.902-3.899l-7.513 8.584a2 2 0 1 0 2.827 2.83z"/></svg>`,
+            globe: html`<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M9 6.371C9 10.789 6.761 13 4 13m0-6.629h7"/><path d="M5 9c0 2.144 2.252 3.908 6 4m1 7l4-9l4 9m-.9-2h-6.2M6.694 3l.793.582"/></g></svg>`,
+            display: html`<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1zm4 15h10m-8-4v4m6-4v4"/></svg>`,
+            camera: html`<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V6a2 2 0 0 1 2-2h2M4 16v2a2 2 0 0 0 2 2h2m8-16h2a2 2 0 0 1 2 2v2m-4 12h2a2 2 0 0 0 2-2v-2M9 12a3 3 0 1 0 6 0a3 3 0 1 0-6 0"/></svg>`,
+            keyboard: html`<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2 8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2zm4 2v.01m4-.01v.01m4-.01v.01m4-.01v.01M6 14v.01M18 14v.01M10 14l4 .01"/></svg>`,
+            search: html`<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10a7 7 0 1 0 14 0a7 7 0 1 0-14 0m18 11l-6-6"/></svg>`,
+            warning: html`<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M10.363 3.591L2.257 17.125a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636-2.87L13.637 3.59a1.914 1.914 0 0 0-3.274 0M12 9h.01"/><path d="M11 12h1v4h1"/></g></svg>`,
         };
         return icons[icon] || '';
     }
@@ -696,8 +664,6 @@ export class CustomizeView extends LitElement {
 
     connectedCallback() {
         super.connectedCallback();
-        // Resize window for this view
-        resizeLayout();
     }
 
     getProfiles() {
@@ -1355,10 +1321,10 @@ export class CustomizeView extends LitElement {
 
     renderAdvancedSection() {
         return html`
-            <div class="content-header" style="color: var(--error-color);">Advanced</div>
+            <div class="content-header" style="color: var(--danger);">Advanced</div>
             <div class="form-grid">
                 <div class="form-group">
-                    <label class="form-label" style="color: var(--error-color);">Data Management</label>
+                    <label class="form-label" style="color: var(--danger);">Data Management</label>
                     <div class="form-description" style="margin-bottom: 12px;">
                         <strong>Warning:</strong> This action will permanently delete all local data including API keys, preferences, and session history. This cannot be undone.
                     </div>
