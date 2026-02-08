@@ -300,8 +300,26 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
 
 function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
     ipcMain.on('view-changed', (event, view) => {
-        if (view !== 'assistant' && !mainWindow.isDestroyed()) {
-            mainWindow.setIgnoreMouseEvents(false);
+        if (!mainWindow.isDestroyed()) {
+            const primaryDisplay = screen.getPrimaryDisplay();
+            const { width: screenWidth } = primaryDisplay.workAreaSize;
+
+            if (view === 'assistant') {
+                // Shrink window for live view
+                const liveWidth = 300;
+                const liveHeight = 600;
+                const x = Math.floor((screenWidth - liveWidth) / 2);
+                mainWindow.setSize(liveWidth, liveHeight);
+                mainWindow.setPosition(x, 0);
+            } else {
+                // Restore full size
+                const fullWidth = 1100;
+                const fullHeight = 800;
+                const x = Math.floor((screenWidth - fullWidth) / 2);
+                mainWindow.setSize(fullWidth, fullHeight);
+                mainWindow.setPosition(x, 0);
+                mainWindow.setIgnoreMouseEvents(false);
+            }
         }
     });
 
