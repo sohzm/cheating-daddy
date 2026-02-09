@@ -696,9 +696,14 @@ export class CustomizeView extends LitElement {
                                     @focus=${this.handleKeybindFocus}
                                     readonly
                                 />
-                                ${this.keybinds[action.key]
-                                    ? html` <button class="keybind-clear" title="Unbind" @click=${() => this.clearKeybind(action.key)}>×</button> `
-                                    : ''}
+                                <button
+                                    class="keybind-clear"
+                                    title="Unbind"
+                                    style="visibility:${this.keybinds[action.key] ? 'visible' : 'hidden'}"
+                                    @click=${() => this.clearKeybind(action.key)}
+                                >
+                                    ×
+                                </button>
                             </div>
                         </div>
                     `
