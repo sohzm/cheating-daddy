@@ -6,7 +6,14 @@ const { getSystemPrompt } = require('./prompts');
 const { getAvailableModel, incrementLimitCount, getApiKey, getGroqApiKey, incrementCharUsage, getModelForToday } = require('../storage');
 const { connectCloud, sendCloudAudio, sendCloudText, sendCloudImage, closeCloud, isCloudActive, setOnTurnComplete } = require('./cloud');
 
-// Provider mode: 'byok' or 'cloud'
+// Lazy-loaded to avoid circular dependency (localai.js imports from gemini.js)
+let _localai = null;
+function getLocalAi() {
+    if (!_localai) _localai = require('./localai');
+    return _localai;
+}
+
+// Provider mode: 'byok', 'cloud', or 'local'
 let currentProviderMode = 'byok';
 
 // Groq conversation history for context
@@ -697,6 +704,8 @@ async function startMacOSAudioCapture(geminiSessionRef) {
 
             if (currentProviderMode === 'cloud') {
                 sendCloudAudio(monoChunk);
+            } else if (currentProviderMode === 'local') {
+                getLocalAi().processLocalAudio(monoChunk);
             } else {
                 const base64Data = monoChunk.toString('base64');
                 sendAudioToGemini(base64Data, geminiSessionRef);
@@ -856,6 +865,15 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
         return false;
     });
 
+    ipcMain.handle('initialize-local', async (event, ollamaHost, ollamaModel, whisperModel, profile, customPrompt) => {
+        currentProviderMode = 'local';
+        const success = await getLocalAi().initializeLocalSession(ollamaHost, ollamaModel, whisperModel, profile, customPrompt);
+        if (!success) {
+            currentProviderMode = 'byok';
+        }
+        return success;
+    });
+
     ipcMain.handle('send-audio-content', async (event, { data, mimeType }) => {
         if (currentProviderMode === 'cloud') {
             try {
@@ -864,6 +882,16 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
                 return { success: true };
             } catch (error) {
                 console.error('Error sending cloud audio:', error);
+                return { success: false, error: error.message };
+            }
+        }
+        if (currentProviderMode === 'local') {
+            try {
+                const pcmBuffer = Buffer.from(data, 'base64');
+                getLocalAi().processLocalAudio(pcmBuffer);
+                return { success: true };
+            } catch (error) {
+                console.error('Error sending local audio:', error);
                 return { success: false, error: error.message };
             }
         }
@@ -889,6 +917,16 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
                 return { success: true };
             } catch (error) {
                 console.error('Error sending cloud mic audio:', error);
+                return { success: false, error: error.message };
+            }
+        }
+        if (currentProviderMode === 'local') {
+            try {
+                const pcmBuffer = Buffer.from(data, 'base64');
+                getLocalAi().processLocalAudio(pcmBuffer);
+                return { success: true };
+            } catch (error) {
+                console.error('Error sending local mic audio:', error);
                 return { success: false, error: error.message };
             }
         }
@@ -954,6 +992,16 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
             }
         }
 
+        if (currentProviderMode === 'local') {
+            try {
+                console.log('Sending text to local Ollama:', text);
+                return await getLocalAi().sendLocalText(text.trim());
+            } catch (error) {
+                console.error('Error sending local text:', error);
+                return { success: false, error: error.message };
+            }
+        }
+
         if (!geminiSessionRef.current) return { success: false, error: 'No active Gemini session' };
 
         try {
@@ -1006,6 +1054,12 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
 
             if (currentProviderMode === 'cloud') {
                 closeCloud();
+                currentProviderMode = 'byok';
+                return { success: true };
+            }
+
+            if (currentProviderMode === 'local') {
+                getLocalAi().closeLocalSession();
                 currentProviderMode = 'byok';
                 return { success: true };
             }

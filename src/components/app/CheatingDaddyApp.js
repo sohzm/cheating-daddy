@@ -362,6 +362,7 @@ export class CheatingDaddyApp extends LitElement {
         shouldAnimateResponse: { type: Boolean },
         _storageLoaded: { state: true },
         _updateAvailable: { state: true },
+        _whisperDownloading: { state: true },
     };
 
     constructor() {
@@ -386,6 +387,7 @@ export class CheatingDaddyApp extends LitElement {
         this._storageLoaded = false;
         this._timerInterval = null;
         this._updateAvailable = false;
+        this._whisperDownloading = false;
         this._localVersion = '';
 
         this._loadFromStorage();
@@ -448,6 +450,7 @@ export class CheatingDaddyApp extends LitElement {
             ipcRenderer.on('update-status', (_, status) => this.setStatus(status));
             ipcRenderer.on('click-through-toggled', (_, isEnabled) => { this._isClickThrough = isEnabled; });
             ipcRenderer.on('reconnect-failed', (_, data) => this.addNewResponse(data.message));
+            ipcRenderer.on('whisper-downloading', (_, downloading) => { this._whisperDownloading = downloading; });
         }
     }
 
@@ -461,6 +464,7 @@ export class CheatingDaddyApp extends LitElement {
             ipcRenderer.removeAllListeners('update-status');
             ipcRenderer.removeAllListeners('click-through-toggled');
             ipcRenderer.removeAllListeners('reconnect-failed');
+            ipcRenderer.removeAllListeners('whisper-downloading');
         }
     }
 
@@ -575,6 +579,15 @@ export class CheatingDaddyApp extends LitElement {
             }
 
             const success = await cheatingDaddy.initializeCloud(this.selectedProfile);
+            if (!success) {
+                const mainView = this.shadowRoot.querySelector('main-view');
+                if (mainView && mainView.triggerApiKeyError) {
+                    mainView.triggerApiKeyError();
+                }
+                return;
+            }
+        } else if (providerMode === 'local') {
+            const success = await cheatingDaddy.initializeLocal(this.selectedProfile);
             if (!success) {
                 const mainView = this.shadowRoot.querySelector('main-view');
                 if (mainView && mainView.triggerApiKeyError) {
@@ -715,6 +728,7 @@ export class CheatingDaddyApp extends LitElement {
                         .onProfileChange=${p => this.handleProfileChange(p)}
                         .onStart=${() => this.handleStart()}
                         .onExternalLink=${url => this.handleExternalLinkClick(url)}
+                        .whisperDownloading=${this._whisperDownloading}
                     ></main-view>
                 `;
 
