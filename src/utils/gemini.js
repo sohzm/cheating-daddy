@@ -967,6 +967,11 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
                 return { success: true, model: 'cloud' };
             }
 
+            if (currentProviderMode === 'local') {
+                const result = await getLocalAi().sendLocalImage(data, prompt);
+                return result;
+            }
+
             // Use HTTP API instead of realtime session
             const result = await sendImageToGeminiHttp(data, prompt);
             return result;

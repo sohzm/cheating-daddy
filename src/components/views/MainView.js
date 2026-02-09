@@ -981,9 +981,10 @@ export class MainView extends LitElement {
                 <div class="help-section">
                     <div class="help-section-title">Recommended models</div>
                     <div class="help-models">
-                        <div class="help-model"><span class="help-model-name">gemma3:4b</span><span>4B — fast, great quality</span></div>
-                        <div class="help-model"><span class="help-model-name">mistral-small</span><span>8B — solid all-rounder</span></div>
+                        <div class="help-model"><span class="help-model-name">gemma3:4b</span><span>4B — fast, multimodal (images + text)</span></div>
+                        <div class="help-model"><span class="help-model-name">mistral-small</span><span>8B — solid all-rounder, text only</span></div>
                     </div>
+                    <div class="help-section-text">gemma3:4b and above supports images — screenshots will work with these models.</div>
                 </div>
 
                 <div class="help-section">

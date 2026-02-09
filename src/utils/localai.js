@@ -362,10 +362,72 @@ async function sendLocalText(text) {
     }
 }
 
+async function sendLocalImage(base64Data, prompt) {
+    if (!isLocalActive || !ollamaClient) {
+        return { success: false, error: 'No active local session' };
+    }
+
+    try {
+        console.log('[LocalAI] Sending image to Ollama');
+        sendToRenderer('update-status', 'Analyzing image...');
+
+        const userMessage = {
+            role: 'user',
+            content: prompt,
+            images: [base64Data],
+        };
+
+        // Store text-only version in history
+        localConversationHistory.push({ role: 'user', content: prompt });
+
+        if (localConversationHistory.length > 20) {
+            localConversationHistory = localConversationHistory.slice(-20);
+        }
+
+        const messages = [
+            { role: 'system', content: currentSystemPrompt || 'You are a helpful assistant.' },
+            ...localConversationHistory.slice(0, -1),
+            userMessage,
+        ];
+
+        const response = await ollamaClient.chat({
+            model: ollamaModel,
+            messages,
+            stream: true,
+        });
+
+        let fullText = '';
+        let isFirst = true;
+
+        for await (const part of response) {
+            const token = part.message?.content || '';
+            if (token) {
+                fullText += token;
+                sendToRenderer(isFirst ? 'new-response' : 'update-response', fullText);
+                isFirst = false;
+            }
+        }
+
+        if (fullText.trim()) {
+            localConversationHistory.push({ role: 'assistant', content: fullText.trim() });
+            saveConversationTurn(prompt, fullText);
+        }
+
+        console.log('[LocalAI] Image response completed');
+        sendToRenderer('update-status', 'Listening...');
+        return { success: true, text: fullText, model: ollamaModel };
+    } catch (error) {
+        console.error('[LocalAI] Image error:', error);
+        sendToRenderer('update-status', 'Ollama error: ' + error.message);
+        return { success: false, error: error.message };
+    }
+}
+
 module.exports = {
     initializeLocalSession,
     processLocalAudio,
     closeLocalSession,
     isLocalSessionActive,
     sendLocalText,
+    sendLocalImage,
 };
