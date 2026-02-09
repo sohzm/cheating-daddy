@@ -303,6 +303,7 @@ export class CustomizeView extends LitElement {
             nextResponse: isMac ? 'Cmd+]' : 'Ctrl+]',
             scrollUp: isMac ? 'Cmd+Shift+Up' : 'Ctrl+Shift+Up',
             scrollDown: isMac ? 'Cmd+Shift+Down' : 'Ctrl+Shift+Down',
+            focusInput: isMac ? 'Cmd+L' : 'Ctrl+L',
         };
     }
 
@@ -319,6 +320,7 @@ export class CustomizeView extends LitElement {
             { key: 'nextResponse', name: 'Next Response', description: 'Move to next AI response' },
             { key: 'scrollUp', name: 'Scroll Response Up', description: 'Scroll response content upward' },
             { key: 'scrollDown', name: 'Scroll Response Down', description: 'Scroll response content downward' },
+            { key: 'focusInput', name: 'Focus Input', description: 'Focus the text input box' },
         ];
     }
 

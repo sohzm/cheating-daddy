@@ -107,6 +107,7 @@ function getDefaultKeybinds() {
         nextResponse: isMac ? 'Cmd+]' : 'Ctrl+]',
         scrollUp: isMac ? 'Cmd+Shift+Up' : 'Ctrl+Shift+Up',
         scrollDown: isMac ? 'Cmd+Shift+Down' : 'Ctrl+Shift+Down',
+        focusInput: isMac ? 'Cmd+L' : 'Ctrl+L',
         emergencyErase: isMac ? 'Cmd+Shift+E' : 'Ctrl+Shift+E',
     };
 }
@@ -267,6 +268,25 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
             console.log(`Registered scrollDown: ${keybinds.scrollDown}`);
         } catch (error) {
             console.error(`Failed to register scrollDown (${keybinds.scrollDown}):`, error);
+        }
+    }
+
+    // Register focus input shortcut
+    if (keybinds.focusInput) {
+        try {
+            globalShortcut.register(keybinds.focusInput, () => {
+                console.log('Focus input shortcut triggered');
+                if (!mainWindow.isVisible()) {
+                    mainWindow.show();
+                } else {
+                    mainWindow.focus();
+                }
+                mainWindow.webContents.focus();
+                mainWindow.webContents.send('focus-input');
+            });
+            console.log(`Registered focusInput: ${keybinds.focusInput}`);
+        } catch (error) {
+            console.error(`Failed to register focusInput (${keybinds.focusInput}):`, error);
         }
     }
 
