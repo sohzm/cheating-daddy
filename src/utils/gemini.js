@@ -4,7 +4,7 @@ const { spawn } = require('child_process');
 const { saveDebugAudio } = require('../audioUtils');
 const { getSystemPrompt } = require('./prompts');
 const { getAvailableModel, incrementLimitCount, getApiKey, getGroqApiKey, incrementCharUsage, getModelForToday } = require('../storage');
-const { connectCloud, sendCloudAudio, sendCloudText, closeCloud, isCloudActive } = require('./cloud');
+const { connectCloud, sendCloudAudio, sendCloudText, sendCloudImage, closeCloud, isCloudActive, setOnTurnComplete } = require('./cloud');
 
 // Provider mode: 'byok' or 'cloud'
 let currentProviderMode = 'byok';
@@ -830,6 +830,10 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
     ipcMain.handle('initialize-cloud', async (event, token, profile, userContext) => {
         try {
             currentProviderMode = 'cloud';
+            initializeNewSession(profile);
+            setOnTurnComplete((transcription, response) => {
+                saveConversationTurn(transcription, response);
+            });
             sendToRenderer('session-initializing', true);
             await connectCloud(token, profile, userContext);
             sendToRenderer('session-initializing', false);
@@ -916,6 +920,14 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
             }
 
             process.stdout.write('!');
+
+            if (currentProviderMode === 'cloud') {
+                const sent = sendCloudImage(data);
+                if (!sent) {
+                    return { success: false, error: 'Cloud connection not active' };
+                }
+                return { success: true, model: 'cloud' };
+            }
 
             // Use HTTP API instead of realtime session
             const result = await sendImageToGeminiHttp(data, prompt);

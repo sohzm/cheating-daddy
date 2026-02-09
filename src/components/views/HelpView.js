@@ -87,6 +87,7 @@ export class HelpView extends LitElement {
                     grid-template-columns: 1fr;
                 }
             }
+
         `,
     ];
 
@@ -160,6 +161,15 @@ export class HelpView extends LitElement {
                     <div class="page-title">Help</div>
 
                     <section class="surface">
+                        <div class="surface-title">Support</div>
+                        <div class="link-row">
+                            <button class="link-button" @click=${() => this._open('https://cheatingdaddy.com')}>Website</button>
+                            <button class="link-button" @click=${() => this._open('https://github.com/sohzm/cheating-daddy')}>GitHub</button>
+                            <button class="link-button" @click=${() => this._open('https://discord.gg/GCBdubnXfJ')}>Discord</button>
+                        </div>
+                    </section>
+
+                    <section class="surface">
                         <div class="surface-title">Keyboard Shortcuts</div>
                         <div class="shortcut-grid">
                             ${shortcutRows.map(([label, keys]) => html`
@@ -168,15 +178,6 @@ export class HelpView extends LitElement {
                                     <span class="shortcut-keys">${this._formatKeybind(keys)}</span>
                                 </div>
                             `)}
-                        </div>
-                    </section>
-
-                    <section class="surface">
-                        <div class="surface-title">Support</div>
-                        <div class="link-row">
-                            <button class="link-button" @click=${() => this._open('https://cheatingdaddy.com')}>Website</button>
-                            <button class="link-button" @click=${() => this._open('https://github.com/sohzm/cheating-daddy')}>GitHub</button>
-                            <button class="link-button" @click=${() => this._open('https://discord.gg/GCBdubnXfJ')}>Discord</button>
                         </div>
                     </section>
                 </div>

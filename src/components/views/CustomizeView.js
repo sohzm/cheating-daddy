@@ -190,6 +190,7 @@ export class CustomizeView extends LitElement {
         onImageQualityChange: { type: Function },
         onLayoutModeChange: { type: Function },
         isClearing: { type: Boolean },
+        isRestoring: { type: Boolean },
         clearStatusMessage: { type: String },
         clearStatusType: { type: String },
     };
@@ -207,6 +208,7 @@ export class CustomizeView extends LitElement {
         this.onLayoutModeChange = () => {};
         this.googleSearchEnabled = true;
         this.isClearing = false;
+        this.isRestoring = false;
         this.clearStatusMessage = '';
         this.clearStatusType = '';
         this.backgroundTransparency = 0.8;
@@ -469,6 +471,71 @@ export class CustomizeView extends LitElement {
         this.requestUpdate();
     }
 
+    async restoreAllSettings() {
+        if (this.isRestoring) return;
+        this.isRestoring = true;
+        this.clearStatusMessage = '';
+        this.clearStatusType = '';
+        this.requestUpdate();
+        try {
+            // Restore all preferences to defaults
+            const defaults = {
+                customPrompt: '',
+                selectedProfile: 'interview',
+                selectedLanguage: 'en-US',
+                selectedScreenshotInterval: '5',
+                selectedImageQuality: 'medium',
+                audioMode: 'speaker_only',
+                fontSize: 20,
+                backgroundTransparency: 0.8,
+                googleSearchEnabled: false,
+                theme: 'dark',
+            };
+            for (const [key, value] of Object.entries(defaults)) {
+                await cheatingDaddy.storage.updatePreference(key, value);
+            }
+
+            // Restore keybinds
+            this.keybinds = this.getDefaultKeybinds();
+            await cheatingDaddy.storage.setKeybinds(null);
+            if (window.require) {
+                const { ipcRenderer } = window.require('electron');
+                ipcRenderer.send('update-keybinds', this.keybinds);
+            }
+
+            // Apply to local state
+            this.selectedProfile = defaults.selectedProfile;
+            this.selectedLanguage = defaults.selectedLanguage;
+            this.selectedImageQuality = defaults.selectedImageQuality;
+            this.audioMode = defaults.audioMode;
+            this.fontSize = defaults.fontSize;
+            this.backgroundTransparency = defaults.backgroundTransparency;
+            this.googleSearchEnabled = defaults.googleSearchEnabled;
+            this.customPrompt = defaults.customPrompt;
+            this.theme = defaults.theme;
+
+            // Notify parent callbacks
+            this.onProfileChange(defaults.selectedProfile);
+            this.onLanguageChange(defaults.selectedLanguage);
+            this.onImageQualityChange(defaults.selectedImageQuality);
+
+            // Apply visual changes
+            this.updateBackgroundAppearance();
+            this.updateFontSize();
+            await cheatingDaddy.theme.save(defaults.theme);
+
+            this.clearStatusMessage = 'All settings restored to defaults';
+            this.clearStatusType = 'success';
+        } catch (error) {
+            console.error('Error restoring settings:', error);
+            this.clearStatusMessage = `Error restoring settings: ${error.message}`;
+            this.clearStatusType = 'error';
+        } finally {
+            this.isRestoring = false;
+            this.requestUpdate();
+        }
+    }
+
     async clearLocalData() {
         if (this.isClearing) return;
         this.isClearing = true;
@@ -620,9 +687,14 @@ export class CustomizeView extends LitElement {
         return html`
             <section class="surface danger-surface">
                 <div class="surface-title danger">Privacy and Data</div>
-                <button class="danger-button" @click=${this.clearLocalData} ?disabled=${this.isClearing}>
-                    ${this.isClearing ? 'Clearing...' : 'Clear all local data'}
-                </button>
+                <div style="display:flex;gap:var(--space-sm);flex-wrap:wrap;">
+                    <button class="danger-button" @click=${this.restoreAllSettings} ?disabled=${this.isRestoring}>
+                        ${this.isRestoring ? 'Restoring...' : 'Restore all settings'}
+                    </button>
+                    <button class="danger-button" @click=${this.clearLocalData} ?disabled=${this.isClearing}>
+                        ${this.isClearing ? 'Clearing...' : 'Delete all data'}
+                    </button>
+                </div>
                 ${this.clearStatusMessage ? html`
                     <div class="status ${this.clearStatusType === 'success' ? 'success' : 'error'}">${this.clearStatusMessage}</div>
                 ` : ''}

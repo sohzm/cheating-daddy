@@ -306,8 +306,8 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
 
             if (view === 'assistant') {
                 // Shrink window for live view
-                const liveWidth = 300;
-                const liveHeight = 600;
+                const liveWidth = 850;
+                const liveHeight = 400;
                 const x = Math.floor((screenWidth - liveWidth) / 2);
                 mainWindow.setSize(liveWidth, liveHeight);
                 mainWindow.setPosition(x, 0);

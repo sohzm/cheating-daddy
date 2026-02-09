@@ -573,21 +573,33 @@ async function captureManualScreenshot(imageQuality = null) {
         return;
     }
 
-    offscreenContext.drawImage(hiddenVideo, 0, 0, offscreenCanvas.width, offscreenCanvas.height);
+    // Downscale to max 1280px wide for faster transfer — vision models don't need 4K
+    const MAX_WIDTH = 1280;
+    const srcW = hiddenVideo.videoWidth;
+    const srcH = hiddenVideo.videoHeight;
+    let destW = srcW;
+    let destH = srcH;
+    if (srcW > MAX_WIDTH) {
+        destW = MAX_WIDTH;
+        destH = Math.round(srcH * (MAX_WIDTH / srcW));
+    }
+    offscreenCanvas.width = destW;
+    offscreenCanvas.height = destH;
+    offscreenContext.drawImage(hiddenVideo, 0, 0, destW, destH);
 
     let qualityValue;
     switch (quality) {
         case 'high':
-            qualityValue = 0.9;
+            qualityValue = 0.85;
             break;
         case 'medium':
-            qualityValue = 0.7;
+            qualityValue = 0.6;
             break;
         case 'low':
-            qualityValue = 0.5;
+            qualityValue = 0.4;
             break;
         default:
-            qualityValue = 0.7;
+            qualityValue = 0.6;
     }
 
     offscreenCanvas.toBlob(
@@ -605,6 +617,8 @@ async function captureManualScreenshot(imageQuality = null) {
                     console.error('Invalid base64 data generated');
                     return;
                 }
+
+                console.log(`Sending image: ${destW}x${destH}, ~${Math.round(base64data.length / 1024)}KB`);
 
                 // Send image with prompt to HTTP API (response streams via IPC events)
                 const result = await ipcRenderer.invoke('send-image-content', {

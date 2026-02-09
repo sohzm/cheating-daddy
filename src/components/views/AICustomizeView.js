@@ -4,7 +4,35 @@ import { unifiedPageStyles } from './sharedPageStyles.js';
 export class AICustomizeView extends LitElement {
     static styles = [
         unifiedPageStyles,
-        css``,
+        css`
+            .unified-page {
+                height: 100%;
+            }
+            .unified-wrap {
+                height: 100%;
+            }
+            section.surface {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+            }
+            .form-grid {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+            }
+            .form-group.vertical {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+            }
+            textarea.control {
+                flex: 1;
+                resize: none;
+                overflow-y: auto;
+                min-height: 0;
+            }
+        `,
     ];
 
     static properties = {

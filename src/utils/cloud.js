@@ -4,14 +4,20 @@ const { BrowserWindow } = require('electron');
 let cloudWs = null;
 let isCloudConnected = false;
 let currentCloudResponse = '';
+let currentTranscription = '';
 let isFirstChunk = true;
 let audioChunkCount = 0;
+let onTurnComplete = null;
 
 function sendToRenderer(channel, data) {
     const windows = BrowserWindow.getAllWindows();
     if (windows.length > 0) {
         windows[0].webContents.send(channel, data);
     }
+}
+
+function setOnTurnComplete(callback) {
+    onTurnComplete = callback;
 }
 
 function connectCloud(token, profile, userContext) {
@@ -88,6 +94,7 @@ function handleMessage(msg) {
 
         case 'transcription':
             console.log('[Cloud] Transcription:', msg.text);
+            currentTranscription = msg.text || '';
             sendToRenderer('update-status', 'Generating response...');
             break;
 
@@ -103,6 +110,10 @@ function handleMessage(msg) {
             break;
 
         case 'response_end':
+            if (onTurnComplete && currentCloudResponse.trim()) {
+                onTurnComplete(currentTranscription, currentCloudResponse);
+            }
+            currentTranscription = '';
             sendToRenderer('update-status', 'Listening...');
             break;
 
@@ -145,6 +156,17 @@ function sendCloudText(text) {
     }
 }
 
+function sendCloudImage(base64Data) {
+    if (!cloudWs || !isCloudConnected || cloudWs.readyState !== WebSocket.OPEN) {
+        return false;
+    }
+    cloudWs.send(JSON.stringify({
+        type: 'image',
+        image: base64Data
+    }));
+    return true;
+}
+
 function closeCloud() {
     console.log('[Cloud] Closing. Audio chunks sent:', audioChunkCount);
     if (cloudWs) {
@@ -160,8 +182,10 @@ function closeCloud() {
     }
     isCloudConnected = false;
     currentCloudResponse = '';
+    currentTranscription = '';
     isFirstChunk = true;
     audioChunkCount = 0;
+    onTurnComplete = null;
 }
 
 function isCloudActive() {
@@ -172,6 +196,8 @@ module.exports = {
     connectCloud,
     sendCloudAudio,
     sendCloudText,
+    sendCloudImage,
     closeCloud,
     isCloudActive,
+    setOnTurnComplete,
 };

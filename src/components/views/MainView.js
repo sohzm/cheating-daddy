@@ -154,15 +154,16 @@ export class MainView extends LitElement {
         /* ── Start button ── */
 
         .start-button {
-            background: var(--accent);
-            color: var(--btn-primary-text, #fff);
+            position: relative;
+            overflow: hidden;
+            background: #e8e8e8;
+            color: #111111;
             border: none;
             padding: 12px var(--space-md);
             border-radius: var(--radius-sm);
             font-size: var(--font-size-base);
             font-weight: var(--font-weight-semibold);
             cursor: pointer;
-            transition: background var(--transition);
             width: 100%;
             display: flex;
             align-items: center;
@@ -170,8 +171,36 @@ export class MainView extends LitElement {
             gap: var(--space-sm);
         }
 
+        .start-button canvas.btn-aurora {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+
+        .start-button canvas.btn-dither {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            opacity: 0.1;
+            mix-blend-mode: overlay;
+            pointer-events: none;
+            image-rendering: pixelated;
+        }
+
+        .start-button .btn-label {
+            position: relative;
+            z-index: 2;
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+        }
+
         .start-button:hover {
-            background: var(--accent-hover);
+            opacity: 0.9;
         }
 
         .start-button.disabled {
@@ -180,12 +209,14 @@ export class MainView extends LitElement {
         }
 
         .start-button.disabled:hover {
-            background: var(--accent);
+            opacity: 0.5;
         }
 
         .shortcut-hint {
-            font-size: var(--font-size-xs);
-            opacity: 0.6;
+            display: inline-flex;
+            align-items: center;
+            gap: 2px;
+            opacity: 0.5;
             font-family: var(--font-mono);
         }
 
@@ -265,6 +296,11 @@ export class MainView extends LitElement {
         this._tokenError = false;
         this._keyError = false;
 
+        this._animId = null;
+        this._time = 0;
+        this._mouseX = -1;
+        this._mouseY = -1;
+
         this.boundKeydownHandler = this._handleKeydown.bind(this);
         this._loadFromStorage();
     }
@@ -298,6 +334,117 @@ export class MainView extends LitElement {
     disconnectedCallback() {
         super.disconnectedCallback();
         document.removeEventListener('keydown', this.boundKeydownHandler);
+        if (this._animId) cancelAnimationFrame(this._animId);
+    }
+
+    updated(changedProperties) {
+        super.updated(changedProperties);
+        if (changedProperties.has('_mode')) {
+            // Stop old animation when switching modes
+            if (this._animId) {
+                cancelAnimationFrame(this._animId);
+                this._animId = null;
+            }
+            // Only start aurora for cloud mode
+            if (this._mode === 'cloud') {
+                this._initButtonAurora();
+            }
+        }
+        // Initial boot — no _mode change yet but need to start
+        if (!this._animId && this._mode === 'cloud') {
+            this._initButtonAurora();
+        }
+    }
+
+    _initButtonAurora() {
+        const btn = this.shadowRoot.querySelector('.start-button');
+        const aurora = this.shadowRoot.querySelector('canvas.btn-aurora');
+        const dither = this.shadowRoot.querySelector('canvas.btn-dither');
+        if (!aurora || !dither || !btn) return;
+
+        // Mouse tracking
+        this._mouseX = -1;
+        this._mouseY = -1;
+        btn.addEventListener('mousemove', (e) => {
+            const rect = btn.getBoundingClientRect();
+            this._mouseX = (e.clientX - rect.left) / rect.width;
+            this._mouseY = (e.clientY - rect.top) / rect.height;
+        });
+        btn.addEventListener('mouseleave', () => {
+            this._mouseX = -1;
+            this._mouseY = -1;
+        });
+
+        // Dither
+        const blockSize = 8;
+        const cols = Math.ceil(aurora.offsetWidth / blockSize);
+        const rows = Math.ceil(aurora.offsetHeight / blockSize);
+        dither.width = cols;
+        dither.height = rows;
+        const dCtx = dither.getContext('2d');
+        const img = dCtx.createImageData(cols, rows);
+        for (let i = 0; i < img.data.length; i += 4) {
+            const v = Math.random() > 0.5 ? 255 : 0;
+            img.data[i] = v; img.data[i+1] = v; img.data[i+2] = v; img.data[i+3] = 255;
+        }
+        dCtx.putImageData(img, 0, 0);
+
+        // Aurora
+        const ctx = aurora.getContext('2d');
+        const scale = 0.4;
+        aurora.width = Math.floor(aurora.offsetWidth * scale);
+        aurora.height = Math.floor(aurora.offsetHeight * scale);
+
+        const blobs = [
+            { color: [120, 160, 230], x: 0.1, y: 0.3, vx: 0.25, vy: 0.2, phase: 0 },
+            { color: [150, 120, 220], x: 0.8, y: 0.5, vx: -0.2, vy: 0.25, phase: 1.5 },
+            { color: [200, 140, 210], x: 0.5, y: 0.6, vx: 0.18, vy: -0.22, phase: 3.0 },
+            { color: [100, 190, 190], x: 0.3, y: 0.7, vx: 0.3, vy: 0.15, phase: 4.5 },
+            { color: [220, 170, 130], x: 0.7, y: 0.4, vx: -0.22, vy: -0.25, phase: 6.0 },
+        ];
+
+        const draw = () => {
+            this._time += 0.008;
+            const w = aurora.width;
+            const h = aurora.height;
+            const maxDim = Math.max(w, h);
+
+            ctx.fillStyle = '#f0f0f0';
+            ctx.fillRect(0, 0, w, h);
+
+            const hovering = this._mouseX >= 0;
+
+            for (const blob of blobs) {
+                const t = this._time;
+                const cx = (blob.x + Math.sin(t * blob.vx + blob.phase) * 0.4) * w;
+                const cy = (blob.y + Math.cos(t * blob.vy + blob.phase * 0.7) * 0.4) * h;
+                const r = maxDim * 0.45;
+
+                let boost = 1;
+                if (hovering) {
+                    const dx = cx / w - this._mouseX;
+                    const dy = cy / h - this._mouseY;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    boost = 1 + 2.5 * Math.max(0, 1 - dist / 0.6);
+                }
+
+                const a0 = Math.min(1, 0.18 * boost);
+                const a1 = Math.min(1, 0.08 * boost);
+                const a2 = Math.min(1, 0.02 * boost);
+
+                const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+                grad.addColorStop(0, `rgba(${blob.color[0]}, ${blob.color[1]}, ${blob.color[2]}, ${a0})`);
+                grad.addColorStop(0.3, `rgba(${blob.color[0]}, ${blob.color[1]}, ${blob.color[2]}, ${a1})`);
+                grad.addColorStop(0.6, `rgba(${blob.color[0]}, ${blob.color[1]}, ${blob.color[2]}, ${a2})`);
+                grad.addColorStop(1, `rgba(${blob.color[0]}, ${blob.color[1]}, ${blob.color[2]}, 0)`);
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, w, h);
+            }
+
+            this._animId = requestAnimationFrame(draw);
+        };
+
+        draw();
     }
 
     _handleKeydown(e) {
@@ -394,15 +541,22 @@ export class MainView extends LitElement {
 
     _renderStartButton() {
         const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-        const shortcut = isMac ? '⌘↵' : 'Ctrl+↵';
+
+        const cmdIcon = html`<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3H6a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3h12a3 3 0 0 0 3-3 3 3 0 0 0-3-3z"/></svg>`;
+        const ctrlIcon = html`<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>`;
+        const enterIcon = html`<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 10l-5 5 5 5"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/></svg>`;
 
         return html`
             <button
                 class="start-button ${this.isInitializing ? 'disabled' : ''}"
                 @click=${() => this._handleStart()}
             >
-                Start Session
-                <span class="shortcut-hint">${shortcut}</span>
+                <canvas class="btn-aurora"></canvas>
+                <canvas class="btn-dither"></canvas>
+                <span class="btn-label">
+                    Start Session
+                    <span class="shortcut-hint">${isMac ? cmdIcon : ctrlIcon}${enterIcon}</span>
+                </span>
             </button>
         `;
     }
@@ -422,17 +576,15 @@ export class MainView extends LitElement {
     _renderCloudMode() {
         return html`
             <div class="form-group">
-                <label class="form-label">Token</label>
+                <label class="form-label">Invite Code</label>
                 <input
                     type="password"
-                    placeholder="Enter your access token"
+                    placeholder="Enter your invite code"
                     .value=${this._token}
                     @input=${e => this._saveToken(e.target.value)}
                     class=${this._tokenError ? 'error' : ''}
                 />
-                <div class="form-hint">
-                    <span class="link" @click=${() => this.onExternalLink('https://cheatingdaddy.com/token')}>Get a token</span>
-                </div>
+                <div class="form-hint">DM soham to get your invite code</div>
             </div>
 
             ${this._renderStartButton()}
@@ -481,16 +633,6 @@ export class MainView extends LitElement {
                 </div>
             </div>
 
-            <div class="form-group">
-                <label class="form-label">OpenAI API Key</label>
-                <input
-                    type="password"
-                    placeholder="Optional"
-                    .value=${this._openaiKey}
-                    @input=${e => this._saveOpenaiKey(e.target.value)}
-                />
-            </div>
-
             ${this._renderStartButton()}
         `;
     }
@@ -522,10 +664,10 @@ export class MainView extends LitElement {
         return html`
             <div class="form-wrapper">
                 <div class="page-title">
-                    ${this._mode === 'cloud' ? 'Start a session' : this._mode === 'byok' ? 'Own API keys' : 'Local AI'}
+                    ${this._mode === 'cloud' ? 'Cheating Daddy Cloud' : this._mode === 'byok' ? 'Own API keys' : 'Local AI'}
                 </div>
                 <div class="page-subtitle">
-                    ${this._mode === 'cloud' ? 'Connect with your token to get started' : this._mode === 'byok' ? 'Bring your own API keys' : 'Run models locally on your machine'}
+                    ${this._mode === 'cloud' ? 'Enter your invite code to get started' : this._mode === 'byok' ? 'Bring your own API keys' : 'Run models locally on your machine'}
                 </div>
                 ${this._mode === 'cloud' ? this._renderCloudMode() : ''}
                 ${this._mode === 'byok' ? this._renderByokMode() : ''}

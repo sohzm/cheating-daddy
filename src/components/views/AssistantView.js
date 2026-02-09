@@ -21,7 +21,7 @@ export class AssistantView extends LitElement {
             font-size: var(--response-font-size, 15px);
             line-height: var(--line-height);
             background: var(--bg-app);
-            padding: var(--space-lg) var(--space-xl);
+            padding: var(--space-sm) var(--space-md);
             scroll-behavior: smooth;
             user-select: text;
             cursor: text;
@@ -212,54 +212,91 @@ export class AssistantView extends LitElement {
             display: flex;
             align-items: center;
             gap: var(--space-sm);
-            height: 44px;
-            padding: 0 var(--space-md);
-            border-top: 1px solid var(--border);
+            padding: var(--space-md);
             background: var(--bg-app);
         }
 
-        .input-bar input {
+        .input-bar-inner {
+            display: flex;
+            align-items: center;
             flex: 1;
             background: var(--bg-elevated);
-            color: var(--text-primary);
             border: 1px solid var(--border);
-            padding: var(--space-sm) var(--space-md);
-            border-radius: var(--radius-md);
-            font-size: var(--font-size-sm);
-            font-family: var(--font);
+            border-radius: 100px;
+            padding: 0 var(--space-md);
             height: 32px;
+            transition: border-color var(--transition);
         }
 
-        .input-bar input:focus {
-            outline: none;
+        .input-bar-inner:focus-within {
             border-color: var(--accent);
         }
 
-        .input-bar input::placeholder {
+        .input-bar-inner input {
+            flex: 1;
+            background: none;
+            color: var(--text-primary);
+            border: none;
+            padding: 0;
+            font-size: var(--font-size-sm);
+            font-family: var(--font);
+            height: 100%;
+            outline: none;
+        }
+
+        .input-bar-inner input::placeholder {
             color: var(--text-muted);
         }
 
-        .capture-btn {
-            background: none;
-            border: none;
-            color: var(--text-muted);
+        .analyze-btn {
+            position: relative;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
             cursor: pointer;
-            padding: var(--space-xs);
-            border-radius: var(--radius-sm);
+            font-size: var(--font-size-xs);
+            font-family: var(--font-mono);
+            white-space: nowrap;
+            padding: var(--space-xs) var(--space-md);
+            border-radius: 100px;
+            height: 32px;
             display: flex;
             align-items: center;
-            justify-content: center;
-            transition: color var(--transition);
+            gap: 4px;
+            transition: border-color 0.4s ease, background var(--transition);
             flex-shrink: 0;
+            overflow: hidden;
         }
 
-        .capture-btn:hover {
-            color: var(--text-primary);
+        .analyze-btn:hover:not(.analyzing) {
+            border-color: var(--accent);
+            background: var(--bg-surface);
         }
 
-        .capture-btn svg {
-            width: 18px;
-            height: 18px;
+        .analyze-btn.analyzing {
+            cursor: default;
+            border-color: transparent;
+        }
+
+        .analyze-btn-content {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: opacity 0.4s ease;
+            z-index: 1;
+            position: relative;
+        }
+
+        .analyze-btn.analyzing .analyze-btn-content {
+            opacity: 0;
+        }
+
+        .analyze-canvas {
+            position: absolute;
+            inset: -1px;
+            width: calc(100% + 2px);
+            height: calc(100% + 2px);
+            pointer-events: none;
         }
     `;
 
@@ -269,6 +306,7 @@ export class AssistantView extends LitElement {
         selectedProfile: { type: String },
         onSendText: { type: Function },
         shouldAnimateResponse: { type: Boolean },
+        isAnalyzing: { type: Boolean, state: true },
     };
 
     constructor() {
@@ -277,6 +315,8 @@ export class AssistantView extends LitElement {
         this.currentResponseIndex = -1;
         this.selectedProfile = 'interview';
         this.onSendText = () => {};
+        this.isAnalyzing = false;
+        this._animFrame = null;
     }
 
     getProfileNames() {
@@ -404,6 +444,7 @@ export class AssistantView extends LitElement {
 
     disconnectedCallback() {
         super.disconnectedCallback();
+        this._stopWaveformAnimation();
 
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
@@ -431,8 +472,148 @@ export class AssistantView extends LitElement {
     }
 
     async handleScreenAnswer() {
+        if (this.isAnalyzing) return;
         if (window.captureManualScreenshot) {
+            this.isAnalyzing = true;
+            this._responseCountWhenStarted = this.responses.length;
             window.captureManualScreenshot();
+        }
+    }
+
+    _startWaveformAnimation() {
+        const canvas = this.shadowRoot.querySelector('.analyze-canvas');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const dpr = window.devicePixelRatio || 1;
+
+        const rect = canvas.getBoundingClientRect();
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+        ctx.scale(dpr, dpr);
+
+        const dangerColor = getComputedStyle(this).getPropertyValue('--danger').trim() || '#EF4444';
+        const startTime = performance.now();
+        const FADE_IN = 0.5; // seconds
+        const PARTICLE_SPREAD = 4; // px inward from border
+        const PARTICLE_COUNT = 250;
+
+        // Pill perimeter helpers
+        const w = rect.width;
+        const h = rect.height;
+        const r = h / 2; // pill radius = half height
+        const straightLen = w - 2 * r;
+        const arcLen = Math.PI * r;
+        const perimeter = 2 * straightLen + 2 * arcLen;
+
+        // Given a distance along the perimeter, return {x, y, nx, ny} (position + inward normal)
+        const pointOnPerimeter = (d) => {
+            d = ((d % perimeter) + perimeter) % perimeter;
+            // Top straight: left to right
+            if (d < straightLen) {
+                return { x: r + d, y: 0, nx: 0, ny: 1 };
+            }
+            d -= straightLen;
+            // Right arc
+            if (d < arcLen) {
+                const angle = -Math.PI / 2 + (d / arcLen) * Math.PI;
+                return {
+                    x: w - r + Math.cos(angle) * r,
+                    y: r + Math.sin(angle) * r,
+                    nx: -Math.cos(angle),
+                    ny: -Math.sin(angle),
+                };
+            }
+            d -= arcLen;
+            // Bottom straight: right to left
+            if (d < straightLen) {
+                return { x: w - r - d, y: h, nx: 0, ny: -1 };
+            }
+            d -= straightLen;
+            // Left arc
+            const angle = Math.PI / 2 + (d / arcLen) * Math.PI;
+            return {
+                x: r + Math.cos(angle) * r,
+                y: r + Math.sin(angle) * r,
+                nx: -Math.cos(angle),
+                ny: -Math.sin(angle),
+            };
+        };
+
+        // Pre-seed random offsets for stable particles
+        const seeds = [];
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+            seeds.push({ pos: Math.random(), drift: Math.random(), depthSeed: Math.random() });
+        }
+
+        const draw = (now) => {
+            const elapsed = (now - startTime) / 1000;
+            const fade = Math.min(1, elapsed / FADE_IN);
+
+            ctx.clearRect(0, 0, w, h);
+
+            // ── Particle border ──
+            ctx.fillStyle = dangerColor;
+            for (let i = 0; i < PARTICLE_COUNT; i++) {
+                const s = seeds[i];
+                const along = (s.pos + s.drift * elapsed * 0.03) * perimeter;
+                const depth = s.depthSeed * PARTICLE_SPREAD;
+                const density = 1 - depth / PARTICLE_SPREAD;
+
+                if (Math.random() > density) continue;
+
+                const p = pointOnPerimeter(along);
+                const px = p.x + p.nx * depth;
+                const py = p.y + p.ny * depth;
+                const size = 0.8 + density * 0.6;
+
+                ctx.globalAlpha = fade * density * 0.85;
+                ctx.beginPath();
+                ctx.arc(px, py, size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // ── Waveform ──
+            const midY = h / 2;
+            const waves = [
+                { freq: 3, amp: 0.35, speed: 2.5, opacity: 0.9, width: 1.8 },
+                { freq: 5, amp: 0.2, speed: 3.5, opacity: 0.5, width: 1.2 },
+                { freq: 7, amp: 0.12, speed: 5, opacity: 0.3, width: 0.8 },
+            ];
+
+            for (const wave of waves) {
+                ctx.beginPath();
+                ctx.strokeStyle = dangerColor;
+                ctx.globalAlpha = wave.opacity * fade;
+                ctx.lineWidth = wave.width;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+
+                for (let x = 0; x <= w; x++) {
+                    const norm = x / w;
+                    const envelope = Math.sin(norm * Math.PI);
+                    const y = midY + Math.sin(norm * Math.PI * 2 * wave.freq + elapsed * wave.speed) * (midY * wave.amp) * envelope;
+                    if (x === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+            }
+
+            ctx.globalAlpha = 1;
+            this._animFrame = requestAnimationFrame(draw);
+        };
+
+        this._animFrame = requestAnimationFrame(draw);
+    }
+
+    _stopWaveformAnimation() {
+        if (this._animFrame) {
+            cancelAnimationFrame(this._animFrame);
+            this._animFrame = null;
+        }
+        const canvas = this.shadowRoot.querySelector('.analyze-canvas');
+        if (canvas) {
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
         }
     }
 
@@ -454,6 +635,20 @@ export class AssistantView extends LitElement {
         super.updated(changedProperties);
         if (changedProperties.has('responses') || changedProperties.has('currentResponseIndex')) {
             this.updateResponseContent();
+        }
+
+        if (changedProperties.has('isAnalyzing')) {
+            if (this.isAnalyzing) {
+                this._startWaveformAnimation();
+            } else {
+                this._stopWaveformAnimation();
+            }
+        }
+
+        if (changedProperties.has('responses') && this.isAnalyzing) {
+            if (this.responses.length > this._responseCountWhenStarted) {
+                this.isAnalyzing = false;
+            }
         }
     }
 
@@ -492,16 +687,22 @@ export class AssistantView extends LitElement {
             ` : ''}
 
             <div class="input-bar">
-                <input
-                    type="text"
-                    id="textInput"
-                    placeholder="Type a message..."
-                    @keydown=${this.handleTextKeydown}
-                />
-                <button class="capture-btn" @click=${this.handleScreenAnswer} title="Analyze screen">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                        <path d="M1 8a2 2 0 0 1 2-2h.93a2 2 0 0 0 1.664-.89l.812-1.22A2 2 0 0 1 8.07 3h3.86a2 2 0 0 1 1.664.89l.812 1.22A2 2 0 0 0 16.07 6H17a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8Zm13.5 3a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0ZM10 14a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
-                    </svg>
+                <div class="input-bar-inner">
+                    <input
+                        type="text"
+                        id="textInput"
+                        placeholder="Type a message..."
+                        @keydown=${this.handleTextKeydown}
+                    />
+                </div>
+                <button class="analyze-btn ${this.isAnalyzing ? 'analyzing' : ''}" @click=${this.handleScreenAnswer}>
+                    <canvas class="analyze-canvas"></canvas>
+                    <span class="analyze-btn-content">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24">
+                            <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 3v7h6l-8 11v-7H5z" />
+                        </svg>
+                        Analyze Screen
+                    </span>
                 </button>
             </div>
         `;
