@@ -642,19 +642,9 @@ export class MainView extends LitElement {
     _renderLocalMode() {
         return html`
             <div class="warning-banner">
-                <div class="warning-text">Local models need decent hardware. Responses will be slower.</div>
-                <button class="switch-cloud-btn" @click=${() => this._saveMode('cloud')}>Switch to Cloud — fast & reliable</button>
+                <div class="warning-text">Local AI support is coming soon. Till then, you can try Cloud for a fast and reliable experience.</div>
+                <button class="switch-cloud-btn" @click=${() => this._saveMode('cloud')}>Switch to Cloud</button>
             </div>
-
-            <div class="form-group">
-                <label class="form-label">Model</label>
-                <select>
-                    <option value="" disabled selected>No local models available</option>
-                </select>
-                <div class="form-hint">Local model support coming soon.</div>
-            </div>
-
-            ${this._renderStartButton()}
         `;
     }
 
