@@ -311,6 +311,43 @@ export class MainView extends LitElement {
             color: var(--text-primary);
         }
 
+        /* ── Mode option cards ── */
+
+        .mode-cards {
+            display: flex;
+            gap: var(--space-sm);
+        }
+
+        .mode-card {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            padding: 12px 14px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border);
+            background: var(--bg-elevated);
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+        }
+
+        .mode-card:hover {
+            border-color: var(--text-muted);
+            background: var(--bg-hover);
+        }
+
+        .mode-card-title {
+            font-size: var(--font-size-sm);
+            font-weight: var(--font-weight-semibold);
+            color: var(--text-primary);
+        }
+
+        .mode-card-desc {
+            font-size: var(--font-size-xs);
+            color: var(--text-muted);
+            line-height: var(--line-height);
+        }
+
         /* ── Title row with help ── */
 
         .title-row {
@@ -807,9 +844,15 @@ export class MainView extends LitElement {
             ${this._renderStartButton()}
             ${this._renderDivider()}
 
-            <div class="mode-links">
-                <button class="mode-link" @click=${() => this._saveMode('byok')}>Use own API keys</button>
-                <button class="mode-link" @click=${() => this._saveMode('local')}>Use local AI</button>
+            <div class="mode-cards">
+                <div class="mode-card" @click=${() => this._saveMode('byok')}>
+                    <span class="mode-card-title">Use your API keys</span>
+                    <span class="mode-card-desc">Bring your own Gemini / Groq keys</span>
+                </div>
+                <div class="mode-card" @click=${() => this._saveMode('local')}>
+                    <span class="mode-card-title">Use local AI</span>
+                    <span class="mode-card-desc">Run Ollama + Whisper on your machine</span>
+                </div>
             </div>
         `;
     }

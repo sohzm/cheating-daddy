@@ -123,7 +123,11 @@ async function loadWhisperPipeline(modelName) {
 
     try {
         // Dynamic import for ESM module
-        const { pipeline } = await import('@huggingface/transformers');
+        const { pipeline, env } = await import('@huggingface/transformers');
+        // Cache models outside the asar archive so ONNX runtime can load them
+        const { app } = require('electron');
+        const path = require('path');
+        env.cacheDir = path.join(app.getPath('userData'), 'whisper-models');
         whisperPipeline = await pipeline('automatic-speech-recognition', modelName, {
             dtype: 'q8',
             device: 'auto',

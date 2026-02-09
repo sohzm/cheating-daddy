@@ -19,6 +19,12 @@ app.whenReady().then(async () => {
     // Initialize storage (checks version, resets if needed)
     storage.initializeStorage();
 
+    // Trigger screen recording permission prompt on macOS if not already granted
+    if (process.platform === 'darwin') {
+        const { desktopCapturer } = require('electron');
+        desktopCapturer.getSources({ types: ['screen'] }).catch(() => {});
+    }
+
     createMainWindow();
     setupGeminiIpcHandlers(geminiSessionRef);
     setupStorageIpcHandlers();
