@@ -195,6 +195,25 @@ ipcRenderer.on('update-status', (event, status) => {
     cheatingDaddy.setStatus(status);
 });
 
+/**
+ * Request microphone permission and return list of audio input devices.
+ * Calling this triggers the browser permission prompt; after permission is granted,
+ * device labels (e.g. "Logitech G733") become available.
+ * @returns {Promise<Array<{deviceId: string, label: string}>>}
+ */
+async function getAudioInputDevices() {
+    let stream = null;
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        return devices
+            .filter(d => d.kind === 'audioinput')
+            .map(d => ({ deviceId: d.deviceId, label: d.label || `Microphone ${(d.deviceId || '').slice(0, 8)}` }));
+    } finally {
+        if (stream) stream.getTracks().forEach(t => t.stop());
+    }
+}
+
 async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'medium') {
     // Store the image quality for manual screenshots
     currentImageQuality = imageQuality;
@@ -202,6 +221,7 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
     // Refresh preferences cache
     await loadPreferencesCache();
     const audioMode = preferencesCache.audioMode || 'speaker_only';
+    const audioInputDeviceId = preferencesCache.audioInputDeviceId || '';
 
     try {
         if (isMacOS) {
@@ -229,16 +249,18 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
             if (audioMode === 'mic_only' || audioMode === 'both') {
                 let micStream = null;
                 try {
-                    micStream = await navigator.mediaDevices.getUserMedia({
+                    const micConstraints = {
                         audio: {
                             sampleRate: SAMPLE_RATE,
                             channelCount: 1,
                             echoCancellation: true,
                             noiseSuppression: true,
                             autoGainControl: true,
+                            ...(audioInputDeviceId ? { deviceId: { ideal: audioInputDeviceId } } : {}),
                         },
                         video: false,
-                    });
+                    };
+                    micStream = await navigator.mediaDevices.getUserMedia(micConstraints);
                     console.log('macOS microphone capture started');
                     setupLinuxMicProcessing(micStream);
                 } catch (micError) {
@@ -286,16 +308,18 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
             if (audioMode === 'mic_only' || audioMode === 'both') {
                 let micStream = null;
                 try {
-                    micStream = await navigator.mediaDevices.getUserMedia({
+                    const micConstraints = {
                         audio: {
                             sampleRate: SAMPLE_RATE,
                             channelCount: 1,
                             echoCancellation: true,
                             noiseSuppression: true,
                             autoGainControl: true,
+                            ...(audioInputDeviceId ? { deviceId: { ideal: audioInputDeviceId } } : {}),
                         },
                         video: false,
-                    });
+                    };
+                    micStream = await navigator.mediaDevices.getUserMedia(micConstraints);
 
                     console.log('Linux microphone capture started');
 
@@ -309,45 +333,58 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
 
             console.log('Linux capture started - system audio:', mediaStream.getAudioTracks().length > 0, 'microphone mode:', audioMode);
         } else {
-            // Windows - use display media with loopback for system audio
-            mediaStream = await navigator.mediaDevices.getDisplayMedia({
-                video: {
-                    frameRate: 1,
-                    width: { ideal: 1920 },
-                    height: { ideal: 1080 },
-                },
-                audio: {
-                    sampleRate: SAMPLE_RATE,
-                    channelCount: 1,
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true,
-                },
-            });
-
-            console.log('Windows capture started with loopback audio');
-
-            // Setup audio processing for Windows loopback audio only
-            setupWindowsLoopbackProcessing();
-
+            // Windows - when mic is needed, request microphone first so permission dialog appears on "Start" and device (e.g. G733) is granted
+            let micStream = null;
             if (audioMode === 'mic_only' || audioMode === 'both') {
-                let micStream = null;
                 try {
-                    micStream = await navigator.mediaDevices.getUserMedia({
+                    const micConstraints = {
                         audio: {
                             sampleRate: SAMPLE_RATE,
                             channelCount: 1,
                             echoCancellation: true,
                             noiseSuppression: true,
                             autoGainControl: true,
+                            ...(audioInputDeviceId ? { deviceId: { ideal: audioInputDeviceId } } : {}),
                         },
                         video: false,
-                    });
-                    console.log('Windows microphone capture started');
+                    };
+                    micStream = await navigator.mediaDevices.getUserMedia(micConstraints);
+                    console.log('Windows microphone capture started (before display)');
                     setupLinuxMicProcessing(micStream);
                 } catch (micError) {
                     console.warn('Failed to get microphone access on Windows:', micError);
                 }
+            }
+
+            // Then request display (screen ± system audio)
+            try {
+                mediaStream = await navigator.mediaDevices.getDisplayMedia({
+                    video: {
+                        frameRate: 1,
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 },
+                    },
+                    audio: {
+                        sampleRate: SAMPLE_RATE,
+                        channelCount: 1,
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true,
+                    },
+                });
+                console.log('Windows capture started with loopback audio');
+                setupWindowsLoopbackProcessing();
+            } catch (displayErr) {
+                console.warn('getDisplayMedia with audio failed, trying screen only:', displayErr);
+                mediaStream = await navigator.mediaDevices.getDisplayMedia({
+                    video: {
+                        frameRate: 1,
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 },
+                    },
+                    audio: false,
+                });
+                console.log('Windows capture started (screen only, no system audio)');
             }
         }
 
@@ -1033,6 +1070,7 @@ const cheatingDaddy = {
     stopCapture,
     sendTextMessage,
     handleShortcut,
+    getAudioInputDevices,
 
     // Storage API
     storage,

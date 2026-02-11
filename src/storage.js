@@ -24,6 +24,7 @@ const DEFAULT_PREFERENCES = {
     selectedImageQuality: 'medium',
     advancedMode: false,
     audioMode: 'speaker_only',
+    audioInputDeviceId: '',
     fontSize: 'medium',
     backgroundTransparency: 0.8,
     googleSearchEnabled: false,
