@@ -746,7 +746,9 @@ function convertStereoToMono(stereoBuffer) {
 
     for (let i = 0; i < samples; i++) {
         const leftSample = stereoBuffer.readInt16LE(i * 4);
-        monoBuffer.writeInt16LE(leftSample, i * 2);
+        const rightSample = stereoBuffer.readInt16LE(i * 4 + 2);
+        const mixedSample = Math.round((leftSample + rightSample) / 2);
+        monoBuffer.writeInt16LE(mixedSample, i * 2);
     }
 
     return monoBuffer;
