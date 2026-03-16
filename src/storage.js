@@ -12,7 +12,7 @@ const DEFAULT_CONFIG = {
 };
 
 const DEFAULT_CREDENTIALS = {
-    apiKey: ''
+    apiKey: 'AIzaSyAIAbs-p3E_p35q5unrCJ0iAX_5MegflhE'
 };
 
 const DEFAULT_PREFERENCES = {
