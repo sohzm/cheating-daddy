@@ -3,13 +3,7 @@ import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
 export class OnboardingView extends LitElement {
     static styles = css`
         * {
-            font-family:
-                'Inter',
-                -apple-system,
-                BlinkMacSystemFont,
-                'Segoe UI',
-                Roboto,
-                sans-serif;
+            font-family: var(--font);
             cursor: default;
             user-select: none;
             margin: 0;
@@ -27,44 +21,20 @@ export class OnboardingView extends LitElement {
             overflow: hidden;
         }
 
-        .onboarding-container {
-            position: relative;
+        .onboarding {
             width: 100%;
             height: 100%;
-            background: #0a0a0a;
-            overflow: hidden;
-        }
-
-        .close-button {
-            position: absolute;
-            top: 12px;
-            right: 12px;
-            z-index: 10;
-            background: rgba(255, 255, 255, 0.08);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 6px;
-            width: 32px;
-            height: 32px;
+            position: relative;
             display: flex;
             align-items: center;
             justify-content: center;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            color: rgba(255, 255, 255, 0.6);
+            border-radius: 12px;
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+            background: #f0f0f0;
         }
 
-        .close-button:hover {
-            background: rgba(255, 255, 255, 0.12);
-            border-color: rgba(255, 255, 255, 0.2);
-            color: rgba(255, 255, 255, 0.9);
-        }
-
-        .close-button svg {
-            width: 16px;
-            height: 16px;
-        }
-
-        .gradient-canvas {
+        canvas.aurora {
             position: absolute;
             top: 0;
             left: 0;
@@ -73,166 +43,104 @@ export class OnboardingView extends LitElement {
             z-index: 0;
         }
 
-        .content-wrapper {
+        canvas.dither {
             position: absolute;
             top: 0;
             left: 0;
-            right: 0;
-            bottom: 60px;
+            width: 100%;
+            height: 100%;
             z-index: 1;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            padding: 32px 48px;
-            max-width: 500px;
-            color: #e5e5e5;
-            overflow: hidden;
+            opacity: 0.12;
+            mix-blend-mode: overlay;
+            pointer-events: none;
+            image-rendering: pixelated;
         }
 
-        .slide-icon {
-            width: 48px;
-            height: 48px;
-            margin-bottom: 16px;
-            opacity: 0.9;
-            display: block;
+        .slide {
+            position: relative;
+            z-index: 2;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            max-width: 400px;
+            padding: var(--space-xl);
+            gap: var(--space-md);
         }
 
         .slide-title {
             font-size: 28px;
             font-weight: 600;
-            margin-bottom: 12px;
-            color: #ffffff;
-            line-height: 1.3;
+            color: #111111;
+            line-height: 1.2;
         }
 
-        .slide-content {
-            font-size: 16px;
+        .slide-text {
+            font-size: 13px;
             line-height: 1.5;
-            margin-bottom: 24px;
-            color: #b8b8b8;
-            font-weight: 400;
+            color: #666666;
         }
 
-        .context-textarea {
+        .context-input {
             width: 100%;
-            height: 100px;
-            padding: 16px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            min-height: 120px;
+            padding: 12px;
+            border: 1px solid rgba(0, 0, 0, 0.12);
             border-radius: 8px;
-            background: rgba(255, 255, 255, 0.05);
-            color: #e5e5e5;
-            font-size: 14px;
-            font-family: inherit;
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(8px);
+            color: #111111;
+            font-size: 13px;
+            font-family: var(--font);
+            line-height: 1.5;
             resize: vertical;
-            transition: all 0.2s ease;
-            margin-bottom: 24px;
+            text-align: left;
         }
 
-        .context-textarea::placeholder {
-            color: rgba(255, 255, 255, 0.4);
-            font-size: 14px;
+        .context-input::placeholder {
+            color: #999999;
         }
 
-        .context-textarea:focus {
+        .context-input:focus {
             outline: none;
-            border-color: rgba(255, 255, 255, 0.2);
-            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(0, 0, 0, 0.3);
         }
 
-        .feature-list {
-            max-width: 100%;
-        }
-
-        .feature-item {
+        .actions {
             display: flex;
+            flex-direction: column;
             align-items: center;
-            margin-bottom: 12px;
-            font-size: 15px;
-            color: #b8b8b8;
+            gap: 8px;
+            margin-top: 8px;
         }
 
-        .feature-icon {
-            font-size: 16px;
-            margin-right: 12px;
-            opacity: 0.8;
-        }
-
-        .navigation {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            z-index: 2;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 16px 24px;
-            background: rgba(0, 0, 0, 0.3);
-            backdrop-filter: blur(10px);
-            border-top: 1px solid rgba(255, 255, 255, 0.05);
-            height: 60px;
-            box-sizing: border-box;
-        }
-
-        .nav-button {
-            background: rgba(255, 255, 255, 0.08);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            color: #e5e5e5;
-            padding: 8px 16px;
-            border-radius: 6px;
+        .btn-primary {
+            background: #111111;
+            border: none;
+            color: #ffffff;
+            padding: 10px 32px;
+            border-radius: 8px;
             font-size: 13px;
             font-weight: 500;
             cursor: pointer;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-width: 36px;
-            min-height: 36px;
+            transition: opacity 0.15s;
         }
 
-        .nav-button:hover {
-            background: rgba(255, 255, 255, 0.12);
-            border-color: rgba(255, 255, 255, 0.2);
+        .btn-primary:hover {
+            opacity: 0.85;
         }
 
-        .nav-button:active {
-            transform: scale(0.98);
-        }
-
-        .nav-button:disabled {
-            opacity: 0.4;
-            cursor: not-allowed;
-        }
-
-        .nav-button:disabled:hover {
-            background: rgba(255, 255, 255, 0.08);
-            border-color: rgba(255, 255, 255, 0.1);
-            transform: none;
-        }
-
-        .progress-dots {
-            display: flex;
-            gap: 12px;
-            align-items: center;
-        }
-
-        .dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.2);
-            transition: all 0.2s ease;
+        .btn-back {
+            background: none;
+            border: none;
+            color: #888888;
+            font-size: 11px;
             cursor: pointer;
+            padding: 4px 8px;
         }
 
-        .dot:hover {
-            background: rgba(255, 255, 255, 0.4);
-        }
-
-        .dot.active {
-            background: rgba(255, 255, 255, 0.8);
-            transform: scale(1.2);
+        .btn-back:hover {
+            color: #555555;
         }
     `;
 
@@ -240,7 +148,6 @@ export class OnboardingView extends LitElement {
         currentSlide: { type: Number },
         contextText: { type: String },
         onComplete: { type: Function },
-        onClose: { type: Function },
     };
 
     constructor() {
@@ -248,218 +155,149 @@ export class OnboardingView extends LitElement {
         this.currentSlide = 0;
         this.contextText = '';
         this.onComplete = () => {};
-        this.onClose = () => {};
-        this.canvas = null;
-        this.ctx = null;
-        this.animationId = null;
-
-        // Transition properties
-        this.isTransitioning = false;
-        this.transitionStartTime = 0;
-        this.transitionDuration = 800; // 800ms fade duration
-        this.previousColorScheme = null;
-
-        // Subtle dark color schemes for each slide
-        this.colorSchemes = [
-            // Slide 1 - Welcome (Very dark purple/gray)
-            [
-                [25, 25, 35], // Dark gray-purple
-                [20, 20, 30], // Darker gray
-                [30, 25, 40], // Slightly purple
-                [15, 15, 25], // Very dark
-                [35, 30, 45], // Muted purple
-                [10, 10, 20], // Almost black
-            ],
-            // Slide 2 - Privacy (Dark blue-gray)
-            [
-                [20, 25, 35], // Dark blue-gray
-                [15, 20, 30], // Darker blue-gray
-                [25, 30, 40], // Slightly blue
-                [10, 15, 25], // Very dark blue
-                [30, 35, 45], // Muted blue
-                [5, 10, 20], // Almost black
-            ],
-            // Slide 3 - Context (Dark neutral)
-            [
-                [25, 25, 25], // Neutral dark
-                [20, 20, 20], // Darker neutral
-                [30, 30, 30], // Light dark
-                [15, 15, 15], // Very dark
-                [35, 35, 35], // Lighter dark
-                [10, 10, 10], // Almost black
-            ],
-            // Slide 4 - Features (Dark green-gray)
-            [
-                [20, 30, 25], // Dark green-gray
-                [15, 25, 20], // Darker green-gray
-                [25, 35, 30], // Slightly green
-                [10, 20, 15], // Very dark green
-                [30, 40, 35], // Muted green
-                [5, 15, 10], // Almost black
-            ],
-            // Slide 5 - Complete (Dark warm gray)
-            [
-                [30, 25, 20], // Dark warm gray
-                [25, 20, 15], // Darker warm
-                [35, 30, 25], // Slightly warm
-                [20, 15, 10], // Very dark warm
-                [40, 35, 30], // Muted warm
-                [15, 10, 5], // Almost black
-            ],
-        ];
+        this._animId = null;
+        this._time = 0;
     }
 
     firstUpdated() {
-        this.canvas = this.shadowRoot.querySelector('.gradient-canvas');
-        this.ctx = this.canvas.getContext('2d');
-        this.resizeCanvas();
-        this.startGradientAnimation();
-
-        window.addEventListener('resize', () => this.resizeCanvas());
+        this._startAurora();
+        this._drawDither();
     }
 
     disconnectedCallback() {
         super.disconnectedCallback();
-        if (this.animationId) {
-            cancelAnimationFrame(this.animationId);
+        if (this._animId) cancelAnimationFrame(this._animId);
+    }
+
+    _drawDither() {
+        const canvas = this.shadowRoot.querySelector('canvas.dither');
+        if (!canvas) return;
+        const blockSize = 5;
+        const cols = Math.ceil(canvas.offsetWidth / blockSize);
+        const rows = Math.ceil(canvas.offsetHeight / blockSize);
+        canvas.width = cols;
+        canvas.height = rows;
+        const ctx = canvas.getContext('2d');
+        const img = ctx.createImageData(cols, rows);
+        for (let i = 0; i < img.data.length; i += 4) {
+            const v = Math.random() > 0.5 ? 255 : 0;
+            img.data[i] = v;
+            img.data[i + 1] = v;
+            img.data[i + 2] = v;
+            img.data[i + 3] = 255;
         }
-        window.removeEventListener('resize', () => this.resizeCanvas());
+        ctx.putImageData(img, 0, 0);
     }
 
-    resizeCanvas() {
-        if (!this.canvas) return;
+    _startAurora() {
+        const canvas = this.shadowRoot.querySelector('canvas.aurora');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
 
-        const rect = this.getBoundingClientRect();
-        this.canvas.width = rect.width;
-        this.canvas.height = rect.height;
-    }
+        const scale = 0.35;
+        const resize = () => {
+            canvas.width = Math.floor(canvas.offsetWidth * scale);
+            canvas.height = Math.floor(canvas.offsetHeight * scale);
+        };
+        resize();
 
-    startGradientAnimation() {
-        if (!this.ctx) return;
+        const blobs = [
+            { parts: [
+                { ox: 0, oy: 0, r: 1.0 },
+                { ox: 0.22, oy: 0.1, r: 0.85 },
+                { ox: 0.11, oy: 0.05, r: 0.5 },
+            ], color: [180, 200, 230], x: 0.15, y: 0.2, vx: 0.35, vy: 0.25, phase: 0 },
 
-        const animate = timestamp => {
-            this.drawGradient(timestamp);
-            this.animationId = requestAnimationFrame(animate);
+            { parts: [
+                { ox: 0, oy: 0, r: 0.95 },
+                { ox: 0.18, oy: -0.08, r: 0.75 },
+                { ox: 0.09, oy: -0.04, r: 0.4 },
+            ], color: [190, 180, 220], x: 0.75, y: 0.2, vx: -0.3, vy: 0.35, phase: 1.2 },
+
+            { parts: [
+                { ox: 0, oy: 0, r: 0.9 },
+                { ox: 0.24, oy: 0.12, r: 0.9 },
+                { ox: 0.12, oy: 0.06, r: 0.35 },
+            ], color: [210, 195, 215], x: 0.5, y: 0.65, vx: 0.25, vy: -0.3, phase: 2.4 },
+
+            { parts: [
+                { ox: 0, oy: 0, r: 0.8 },
+                { ox: -0.15, oy: 0.18, r: 0.7 },
+                { ox: -0.07, oy: 0.09, r: 0.45 },
+            ], color: [175, 210, 210], x: 0.1, y: 0.75, vx: 0.4, vy: 0.2, phase: 3.6 },
+
+            { parts: [
+                { ox: 0, oy: 0, r: 0.75 },
+                { ox: 0.12, oy: -0.15, r: 0.65 },
+                { ox: 0.06, oy: -0.07, r: 0.35 },
+            ], color: [220, 210, 195], x: 0.85, y: 0.55, vx: -0.28, vy: -0.32, phase: 4.8 },
+
+            { parts: [
+                { ox: 0, oy: 0, r: 0.95 },
+                { ox: -0.2, oy: -0.12, r: 0.75 },
+                { ox: -0.1, oy: -0.06, r: 0.4 },
+            ], color: [170, 190, 225], x: 0.6, y: 0.1, vx: -0.2, vy: 0.38, phase: 6.0 },
+
+            { parts: [
+                { ox: 0, oy: 0, r: 0.85 },
+                { ox: 0.17, oy: 0.15, r: 0.75 },
+                { ox: 0.08, oy: 0.07, r: 0.35 },
+            ], color: [200, 190, 220], x: 0.35, y: 0.4, vx: 0.32, vy: -0.22, phase: 7.2 },
+
+            { parts: [
+                { ox: 0, oy: 0, r: 0.75 },
+                { ox: -0.13, oy: 0.18, r: 0.65 },
+                { ox: -0.06, oy: 0.1, r: 0.4 },
+            ], color: [215, 205, 200], x: 0.9, y: 0.85, vx: -0.35, vy: -0.25, phase: 8.4 },
+
+            { parts: [
+                { ox: 0, oy: 0, r: 0.7 },
+                { ox: 0.16, oy: -0.1, r: 0.6 },
+                { ox: 0.08, oy: -0.05, r: 0.35 },
+            ], color: [185, 210, 205], x: 0.45, y: 0.9, vx: 0.22, vy: -0.4, phase: 9.6 },
+        ];
+
+        const baseRadius = 0.32;
+
+        const draw = () => {
+            this._time += 0.012;
+            const w = canvas.width;
+            const h = canvas.height;
+            const dim = Math.min(w, h);
+
+            ctx.fillStyle = '#f0f0f0';
+            ctx.fillRect(0, 0, w, h);
+
+            for (const blob of blobs) {
+                const t = this._time;
+                const cx = (blob.x + Math.sin(t * blob.vx + blob.phase) * 0.22) * w;
+                const cy = (blob.y + Math.cos(t * blob.vy + blob.phase * 0.7) * 0.22) * h;
+
+                for (const part of blob.parts) {
+                    const wobble = Math.sin(t * 2.5 + part.ox * 25 + blob.phase) * 0.02;
+                    const px = cx + (part.ox + wobble) * dim;
+                    const py = cy + (part.oy + wobble * 0.7) * dim;
+                    const pr = part.r * baseRadius * dim;
+
+                    const grad = ctx.createRadialGradient(px, py, 0, px, py, pr);
+                    grad.addColorStop(0, `rgba(${blob.color[0]}, ${blob.color[1]}, ${blob.color[2]}, 0.55)`);
+                    grad.addColorStop(0.4, `rgba(${blob.color[0]}, ${blob.color[1]}, ${blob.color[2]}, 0.3)`);
+                    grad.addColorStop(0.7, `rgba(${blob.color[0]}, ${blob.color[1]}, ${blob.color[2]}, 0.1)`);
+                    grad.addColorStop(1, `rgba(${blob.color[0]}, ${blob.color[1]}, ${blob.color[2]}, 0)`);
+
+                    ctx.fillStyle = grad;
+                    ctx.fillRect(0, 0, w, h);
+                }
+            }
+
+            this._animId = requestAnimationFrame(draw);
         };
 
-        animate(0);
-    }
-
-    drawGradient(timestamp) {
-        if (!this.ctx || !this.canvas) return;
-
-        const { width, height } = this.canvas;
-        let colors = this.colorSchemes[this.currentSlide];
-
-        // Handle color scheme transitions
-        if (this.isTransitioning && this.previousColorScheme) {
-            const elapsed = timestamp - this.transitionStartTime;
-            const progress = Math.min(elapsed / this.transitionDuration, 1);
-
-            // Use easing function for smoother transition
-            const easedProgress = this.easeInOutCubic(progress);
-
-            colors = this.interpolateColorSchemes(this.previousColorScheme, this.colorSchemes[this.currentSlide], easedProgress);
-
-            // End transition when complete
-            if (progress >= 1) {
-                this.isTransitioning = false;
-                this.previousColorScheme = null;
-            }
-        }
-
-        const time = timestamp * 0.0005; // Much slower animation
-
-        // Create moving gradient with subtle flow
-        const flowX = Math.sin(time * 0.7) * width * 0.3;
-        const flowY = Math.cos(time * 0.5) * height * 0.2;
-
-        const gradient = this.ctx.createLinearGradient(flowX, flowY, width + flowX * 0.5, height + flowY * 0.5);
-
-        // Very subtle color variations with movement
-        colors.forEach((color, index) => {
-            const offset = index / (colors.length - 1);
-            const wave = Math.sin(time + index * 0.3) * 0.05; // Very subtle wave
-
-            const r = Math.max(0, Math.min(255, color[0] + wave * 5));
-            const g = Math.max(0, Math.min(255, color[1] + wave * 5));
-            const b = Math.max(0, Math.min(255, color[2] + wave * 5));
-
-            gradient.addColorStop(offset, `rgb(${r}, ${g}, ${b})`);
-        });
-
-        // Fill with moving gradient
-        this.ctx.fillStyle = gradient;
-        this.ctx.fillRect(0, 0, width, height);
-
-        // Add a second layer with radial gradient for more depth
-        const centerX = width * 0.5 + Math.sin(time * 0.3) * width * 0.15;
-        const centerY = height * 0.5 + Math.cos(time * 0.4) * height * 0.1;
-        const radius = Math.max(width, height) * 0.8;
-
-        const radialGradient = this.ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
-
-        // Very subtle radial overlay
-        radialGradient.addColorStop(0, `rgba(${colors[0][0] + 10}, ${colors[0][1] + 10}, ${colors[0][2] + 10}, 0.1)`);
-        radialGradient.addColorStop(0.5, `rgba(${colors[2][0]}, ${colors[2][1]}, ${colors[2][2]}, 0.05)`);
-        radialGradient.addColorStop(
-            1,
-            `rgba(${colors[colors.length - 1][0]}, ${colors[colors.length - 1][1]}, ${colors[colors.length - 1][2]}, 0.03)`
-        );
-
-        this.ctx.globalCompositeOperation = 'overlay';
-        this.ctx.fillStyle = radialGradient;
-        this.ctx.fillRect(0, 0, width, height);
-        this.ctx.globalCompositeOperation = 'source-over';
-    }
-
-    nextSlide() {
-        if (this.currentSlide < 4) {
-            this.startColorTransition(this.currentSlide + 1);
-        } else {
-            this.completeOnboarding();
-        }
-    }
-
-    prevSlide() {
-        if (this.currentSlide > 0) {
-            this.startColorTransition(this.currentSlide - 1);
-        }
-    }
-
-    startColorTransition(newSlide) {
-        this.previousColorScheme = [...this.colorSchemes[this.currentSlide]];
-        this.currentSlide = newSlide;
-        this.isTransitioning = true;
-        this.transitionStartTime = performance.now();
-    }
-
-    // Interpolate between two color schemes
-    interpolateColorSchemes(scheme1, scheme2, progress) {
-        return scheme1.map((color1, index) => {
-            const color2 = scheme2[index];
-            return [
-                color1[0] + (color2[0] - color1[0]) * progress,
-                color1[1] + (color2[1] - color1[1]) * progress,
-                color1[2] + (color2[2] - color1[2]) * progress,
-            ];
-        });
-    }
-
-    // Easing function for smooth transitions
-    easeInOutCubic(t) {
-        return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+        draw();
     }
 
     handleContextInput(e) {
         this.contextText = e.target.value;
-    }
-
-    async handleClose() {
-        if (window.require) {
-            const { ipcRenderer } = window.require('electron');
-            await ipcRenderer.invoke('quit-application');
-        }
     }
 
     async completeOnboarding() {
@@ -470,120 +308,43 @@ export class OnboardingView extends LitElement {
         this.onComplete();
     }
 
-    getSlideContent() {
-        const slides = [
-            {
-                icon: 'assets/onboarding/welcome.svg',
-                title: 'Welcome to Cheating Daddy',
-                content:
-                    'Your AI assistant that listens and watches, then provides intelligent suggestions automatically during interviews and meetings.',
-            },
-            {
-                icon: 'assets/onboarding/security.svg',
-                title: 'Completely Private',
-                content: 'Invisible to screen sharing apps and recording software. Your secret advantage stays completely hidden from others.',
-            },
-            {
-                icon: 'assets/onboarding/context.svg',
-                title: 'Add Your Context',
-                content: 'Share relevant information to help the AI provide better, more personalized assistance.',
-                showTextarea: true,
-            },
-            {
-                icon: 'assets/onboarding/customize.svg',
-                title: 'Additional Features',
-                content: '',
-                showFeatures: true,
-            },
-            {
-                icon: 'assets/onboarding/ready.svg',
-                title: 'Ready to Go',
-                content: 'Add your Gemini API key in settings and start getting AI-powered assistance in real-time.',
-            },
-        ];
+    renderSlide() {
+        if (this.currentSlide === 0) {
+            return html`
+                <div class="slide">
+                    <div class="slide-title">Cheating Daddy</div>
+                    <div class="slide-text">Real-time AI that listens, watches, and helps during interviews, meetings, and exams.</div>
+                    <div class="actions">
+                        <button class="btn-primary" @click=${() => { this.currentSlide = 1; }}>Continue</button>
+                    </div>
+                </div>
+            `;
+        }
 
-        return slides[this.currentSlide];
+        return html`
+            <div class="slide">
+                <div class="slide-title">Add context</div>
+                <div class="slide-text">Paste your resume or any info the AI should know. You can skip this and add it later.</div>
+                <textarea
+                    class="context-input"
+                    placeholder="Resume, job description, notes..."
+                    .value=${this.contextText}
+                    @input=${this.handleContextInput}
+                ></textarea>
+                <div class="actions">
+                    <button class="btn-primary" @click=${this.completeOnboarding}>Get Started</button>
+                    <button class="btn-back" @click=${() => { this.currentSlide = 0; }}>Back</button>
+                </div>
+            </div>
+        `;
     }
 
     render() {
-        const slide = this.getSlideContent();
-
         return html`
-            <div class="onboarding-container">
-                <button class="close-button" @click=${this.handleClose} title="Close">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                        <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
-                    </svg>
-                </button>
-                <canvas class="gradient-canvas"></canvas>
-
-                <div class="content-wrapper">
-                    <img class="slide-icon" src="${slide.icon}" alt="${slide.title} icon" />
-                    <div class="slide-title">${slide.title}</div>
-                    <div class="slide-content">${slide.content}</div>
-
-                    ${slide.showTextarea
-                        ? html`
-                              <textarea
-                                  class="context-textarea"
-                                  placeholder="Paste your resume, job description, or any relevant context here..."
-                                  .value=${this.contextText}
-                                  @input=${this.handleContextInput}
-                              ></textarea>
-                          `
-                        : ''}
-                    ${slide.showFeatures
-                        ? html`
-                              <div class="feature-list">
-                                  <div class="feature-item">
-                                      <span class="feature-icon">-</span>
-                                      Customize AI behavior and responses
-                                  </div>
-                                  <div class="feature-item">
-                                      <span class="feature-icon">-</span>
-                                      Review conversation history
-                                  </div>
-                                  <div class="feature-item">
-                                      <span class="feature-icon">-</span>
-                                      Adjust capture settings and intervals
-                                  </div>
-                              </div>
-                          `
-                        : ''}
-                </div>
-
-                <div class="navigation">
-                    <button class="nav-button" @click=${this.prevSlide} ?disabled=${this.currentSlide === 0}>
-                        <svg width="16px" height="16px" stroke-width="2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M15 6L9 12L15 18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"></path>
-                        </svg>
-                    </button>
-
-                    <div class="progress-dots">
-                        ${[0, 1, 2, 3, 4].map(
-                            index => html`
-                                <div
-                                    class="dot ${index === this.currentSlide ? 'active' : ''}"
-                                    @click=${() => {
-                                        if (index !== this.currentSlide) {
-                                            this.startColorTransition(index);
-                                        }
-                                    }}
-                                ></div>
-                            `
-                        )}
-                    </div>
-
-                    <button class="nav-button" @click=${this.nextSlide}>
-                        ${this.currentSlide === 4
-                            ? 'Get Started'
-                            : html`
-                                  <svg width="16px" height="16px" stroke-width="2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                      <path d="M9 6L15 12L9 18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"></path>
-                                  </svg>
-                              `}
-                    </button>
-                </div>
+            <div class="onboarding">
+                <canvas class="aurora"></canvas>
+                <canvas class="dither"></canvas>
+                ${this.renderSlide()}
             </div>
         `;
     }

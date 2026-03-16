@@ -9,20 +9,23 @@ export class AssistantView extends LitElement {
         }
 
         * {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family: var(--font);
             cursor: default;
         }
 
+        /* ── Response area ── */
+
         .response-container {
-            height: calc(100% - 50px);
+            flex: 1;
             overflow-y: auto;
-            font-size: var(--response-font-size, 16px);
-            line-height: 1.6;
-            background: var(--bg-primary);
-            padding: 12px;
+            font-size: var(--response-font-size, 15px);
+            line-height: var(--line-height);
+            background: var(--bg-app);
+            padding: var(--space-sm) var(--space-md);
             scroll-behavior: smooth;
             user-select: text;
             cursor: text;
+            color: var(--text-primary);
         }
 
         .response-container * {
@@ -34,12 +37,12 @@ export class AssistantView extends LitElement {
             cursor: pointer;
         }
 
-        /* Word display (no animation) */
         .response-container [data-word] {
             display: inline-block;
         }
 
-        /* Markdown styling */
+        /* ── Markdown ── */
+
         .response-container h1,
         .response-container h2,
         .response-container h3,
@@ -47,27 +50,27 @@ export class AssistantView extends LitElement {
         .response-container h5,
         .response-container h6 {
             margin: 1em 0 0.5em 0;
-            color: var(--text-color);
-            font-weight: 600;
+            color: var(--text-primary);
+            font-weight: var(--font-weight-semibold);
         }
 
-        .response-container h1 { font-size: 1.6em; }
-        .response-container h2 { font-size: 1.4em; }
-        .response-container h3 { font-size: 1.2em; }
-        .response-container h4 { font-size: 1.1em; }
-        .response-container h5 { font-size: 1em; }
-        .response-container h6 { font-size: 0.9em; }
+        .response-container h1 { font-size: 1.5em; }
+        .response-container h2 { font-size: 1.3em; }
+        .response-container h3 { font-size: 1.15em; }
+        .response-container h4 { font-size: 1.05em; }
+        .response-container h5,
+        .response-container h6 { font-size: 1em; }
 
         .response-container p {
             margin: 0.6em 0;
-            color: var(--text-color);
+            color: var(--text-primary);
         }
 
         .response-container ul,
         .response-container ol {
             margin: 0.6em 0;
             padding-left: 1.5em;
-            color: var(--text-color);
+            color: var(--text-primary);
         }
 
         .response-container li {
@@ -77,23 +80,24 @@ export class AssistantView extends LitElement {
         .response-container blockquote {
             margin: 0.8em 0;
             padding: 0.5em 1em;
-            border-left: 2px solid var(--border-default);
-            background: var(--bg-secondary);
+            border-left: 2px solid var(--border-strong);
+            background: var(--bg-surface);
+            border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
         }
 
         .response-container code {
-            background: var(--bg-tertiary);
+            background: var(--bg-elevated);
             padding: 0.15em 0.4em;
-            border-radius: 3px;
-            font-family: 'SF Mono', Monaco, monospace;
+            border-radius: var(--radius-sm);
+            font-family: var(--font-mono);
             font-size: 0.85em;
         }
 
         .response-container pre {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 3px;
-            padding: 12px;
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: var(--space-md);
             overflow-x: auto;
             margin: 0.8em 0;
         }
@@ -104,19 +108,19 @@ export class AssistantView extends LitElement {
         }
 
         .response-container a {
-            color: var(--text-color);
+            color: var(--accent);
             text-decoration: underline;
             text-underline-offset: 2px;
         }
 
         .response-container strong,
         .response-container b {
-            font-weight: 600;
+            font-weight: var(--font-weight-semibold);
         }
 
         .response-container hr {
             border: none;
-            border-top: 1px solid var(--border-color);
+            border-top: 1px solid var(--border);
             margin: 1.5em 0;
         }
 
@@ -128,18 +132,18 @@ export class AssistantView extends LitElement {
 
         .response-container th,
         .response-container td {
-            border: 1px solid var(--border-color);
-            padding: 8px;
+            border: 1px solid var(--border);
+            padding: var(--space-sm);
             text-align: left;
         }
 
         .response-container th {
-            background: var(--bg-secondary);
-            font-weight: 600;
+            background: var(--bg-surface);
+            font-weight: var(--font-weight-semibold);
         }
 
         .response-container::-webkit-scrollbar {
-            width: 8px;
+            width: 6px;
         }
 
         .response-container::-webkit-scrollbar-track {
@@ -147,172 +151,152 @@ export class AssistantView extends LitElement {
         }
 
         .response-container::-webkit-scrollbar-thumb {
-            background: var(--scrollbar-thumb);
-            border-radius: 4px;
+            background: var(--border-strong);
+            border-radius: 3px;
         }
 
         .response-container::-webkit-scrollbar-thumb:hover {
-            background: var(--scrollbar-thumb-hover);
+            background: #444444;
         }
 
-        .text-input-container {
-            display: flex;
-            gap: 8px;
-            margin-top: 8px;
-            align-items: center;
-        }
+        /* ── Response navigation strip ── */
 
-        .text-input-container input {
-            flex: 1;
-            background: transparent;
-            color: var(--text-color);
-            border: none;
-            border-bottom: 1px solid var(--border-color);
-            padding: 8px 4px;
-            border-radius: 0;
-            font-size: 13px;
-        }
-
-        .text-input-container input:focus {
-            outline: none;
-            border-bottom-color: var(--text-color);
-        }
-
-        .text-input-container input::placeholder {
-            color: var(--placeholder-color);
-        }
-
-        .nav-button {
-            background: transparent;
-            color: var(--text-secondary);
-            border: none;
-            padding: 6px;
-            border-radius: 3px;
-            font-size: 12px;
+        .response-nav {
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: all 0.1s ease;
+            gap: var(--space-sm);
+            padding: var(--space-xs) var(--space-md);
+            border-top: 1px solid var(--border);
+            background: var(--bg-app);
         }
 
-        .nav-button:hover {
-            background: var(--hover-background);
-            color: var(--text-color);
+        .nav-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: var(--space-xs);
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color var(--transition);
         }
 
-        .nav-button:disabled {
-            opacity: 0.3;
+        .nav-btn:hover:not(:disabled) {
+            color: var(--text-primary);
         }
 
-        .nav-button svg {
-            width: 18px;
-            height: 18px;
-            stroke: currentColor;
+        .nav-btn:disabled {
+            opacity: 0.25;
+            cursor: default;
+        }
+
+        .nav-btn svg {
+            width: 14px;
+            height: 14px;
         }
 
         .response-counter {
-            font-size: 11px;
+            font-size: var(--font-size-xs);
             color: var(--text-muted);
-            white-space: nowrap;
-            min-width: 50px;
+            font-family: var(--font-mono);
+            min-width: 40px;
             text-align: center;
-            font-family: 'SF Mono', Monaco, monospace;
         }
 
-        .screen-answer-btn {
+        /* ── Bottom input bar ── */
+
+        .input-bar {
             display: flex;
             align-items: center;
-            gap: 6px;
-            background: var(--btn-primary-bg, #ffffff);
-            color: var(--btn-primary-text, #000000);
+            gap: var(--space-sm);
+            padding: var(--space-md);
+            background: var(--bg-app);
+        }
+
+        .input-bar-inner {
+            display: flex;
+            align-items: center;
+            flex: 1;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-radius: 100px;
+            padding: 0 var(--space-md);
+            height: 32px;
+            transition: border-color var(--transition);
+        }
+
+        .input-bar-inner:focus-within {
+            border-color: var(--accent);
+        }
+
+        .input-bar-inner input {
+            flex: 1;
+            background: none;
+            color: var(--text-primary);
             border: none;
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 500;
+            padding: 0;
+            font-size: var(--font-size-sm);
+            font-family: var(--font);
+            height: 100%;
+            outline: none;
+        }
+
+        .input-bar-inner input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .analyze-btn {
+            position: relative;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
             cursor: pointer;
-            transition: all 0.15s ease;
+            font-size: var(--font-size-xs);
+            font-family: var(--font-mono);
             white-space: nowrap;
-        }
-
-        .screen-answer-btn:hover {
-            background: var(--btn-primary-hover, #f0f0f0);
-        }
-
-        .screen-answer-btn svg {
-            width: 16px;
-            height: 16px;
+            padding: var(--space-xs) var(--space-md);
+            border-radius: 100px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: border-color 0.4s ease, background var(--transition);
             flex-shrink: 0;
+            overflow: hidden;
         }
 
-        .screen-answer-btn .usage-count {
-            font-size: 11px;
-            opacity: 0.7;
-            font-family: 'SF Mono', Monaco, monospace;
+        .analyze-btn:hover:not(.analyzing) {
+            border-color: var(--accent);
+            background: var(--bg-surface);
         }
 
-        .screen-answer-btn-wrapper {
+        .analyze-btn.analyzing {
+            cursor: default;
+            border-color: transparent;
+        }
+
+        .analyze-btn-content {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: opacity 0.4s ease;
+            z-index: 1;
             position: relative;
         }
 
-        .screen-answer-btn-wrapper .tooltip {
-            position: absolute;
-            bottom: 100%;
-            right: 0;
-            margin-bottom: 8px;
-            background: var(--tooltip-bg, #1a1a1a);
-            color: var(--tooltip-text, #ffffff);
-            padding: 8px 12px;
-            border-radius: 6px;
-            font-size: 11px;
-            white-space: nowrap;
+        .analyze-btn.analyzing .analyze-btn-content {
             opacity: 0;
-            visibility: hidden;
-            transition: opacity 0.15s ease, visibility 0.15s ease;
-            pointer-events: none;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            z-index: 100;
         }
 
-        .screen-answer-btn-wrapper .tooltip::after {
-            content: '';
+        .analyze-canvas {
             position: absolute;
-            top: 100%;
-            right: 16px;
-            border: 6px solid transparent;
-            border-top-color: var(--tooltip-bg, #1a1a1a);
-        }
-
-        .screen-answer-btn-wrapper:hover .tooltip {
-            opacity: 1;
-            visibility: visible;
-        }
-
-        .tooltip-row {
-            display: flex;
-            justify-content: space-between;
-            gap: 16px;
-            margin-bottom: 4px;
-        }
-
-        .tooltip-row:last-child {
-            margin-bottom: 0;
-        }
-
-        .tooltip-label {
-            opacity: 0.7;
-        }
-
-        .tooltip-value {
-            font-family: 'SF Mono', Monaco, monospace;
-        }
-
-        .tooltip-note {
-            margin-top: 6px;
-            padding-top: 6px;
-            border-top: 1px solid rgba(255,255,255,0.1);
-            opacity: 0.5;
-            font-size: 10px;
+            inset: -1px;
+            width: calc(100% + 2px);
+            height: calc(100% + 2px);
+            pointer-events: none;
         }
     `;
 
@@ -322,8 +306,7 @@ export class AssistantView extends LitElement {
         selectedProfile: { type: String },
         onSendText: { type: Function },
         shouldAnimateResponse: { type: Boolean },
-        flashCount: { type: Number },
-        flashLiteCount: { type: Number },
+        isAnalyzing: { type: Boolean, state: true },
     };
 
     constructor() {
@@ -332,8 +315,8 @@ export class AssistantView extends LitElement {
         this.currentResponseIndex = -1;
         this.selectedProfile = 'interview';
         this.onSendText = () => {};
-        this.flashCount = 0;
-        this.flashLiteCount = 0;
+        this.isAnalyzing = false;
+        this._animFrame = null;
     }
 
     getProfileNames() {
@@ -351,29 +334,26 @@ export class AssistantView extends LitElement {
         const profileNames = this.getProfileNames();
         return this.responses.length > 0 && this.currentResponseIndex >= 0
             ? this.responses[this.currentResponseIndex]
-            : `Hey, Im listening to your ${profileNames[this.selectedProfile] || 'session'}?`;
+            : `Listening to your ${profileNames[this.selectedProfile] || 'session'}...`;
     }
 
     renderMarkdown(content) {
-        // Check if marked is available
         if (typeof window !== 'undefined' && window.marked) {
             try {
-                // Configure marked for better security and formatting
                 window.marked.setOptions({
                     breaks: true,
                     gfm: true,
-                    sanitize: false, // We trust the AI responses
+                    sanitize: false,
                 });
                 let rendered = window.marked.parse(content);
                 rendered = this.wrapWordsInSpans(rendered);
                 return rendered;
             } catch (error) {
                 console.warn('Error parsing markdown:', error);
-                return content; // Fallback to plain text
+                return content;
             }
         }
-        console.log('Marked not available, using plain text');
-        return content; // Fallback if marked is not available
+        return content;
     }
 
     wrapWordsInSpans(html) {
@@ -404,10 +384,6 @@ export class AssistantView extends LitElement {
         return doc.body.innerHTML;
     }
 
-    getResponseCounter() {
-        return this.responses.length > 0 ? `${this.currentResponseIndex + 1}/${this.responses.length}` : '';
-    }
-
     navigateToPreviousResponse() {
         if (this.currentResponseIndex > 0) {
             this.currentResponseIndex--;
@@ -435,7 +411,7 @@ export class AssistantView extends LitElement {
     scrollResponseUp() {
         const container = this.shadowRoot.querySelector('.response-container');
         if (container) {
-            const scrollAmount = container.clientHeight * 0.3; // Scroll 30% of container height
+            const scrollAmount = container.clientHeight * 0.3;
             container.scrollTop = Math.max(0, container.scrollTop - scrollAmount);
         }
     }
@@ -443,7 +419,7 @@ export class AssistantView extends LitElement {
     scrollResponseDown() {
         const container = this.shadowRoot.querySelector('.response-container');
         if (container) {
-            const scrollAmount = container.clientHeight * 0.3; // Scroll 30% of container height
+            const scrollAmount = container.clientHeight * 0.3;
             container.scrollTop = Math.min(container.scrollHeight - container.clientHeight, container.scrollTop + scrollAmount);
         }
     }
@@ -451,32 +427,13 @@ export class AssistantView extends LitElement {
     connectedCallback() {
         super.connectedCallback();
 
-        // Load limits on mount
-        this.loadLimits();
-
-        // Set up IPC listeners for keyboard shortcuts
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
 
-            this.handlePreviousResponse = () => {
-                console.log('Received navigate-previous-response message');
-                this.navigateToPreviousResponse();
-            };
-
-            this.handleNextResponse = () => {
-                console.log('Received navigate-next-response message');
-                this.navigateToNextResponse();
-            };
-
-            this.handleScrollUp = () => {
-                console.log('Received scroll-response-up message');
-                this.scrollResponseUp();
-            };
-
-            this.handleScrollDown = () => {
-                console.log('Received scroll-response-down message');
-                this.scrollResponseDown();
-            };
+            this.handlePreviousResponse = () => this.navigateToPreviousResponse();
+            this.handleNextResponse = () => this.navigateToNextResponse();
+            this.handleScrollUp = () => this.scrollResponseUp();
+            this.handleScrollDown = () => this.scrollResponseDown();
 
             ipcRenderer.on('navigate-previous-response', this.handlePreviousResponse);
             ipcRenderer.on('navigate-next-response', this.handleNextResponse);
@@ -487,22 +444,14 @@ export class AssistantView extends LitElement {
 
     disconnectedCallback() {
         super.disconnectedCallback();
+        this._stopWaveformAnimation();
 
-        // Clean up IPC listeners
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
-            if (this.handlePreviousResponse) {
-                ipcRenderer.removeListener('navigate-previous-response', this.handlePreviousResponse);
-            }
-            if (this.handleNextResponse) {
-                ipcRenderer.removeListener('navigate-next-response', this.handleNextResponse);
-            }
-            if (this.handleScrollUp) {
-                ipcRenderer.removeListener('scroll-response-up', this.handleScrollUp);
-            }
-            if (this.handleScrollDown) {
-                ipcRenderer.removeListener('scroll-response-down', this.handleScrollDown);
-            }
+            if (this.handlePreviousResponse) ipcRenderer.removeListener('navigate-previous-response', this.handlePreviousResponse);
+            if (this.handleNextResponse) ipcRenderer.removeListener('navigate-next-response', this.handleNextResponse);
+            if (this.handleScrollUp) ipcRenderer.removeListener('scroll-response-up', this.handleScrollUp);
+            if (this.handleScrollDown) ipcRenderer.removeListener('scroll-response-down', this.handleScrollDown);
         }
     }
 
@@ -510,7 +459,7 @@ export class AssistantView extends LitElement {
         const textInput = this.shadowRoot.querySelector('#textInput');
         if (textInput && textInput.value.trim()) {
             const message = textInput.value.trim();
-            textInput.value = ''; // Clear input
+            textInput.value = '';
             await this.onSendText(message);
         }
     }
@@ -522,27 +471,149 @@ export class AssistantView extends LitElement {
         }
     }
 
-    async loadLimits() {
-        if (window.cheatingDaddy?.storage?.getTodayLimits) {
-            const limits = await window.cheatingDaddy.storage.getTodayLimits();
-            this.flashCount = limits.flash?.count || 0;
-            this.flashLiteCount = limits.flashLite?.count || 0;
+    async handleScreenAnswer() {
+        if (this.isAnalyzing) return;
+        if (window.captureManualScreenshot) {
+            this.isAnalyzing = true;
+            this._responseCountWhenStarted = this.responses.length;
+            window.captureManualScreenshot();
         }
     }
 
-    getTotalUsed() {
-        return this.flashCount + this.flashLiteCount;
+    _startWaveformAnimation() {
+        const canvas = this.shadowRoot.querySelector('.analyze-canvas');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const dpr = window.devicePixelRatio || 1;
+
+        const rect = canvas.getBoundingClientRect();
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+        ctx.scale(dpr, dpr);
+
+        const dangerColor = getComputedStyle(this).getPropertyValue('--danger').trim() || '#EF4444';
+        const startTime = performance.now();
+        const FADE_IN = 0.5; // seconds
+        const PARTICLE_SPREAD = 4; // px inward from border
+        const PARTICLE_COUNT = 250;
+
+        // Pill perimeter helpers
+        const w = rect.width;
+        const h = rect.height;
+        const r = h / 2; // pill radius = half height
+        const straightLen = w - 2 * r;
+        const arcLen = Math.PI * r;
+        const perimeter = 2 * straightLen + 2 * arcLen;
+
+        // Given a distance along the perimeter, return {x, y, nx, ny} (position + inward normal)
+        const pointOnPerimeter = (d) => {
+            d = ((d % perimeter) + perimeter) % perimeter;
+            // Top straight: left to right
+            if (d < straightLen) {
+                return { x: r + d, y: 0, nx: 0, ny: 1 };
+            }
+            d -= straightLen;
+            // Right arc
+            if (d < arcLen) {
+                const angle = -Math.PI / 2 + (d / arcLen) * Math.PI;
+                return {
+                    x: w - r + Math.cos(angle) * r,
+                    y: r + Math.sin(angle) * r,
+                    nx: -Math.cos(angle),
+                    ny: -Math.sin(angle),
+                };
+            }
+            d -= arcLen;
+            // Bottom straight: right to left
+            if (d < straightLen) {
+                return { x: w - r - d, y: h, nx: 0, ny: -1 };
+            }
+            d -= straightLen;
+            // Left arc
+            const angle = Math.PI / 2 + (d / arcLen) * Math.PI;
+            return {
+                x: r + Math.cos(angle) * r,
+                y: r + Math.sin(angle) * r,
+                nx: -Math.cos(angle),
+                ny: -Math.sin(angle),
+            };
+        };
+
+        // Pre-seed random offsets for stable particles
+        const seeds = [];
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+            seeds.push({ pos: Math.random(), drift: Math.random(), depthSeed: Math.random() });
+        }
+
+        const draw = (now) => {
+            const elapsed = (now - startTime) / 1000;
+            const fade = Math.min(1, elapsed / FADE_IN);
+
+            ctx.clearRect(0, 0, w, h);
+
+            // ── Particle border ──
+            ctx.fillStyle = dangerColor;
+            for (let i = 0; i < PARTICLE_COUNT; i++) {
+                const s = seeds[i];
+                const along = (s.pos + s.drift * elapsed * 0.03) * perimeter;
+                const depth = s.depthSeed * PARTICLE_SPREAD;
+                const density = 1 - depth / PARTICLE_SPREAD;
+
+                if (Math.random() > density) continue;
+
+                const p = pointOnPerimeter(along);
+                const px = p.x + p.nx * depth;
+                const py = p.y + p.ny * depth;
+                const size = 0.8 + density * 0.6;
+
+                ctx.globalAlpha = fade * density * 0.85;
+                ctx.beginPath();
+                ctx.arc(px, py, size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // ── Waveform ──
+            const midY = h / 2;
+            const waves = [
+                { freq: 3, amp: 0.35, speed: 2.5, opacity: 0.9, width: 1.8 },
+                { freq: 5, amp: 0.2, speed: 3.5, opacity: 0.5, width: 1.2 },
+                { freq: 7, amp: 0.12, speed: 5, opacity: 0.3, width: 0.8 },
+            ];
+
+            for (const wave of waves) {
+                ctx.beginPath();
+                ctx.strokeStyle = dangerColor;
+                ctx.globalAlpha = wave.opacity * fade;
+                ctx.lineWidth = wave.width;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+
+                for (let x = 0; x <= w; x++) {
+                    const norm = x / w;
+                    const envelope = Math.sin(norm * Math.PI);
+                    const y = midY + Math.sin(norm * Math.PI * 2 * wave.freq + elapsed * wave.speed) * (midY * wave.amp) * envelope;
+                    if (x === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+            }
+
+            ctx.globalAlpha = 1;
+            this._animFrame = requestAnimationFrame(draw);
+        };
+
+        this._animFrame = requestAnimationFrame(draw);
     }
 
-    getTotalAvailable() {
-        return 40; // 20 flash + 20 flash-lite
-    }
-
-    async handleScreenAnswer() {
-        if (window.captureManualScreenshot) {
-            window.captureManualScreenshot();
-            // Reload limits after a short delay to catch the update
-            setTimeout(() => this.loadLimits(), 1000);
+    _stopWaveformAnimation() {
+        if (this._animFrame) {
+            cancelAnimationFrame(this._animFrame);
+            this._animFrame = null;
+        }
+        const canvas = this.shadowRoot.querySelector('.analyze-canvas');
+        if (canvas) {
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
         }
     }
 
@@ -565,69 +636,74 @@ export class AssistantView extends LitElement {
         if (changedProperties.has('responses') || changedProperties.has('currentResponseIndex')) {
             this.updateResponseContent();
         }
+
+        if (changedProperties.has('isAnalyzing')) {
+            if (this.isAnalyzing) {
+                this._startWaveformAnimation();
+            } else {
+                this._stopWaveformAnimation();
+            }
+        }
+
+        if (changedProperties.has('responses') && this.isAnalyzing) {
+            if (this.responses.length > this._responseCountWhenStarted) {
+                this.isAnalyzing = false;
+            }
+        }
     }
 
     updateResponseContent() {
-        console.log('updateResponseContent called');
         const container = this.shadowRoot.querySelector('#responseContainer');
         if (container) {
             const currentResponse = this.getCurrentResponse();
-            console.log('Current response:', currentResponse);
             const renderedResponse = this.renderMarkdown(currentResponse);
-            console.log('Rendered response:', renderedResponse);
             container.innerHTML = renderedResponse;
-            // Show all words immediately (no animation)
             if (this.shouldAnimateResponse) {
                 this.dispatchEvent(new CustomEvent('response-animation-complete', { bubbles: true, composed: true }));
             }
-        } else {
-            console.log('Response container not found');
         }
     }
 
     render() {
-        const responseCounter = this.getResponseCounter();
+        const hasMultipleResponses = this.responses.length > 1;
 
         return html`
             <div class="response-container" id="responseContainer"></div>
 
-            <div class="text-input-container">
-                <button class="nav-button" @click=${this.navigateToPreviousResponse} ?disabled=${this.currentResponseIndex <= 0}>
-                    <svg width="24px" height="24px" stroke-width="1.7" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M15 6L9 12L15 18" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
-                    </svg>
-                </button>
-
-                ${this.responses.length > 0 ? html`<span class="response-counter">${responseCounter}</span>` : ''}
-
-                <button class="nav-button" @click=${this.navigateToNextResponse} ?disabled=${this.currentResponseIndex >= this.responses.length - 1}>
-                    <svg width="24px" height="24px" stroke-width="1.7" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M9 6L15 12L9 18" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
-                    </svg>
-                </button>
-
-                <input type="text" id="textInput" placeholder="Type a message to the AI..." @keydown=${this.handleTextKeydown} />
-
-                <div class="screen-answer-btn-wrapper">
-                    <div class="tooltip">
-                        <div class="tooltip-row">
-                            <span class="tooltip-label">Flash</span>
-                            <span class="tooltip-value">${this.flashCount}/20</span>
-                        </div>
-                        <div class="tooltip-row">
-                            <span class="tooltip-label">Flash Lite</span>
-                            <span class="tooltip-value">${this.flashLiteCount}/20</span>
-                        </div>
-                        <div class="tooltip-note">Resets every 24 hours</div>
-                    </div>
-                    <button class="screen-answer-btn" @click=${this.handleScreenAnswer}>
+            ${hasMultipleResponses ? html`
+                <div class="response-nav">
+                    <button class="nav-btn" @click=${this.navigateToPreviousResponse} ?disabled=${this.currentResponseIndex <= 0} title="Previous response">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                            <path d="M15.98 1.804a1 1 0 0 0-1.96 0l-.24 1.192a1 1 0 0 1-.784.785l-1.192.238a1 1 0 0 0 0 1.962l1.192.238a1 1 0 0 1 .785.785l.238 1.192a1 1 0 0 0 1.962 0l.238-1.192a1 1 0 0 1 .785-.785l1.192-.238a1 1 0 0 0 0-1.962l-1.192-.238a1 1 0 0 1-.785-.785l-.238-1.192ZM6.949 5.684a1 1 0 0 0-1.898 0l-.683 2.051a1 1 0 0 1-.633.633l-2.051.683a1 1 0 0 0 0 1.898l2.051.684a1 1 0 0 1 .633.632l.683 2.051a1 1 0 0 0 1.898 0l.683-2.051a1 1 0 0 1 .633-.633l2.051-.683a1 1 0 0 0 0-1.898l-2.051-.683a1 1 0 0 1-.633-.633L6.95 5.684ZM13.949 13.684a1 1 0 0 0-1.898 0l-.184.551a1 1 0 0 1-.632.633l-.551.183a1 1 0 0 0 0 1.898l.551.183a1 1 0 0 1 .633.633l.183.551a1 1 0 0 0 1.898 0l.184-.551a1 1 0 0 1 .632-.633l.551-.183a1 1 0 0 0 0-1.898l-.551-.184a1 1 0 0 1-.633-.632l-.183-.551Z" />
+                            <path fill-rule="evenodd" d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd" />
                         </svg>
-                        <span>Analyze screen</span>
-                        <span class="usage-count">(${this.getTotalUsed()}/${this.getTotalAvailable()})</span>
+                    </button>
+                    <span class="response-counter">${this.currentResponseIndex + 1} of ${this.responses.length}</span>
+                    <button class="nav-btn" @click=${this.navigateToNextResponse} ?disabled=${this.currentResponseIndex >= this.responses.length - 1} title="Next response">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+                        </svg>
                     </button>
                 </div>
+            ` : ''}
+
+            <div class="input-bar">
+                <div class="input-bar-inner">
+                    <input
+                        type="text"
+                        id="textInput"
+                        placeholder="Type a message..."
+                        @keydown=${this.handleTextKeydown}
+                    />
+                </div>
+                <button class="analyze-btn ${this.isAnalyzing ? 'analyzing' : ''}" @click=${this.handleScreenAnswer}>
+                    <canvas class="analyze-canvas"></canvas>
+                    <span class="analyze-btn-content">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24">
+                            <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 3v7h6l-8 11v-7H5z" />
+                        </svg>
+                        Analyze Screen
+                    </span>
+                </button>
             </div>
         `;
     }

@@ -49,6 +49,13 @@ const storage = {
     async setApiKey(apiKey) {
         return ipcRenderer.invoke('storage:set-api-key', apiKey);
     },
+    async getGroqApiKey() {
+        const result = await ipcRenderer.invoke('storage:get-groq-api-key');
+        return result.success ? result.data : '';
+    },
+    async setGroqApiKey(groqApiKey) {
+        return ipcRenderer.invoke('storage:set-groq-api-key', groqApiKey);
+    },
 
     // Preferences
     async getPreferences() {
@@ -143,6 +150,42 @@ async function initializeGemini(profile = 'interview', language = 'en-US') {
         } else {
             cheatingDaddy.setStatus('error');
         }
+    }
+}
+
+async function initializeLocal(profile = 'interview') {
+    const prefs = await storage.getPreferences();
+    const ollamaHost = prefs.ollamaHost || 'http://127.0.0.1:11434';
+    const ollamaModel = prefs.ollamaModel || 'llama3.1';
+    const whisperModel = prefs.whisperModel || 'Xenova/whisper-small';
+    const customPrompt = prefs.customPrompt || '';
+
+    const success = await ipcRenderer.invoke('initialize-local', ollamaHost, ollamaModel, whisperModel, profile, customPrompt);
+    if (success) {
+        cheatingDaddy.setStatus('Local AI Live');
+        return true;
+    } else {
+        cheatingDaddy.setStatus('error');
+        return false;
+    }
+}
+
+async function initializeCloud(profile = 'interview') {
+    const creds = await storage.getCredentials();
+    const token = creds.cloudToken;
+    if (!token || !token.trim()) {
+        cheatingDaddy.setStatus('error');
+        return false;
+    }
+
+    const prefs = await storage.getPreferences();
+    const success = await ipcRenderer.invoke('initialize-cloud', token, profile, prefs.customPrompt || '');
+    if (success) {
+        cheatingDaddy.setStatus('Live');
+        return true;
+    } else {
+        cheatingDaddy.setStatus('error');
+        return false;
     }
 }
 
@@ -547,21 +590,33 @@ async function captureManualScreenshot(imageQuality = null) {
         return;
     }
 
-    offscreenContext.drawImage(hiddenVideo, 0, 0, offscreenCanvas.width, offscreenCanvas.height);
+    // Downscale to max 1280px wide for faster transfer — vision models don't need 4K
+    const MAX_WIDTH = 1280;
+    const srcW = hiddenVideo.videoWidth;
+    const srcH = hiddenVideo.videoHeight;
+    let destW = srcW;
+    let destH = srcH;
+    if (srcW > MAX_WIDTH) {
+        destW = MAX_WIDTH;
+        destH = Math.round(srcH * (MAX_WIDTH / srcW));
+    }
+    offscreenCanvas.width = destW;
+    offscreenCanvas.height = destH;
+    offscreenContext.drawImage(hiddenVideo, 0, 0, destW, destH);
 
     let qualityValue;
     switch (quality) {
         case 'high':
-            qualityValue = 0.9;
+            qualityValue = 0.85;
             break;
         case 'medium':
-            qualityValue = 0.7;
+            qualityValue = 0.6;
             break;
         case 'low':
-            qualityValue = 0.5;
+            qualityValue = 0.4;
             break;
         default:
-            qualityValue = 0.7;
+            qualityValue = 0.6;
     }
 
     offscreenCanvas.toBlob(
@@ -579,6 +634,8 @@ async function captureManualScreenshot(imageQuality = null) {
                     console.error('Invalid base64 data generated');
                     return;
                 }
+
+                console.log(`Sending image: ${destW}x${destH}, ~${Math.round(base64data.length / 1024)}KB`);
 
                 // Send image with prompt to HTTP API (response streams via IPC events)
                 const result = await ipcRenderer.invoke('send-image-content', {
@@ -732,9 +789,9 @@ const cheatingDaddyApp = document.querySelector('cheating-daddy-app');
 const theme = {
     themes: {
         dark: {
-            background: '#1e1e1e',
+            background: '#101010',
             text: '#e0e0e0', textSecondary: '#a0a0a0', textMuted: '#6b6b6b',
-            border: '#333333', accent: '#ffffff',
+            border: '#2a2a2a', accent: '#ffffff',
             btnPrimaryBg: '#ffffff', btnPrimaryText: '#000000', btnPrimaryHover: '#e0e0e0',
             tooltipBg: '#1a1a1a', tooltipText: '#ffffff',
             keyBg: 'rgba(255,255,255,0.1)'
@@ -763,30 +820,46 @@ const theme = {
             tooltipBg: '#5c4b37', tooltipText: '#f4ecd8',
             keyBg: 'rgba(92,75,55,0.15)'
         },
-        nord: {
-            background: '#2e3440',
-            text: '#eceff4', textSecondary: '#d8dee9', textMuted: '#4c566a',
-            border: '#3b4252', accent: '#88c0d0',
-            btnPrimaryBg: '#88c0d0', btnPrimaryText: '#2e3440', btnPrimaryHover: '#8fbcbb',
-            tooltipBg: '#3b4252', tooltipText: '#eceff4',
-            keyBg: 'rgba(136,192,208,0.15)'
+        catppuccin: {
+            background: '#1e1e2e',
+            text: '#cdd6f4', textSecondary: '#a6adc8', textMuted: '#585b70',
+            border: '#313244', accent: '#cba6f7',
+            btnPrimaryBg: '#cba6f7', btnPrimaryText: '#1e1e2e', btnPrimaryHover: '#b4befe',
+            tooltipBg: '#313244', tooltipText: '#cdd6f4',
+            keyBg: 'rgba(203,166,247,0.12)'
         },
-        dracula: {
-            background: '#282a36',
-            text: '#f8f8f2', textSecondary: '#bd93f9', textMuted: '#6272a4',
-            border: '#44475a', accent: '#ff79c6',
-            btnPrimaryBg: '#ff79c6', btnPrimaryText: '#282a36', btnPrimaryHover: '#ff92d0',
-            tooltipBg: '#44475a', tooltipText: '#f8f8f2',
-            keyBg: 'rgba(255,121,198,0.15)'
+        gruvbox: {
+            background: '#1d2021',
+            text: '#ebdbb2', textSecondary: '#a89984', textMuted: '#665c54',
+            border: '#3c3836', accent: '#fe8019',
+            btnPrimaryBg: '#fe8019', btnPrimaryText: '#1d2021', btnPrimaryHover: '#fabd2f',
+            tooltipBg: '#3c3836', tooltipText: '#ebdbb2',
+            keyBg: 'rgba(254,128,25,0.12)'
         },
-        abyss: {
-            background: '#0a0a0a',
-            text: '#d4d4d4', textSecondary: '#808080', textMuted: '#505050',
-            border: '#1a1a1a', accent: '#ffffff',
-            btnPrimaryBg: '#ffffff', btnPrimaryText: '#0a0a0a', btnPrimaryHover: '#d4d4d4',
-            tooltipBg: '#141414', tooltipText: '#d4d4d4',
-            keyBg: 'rgba(255,255,255,0.08)'
-        }
+        rosepine: {
+            background: '#191724',
+            text: '#e0def4', textSecondary: '#908caa', textMuted: '#6e6a86',
+            border: '#26233a', accent: '#ebbcba',
+            btnPrimaryBg: '#ebbcba', btnPrimaryText: '#191724', btnPrimaryHover: '#f6c177',
+            tooltipBg: '#26233a', tooltipText: '#e0def4',
+            keyBg: 'rgba(235,188,186,0.12)'
+        },
+        solarized: {
+            background: '#002b36',
+            text: '#93a1a1', textSecondary: '#839496', textMuted: '#586e75',
+            border: '#073642', accent: '#2aa198',
+            btnPrimaryBg: '#2aa198', btnPrimaryText: '#002b36', btnPrimaryHover: '#268bd2',
+            tooltipBg: '#073642', tooltipText: '#93a1a1',
+            keyBg: 'rgba(42,161,152,0.12)'
+        },
+        tokyonight: {
+            background: '#1a1b26',
+            text: '#c0caf5', textSecondary: '#9aa5ce', textMuted: '#565f89',
+            border: '#292e42', accent: '#7aa2f7',
+            btnPrimaryBg: '#7aa2f7', btnPrimaryText: '#1a1b26', btnPrimaryHover: '#bb9af7',
+            tooltipBg: '#292e42', tooltipText: '#c0caf5',
+            keyBg: 'rgba(122,162,247,0.12)'
+        },
     },
 
     current: 'dark',
@@ -801,9 +874,11 @@ const theme = {
             light: 'Light',
             midnight: 'Midnight Blue',
             sepia: 'Sepia',
-            nord: 'Nord',
-            dracula: 'Dracula',
-            abyss: 'Abyss'
+            catppuccin: 'Catppuccin Mocha',
+            gruvbox: 'Gruvbox Dark',
+            rosepine: 'Ros\u00e9 Pine',
+            solarized: 'Solarized Dark',
+            tokyonight: 'Tokyo Night'
         };
         return Object.keys(this.themes).map(key => ({
             value: key,
@@ -845,20 +920,31 @@ const theme = {
         const isLight = (baseRgb.r + baseRgb.g + baseRgb.b) / 3 > 128;
         const adjust = isLight ? this.darkenColor.bind(this) : this.lightenColor.bind(this);
 
-        const secondary = adjust(baseRgb, 7);
-        const tertiary = adjust(baseRgb, 15);
-        const hover = adjust(baseRgb, 20);
+        const secondary = adjust(baseRgb, 10);
+        const tertiary = adjust(baseRgb, 22);
+        const hover = adjust(baseRgb, 28);
 
-        root.style.setProperty('--header-background', `rgba(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}, ${alpha})`);
-        root.style.setProperty('--main-content-background', `rgba(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}, ${alpha})`);
-        root.style.setProperty('--bg-primary', `rgba(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}, ${alpha})`);
-        root.style.setProperty('--bg-secondary', `rgba(${secondary.r}, ${secondary.g}, ${secondary.b}, ${alpha})`);
-        root.style.setProperty('--bg-tertiary', `rgba(${tertiary.r}, ${tertiary.g}, ${tertiary.b}, ${alpha})`);
-        root.style.setProperty('--bg-hover', `rgba(${hover.r}, ${hover.g}, ${hover.b}, ${alpha})`);
-        root.style.setProperty('--input-background', `rgba(${tertiary.r}, ${tertiary.g}, ${tertiary.b}, ${alpha})`);
-        root.style.setProperty('--input-focus-background', `rgba(${tertiary.r}, ${tertiary.g}, ${tertiary.b}, ${alpha})`);
-        root.style.setProperty('--hover-background', `rgba(${hover.r}, ${hover.g}, ${hover.b}, ${alpha})`);
-        root.style.setProperty('--scrollbar-background', `rgba(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}, ${alpha})`);
+        const bgBase = `rgba(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}, ${alpha})`;
+        const bgSurface = `rgba(${secondary.r}, ${secondary.g}, ${secondary.b}, ${alpha})`;
+        const bgElevated = `rgba(${tertiary.r}, ${tertiary.g}, ${tertiary.b}, ${alpha})`;
+        const bgHover = `rgba(${hover.r}, ${hover.g}, ${hover.b}, ${alpha})`;
+
+        // New design tokens (used by components)
+        root.style.setProperty('--bg-app', bgBase);
+        root.style.setProperty('--bg-surface', bgSurface);
+        root.style.setProperty('--bg-elevated', bgElevated);
+        root.style.setProperty('--bg-hover', bgHover);
+
+        // Legacy aliases
+        root.style.setProperty('--header-background', bgBase);
+        root.style.setProperty('--main-content-background', bgBase);
+        root.style.setProperty('--bg-primary', bgBase);
+        root.style.setProperty('--bg-secondary', bgSurface);
+        root.style.setProperty('--bg-tertiary', bgElevated);
+        root.style.setProperty('--input-background', bgElevated);
+        root.style.setProperty('--input-focus-background', bgElevated);
+        root.style.setProperty('--hover-background', bgHover);
+        root.style.setProperty('--scrollbar-background', bgBase);
     },
 
     apply(themeName, alpha = 0.8) {
@@ -866,14 +952,19 @@ const theme = {
         this.current = themeName;
         const root = document.documentElement;
 
-        // Text colors
-        root.style.setProperty('--text-color', colors.text);
+        // New design tokens (used by components)
+        root.style.setProperty('--text-primary', colors.text);
         root.style.setProperty('--text-secondary', colors.textSecondary);
         root.style.setProperty('--text-muted', colors.textMuted);
-        // Border colors
+        root.style.setProperty('--border', colors.border);
+        root.style.setProperty('--border-strong', colors.accent);
+        root.style.setProperty('--accent', colors.btnPrimaryBg);
+        root.style.setProperty('--accent-hover', colors.btnPrimaryHover);
+
+        // Legacy aliases
+        root.style.setProperty('--text-color', colors.text);
         root.style.setProperty('--border-color', colors.border);
         root.style.setProperty('--border-default', colors.accent);
-        // Misc
         root.style.setProperty('--placeholder-color', colors.textMuted);
         root.style.setProperty('--scrollbar-thumb', colors.border);
         root.style.setProperty('--scrollbar-thumb-hover', colors.textMuted);
@@ -936,6 +1027,8 @@ const cheatingDaddy = {
 
     // Core functionality
     initializeGemini,
+    initializeCloud,
+    initializeLocal,
     startCapture,
     stopCapture,
     sendTextMessage,

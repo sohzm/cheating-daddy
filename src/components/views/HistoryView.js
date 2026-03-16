@@ -1,376 +1,281 @@
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
-import { resizeLayout } from '../../utils/windowResize.js';
+import { unifiedPageStyles } from './sharedPageStyles.js';
 
 export class HistoryView extends LitElement {
-    static styles = css`
-        * {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            cursor: default;
-            user-select: none;
-        }
+    static styles = [
+        unifiedPageStyles,
+        css`
+            .unified-page {
+                overflow-y: hidden;
+            }
 
-        :host {
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            width: 100%;
-        }
+            .unified-wrap {
+                height: 100%;
+            }
 
-        .history-container {
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-        }
+            .search-wrap {
+                position: relative;
+                max-width: 280px;
+            }
 
-        .sessions-list {
-            flex: 1;
-            overflow-y: auto;
-        }
+            .search-icon {
+                position: absolute;
+                left: 10px;
+                top: 50%;
+                transform: translateY(-50%);
+                width: 14px;
+                height: 14px;
+                color: var(--text-muted);
+                pointer-events: none;
+            }
 
-        .session-item {
-            padding: 12px;
-            border-bottom: 1px solid var(--border-color);
-            cursor: pointer;
-            transition: background 0.1s ease;
-        }
+            .search-wrap .control {
+                padding-left: 30px;
+            }
 
-        .session-item:hover {
-            background: var(--hover-background);
-        }
+            .list-shell {
+                border: 1px solid var(--border);
+                border-radius: var(--radius-md);
+                background: var(--bg-surface);
+                overflow: hidden;
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                min-height: 0;
+            }
 
-        .session-item.selected {
-            background: var(--bg-secondary);
-        }
+            .sessions-list {
+                overflow-y: auto;
+                flex: 1;
+            }
 
-        .session-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 4px;
-        }
+            .session-card {
+                width: 100%;
+                border: none;
+                border-bottom: 1px solid var(--border);
+                background: transparent;
+                text-align: left;
+                padding: var(--space-sm) var(--space-md);
+                cursor: pointer;
+                transition: background var(--transition);
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: var(--space-sm);
+            }
 
-        .session-date {
-            font-size: 12px;
-            font-weight: 500;
-            color: var(--text-color);
-        }
+            .session-card:hover {
+                background: var(--bg-hover);
+            }
 
-        .session-time {
-            font-size: 11px;
-            color: var(--text-muted);
-            font-family: 'SF Mono', Monaco, monospace;
-        }
+            .session-left {
+                display: flex;
+                flex-direction: column;
+                gap: 2px;
+            }
 
-        .session-preview {
-            font-size: 11px;
-            color: var(--text-muted);
-            line-height: 1.3;
-        }
+            .session-profile {
+                color: var(--text-primary);
+                font-size: var(--font-size-sm);
+            }
 
-        .conversation-view {
-            flex: 1;
-            overflow-y: auto;
-            background: var(--bg-primary);
-            padding: 12px 0;
-            user-select: text;
-            cursor: text;
-        }
+            .session-date {
+                color: var(--text-muted);
+                font-size: var(--font-size-xs);
+            }
 
-        .message {
-            margin-bottom: 8px;
-            padding: 8px 12px;
-            border-left: 2px solid transparent;
-            font-size: 12px;
-            line-height: 1.4;
-            background: var(--bg-secondary);
-            user-select: text;
-            cursor: text;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-        }
+            .session-badge {
+                color: var(--text-secondary);
+                font-size: var(--font-size-xs);
+                background: var(--bg-elevated);
+                border: 1px solid var(--border);
+                border-radius: var(--radius-sm);
+                padding: 2px 8px;
+                white-space: nowrap;
+            }
 
-        .message.user {
-            border-left-color: #3b82f6;
-        }
+            .detail-top {
+                display: flex;
+                align-items: center;
+                gap: var(--space-sm);
+            }
 
-        .message.ai {
-            border-left-color: #ef4444;
-        }
+            .back-btn {
+                border: none;
+                background: none;
+                color: var(--text-muted);
+                padding: 0;
+                font-size: var(--font-size-sm);
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+            }
 
-        .back-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-            padding: 12px 12px 12px 12px;
-            border-bottom: 1px solid var(--border-color);
-        }
+            .back-btn svg {
+                cursor: pointer;
+            }
 
-        .back-button {
-            background: transparent;
-            color: var(--text-color);
-            border: 1px solid var(--border-color);
-            padding: 6px 12px;
-            border-radius: 3px;
-            font-size: 11px;
-            font-weight: 500;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            transition: background 0.1s ease;
-        }
+            .back-btn:hover {
+                color: var(--text-primary);
+            }
 
-        .back-button:hover {
-            background: var(--hover-background);
-        }
+            .detail-info {
+                color: var(--text-secondary);
+                font-size: var(--font-size-sm);
+            }
 
-        .legend {
-            display: flex;
-            gap: 12px;
-            align-items: center;
-        }
+            .tab-row {
+                display: flex;
+                gap: 6px;
+            }
 
-        .legend-item {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            font-size: 10px;
-            color: var(--text-muted);
-        }
+            .tab-btn {
+                border: 1px solid var(--border);
+                border-radius: var(--radius-sm);
+                background: transparent;
+                color: var(--text-muted);
+                padding: 6px 10px;
+                cursor: pointer;
+                font-size: var(--font-size-xs);
+            }
 
-        .legend-dot {
-            width: 8px;
-            height: 2px;
-        }
+            .tab-btn:hover {
+                color: var(--text-secondary);
+            }
 
-        .legend-dot.user {
-            background-color: #3b82f6;
-        }
+            .tab-btn.active {
+                color: var(--text-primary);
+                border-color: var(--text-secondary);
+            }
 
-        .legend-dot.ai {
-            background-color: #ef4444;
-        }
+            .details-scroll {
+                overflow-y: auto;
+                flex: 1;
+                min-height: 0;
+                display: flex;
+                flex-direction: column;
+                gap: var(--space-sm);
+                padding: var(--space-sm) 0;
+            }
 
-        .legend-dot.screen {
-            background-color: #22c55e;
-        }
+            .message-row {
+                display: flex;
+            }
 
-        .session-context {
-            padding: 8px 12px;
-            margin-bottom: 8px;
-            background: var(--bg-tertiary);
-            border-radius: 4px;
-            font-size: 11px;
-        }
+            .message-row.user {
+                justify-content: flex-end;
+            }
 
-        .session-context-row {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 4px;
-        }
+            .message-row.ai,
+            .message-row.screen {
+                justify-content: flex-start;
+            }
 
-        .session-context-row:last-child {
-            margin-bottom: 0;
-        }
+            .message {
+                max-width: 75%;
+                border-radius: 16px;
+                padding: 8px 12px;
+                word-break: break-word;
+                user-select: text;
+                cursor: text;
+                font-size: var(--font-size-sm);
+                line-height: 1.45;
+            }
 
-        .context-label {
-            color: var(--text-muted);
-            min-width: 80px;
-        }
+            .message-body {
+                white-space: pre-wrap;
+            }
 
-        .context-value {
-            color: var(--text-color);
-            font-weight: 500;
-        }
+            .message-meta {
+                font-size: 10px;
+                margin-top: 4px;
+                opacity: 0.5;
+            }
 
-        .custom-prompt-value {
-            color: var(--text-secondary);
-            font-style: italic;
-            word-break: break-word;
-            white-space: pre-wrap;
-        }
+            .message-row.user .message {
+                background: var(--accent);
+                color: var(--bg-app);
+                border-bottom-right-radius: 4px;
+            }
 
-        .view-tabs {
-            display: flex;
-            gap: 0;
-            border-bottom: 1px solid var(--border-color);
-            margin-bottom: 8px;
-        }
+            .message-row.user .message-meta {
+                text-align: right;
+            }
 
-        .view-tab {
-            background: transparent;
-            color: var(--text-muted);
-            border: none;
-            padding: 8px 16px;
-            font-size: 11px;
-            font-weight: 500;
-            cursor: pointer;
-            border-bottom: 2px solid transparent;
-            margin-bottom: -1px;
-            transition: color 0.1s ease;
-        }
+            .message-row.ai .message {
+                background: var(--bg-elevated);
+                color: var(--text-primary);
+                border: 1px solid var(--border);
+                border-bottom-left-radius: 4px;
+            }
 
-        .view-tab:hover {
-            color: var(--text-color);
-        }
+            .message-row.screen .message {
+                background: var(--bg-elevated);
+                color: var(--text-primary);
+                border: 1px solid var(--border);
+                border-bottom-left-radius: 4px;
+            }
 
-        .view-tab.active {
-            color: var(--text-color);
-            border-bottom-color: var(--text-color);
-        }
+            .context-row {
+                display: flex;
+                align-items: flex-start;
+                gap: var(--space-sm);
+                padding: var(--space-sm);
+                border: 1px solid var(--border);
+                border-radius: var(--radius-sm);
+                background: var(--bg-elevated);
+            }
 
-        .message.screen {
-            border-left-color: #22c55e;
-        }
+            .context-key {
+                width: 84px;
+                color: var(--text-muted);
+                font-size: var(--font-size-xs);
+                text-transform: uppercase;
+                letter-spacing: 0.4px;
+                flex-shrink: 0;
+            }
 
-        .analysis-meta {
-            font-size: 10px;
-            color: var(--text-muted);
-            margin-bottom: 4px;
-            font-family: 'SF Mono', Monaco, monospace;
-        }
+            .context-value {
+                color: var(--text-primary);
+                font-size: var(--font-size-sm);
+                line-height: 1.45;
+                white-space: pre-wrap;
+                word-break: break-word;
+                user-select: text;
+                cursor: text;
+            }
 
-        .empty-state {
-            text-align: center;
-            color: var(--text-muted);
-            font-size: 12px;
-            margin-top: 32px;
-        }
-
-        .empty-state-title {
-            font-size: 14px;
-            font-weight: 500;
-            margin-bottom: 6px;
-            color: var(--text-secondary);
-        }
-
-        .loading {
-            text-align: center;
-            color: var(--text-muted);
-            font-size: 12px;
-            margin-top: 32px;
-        }
-
-        .sessions-list::-webkit-scrollbar,
-        .conversation-view::-webkit-scrollbar {
-            width: 8px;
-        }
-
-        .sessions-list::-webkit-scrollbar-track,
-        .conversation-view::-webkit-scrollbar-track {
-            background: transparent;
-        }
-
-        .sessions-list::-webkit-scrollbar-thumb,
-        .conversation-view::-webkit-scrollbar-thumb {
-            background: var(--scrollbar-thumb);
-            border-radius: 4px;
-        }
-
-        .sessions-list::-webkit-scrollbar-thumb:hover,
-        .conversation-view::-webkit-scrollbar-thumb:hover {
-            background: var(--scrollbar-thumb-hover);
-        }
-
-        .tabs-container {
-            display: flex;
-            gap: 0;
-            margin-bottom: 16px;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .tab {
-            background: transparent;
-            color: var(--text-muted);
-            border: none;
-            padding: 8px 16px;
-            font-size: 12px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: color 0.1s ease;
-            border-bottom: 2px solid transparent;
-            margin-bottom: -1px;
-        }
-
-        .tab:hover {
-            color: var(--text-color);
-        }
-
-        .tab.active {
-            color: var(--text-color);
-            border-bottom-color: var(--text-color);
-        }
-
-        .saved-response-item {
-            padding: 12px 0;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .saved-response-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 6px;
-        }
-
-        .saved-response-profile {
-            font-size: 11px;
-            font-weight: 500;
-            color: var(--text-secondary);
-            text-transform: capitalize;
-        }
-
-        .saved-response-date {
-            font-size: 10px;
-            color: var(--text-muted);
-            font-family: 'SF Mono', Monaco, monospace;
-        }
-
-        .saved-response-content {
-            font-size: 12px;
-            color: var(--text-color);
-            line-height: 1.4;
-            user-select: text;
-            cursor: text;
-        }
-
-        .delete-button {
-            background: transparent;
-            color: var(--text-muted);
-            border: none;
-            padding: 4px;
-            border-radius: 3px;
-            cursor: pointer;
-            transition: all 0.1s ease;
-        }
-
-        .delete-button:hover {
-            background: rgba(241, 76, 76, 0.1);
-            color: var(--error-color);
-        }
-    `;
+            .empty {
+                color: var(--text-muted);
+                font-size: var(--font-size-sm);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                min-height: 120px;
+                border: 1px dashed var(--border);
+                border-radius: var(--radius-sm);
+            }
+        `,
+    ];
 
     static properties = {
         sessions: { type: Array },
         selectedSession: { type: Object },
+        selectedSessionId: { type: String },
         loading: { type: Boolean },
         activeTab: { type: String },
+        searchQuery: { type: String },
     };
 
     constructor() {
         super();
         this.sessions = [];
         this.selectedSession = null;
+        this.selectedSessionId = null;
         this.loading = true;
-        this.activeTab = 'conversation'; // 'conversation' or 'screen'
+        this.activeTab = 'conversation';
+        this.searchQuery = '';
         this.loadSessions();
-    }
-
-    connectedCallback() {
-        super.connectedCallback();
-        // Resize window for this view
-        resizeLayout();
     }
 
     async loadSessions() {
@@ -378,7 +283,7 @@ export class HistoryView extends LitElement {
             this.loading = true;
             this.sessions = await cheatingDaddy.storage.getAllSessions();
         } catch (error) {
-            console.error('Error loading conversation sessions:', error);
+            console.error('Error loading sessions:', error);
             this.sessions = [];
         } finally {
             this.loading = false;
@@ -386,11 +291,13 @@ export class HistoryView extends LitElement {
         }
     }
 
-    async loadSelectedSession(sessionId) {
+    async openSession(sessionId) {
         try {
             const session = await cheatingDaddy.storage.getSession(sessionId);
             if (session) {
                 this.selectedSession = session;
+                this.selectedSessionId = sessionId;
+                this.activeTab = 'conversation';
                 this.requestUpdate();
             }
         } catch (error) {
@@ -398,59 +305,29 @@ export class HistoryView extends LitElement {
         }
     }
 
+    closeSession() {
+        this.selectedSession = null;
+        this.selectedSessionId = null;
+        this.activeTab = 'conversation';
+    }
+
+    handleSearchInput(e) {
+        this.searchQuery = e.target.value;
+    }
+
     formatDate(timestamp) {
         const date = new Date(timestamp);
-        return date.toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric',
-        });
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     }
 
     formatTime(timestamp) {
         const date = new Date(timestamp);
-        return date.toLocaleTimeString('en-US', {
-            hour: '2-digit',
-            minute: '2-digit',
-        });
+        return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     }
 
     formatTimestamp(timestamp) {
         const date = new Date(timestamp);
-        return date.toLocaleString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-        });
-    }
-
-    getSessionPreview(session) {
-        const parts = [];
-        if (session.messageCount > 0) {
-            parts.push(`${session.messageCount} messages`);
-        }
-        if (session.screenAnalysisCount > 0) {
-            parts.push(`${session.screenAnalysisCount} screen analysis`);
-        }
-        if (session.profile) {
-            const profileNames = this.getProfileNames();
-            parts.push(profileNames[session.profile] || session.profile);
-        }
-        return parts.length > 0 ? parts.join(' • ') : 'Empty session';
-    }
-
-    handleSessionClick(session) {
-        this.loadSelectedSession(session.sessionId);
-    }
-
-    handleBackClick() {
-        this.selectedSession = null;
-        this.activeTab = 'conversation';
-    }
-
-    handleTabClick(tab) {
-        this.activeTab = tab;
+        return date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
     }
 
     getProfileNames() {
@@ -464,183 +341,168 @@ export class HistoryView extends LitElement {
         };
     }
 
-    renderSessionsList() {
-        if (this.loading) {
-            return html`<div class="loading">Loading conversation history...</div>`;
+    _getProfileLabel(session) {
+        if (session.profile) {
+            const names = this.getProfileNames();
+            return names[session.profile] || session.profile;
         }
-
-        if (this.sessions.length === 0) {
-            return html`
-                <div class="empty-state">
-                    <div class="empty-state-title">No conversations yet</div>
-                    <div>Start a session to see your conversation history here</div>
-                </div>
-            `;
-        }
-
-        return html`
-            <div class="sessions-list">
-                ${this.sessions.map(
-                    session => html`
-                        <div class="session-item" @click=${() => this.handleSessionClick(session)}>
-                            <div class="session-header">
-                                <div class="session-date">${this.formatDate(session.createdAt)}</div>
-                                <div class="session-time">${this.formatTime(session.createdAt)}</div>
-                            </div>
-                            <div class="session-preview">${this.getSessionPreview(session)}</div>
-                        </div>
-                    `
-                )}
-            </div>
-        `;
+        return 'Session';
     }
 
-    renderContextContent() {
-        const { profile, customPrompt } = this.selectedSession;
-        const profileNames = this.getProfileNames();
-
-        if (!profile && !customPrompt) {
-            return html`<div class="empty-state">No profile context available</div>`;
+    getSessionPreview(session) {
+        const parts = [];
+        if (session.messageCount > 0) parts.push(`${session.messageCount} messages`);
+        if (session.screenAnalysisCount > 0) parts.push(`${session.screenAnalysisCount} screen`);
+        if (session.profile) {
+            const profileNames = this.getProfileNames();
+            parts.push(profileNames[session.profile] || session.profile);
         }
-
-        return html`
-            <div class="session-context">
-                ${profile ? html`
-                    <div class="session-context-row">
-                        <span class="context-label">Profile:</span>
-                        <span class="context-value">${profileNames[profile] || profile}</span>
-                    </div>
-                ` : ''}
-                ${customPrompt ? html`
-                    <div class="session-context-row">
-                        <span class="context-label">Custom Prompt:</span>
-                        <span class="custom-prompt-value">${customPrompt}</span>
-                    </div>
-                ` : ''}
-            </div>
-        `;
+        return parts.length > 0 ? parts.join(' · ') : 'Empty session';
     }
 
-    renderConversationContent() {
-        const { conversationHistory } = this.selectedSession;
+    getFilteredSessions() {
+        if (!this.searchQuery.trim()) return this.sessions;
+        const q = this.searchQuery.toLowerCase();
+        return this.sessions.filter(session => {
+            const preview = this.getSessionPreview(session).toLowerCase();
+            const date = this.formatDate(session.createdAt).toLowerCase();
+            return preview.includes(q) || date.includes(q);
+        });
+    }
 
-        // Flatten the conversation turns into individual messages
+    collectConversation(session) {
         const messages = [];
-        if (conversationHistory) {
-            conversationHistory.forEach(turn => {
-                if (turn.transcription) {
-                    messages.push({
-                        type: 'user',
-                        content: turn.transcription,
-                        timestamp: turn.timestamp,
-                    });
-                }
-                if (turn.ai_response) {
-                    messages.push({
-                        type: 'ai',
-                        content: turn.ai_response,
-                        timestamp: turn.timestamp,
-                    });
-                }
-            });
-        }
-
-        if (messages.length === 0) {
-            return html`<div class="empty-state">No conversation data available</div>`;
-        }
-
-        return messages.map(message => html`<div class="message ${message.type}">${message.content}</div>`);
+        const history = session.conversationHistory || [];
+        history.forEach(turn => {
+            if (turn.transcription) messages.push({ type: 'user', content: turn.transcription, timestamp: turn.timestamp });
+            if (turn.ai_response) messages.push({ type: 'ai', content: turn.ai_response, timestamp: turn.timestamp });
+        });
+        return messages;
     }
 
-    renderScreenAnalysisContent() {
-        const { screenAnalysisHistory } = this.selectedSession;
+    renderTabContent() {
+        if (!this.selectedSession) return html`<div class="empty">Select a session.</div>`;
 
-        if (!screenAnalysisHistory || screenAnalysisHistory.length === 0) {
-            return html`<div class="empty-state">No screen analysis data available</div>`;
-        }
-
-        return screenAnalysisHistory.map(analysis => html`
-            <div class="message screen"><div class="analysis-meta">${this.formatTimestamp(analysis.timestamp)} • ${analysis.model || 'unknown model'}</div>${analysis.response}</div>
-        `);
-    }
-
-    renderConversationView() {
-        if (!this.selectedSession) return html``;
-
-        const { conversationHistory, screenAnalysisHistory, profile, customPrompt } = this.selectedSession;
-        const hasConversation = conversationHistory && conversationHistory.length > 0;
-        const hasScreenAnalysis = screenAnalysisHistory && screenAnalysisHistory.length > 0;
-        const hasContext = profile || customPrompt;
-
-        return html`
-            <div class="back-header">
-                <button class="back-button" @click=${this.handleBackClick}>
-                    <svg
-                        width="16px"
-                        height="16px"
-                        stroke-width="1.7"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                        color="currentColor"
-                    >
-                        <path d="M15 6L9 12L15 18" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
-                    </svg>
-                    Back to Sessions
-                </button>
-                <div class="legend">
-                    <div class="legend-item">
-                        <div class="legend-dot user"></div>
-                        <span>Them</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-dot ai"></div>
-                        <span>Suggestion</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-dot screen"></div>
-                        <span>Screen</span>
+        if (this.activeTab === 'conversation') {
+            const messages = this.collectConversation(this.selectedSession);
+            if (!messages.length) return html`<div class="empty">No conversation data.</div>`;
+            return messages.map(msg => html`
+                <div class="message-row ${msg.type}">
+                    <div class="message">
+                        <div class="message-body">${msg.content}</div>
+                        <div class="message-meta">${this.formatTime(msg.timestamp)}</div>
                     </div>
                 </div>
+            `);
+        }
+
+        if (this.activeTab === 'screen') {
+            const screen = this.selectedSession.screenAnalysisHistory || [];
+            if (!screen.length) return html`<div class="empty">No screen analysis data.</div>`;
+            return screen.map(entry => html`
+                <div class="message-row screen">
+                    <div class="message">
+                        <div class="message-body">${entry.response || ''}</div>
+                        <div class="message-meta">${this.formatTime(entry.timestamp)}</div>
+                    </div>
+                </div>
+            `);
+        }
+
+        const profile = this.selectedSession.profile;
+        const prompt = this.selectedSession.customPrompt;
+        if (!profile && !prompt) return html`<div class="empty">No context saved for this session.</div>`;
+
+        return html`
+            ${profile ? html`
+                <div class="context-row">
+                    <span class="context-key">Profile</span>
+                    <span class="context-value">${this.getProfileNames()[profile] || profile}</span>
+                </div>
+            ` : ''}
+            ${prompt ? html`
+                <div class="context-row">
+                    <span class="context-key">Prompt</span>
+                    <span class="context-value">${prompt}</span>
+                </div>
+            ` : ''}
+        `;
+    }
+
+    renderListView() {
+        const filteredSessions = this.getFilteredSessions();
+        return html`
+            <div class="page-title">History</div>
+
+            <div class="search-wrap">
+                <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="8"/>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+                <input
+                    class="control"
+                    type="text"
+                    placeholder="Search sessions..."
+                    .value=${this.searchQuery}
+                    @input=${this.handleSearchInput}
+                />
             </div>
-            <div class="view-tabs">
-                <button
-                    class="view-tab ${this.activeTab === 'conversation' ? 'active' : ''}"
-                    @click=${() => this.handleTabClick('conversation')}
-                >
-                    Conversation ${hasConversation ? `(${conversationHistory.length})` : ''}
+
+            <section class="list-shell">
+                <div class="sessions-list">
+                    ${this.loading ? html`<div class="empty" style="margin:var(--space-md);">Loading sessions...</div>` : ''}
+                    ${!this.loading && filteredSessions.length === 0 ? html`<div class="empty" style="margin:var(--space-md);">No matching sessions.</div>` : ''}
+                    ${!this.loading ? filteredSessions.map(session => html`
+                        <button class="session-card" @click=${() => this.openSession(session.sessionId)}>
+                            <div class="session-left">
+                                <span class="session-profile">${this._getProfileLabel(session)}</span>
+                                <span class="session-date">${this.formatDate(session.createdAt)} · ${this.formatTime(session.createdAt)}</span>
+                            </div>
+                            ${session.messageCount > 0 ? html`<span class="session-badge">${session.messageCount}</span>` : ''}
+                        </button>
+                    `) : ''}
+                </div>
+            </section>
+        `;
+    }
+
+    renderDetailView() {
+        const conversationCount = this.collectConversation(this.selectedSession).length;
+        const screenCount = this.selectedSession?.screenAnalysisHistory?.length || 0;
+
+        return html`
+            <div class="page-title">Session Detail</div>
+            <div class="detail-top">
+                <button class="back-btn" @click=${this.closeSession}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="15 18 9 12 15 6"/>
+                    </svg>
                 </button>
-                <button
-                    class="view-tab ${this.activeTab === 'screen' ? 'active' : ''}"
-                    @click=${() => this.handleTabClick('screen')}
-                >
-                    Screen ${hasScreenAnalysis ? `(${screenAnalysisHistory.length})` : ''}
+                <span class="detail-info">${this._getProfileLabel(this.selectedSession)} · ${this.formatDate(this.selectedSession.createdAt)} · ${this.formatTime(this.selectedSession.createdAt)}</span>
+            </div>
+            <div class="tab-row">
+                <button class="tab-btn ${this.activeTab === 'conversation' ? 'active' : ''}" @click=${() => { this.activeTab = 'conversation'; }}>
+                    Conversation (${conversationCount})
                 </button>
-                <button
-                    class="view-tab ${this.activeTab === 'context' ? 'active' : ''}"
-                    @click=${() => this.handleTabClick('context')}
-                >
-                    Context ${hasContext ? '' : '(empty)'}
+                <button class="tab-btn ${this.activeTab === 'screen' ? 'active' : ''}" @click=${() => { this.activeTab = 'screen'; }}>
+                    Screen (${screenCount})
+                </button>
+                <button class="tab-btn ${this.activeTab === 'context' ? 'active' : ''}" @click=${() => { this.activeTab = 'context'; }}>
+                    Context
                 </button>
             </div>
-            <div class="conversation-view">
-                ${this.activeTab === 'conversation'
-                    ? this.renderConversationContent()
-                    : this.activeTab === 'screen'
-                        ? this.renderScreenAnalysisContent()
-                        : this.renderContextContent()}
-            </div>
+            <section class="details-scroll">
+                ${this.renderTabContent()}
+            </section>
         `;
     }
 
     render() {
-        if (this.selectedSession) {
-            return html`<div class="history-container">${this.renderConversationView()}</div>`;
-        }
-
         return html`
-            <div class="history-container">
-                ${this.renderSessionsList()}
+            <div class="unified-page">
+                <div class="unified-wrap">
+                    ${this.selectedSession ? this.renderDetailView() : this.renderListView()}
+                </div>
             </div>
         `;
     }

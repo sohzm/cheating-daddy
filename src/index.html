@@ -5,75 +5,112 @@
         <title>Screen and Audio Capture</title>
         <style>
             :root {
-                /* Backgrounds - with default 0.8 transparency */
-                --background-transparent: transparent;
-                --bg-primary: rgba(30, 30, 30, 0.8);
-                --bg-secondary: rgba(37, 37, 38, 0.8);
-                --bg-tertiary: rgba(45, 45, 45, 0.8);
-                --bg-hover: rgba(50, 50, 50, 0.8);
+                /* Backgrounds */
+                --bg-app: #0A0A0A;
+                --bg-surface: #111111;
+                --bg-elevated: #191919;
+                --bg-hover: #1F1F1F;
 
                 /* Text */
-                --text-color: #e5e5e5;
-                --text-secondary: #a0a0a0;
-                --text-muted: #6b6b6b;
-                --description-color: #a0a0a0;
-                --placeholder-color: #6b6b6b;
+                --text-primary: #F5F5F5;
+                --text-secondary: #999999;
+                --text-muted: #555555;
 
-                /* Borders */
-                --border-color: #3c3c3c;
-                --border-subtle: #3c3c3c;
-                --border-default: #4a4a4a;
+                /* Borders & Lines */
+                --border: #222222;
+                --border-strong: #333333;
 
-                /* Component backgrounds - with default 0.8 transparency */
-                --header-background: rgba(30, 30, 30, 0.8);
-                --header-actions-color: #a0a0a0;
-                --main-content-background: rgba(30, 30, 30, 0.8);
+                /* Accent */
+                --accent: #3B82F6;
+                --accent-hover: #2563EB;
+
+                /* Status */
+                --success: #22C55E;
+                --warning: #D4A017;
+                --danger: #EF4444;
+
+                /* Typography */
+                --font: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+                --font-mono: 'SF Mono', 'Menlo', 'Monaco', 'Consolas', monospace;
+                --font-size-xs: 11px;
+                --font-size-sm: 13px;
+                --font-size-base: 14px;
+                --font-size-lg: 16px;
+                --font-size-xl: 20px;
+                --font-size-2xl: 28px;
+                --font-weight-normal: 400;
+                --font-weight-medium: 500;
+                --font-weight-semibold: 600;
+                --line-height: 1.6;
+
+                /* Spacing */
+                --space-xs: 4px;
+                --space-sm: 8px;
+                --space-md: 16px;
+                --space-lg: 24px;
+                --space-xl: 40px;
+                --space-2xl: 64px;
+
+                /* Radius */
+                --radius-sm: 4px;
+                --radius-md: 8px;
+                --radius-lg: 12px;
+
+                /* Transitions */
+                --transition: 150ms ease;
+
+                /* Sidebar */
+                --sidebar-width: 220px;
+                --sidebar-width-collapsed: 60px;
+
+                /* Legacy compatibility — mapped to new tokens */
+                --background-transparent: transparent;
+                --bg-primary: var(--bg-app);
+                --bg-secondary: var(--bg-surface);
+                --bg-tertiary: var(--bg-elevated);
+                --text-color: var(--text-primary);
+                --description-color: var(--text-secondary);
+                --placeholder-color: var(--text-muted);
+                --border-color: var(--border);
+                --border-subtle: var(--border);
+                --border-default: var(--border-strong);
+                --header-background: var(--bg-surface);
+                --header-actions-color: var(--text-secondary);
+                --main-content-background: var(--bg-app);
                 --button-background: transparent;
-                --button-border: #3c3c3c;
-                --icon-button-color: #a0a0a0;
-                --hover-background: rgba(50, 50, 50, 0.8);
-                --input-background: rgba(45, 45, 45, 0.8);
-                --input-focus-background: rgba(45, 45, 45, 0.8);
-
-                /* Focus states - neutral */
-                --focus-border-color: #4a4a4a;
+                --button-border: var(--border-strong);
+                --icon-button-color: var(--text-secondary);
+                --hover-background: var(--bg-hover);
+                --input-background: var(--bg-elevated);
+                --input-focus-background: var(--bg-elevated);
+                --focus-border-color: var(--accent);
                 --focus-box-shadow: transparent;
+                --scrollbar-track: var(--bg-app);
+                --scrollbar-thumb: var(--border-strong);
+                --scrollbar-thumb-hover: #444444;
+                --scrollbar-background: var(--bg-app);
+                --start-button-background: var(--accent);
+                --start-button-color: #ffffff;
+                --start-button-border: var(--accent);
+                --start-button-hover-background: var(--accent-hover);
+                --start-button-hover-border: var(--accent-hover);
+                --text-input-button-background: var(--accent);
+                --text-input-button-hover: var(--accent-hover);
+                --link-color: var(--accent);
+                --key-background: var(--bg-elevated);
+                --success-color: var(--success);
+                --warning-color: var(--warning);
+                --error-color: var(--danger);
+                --danger-color: var(--danger);
+                --preview-video-background: var(--bg-surface);
+                --preview-video-border: var(--border);
+                --option-label-color: var(--text-primary);
+                --screen-option-background: var(--bg-surface);
+                --screen-option-hover-background: var(--bg-elevated);
+                --screen-option-selected-background: var(--bg-hover);
+                --screen-option-text: var(--text-secondary);
 
-                /* Scrollbar */
-                --scrollbar-track: #1e1e1e;
-                --scrollbar-thumb: #3c3c3c;
-                --scrollbar-thumb-hover: #4a4a4a;
-                --scrollbar-background: #1e1e1e;
-
-                /* Legacy/misc */
-                --preview-video-background: #1e1e1e;
-                --preview-video-border: #3c3c3c;
-                --option-label-color: #e5e5e5;
-                --screen-option-background: #252526;
-                --screen-option-hover-background: #2d2d2d;
-                --screen-option-selected-background: #323232;
-                --screen-option-text: #a0a0a0;
-
-                /* Buttons */
-                --start-button-background: #ffffff;
-                --start-button-color: #1e1e1e;
-                --start-button-border: #ffffff;
-                --start-button-hover-background: #e0e0e0;
-                --start-button-hover-border: #e0e0e0;
-                --text-input-button-background: #ffffff;
-                --text-input-button-hover: #e0e0e0;
-
-                /* Links - neutral */
-                --link-color: #e5e5e5;
-                --key-background: #2d2d2d;
-
-                /* Status colors */
-                --success-color: #4ec9b0;
-                --warning-color: #dcdcaa;
-                --error-color: #f14c4c;
-                --danger-color: #f14c4c;
-
-                /* Layout-specific variables */
+                /* Layout-specific */
                 --header-padding: 8px 16px;
                 --header-font-size: 14px;
                 --header-gap: 8px;
@@ -81,46 +118,63 @@
                 --header-icon-padding: 6px;
                 --header-font-size-small: 12px;
                 --main-content-padding: 16px;
-                --main-content-margin-top: 1px;
+                --main-content-margin-top: 0;
                 --icon-size: 18px;
-                --border-radius: 3px;
+                --border-radius: var(--radius-sm);
                 --content-border-radius: 0;
             }
 
-            /* Compact layout styles */
-            :root.compact-layout {
-                --header-padding: 6px 12px;
-                --header-font-size: 12px;
-                --header-gap: 6px;
-                --header-button-padding: 4px 8px;
-                --header-icon-padding: 4px;
-                --header-font-size-small: 10px;
-                --main-content-padding: 12px;
-                --main-content-margin-top: 1px;
-                --icon-size: 16px;
-                --border-radius: 3px;
-                --content-border-radius: 0;
+            html {
+                margin: 0;
+                padding: 0;
+                height: 100%;
+                overflow: hidden;
+                border-radius: 12px;
+                background: transparent;
             }
 
-            html,
             body {
                 margin: 0;
                 padding: 0;
                 height: 100%;
                 overflow: hidden;
-                background: transparent;
-            }
-
-            body {
-                font-family:
-                    'Inter',
-                    -apple-system,
-                    BlinkMacSystemFont,
-                    sans-serif;
+                background: var(--bg-app);
+                color: var(--text-primary);
+                line-height: var(--line-height);
+                border-radius: 12px;
+                border: 1px solid var(--border);
+                font-family: var(--font);
+                font-size: var(--font-size-base);
+                font-weight: var(--font-weight-normal);
+                -webkit-font-smoothing: antialiased;
+                -moz-osx-font-smoothing: grayscale;
             }
 
             * {
                 box-sizing: border-box;
+            }
+
+            :focus-visible {
+                outline: 2px solid var(--accent);
+                outline-offset: 2px;
+            }
+
+            ::-webkit-scrollbar {
+                width: 6px;
+                height: 6px;
+            }
+
+            ::-webkit-scrollbar-track {
+                background: transparent;
+            }
+
+            ::-webkit-scrollbar-thumb {
+                background: var(--border-strong);
+                border-radius: 3px;
+            }
+
+            ::-webkit-scrollbar-thumb:hover {
+                background: #444444;
             }
 
             cheating-daddy-app {
