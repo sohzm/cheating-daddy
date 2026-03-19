@@ -1,4 +1,4 @@
-# Repo Guidelines
+ra# Repo Guidelines
 
 This repository is a fork of [`cheating-daddy`](https://github.com/sohzm/cheating-daddy).
 It provides an Electron-based real‑time assistant which captures screen and audio
