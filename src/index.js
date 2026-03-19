@@ -2,7 +2,7 @@ if (require('electron-squirrel-startup')) {
     process.exit(0);
 }
 
-const { app, BrowserWindow, shell, ipcMain } = require('electron');
+const { app, BrowserWindow, shell, ipcMain, dialog } = require('electron');
 const { createWindow, updateGlobalShortcuts } = require('./utils/window');
 const { setupGeminiIpcHandlers, stopMacOSAudioCapture, sendToRenderer } = require('./utils/gemini');
 const storage = require('./storage');
@@ -133,6 +133,25 @@ function setupStorageIpcHandlers() {
             return { success: true };
         } catch (error) {
             console.error('Error setting Groq API key:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('storage:get-nvidia-api-key', async () => {
+        try {
+            return { success: true, data: storage.getNvidiaApiKey() };
+        } catch (error) {
+            console.error('Error getting NVIDIA API key:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('storage:set-nvidia-api-key', async (event, nvidiaApiKey) => {
+        try {
+            storage.setNvidiaApiKey(nvidiaApiKey);
+            return { success: true };
+        } catch (error) {
+            console.error('Error setting NVIDIA API key:', error);
             return { success: false, error: error.message };
         }
     });
@@ -280,6 +299,22 @@ function setupGeneralIpcHandlers() {
             return { success: true };
         } catch (error) {
             console.error('Error opening external URL:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('select-folder', async (event) => {
+        try {
+            const result = await dialog.showOpenDialog(mainWindow, {
+                properties: ['openDirectory'],
+                title: 'Select Context Folder'
+            });
+            if (result.canceled || result.filePaths.length === 0) {
+                return { success: false };
+            }
+            return { success: true, path: result.filePaths[0] };
+        } catch (error) {
+            console.error('Error selecting folder:', error);
             return { success: false, error: error.message };
         }
     });

@@ -4,7 +4,9 @@ const { spawn } = require('child_process');
 const { saveDebugAudio } = require('../audioUtils');
 const { getSystemPrompt } = require('./prompts');
 const { getAvailableModel, incrementLimitCount, getApiKey, getGroqApiKey, incrementCharUsage, getModelForToday } = require('../storage');
+const storageRef = require('../storage');
 const { connectCloud, sendCloudAudio, sendCloudText, sendCloudImage, closeCloud, isCloudActive, setOnTurnComplete } = require('./cloud');
+const rag = require('./rag');
 
 // Lazy-loaded to avoid circular dependency (localai.js imports from gemini.js)
 let _localai = null;
@@ -93,6 +95,20 @@ function initializeNewSession(profile = null, customPrompt = null) {
             profile: profile,
             customPrompt: customPrompt || ''
         });
+    }
+
+    const prefs = storageRef.getPreferences();
+    if (prefs && prefs.contextFolder) {
+        sendToRenderer('update-status', 'Indexing project files...');
+        rag.indexFolder(prefs.contextFolder)
+            .then(res => {
+                if (res) sendToRenderer('update-status', 'Project codebase ready! Listening...');
+                else sendToRenderer('update-status', 'Codebase index returned empty/failed.');
+            })
+            .catch(e => {
+                console.error('[RAG] Init error:', e);
+                sendToRenderer('update-status', 'Error indexing: ' + e.message);
+            });
     }
 }
 
@@ -256,6 +272,17 @@ async function sendToGroq(transcription) {
         groqConversationHistory = groqConversationHistory.slice(-20);
     }
 
+    let dynamicSystemPrompt = currentSystemPrompt || 'You are a helpful assistant.';
+    const prefs = storageRef.getPreferences();
+    if (prefs && prefs.contextFolder && rag.isReady()) {
+        try {
+            const contextText = await rag.searchContext(transcription, 3);
+            if (contextText && contextText.trim() !== '') {
+                dynamicSystemPrompt += `\n\n[CRITICAL INSTRUCTION] Use the following context retrieved from the user's personal files to answer their query if relevant:\n\n${contextText}`;
+            }
+        } catch(e) { console.error('[RAG] Groq error:', e); }
+    }
+
     try {
         const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
             method: 'POST',
@@ -266,7 +293,7 @@ async function sendToGroq(transcription) {
             body: JSON.stringify({
                 model: modelToUse,
                 messages: [
-                    { role: 'system', content: currentSystemPrompt || 'You are a helpful assistant.' },
+                    { role: 'system', content: dynamicSystemPrompt },
                     ...groqConversationHistory
                 ],
                 stream: true,
@@ -366,6 +393,17 @@ async function sendToGemma(transcription) {
 
     const trimmedHistory = trimConversationHistoryForGemma(groqConversationHistory, 42000);
 
+    let dynamicSystemPrompt = currentSystemPrompt || 'You are a helpful assistant.';
+    const prefs = storageRef.getPreferences();
+    if (prefs && prefs.contextFolder && rag.isReady()) {
+        try {
+            const contextText = await rag.searchContext(transcription, 3);
+            if (contextText && contextText.trim() !== '') {
+                dynamicSystemPrompt += `\n\n[CRITICAL INSTRUCTION] Use the following context retrieved from the user's personal files to answer their query if relevant:\n\n${contextText}`;
+            }
+        } catch(e) { console.error('[RAG] Gemma error:', e); }
+    }
+
     try {
         const ai = new GoogleGenAI({ apiKey: apiKey });
 
@@ -374,7 +412,7 @@ async function sendToGemma(transcription) {
             parts: [{ text: msg.content }]
         }));
 
-        const systemPrompt = currentSystemPrompt || 'You are a helpful assistant.';
+        const systemPrompt = dynamicSystemPrompt;
         const messagesWithSystem = [
             { role: 'user', parts: [{ text: systemPrompt }] },
             { role: 'model', parts: [{ text: 'Understood. I will follow these instructions.' }] },

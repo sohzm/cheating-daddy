@@ -193,6 +193,8 @@ export class CustomizeView extends LitElement {
         isRestoring: { type: Boolean },
         clearStatusMessage: { type: String },
         clearStatusType: { type: String },
+        contextFolder: { type: String },
+        nvidiaApiKey: { type: String },
     };
 
     constructor() {
@@ -211,6 +213,8 @@ export class CustomizeView extends LitElement {
         this.isRestoring = false;
         this.clearStatusMessage = '';
         this.clearStatusType = '';
+        this.contextFolder = '';
+        this.nvidiaApiKey = '';
         this.backgroundTransparency = 0.8;
         this.fontSize = 20;
         this.audioMode = 'speaker_only';
@@ -225,13 +229,19 @@ export class CustomizeView extends LitElement {
 
     async _loadFromStorage() {
         try {
-            const [prefs, keybinds] = await Promise.all([cheatingDaddy.storage.getPreferences(), cheatingDaddy.storage.getKeybinds()]);
+            const [prefs, keybinds, nvidiaKey] = await Promise.all([
+                cheatingDaddy.storage.getPreferences(),
+                cheatingDaddy.storage.getKeybinds(),
+                cheatingDaddy.storage.getNvidiaApiKey().catch(() => '')
+            ]);
             this.googleSearchEnabled = prefs.googleSearchEnabled ?? true;
             this.backgroundTransparency = prefs.backgroundTransparency ?? 0.8;
             this.fontSize = prefs.fontSize ?? 20;
             this.audioMode = prefs.audioMode ?? 'speaker_only';
             this.customPrompt = prefs.customPrompt ?? '';
             this.theme = prefs.theme ?? 'dark';
+            this.contextFolder = prefs.contextFolder ?? '';
+            this.nvidiaApiKey = nvidiaKey || '';
             if (keybinds) {
                 this.keybinds = { ...this.getDefaultKeybinds(), ...keybinds };
             }
@@ -394,6 +404,18 @@ export class CustomizeView extends LitElement {
         cheatingDaddy.theme.applyBackgrounds(colors.background, this.backgroundTransparency);
     }
 
+    async handleFolderSelect() {
+        if (window.require) {
+            const { ipcRenderer } = window.require('electron');
+            const result = await ipcRenderer.invoke('select-folder');
+            if (result && result.success && result.path) {
+                this.contextFolder = result.path;
+                await cheatingDaddy.storage.updatePreference('contextFolder', result.path);
+                this.requestUpdate();
+            }
+        }
+    }
+
     async handleFontSizeChange(e) {
         this.fontSize = parseInt(e.target.value, 10);
         await cheatingDaddy.storage.updatePreference('fontSize', this.fontSize);
@@ -490,6 +512,7 @@ export class CustomizeView extends LitElement {
                 backgroundTransparency: 0.8,
                 googleSearchEnabled: false,
                 theme: 'dark',
+                contextFolder: '',
             };
             for (const [key, value] of Object.entries(defaults)) {
                 await cheatingDaddy.storage.updatePreference(key, value);
@@ -513,6 +536,7 @@ export class CustomizeView extends LitElement {
             this.googleSearchEnabled = defaults.googleSearchEnabled;
             this.customPrompt = defaults.customPrompt;
             this.theme = defaults.theme;
+            this.contextFolder = defaults.contextFolder;
 
             // Notify parent callbacks
             this.onProfileChange(defaults.selectedProfile);
@@ -658,6 +682,49 @@ export class CustomizeView extends LitElement {
         `;
     }
 
+    renderKnowledgeBaseSection() {
+        return html`
+            <section class="surface">
+                <div class="surface-title">Knowledge Base (RAG)</div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Interview Context Folder</label>
+                        <div style="display: flex; gap: var(--space-sm); align-items: center;">
+                            <input 
+                                type="text" 
+                                class="control" 
+                                style="flex: 1; padding: 8px;"
+                                readonly 
+                                .value=${this.contextFolder || 'No folder selected'} 
+                            />
+                            <button class="control" style="width: auto; padding: 8px 12px; cursor: pointer;" @click=${this.handleFolderSelect}>
+                                Select Folder
+                            </button>
+                        </div>
+                        <div class="status" style="border: none; padding: 4px 0; font-size: 11px; color: var(--text-muted); background: transparent;">
+                            Select a folder containing your notes or CV (txt, md, pdf). The AI will use it as context during the interview.
+                        </div>
+
+                        <label class="form-label" style="margin-top: var(--space-md);">NVIDIA NIM API Key</label>
+                        <input 
+                            type="password" 
+                            class="control" 
+                            placeholder="nvapi-..."
+                            .value=${this.nvidiaApiKey || ''}
+                            @input=${e => {
+                                this.nvidiaApiKey = e.target.value;
+                                cheatingDaddy.storage.setNvidiaApiKey(this.nvidiaApiKey);
+                            }}
+                        />
+                        <div class="status" style="border: none; padding: 4px 0; font-size: 11px; color: var(--text-muted); background: transparent;">
+                            Leave empty for local embeddings, or use an NVIDIA API key for build.nvidia.com embeddings API.
+                        </div>
+                    </div>
+                </div>
+            </section>
+        `;
+    }
+
     renderKeyboardSection() {
         return html`
             <section class="surface">
@@ -710,6 +777,7 @@ export class CustomizeView extends LitElement {
                     ${this.renderAudioSection()}
                     ${this.renderLanguageSection()}
                     ${this.renderAppearanceSection()}
+                    ${this.renderKnowledgeBaseSection()}
                     ${this.renderKeyboardSection()}
                     ${this.renderPrivacySection()}
                 </div>

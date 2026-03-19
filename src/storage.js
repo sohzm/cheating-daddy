@@ -13,7 +13,8 @@ const DEFAULT_CONFIG = {
 
 const DEFAULT_CREDENTIALS = {
     apiKey: '',
-    groqApiKey: ''
+    groqApiKey: '',
+    nvidiaApiKey: ''
 };
 
 const DEFAULT_PREFERENCES = {
@@ -202,6 +203,14 @@ function getGroqApiKey() {
 
 function setGroqApiKey(groqApiKey) {
     return setCredentials({ groqApiKey });
+}
+
+function getNvidiaApiKey() {
+    return getCredentials().nvidiaApiKey || '';
+}
+
+function setNvidiaApiKey(nvidiaApiKey) {
+    return setCredentials({ nvidiaApiKey });
 }
 
 // ============ PREFERENCES ============
@@ -500,6 +509,8 @@ module.exports = {
     setApiKey,
     getGroqApiKey,
     setGroqApiKey,
+    getNvidiaApiKey,
+    setNvidiaApiKey,
 
     // Preferences
     getPreferences,

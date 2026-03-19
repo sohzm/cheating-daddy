@@ -28,6 +28,7 @@
         "@huggingface/transformers": "^3.8.1",
         "electron-squirrel-startup": "^1.0.1",
         "ollama": "^0.6.3",
+        "pdf-parse": "^2.4.5",
         "ws": "^8.19.0"
     },
     "devDependencies": {
