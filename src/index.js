@@ -263,6 +263,36 @@ function setupGeneralIpcHandlers() {
         return app.getVersion();
     });
 
+    ipcMain.handle('get-display-sources', async () => {
+        try {
+            const { desktopCapturer, screen } = require('electron');
+            const [sources, displays] = await Promise.all([
+                desktopCapturer.getSources({ types: ['screen'] }),
+                Promise.resolve(screen.getAllDisplays()),
+            ]);
+            const displayById = new Map(displays.map(d => [String(d.id), d]));
+            const data = sources.map((s, i) => {
+                const display = displayById.get(String(s.display_id));
+                let name;
+                if (display) {
+                    const { width, height } = display.bounds;
+                    const tag = display.internal ? 'Built-in' : 'External';
+                    const label = display.label && display.label !== s.name ? display.label : null;
+                    name = label
+                        ? `${tag}: ${label} (${width}×${height})`
+                        : `${tag}: ${s.name} (${width}×${height})`;
+                } else {
+                    name = s.name || `Display ${i + 1}`;
+                }
+                return { index: i, name, id: s.id };
+            });
+            return { success: true, data };
+        } catch (error) {
+            console.error('Error getting display sources:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
     ipcMain.handle('quit-application', async event => {
         try {
             stopMacOSAudioCapture();

@@ -30,6 +30,7 @@ const DEFAULT_PREFERENCES = {
     ollamaHost: 'http://127.0.0.1:11434',
     ollamaModel: 'llama3.1',
     whisperModel: 'Xenova/whisper-small',
+    captureDisplayIndex: 0,
 };
 
 const DEFAULT_KEYBINDS = null; // null means use system defaults

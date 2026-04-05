@@ -31,10 +31,13 @@ function createWindow(sendToRenderer, geminiSessionRef) {
     session.defaultSession.setDisplayMediaRequestHandler(
         (request, callback) => {
             desktopCapturer.getSources({ types: ['screen'] }).then(sources => {
-                callback({ video: sources[0], audio: 'loopback' });
+                const prefs = storage.getPreferences();
+                const displayIndex = prefs.captureDisplayIndex || 0;
+                const source = sources[displayIndex] || sources[0];
+                callback({ video: source, audio: 'loopback' });
             });
         },
-        { useSystemPicker: true }
+        { useSystemPicker: false }
     );
 
     mainWindow.setResizable(false);

@@ -216,7 +216,10 @@ export class CustomizeView extends LitElement {
         this.audioMode = 'speaker_only';
         this.customPrompt = '';
         this.theme = 'dark';
+        this.captureDisplayIndex = 0;
+        this.availableDisplays = [];
         this._loadFromStorage();
+        this._loadDisplaySources();
     }
 
     getThemes() {
@@ -232,6 +235,7 @@ export class CustomizeView extends LitElement {
             this.audioMode = prefs.audioMode ?? 'speaker_only';
             this.customPrompt = prefs.customPrompt ?? '';
             this.theme = prefs.theme ?? 'dark';
+            this.captureDisplayIndex = prefs.captureDisplayIndex ?? 0;
             if (keybinds) {
                 this.keybinds = { ...this.getDefaultKeybinds(), ...keybinds };
             }
@@ -359,6 +363,25 @@ export class CustomizeView extends LitElement {
         this.audioMode = e.target.value;
         await cheatingDaddy.storage.updatePreference('audioMode', this.audioMode);
         this.requestUpdate();
+    }
+
+    async _loadDisplaySources() {
+        if (!window.require) return;
+        try {
+            const { ipcRenderer } = window.require('electron');
+            const result = await ipcRenderer.invoke('get-display-sources');
+            if (result.success) {
+                this.availableDisplays = result.data;
+                this.requestUpdate();
+            }
+        } catch (error) {
+            console.error('Error loading display sources:', error);
+        }
+    }
+
+    async handleCaptureDisplaySelect(e) {
+        this.captureDisplayIndex = parseInt(e.target.value, 10);
+        await cheatingDaddy.storage.updatePreference('captureDisplayIndex', this.captureDisplayIndex);
     }
 
     async handleThemeChange(e) {
@@ -589,6 +612,15 @@ export class CustomizeView extends LitElement {
                             <option value="high">High Quality</option>
                             <option value="medium">Medium Quality</option>
                             <option value="low">Low Quality</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Capture Display</label>
+                        <select class="control" .value=${String(this.captureDisplayIndex)} @change=${this.handleCaptureDisplaySelect}>
+                            ${this.availableDisplays.length > 0
+                                ? this.availableDisplays.map(d => html`<option value=${d.index}>${d.name}</option>`)
+                                : html`<option value="0">Display 1 (default)</option>`
+                            }
                         </select>
                     </div>
                 </div>
