@@ -32,8 +32,8 @@ function createWindow(sendToRenderer, geminiSessionRef) {
         (request, callback) => {
             desktopCapturer.getSources({ types: ['screen'] }).then(sources => {
                 const prefs = storage.getPreferences();
-                const displayIndex = prefs.captureDisplayIndex || 0;
-                const source = sources[displayIndex] || sources[0];
+                const savedId = prefs.captureDisplayId;
+                const source = (savedId && sources.find(s => s.id === savedId)) || sources[0];
                 callback({ video: source, audio: 'loopback' });
             });
         },
@@ -304,23 +304,23 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
 function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
     ipcMain.on('view-changed', (event, view) => {
         if (!mainWindow.isDestroyed()) {
-            const primaryDisplay = screen.getPrimaryDisplay();
-            const { width: screenWidth } = primaryDisplay.workAreaSize;
+            const currentDisplay = screen.getDisplayNearestPoint(mainWindow.getBounds());
+            const { x: dispX, width: screenWidth } = currentDisplay.workArea;
 
             if (view === 'assistant') {
                 // Shrink window for live view
                 const liveWidth = 850;
                 const liveHeight = 400;
-                const x = Math.floor((screenWidth - liveWidth) / 2);
+                const x = dispX + Math.floor((screenWidth - liveWidth) / 2);
                 mainWindow.setSize(liveWidth, liveHeight);
-                mainWindow.setPosition(x, 0);
+                mainWindow.setPosition(x, currentDisplay.workArea.y);
             } else {
                 // Restore full size
                 const fullWidth = 1100;
                 const fullHeight = 800;
-                const x = Math.floor((screenWidth - fullWidth) / 2);
+                const x = dispX + Math.floor((screenWidth - fullWidth) / 2);
                 mainWindow.setSize(fullWidth, fullHeight);
-                mainWindow.setPosition(x, 0);
+                mainWindow.setPosition(x, currentDisplay.workArea.y);
                 mainWindow.setIgnoreMouseEvents(false);
             }
         }

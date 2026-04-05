@@ -216,7 +216,7 @@ export class CustomizeView extends LitElement {
         this.audioMode = 'speaker_only';
         this.customPrompt = '';
         this.theme = 'dark';
-        this.captureDisplayIndex = 0;
+        this.captureDisplayId = '';
         this.availableDisplays = [];
         this._loadFromStorage();
         this._loadDisplaySources();
@@ -235,7 +235,7 @@ export class CustomizeView extends LitElement {
             this.audioMode = prefs.audioMode ?? 'speaker_only';
             this.customPrompt = prefs.customPrompt ?? '';
             this.theme = prefs.theme ?? 'dark';
-            this.captureDisplayIndex = prefs.captureDisplayIndex ?? 0;
+            this.captureDisplayId = prefs.captureDisplayId ?? '';
             if (keybinds) {
                 this.keybinds = { ...this.getDefaultKeybinds(), ...keybinds };
             }
@@ -380,8 +380,8 @@ export class CustomizeView extends LitElement {
     }
 
     async handleCaptureDisplaySelect(e) {
-        this.captureDisplayIndex = parseInt(e.target.value, 10);
-        await cheatingDaddy.storage.updatePreference('captureDisplayIndex', this.captureDisplayIndex);
+        this.captureDisplayId = e.target.value;
+        await cheatingDaddy.storage.updatePreference('captureDisplayId', this.captureDisplayId);
     }
 
     async handleThemeChange(e) {
@@ -513,6 +513,7 @@ export class CustomizeView extends LitElement {
                 backgroundTransparency: 0.8,
                 googleSearchEnabled: false,
                 theme: 'dark',
+                captureDisplayId: '',
             };
             for (const [key, value] of Object.entries(defaults)) {
                 await cheatingDaddy.storage.updatePreference(key, value);
@@ -536,6 +537,7 @@ export class CustomizeView extends LitElement {
             this.googleSearchEnabled = defaults.googleSearchEnabled;
             this.customPrompt = defaults.customPrompt;
             this.theme = defaults.theme;
+            this.captureDisplayId = defaults.captureDisplayId;
 
             // Notify parent callbacks
             this.onProfileChange(defaults.selectedProfile);
@@ -616,10 +618,10 @@ export class CustomizeView extends LitElement {
                     </div>
                     <div class="form-group">
                         <label class="form-label">Capture Display</label>
-                        <select class="control" .value=${String(this.captureDisplayIndex)} @change=${this.handleCaptureDisplaySelect}>
+                        <select class="control" .value=${this.captureDisplayId} @change=${this.handleCaptureDisplaySelect}>
                             ${this.availableDisplays.length > 0
-                                ? this.availableDisplays.map(d => html`<option value=${d.index}>${d.name}</option>`)
-                                : html`<option value="0">Display 1 (default)</option>`
+                                ? this.availableDisplays.map(d => html`<option value=${d.id}>${d.name}</option>`)
+                                : html`<option value="">Display 1 (default)</option>`
                             }
                         </select>
                     </div>
