@@ -226,6 +226,7 @@ export class CustomizeView extends LitElement {
     async _loadFromStorage() {
         try {
             const [prefs, keybinds] = await Promise.all([cheatingDaddy.storage.getPreferences(), cheatingDaddy.storage.getKeybinds()]);
+            this.selectedLanguage = prefs.selectedLanguage ?? 'en-US';
             this.googleSearchEnabled = prefs.googleSearchEnabled ?? true;
             this.backgroundTransparency = prefs.backgroundTransparency ?? 0.8;
             this.fontSize = prefs.fontSize ?? 20;
@@ -335,8 +336,9 @@ export class CustomizeView extends LitElement {
         this.onProfileChange(this.selectedProfile);
     }
 
-    handleLanguageSelect(e) {
+    async handleLanguageSelect(e) {
         this.selectedLanguage = e.target.value;
+        await cheatingDaddy.storage.updatePreference('selectedLanguage', this.selectedLanguage);
         this.onLanguageChange(this.selectedLanguage);
     }
 
