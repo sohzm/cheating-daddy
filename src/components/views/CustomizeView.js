@@ -226,6 +226,7 @@ export class CustomizeView extends LitElement {
     async _loadFromStorage() {
         try {
             const [prefs, keybinds] = await Promise.all([cheatingDaddy.storage.getPreferences(), cheatingDaddy.storage.getKeybinds()]);
+            this.selectedLanguage = prefs.selectedLanguage ?? 'en-US';
             this.googleSearchEnabled = prefs.googleSearchEnabled ?? true;
             this.backgroundTransparency = prefs.backgroundTransparency ?? 0.8;
             this.fontSize = prefs.fontSize ?? 20;
@@ -333,21 +334,26 @@ export class CustomizeView extends LitElement {
     handleProfileSelect(e) {
         this.selectedProfile = e.target.value;
         this.onProfileChange(this.selectedProfile);
+        this.requestUpdate();
     }
 
-    handleLanguageSelect(e) {
+    async handleLanguageSelect(e) {
         this.selectedLanguage = e.target.value;
+        await cheatingDaddy.storage.updatePreference('selectedLanguage', this.selectedLanguage);
         this.onLanguageChange(this.selectedLanguage);
+        this.requestUpdate();
     }
 
     handleImageQualitySelect(e) {
         this.selectedImageQuality = e.target.value;
         this.onImageQualityChange(this.selectedImageQuality);
+        this.requestUpdate();
     }
 
     handleLayoutModeSelect(e) {
         this.layoutMode = e.target.value;
         this.onLayoutModeChange(this.layoutMode);
+        this.requestUpdate();
     }
 
     async handleCustomPromptInput(e) {
@@ -604,7 +610,7 @@ export class CustomizeView extends LitElement {
                     <div class="form-group">
                         <label class="form-label">Speech Language</label>
                         <select class="control" .value=${this.selectedLanguage} @change=${this.handleLanguageSelect}>
-                            ${this.getLanguages().map(language => html`<option value=${language.value}>${language.name}</option>`)}
+                            ${this.getLanguages().map(language => html`<option value=${language.value} ?selected=${language.value === this.selectedLanguage}>${language.name}</option>`)}
                         </select>
                     </div>
                 </div>
