@@ -1,15 +1,15 @@
 <!doctype html>
 <html>
     <head>
-        <meta http-equiv="content-security-policy" content="script-src 'self' 'unsafe-inline'" />
+        <meta http-equiv="content-security-policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https: wss:; object-src 'none'; base-uri 'none'" />
         <title>Screen and Audio Capture</title>
         <style>
             :root {
                 /* Backgrounds */
-                --bg-app: #0A0A0A;
-                --bg-surface: #111111;
-                --bg-elevated: #191919;
-                --bg-hover: #1F1F1F;
+                --bg-app: rgba(8, 10, 14, 0.18);
+                --bg-surface: rgba(14, 17, 22, 0.58);
+                --bg-elevated: rgba(20, 24, 31, 0.72);
+                --bg-hover: rgba(255, 255, 255, 0.08);
 
                 /* Text */
                 --text-primary: #F5F5F5;
@@ -17,8 +17,8 @@
                 --text-muted: #555555;
 
                 /* Borders & Lines */
-                --border: #222222;
-                --border-strong: #333333;
+                --border: rgba(255, 255, 255, 0.12);
+                --border-strong: rgba(255, 255, 255, 0.2);
 
                 /* Accent */
                 --accent: #3B82F6;
@@ -138,16 +138,17 @@
                 padding: 0;
                 height: 100%;
                 overflow: hidden;
-                background: var(--bg-app);
+                background: transparent;
                 color: var(--text-primary);
                 line-height: var(--line-height);
                 border-radius: 12px;
-                border: 1px solid var(--border);
+                border: 1px solid rgba(255, 255, 255, 0.08);
                 font-family: var(--font);
                 font-size: var(--font-size-base);
                 font-weight: var(--font-weight-normal);
                 -webkit-font-smoothing: antialiased;
                 -moz-osx-font-smoothing: grayscale;
+                backdrop-filter: blur(10px);
             }
 
             * {
@@ -191,7 +192,6 @@
         <script type="module" src="components/app/CheatingDaddyApp.js"></script>
 
         <cheating-daddy-app id="cheatingDaddy"></cheating-daddy-app>
-        <script src="script.js"></script>
         <script src="utils/renderer.js"></script>
     </body>
 </html>

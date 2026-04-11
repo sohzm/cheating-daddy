@@ -169,35 +169,62 @@ async function getEnabledTools() {
 
 async function getStoredSetting(key, defaultValue) {
     try {
-        const windows = BrowserWindow.getAllWindows();
-        if (windows.length > 0) {
-            // Wait a bit for the renderer to be ready
-            await new Promise(resolve => setTimeout(resolve, 100));
-
-            // Try to get setting from renderer process localStorage
-            const value = await windows[0].webContents.executeJavaScript(`
-                (function() {
-                    try {
-                        if (typeof localStorage === 'undefined') {
-                            console.log('localStorage not available yet for ${key}');
-                            return '${defaultValue}';
-                        }
-                        const stored = localStorage.getItem('${key}');
-                        console.log('Retrieved setting ${key}:', stored);
-                        return stored || '${defaultValue}';
-                    } catch (e) {
-                        console.error('Error accessing localStorage for ${key}:', e);
-                        return '${defaultValue}';
-                    }
-                })()
-            `);
-            return value;
-        }
+        const preferences = require('../storage').getPreferences();
+        const value = preferences[key];
+        return value === undefined || value === null ? defaultValue : String(value);
     } catch (error) {
         console.error('Error getting stored setting for', key, ':', error.message);
+        return defaultValue;
     }
-    console.log('Using default value for', key, ':', defaultValue);
-    return defaultValue;
+}
+
+function describeCloseReason(closeEvent) {
+    if (!closeEvent) {
+        return 'unknown';
+    }
+
+    if (typeof closeEvent.reason === 'string' && closeEvent.reason.trim() !== '') {
+        return closeEvent.reason;
+    }
+
+    if (typeof closeEvent.code === 'number') {
+        return `code ${closeEvent.code}`;
+    }
+
+    return 'no reason provided';
+}
+
+function summarizeLiveServerMessage(message) {
+    const serverContent = message?.serverContent;
+    if (!serverContent) {
+        return null;
+    }
+
+    if (serverContent.setupComplete) {
+        return 'setupComplete';
+    }
+
+    if (serverContent.generationComplete) {
+        return 'generationComplete';
+    }
+
+    if (serverContent.turnComplete) {
+        return 'turnComplete';
+    }
+
+    if (typeof serverContent.inputTranscription?.text === 'string') {
+        return `inputTranscription: ${serverContent.inputTranscription.text}`;
+    }
+
+    if (typeof serverContent.outputTranscription?.text === 'string') {
+        return `outputTranscription: ${serverContent.outputTranscription.text}`;
+    }
+
+    if (serverContent.modelTurn?.parts) {
+        return `modelTurn parts=${serverContent.modelTurn.parts.length}`;
+    }
+
+    return null;
 }
 
 // helper to check if groq has been configured
@@ -470,7 +497,10 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                     sendToRenderer('update-status', 'Live session connected');
                 },
                 onmessage: function (message) {
-                    console.log('----------------', message);
+                    const summary = summarizeLiveServerMessage(message);
+                    if (summary) {
+                        console.log('[Gemini]', summary);
+                    }
 
                     // Handle input transcription (what was spoken)
                     if (message.serverContent?.inputTranscription?.results) {
@@ -506,7 +536,7 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                     sendToRenderer('update-status', 'Error: ' + e.message);
                 },
                 onclose: function (e) {
-                    console.log('Session closed:', e.reason);
+                    console.log('Session closed:', describeCloseReason(e));
 
                     // Don't reconnect if user intentionally closed
                     if (isUserClosing) {
@@ -764,7 +794,6 @@ async function sendAudioToGemini(base64Data, geminiSessionRef) {
     if (!geminiSessionRef.current) return;
 
     try {
-        process.stdout.write('.');
         await geminiSessionRef.current.sendRealtimeInput({
             audio: {
                 data: base64Data,
@@ -897,7 +926,6 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
         }
         if (!geminiSessionRef.current) return { success: false, error: 'No active Gemini session' };
         try {
-            process.stdout.write('.');
             await geminiSessionRef.current.sendRealtimeInput({
                 audio: { data: data, mimeType: mimeType },
             });
@@ -932,7 +960,6 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
         }
         if (!geminiSessionRef.current) return { success: false, error: 'No active Gemini session' };
         try {
-            process.stdout.write(',');
             await geminiSessionRef.current.sendRealtimeInput({
                 audio: { data: data, mimeType: mimeType },
             });
@@ -956,8 +983,6 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
                 console.error(`Image buffer too small: ${buffer.length} bytes`);
                 return { success: false, error: 'Image buffer too small' };
             }
-
-            process.stdout.write('!');
 
             if (currentProviderMode === 'cloud') {
                 const sent = sendCloudImage(data);

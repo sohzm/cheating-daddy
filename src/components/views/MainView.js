@@ -528,6 +528,7 @@ export class MainView extends LitElement {
         this._mouseY = -1;
 
         this.boundKeydownHandler = this._handleKeydown.bind(this);
+        this._boundStartClick = () => this._handleStart();
         this._loadFromStorage();
     }
 
@@ -801,10 +802,7 @@ export class MainView extends LitElement {
         const enterIcon = html`<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 10l-5 5 5 5"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/></svg>`;
 
         return html`
-            <button
-                class="start-button ${this.isInitializing ? 'disabled' : ''}"
-                @click=${() => this._handleStart()}
-            >
+            <button class="start-button ${this.isInitializing ? 'disabled' : ''}" @click=${this._boundStartClick}>
                 <canvas class="btn-aurora"></canvas>
                 <canvas class="btn-dither"></canvas>
                 <span class="btn-label">

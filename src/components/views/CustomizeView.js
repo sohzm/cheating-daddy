@@ -303,6 +303,7 @@ export class CustomizeView extends LitElement {
             nextResponse: isMac ? 'Cmd+]' : 'Ctrl+]',
             scrollUp: isMac ? 'Cmd+Shift+Up' : 'Ctrl+Shift+Up',
             scrollDown: isMac ? 'Cmd+Shift+Down' : 'Ctrl+Shift+Down',
+            emergencyErase: isMac ? 'Cmd+Shift+E' : 'Ctrl+Shift+E',
         };
     }
 
@@ -319,15 +320,13 @@ export class CustomizeView extends LitElement {
             { key: 'nextResponse', name: 'Next Response', description: 'Move to next AI response' },
             { key: 'scrollUp', name: 'Scroll Response Up', description: 'Scroll response content upward' },
             { key: 'scrollDown', name: 'Scroll Response Down', description: 'Scroll response content downward' },
+            { key: 'emergencyErase', name: 'Emergency Erase', description: 'Hide window, clear data, and quit quickly' },
         ];
     }
 
     async saveKeybinds() {
         await cheatingDaddy.storage.setKeybinds(this.keybinds);
-        if (window.require) {
-            const { ipcRenderer } = window.require('electron');
-            ipcRenderer.send('update-keybinds', this.keybinds);
-        }
+        cheatingDaddy.ipc.send('update-keybinds', this.keybinds);
     }
 
     handleProfileSelect(e) {
@@ -371,13 +370,10 @@ export class CustomizeView extends LitElement {
     async handleGoogleSearchChange(e) {
         this.googleSearchEnabled = e.target.checked;
         await cheatingDaddy.storage.updatePreference('googleSearchEnabled', this.googleSearchEnabled);
-        if (window.require) {
-            try {
-                const { ipcRenderer } = window.require('electron');
-                await ipcRenderer.invoke('update-google-search-setting', this.googleSearchEnabled);
-            } catch (error) {
-                console.error('Failed to notify main process:', error);
-            }
+        try {
+            await cheatingDaddy.ipc.invoke('update-google-search-setting', this.googleSearchEnabled);
+        } catch (error) {
+            console.error('Failed to notify main process:', error);
         }
         this.requestUpdate();
     }
@@ -464,10 +460,7 @@ export class CustomizeView extends LitElement {
     async resetKeybinds() {
         this.keybinds = this.getDefaultKeybinds();
         await cheatingDaddy.storage.setKeybinds(null);
-        if (window.require) {
-            const { ipcRenderer } = window.require('electron');
-            ipcRenderer.send('update-keybinds', this.keybinds);
-        }
+        cheatingDaddy.ipc.send('update-keybinds', this.keybinds);
         this.requestUpdate();
     }
 
@@ -498,10 +491,7 @@ export class CustomizeView extends LitElement {
             // Restore keybinds
             this.keybinds = this.getDefaultKeybinds();
             await cheatingDaddy.storage.setKeybinds(null);
-            if (window.require) {
-                const { ipcRenderer } = window.require('electron');
-                ipcRenderer.send('update-keybinds', this.keybinds);
-            }
+            cheatingDaddy.ipc.send('update-keybinds', this.keybinds);
 
             // Apply to local state
             this.selectedProfile = defaults.selectedProfile;
@@ -551,10 +541,7 @@ export class CustomizeView extends LitElement {
                 this.clearStatusMessage = 'Closing application...';
                 this.requestUpdate();
                 setTimeout(async () => {
-                    if (window.require) {
-                        const { ipcRenderer } = window.require('electron');
-                        await ipcRenderer.invoke('quit-application');
-                    }
+                    await cheatingDaddy.ipc.invoke('quit-application');
                 }, 1000);
             }, 2000);
         } catch (error) {

@@ -9,7 +9,9 @@
         "package": "electron-forge package",
         "make": "electron-forge make",
         "publish": "electron-forge publish",
-        "lint": "echo \"No linting configured\""
+        "lint": "echo \"No linting configured\"",
+        "typecheck": "node --check src/index.js && node --check src/preload.js && node --check src/storage.js && node --check src/utils/window.js && node --check src/utils/renderer.js",
+        "test": "npm run typecheck"
     },
     "keywords": [
         "cheating daddy",

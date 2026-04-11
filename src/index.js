@@ -10,6 +10,14 @@ const storage = require('./storage');
 const geminiSessionRef = { current: null };
 let mainWindow = null;
 
+function normalizeExternalUrl(rawUrl) {
+    const parsed = new URL(rawUrl);
+    if (!['https:', 'http:'].includes(parsed.protocol)) {
+        throw new Error(`Unsupported external URL protocol: ${parsed.protocol}`);
+    }
+    return parsed.toString();
+}
+
 function createMainWindow() {
     mainWindow = createWindow(sendToRenderer, geminiSessionRef);
     return mainWindow;
@@ -276,7 +284,7 @@ function setupGeneralIpcHandlers() {
 
     ipcMain.handle('open-external', async (event, url) => {
         try {
-            await shell.openExternal(url);
+            await shell.openExternal(normalizeExternalUrl(url));
             return { success: true };
         } catch (error) {
             console.error('Error opening external URL:', error);

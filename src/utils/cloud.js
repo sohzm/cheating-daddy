@@ -144,7 +144,6 @@ function sendCloudAudio(pcmBuffer) {
     });
 
     audioChunkCount++;
-    process.stdout.write('.');
 }
 
 function sendCloudText(text) {

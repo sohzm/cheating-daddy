@@ -3,26 +3,73 @@ const path = require('node:path');
 const storage = require('../storage');
 
 let mouseEventsIgnored = false;
+const MIN_VISIBLE_WIDTH = 220;
+const MIN_VISIBLE_HEIGHT = 72;
+
+function getWorkArea() {
+    return screen.getPrimaryDisplay().workArea;
+}
+
+function constrainBounds(width, height) {
+    const workArea = getWorkArea();
+    const safeWidth = Math.max(900, Math.min(width, workArea.width));
+    const safeHeight = Math.max(560, Math.min(height, workArea.height));
+
+    return {
+        width: safeWidth,
+        height: safeHeight,
+        x: workArea.x + Math.max(0, Math.floor((workArea.width - safeWidth) / 2)),
+        y: workArea.y + Math.max(0, Math.floor((workArea.height - safeHeight) / 2)),
+    };
+}
+
+function clampPosition(mainWindow, x, y) {
+    const workArea = getWorkArea();
+    const [windowWidth, windowHeight] = mainWindow.getSize();
+    const visibleWidth = Math.min(MIN_VISIBLE_WIDTH, windowWidth);
+    const visibleHeight = Math.min(MIN_VISIBLE_HEIGHT, windowHeight);
+    const minX = workArea.x - windowWidth + visibleWidth;
+    const minY = workArea.y - windowHeight + visibleHeight;
+    const maxX = workArea.x + workArea.width - visibleWidth;
+    const maxY = workArea.y + workArea.height - visibleHeight;
+
+    return {
+        x: Math.min(Math.max(x, minX), maxX),
+        y: Math.min(Math.max(y, minY), maxY),
+    };
+}
+
+function applyViewBounds(mainWindow, width, height) {
+    const bounds = constrainBounds(width, height);
+    mainWindow.setBounds(bounds);
+}
 
 function createWindow(sendToRenderer, geminiSessionRef) {
     // Get layout preference (default to 'normal')
-    let windowWidth = 1100;
-    let windowHeight = 800;
+    const initialBounds = constrainBounds(1180, 820);
 
     const mainWindow = new BrowserWindow({
-        width: windowWidth,
-        height: windowHeight,
+        x: initialBounds.x,
+        y: initialBounds.y,
+        width: initialBounds.width,
+        height: initialBounds.height,
+        minWidth: 900,
+        minHeight: 560,
         frame: false,
         transparent: true,
         hasShadow: false,
         alwaysOnTop: true,
+        resizable: true,
+        minimizable: true,
+        maximizable: true,
         webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false, // TODO: change to true
+            nodeIntegration: false,
+            contextIsolation: true,
             backgroundThrottling: false,
             enableBlinkFeatures: 'GetDisplayMedia',
             webSecurity: true,
             allowRunningInsecureContent: false,
+            preload: path.join(__dirname, '../preload.js'),
         },
         backgroundColor: '#00000000',
     });
@@ -37,7 +84,6 @@ function createWindow(sendToRenderer, geminiSessionRef) {
         { useSystemPicker: true }
     );
 
-    mainWindow.setResizable(false);
     mainWindow.setContentProtection(true);
     mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 
@@ -59,16 +105,21 @@ function createWindow(sendToRenderer, geminiSessionRef) {
         }
     }
 
-    // Center window at the top of the screen
-    const primaryDisplay = screen.getPrimaryDisplay();
-    const { width: screenWidth } = primaryDisplay.workAreaSize;
-    const x = Math.floor((screenWidth - windowWidth) / 2);
-    const y = 0;
-    mainWindow.setPosition(x, y);
-
     if (process.platform === 'win32') {
         mainWindow.setAlwaysOnTop(true, 'screen-saver', 1);
     }
+
+    mainWindow.on('move', () => {
+        if (mainWindow.isDestroyed() || mainWindow.isMaximized()) {
+            return;
+        }
+
+        const [currentX, currentY] = mainWindow.getPosition();
+        const nextPosition = clampPosition(mainWindow, currentX, currentY);
+        if (nextPosition.x !== currentX || nextPosition.y !== currentY) {
+            mainWindow.setPosition(nextPosition.x, nextPosition.y);
+        }
+    });
 
     mainWindow.loadFile(path.join(__dirname, '../index.html'));
 
@@ -126,22 +177,26 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
         moveUp: () => {
             if (!mainWindow.isVisible()) return;
             const [currentX, currentY] = mainWindow.getPosition();
-            mainWindow.setPosition(currentX, currentY - moveIncrement);
+            const nextPosition = clampPosition(mainWindow, currentX, currentY - moveIncrement);
+            mainWindow.setPosition(nextPosition.x, nextPosition.y);
         },
         moveDown: () => {
             if (!mainWindow.isVisible()) return;
             const [currentX, currentY] = mainWindow.getPosition();
-            mainWindow.setPosition(currentX, currentY + moveIncrement);
+            const nextPosition = clampPosition(mainWindow, currentX, currentY + moveIncrement);
+            mainWindow.setPosition(nextPosition.x, nextPosition.y);
         },
         moveLeft: () => {
             if (!mainWindow.isVisible()) return;
             const [currentX, currentY] = mainWindow.getPosition();
-            mainWindow.setPosition(currentX - moveIncrement, currentY);
+            const nextPosition = clampPosition(mainWindow, currentX - moveIncrement, currentY);
+            mainWindow.setPosition(nextPosition.x, nextPosition.y);
         },
         moveRight: () => {
             if (!mainWindow.isVisible()) return;
             const [currentX, currentY] = mainWindow.getPosition();
-            mainWindow.setPosition(currentX + moveIncrement, currentY);
+            const nextPosition = clampPosition(mainWindow, currentX + moveIncrement, currentY);
+            mainWindow.setPosition(nextPosition.x, nextPosition.y);
         },
     };
 
@@ -204,10 +259,7 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
                     const isMac = process.platform === 'darwin';
                     const shortcutKey = isMac ? 'cmd+enter' : 'ctrl+enter';
 
-                    // Use the new handleShortcut function
-                    mainWindow.webContents.executeJavaScript(`
-                        cheatingDaddy.handleShortcut('${shortcutKey}');
-                    `);
+                    mainWindow.webContents.send('shortcut-triggered', shortcutKey);
                 } catch (error) {
                     console.error('Error handling next step shortcut:', error);
                 }
@@ -301,23 +353,14 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
 function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
     ipcMain.on('view-changed', (event, view) => {
         if (!mainWindow.isDestroyed()) {
-            const primaryDisplay = screen.getPrimaryDisplay();
-            const { width: screenWidth } = primaryDisplay.workAreaSize;
+            if (mainWindow.isMaximized()) {
+                return;
+            }
 
             if (view === 'assistant') {
-                // Shrink window for live view
-                const liveWidth = 850;
-                const liveHeight = 400;
-                const x = Math.floor((screenWidth - liveWidth) / 2);
-                mainWindow.setSize(liveWidth, liveHeight);
-                mainWindow.setPosition(x, 0);
+                applyViewBounds(mainWindow, 980, 520);
             } else {
-                // Restore full size
-                const fullWidth = 1100;
-                const fullHeight = 800;
-                const x = Math.floor((screenWidth - fullWidth) / 2);
-                mainWindow.setSize(fullWidth, fullHeight);
-                mainWindow.setPosition(x, 0);
+                applyViewBounds(mainWindow, 1180, 820);
                 mainWindow.setIgnoreMouseEvents(false);
             }
         }
@@ -326,6 +369,16 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
     ipcMain.handle('window-minimize', () => {
         if (!mainWindow.isDestroyed()) {
             mainWindow.minimize();
+        }
+    });
+
+    ipcMain.handle('window-toggle-maximize', () => {
+        if (!mainWindow.isDestroyed()) {
+            if (mainWindow.isMaximized()) {
+                mainWindow.unmaximize();
+            } else {
+                mainWindow.maximize();
+            }
         }
     });
 

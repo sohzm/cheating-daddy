@@ -1,11 +1,13 @@
 // renderer.js
-const { ipcRenderer } = require('electron');
+const electronAPI = window.cheatingDaddyAPI;
 
 let mediaStream = null;
 let screenshotInterval = null;
 let audioContext = null;
 let audioProcessor = null;
 let micAudioProcessor = null;
+let micAudioContext = null;
+let micMediaStream = null;
 let audioBuffer = [];
 const SAMPLE_RATE = 24000;
 const AUDIO_CHUNK_DURATION = 0.1; // seconds
@@ -15,96 +17,100 @@ let hiddenVideo = null;
 let offscreenCanvas = null;
 let offscreenContext = null;
 let currentImageQuality = 'medium'; // Store current image quality for manual screenshots
+let audioDiagnostics = {
+    system: { lastLoggedAt: 0, active: false },
+    mic: { lastLoggedAt: 0, active: false },
+};
 
-const isLinux = process.platform === 'linux';
-const isMacOS = process.platform === 'darwin';
+const isLinux = electronAPI.platform.isLinux;
+const isMacOS = electronAPI.platform.isMacOS;
 
 // ============ STORAGE API ============
 // Wrapper for IPC-based storage access
 const storage = {
     // Config
     async getConfig() {
-        const result = await ipcRenderer.invoke('storage:get-config');
+        const result = await electronAPI.invoke('storage:get-config');
         return result.success ? result.data : {};
     },
     async setConfig(config) {
-        return ipcRenderer.invoke('storage:set-config', config);
+        return electronAPI.invoke('storage:set-config', config);
     },
     async updateConfig(key, value) {
-        return ipcRenderer.invoke('storage:update-config', key, value);
+        return electronAPI.invoke('storage:update-config', key, value);
     },
 
     // Credentials
     async getCredentials() {
-        const result = await ipcRenderer.invoke('storage:get-credentials');
+        const result = await electronAPI.invoke('storage:get-credentials');
         return result.success ? result.data : {};
     },
     async setCredentials(credentials) {
-        return ipcRenderer.invoke('storage:set-credentials', credentials);
+        return electronAPI.invoke('storage:set-credentials', credentials);
     },
     async getApiKey() {
-        const result = await ipcRenderer.invoke('storage:get-api-key');
+        const result = await electronAPI.invoke('storage:get-api-key');
         return result.success ? result.data : '';
     },
     async setApiKey(apiKey) {
-        return ipcRenderer.invoke('storage:set-api-key', apiKey);
+        return electronAPI.invoke('storage:set-api-key', apiKey);
     },
     async getGroqApiKey() {
-        const result = await ipcRenderer.invoke('storage:get-groq-api-key');
+        const result = await electronAPI.invoke('storage:get-groq-api-key');
         return result.success ? result.data : '';
     },
     async setGroqApiKey(groqApiKey) {
-        return ipcRenderer.invoke('storage:set-groq-api-key', groqApiKey);
+        return electronAPI.invoke('storage:set-groq-api-key', groqApiKey);
     },
 
     // Preferences
     async getPreferences() {
-        const result = await ipcRenderer.invoke('storage:get-preferences');
+        const result = await electronAPI.invoke('storage:get-preferences');
         return result.success ? result.data : {};
     },
     async setPreferences(preferences) {
-        return ipcRenderer.invoke('storage:set-preferences', preferences);
+        return electronAPI.invoke('storage:set-preferences', preferences);
     },
     async updatePreference(key, value) {
-        return ipcRenderer.invoke('storage:update-preference', key, value);
+        return electronAPI.invoke('storage:update-preference', key, value);
     },
 
     // Keybinds
     async getKeybinds() {
-        const result = await ipcRenderer.invoke('storage:get-keybinds');
+        const result = await electronAPI.invoke('storage:get-keybinds');
         return result.success ? result.data : null;
     },
     async setKeybinds(keybinds) {
-        return ipcRenderer.invoke('storage:set-keybinds', keybinds);
+        return electronAPI.invoke('storage:set-keybinds', keybinds);
     },
 
     // Sessions (History)
     async getAllSessions() {
-        const result = await ipcRenderer.invoke('storage:get-all-sessions');
+        const result = await electronAPI.invoke('storage:get-all-sessions');
         return result.success ? result.data : [];
     },
     async getSession(sessionId) {
-        const result = await ipcRenderer.invoke('storage:get-session', sessionId);
+        const result = await electronAPI.invoke('storage:get-session', sessionId);
         return result.success ? result.data : null;
     },
     async saveSession(sessionId, data) {
-        return ipcRenderer.invoke('storage:save-session', sessionId, data);
+        return electronAPI.invoke('storage:save-session', sessionId, data);
     },
     async deleteSession(sessionId) {
-        return ipcRenderer.invoke('storage:delete-session', sessionId);
+        return electronAPI.invoke('storage:delete-session', sessionId);
     },
     async deleteAllSessions() {
-        return ipcRenderer.invoke('storage:delete-all-sessions');
+        return electronAPI.invoke('storage:delete-all-sessions');
     },
 
     // Clear all
     async clearAll() {
-        return ipcRenderer.invoke('storage:clear-all');
+        return electronAPI.invoke('storage:clear-all');
     },
 
     // Limits
     async getTodayLimits() {
-        const result = await ipcRenderer.invoke('storage:get-today-limits');
+        const result = await electronAPI.invoke('storage:get-today-limits');
         return result.success ? result.data : { flash: { count: 0 }, flashLite: { count: 0 } };
     }
 };
@@ -140,17 +146,56 @@ function arrayBufferToBase64(buffer) {
     return btoa(binary);
 }
 
+function calculateRms(float32Array) {
+    if (!float32Array || float32Array.length === 0) {
+        return 0;
+    }
+
+    let sumSquares = 0;
+    for (let i = 0; i < float32Array.length; i++) {
+        sumSquares += float32Array[i] * float32Array[i];
+    }
+    return Math.sqrt(sumSquares / float32Array.length);
+}
+
+function logAudioDiagnostics(channel, float32Array) {
+    const state = audioDiagnostics[channel];
+    const now = Date.now();
+    const rms = calculateRms(float32Array);
+    const isActive = rms > 0.005;
+
+    if (now - state.lastLoggedAt < 2000 && state.active === isActive) {
+        return;
+    }
+
+    state.lastLoggedAt = now;
+    state.active = isActive;
+
+    const label = channel === 'mic' ? 'Microphone' : 'Speaker';
+    console.log(`[Audio] ${label}: ${isActive ? 'signal detected' : 'no signal'} (rms=${rms.toFixed(4)})`);
+}
+
+function resetAudioDiagnostics() {
+    audioDiagnostics = {
+        system: { lastLoggedAt: 0, active: false },
+        mic: { lastLoggedAt: 0, active: false },
+    };
+}
+
 async function initializeGemini(profile = 'interview', language = 'en-US') {
     const apiKey = await storage.getApiKey();
     if (apiKey) {
         const prefs = await storage.getPreferences();
-        const success = await ipcRenderer.invoke('initialize-gemini', apiKey, prefs.customPrompt || '', profile, language);
+        const success = await electronAPI.invoke('initialize-gemini', apiKey, prefs.customPrompt || '', profile, language);
         if (success) {
             cheatingDaddy.setStatus('Live');
+            return true;
         } else {
             cheatingDaddy.setStatus('error');
+            return false;
         }
     }
+    return false;
 }
 
 async function initializeLocal(profile = 'interview') {
@@ -160,7 +205,7 @@ async function initializeLocal(profile = 'interview') {
     const whisperModel = prefs.whisperModel || 'Xenova/whisper-small';
     const customPrompt = prefs.customPrompt || '';
 
-    const success = await ipcRenderer.invoke('initialize-local', ollamaHost, ollamaModel, whisperModel, profile, customPrompt);
+    const success = await electronAPI.invoke('initialize-local', ollamaHost, ollamaModel, whisperModel, profile, customPrompt);
     if (success) {
         cheatingDaddy.setStatus('Local AI Live');
         return true;
@@ -179,7 +224,7 @@ async function initializeCloud(profile = 'interview') {
     }
 
     const prefs = await storage.getPreferences();
-    const success = await ipcRenderer.invoke('initialize-cloud', token, profile, prefs.customPrompt || '');
+    const success = await electronAPI.invoke('initialize-cloud', token, profile, prefs.customPrompt || '');
     if (success) {
         cheatingDaddy.setStatus('Live');
         return true;
@@ -190,10 +235,14 @@ async function initializeCloud(profile = 'interview') {
 }
 
 // Listen for status updates
-ipcRenderer.on('update-status', (event, status) => {
+const cleanupListeners = [];
+
+cleanupListeners.push(
+    electronAPI.on('update-status', status => {
     console.log('Status update:', status);
     cheatingDaddy.setStatus(status);
-});
+    })
+);
 
 async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'medium') {
     // Store the image quality for manual screenshots
@@ -204,12 +253,13 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
     const audioMode = preferencesCache.audioMode || 'speaker_only';
 
     try {
+        resetAudioDiagnostics();
         if (isMacOS) {
             // On macOS, use SystemAudioDump for audio and getDisplayMedia for screen
             console.log('Starting macOS capture with SystemAudioDump...');
 
             // Start macOS audio capture
-            const audioResult = await ipcRenderer.invoke('start-macos-audio');
+            const audioResult = await electronAPI.invoke('start-macos-audio');
             if (!audioResult.success) {
                 throw new Error('Failed to start macOS audio capture: ' + audioResult.error);
             }
@@ -240,7 +290,7 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
                         video: false,
                     });
                     console.log('macOS microphone capture started');
-                    setupLinuxMicProcessing(micStream);
+                    setupMicProcessing(micStream);
                 } catch (micError) {
                     console.warn('Failed to get microphone access on macOS:', micError);
                 }
@@ -300,7 +350,7 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
                     console.log('Linux microphone capture started');
 
                     // Setup audio processing for microphone on Linux
-                    setupLinuxMicProcessing(micStream);
+                    setupMicProcessing(micStream);
                 } catch (micError) {
                     console.warn('Failed to get microphone access on Linux:', micError);
                     // Continue without microphone if permission denied
@@ -316,19 +366,28 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
                     width: { ideal: 1920 },
                     height: { ideal: 1080 },
                 },
-                audio: {
-                    sampleRate: SAMPLE_RATE,
-                    channelCount: 1,
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true,
-                },
+                audio:
+                    audioMode === 'mic_only'
+                        ? false
+                        : {
+                              sampleRate: SAMPLE_RATE,
+                              channelCount: 1,
+                              echoCancellation: false,
+                              noiseSuppression: false,
+                              autoGainControl: false,
+                          },
             });
 
             console.log('Windows capture started with loopback audio');
 
-            // Setup audio processing for Windows loopback audio only
-            setupWindowsLoopbackProcessing();
+            if (audioMode !== 'mic_only') {
+                const hasLoopbackTrack = mediaStream.getAudioTracks().length > 0;
+                if (!hasLoopbackTrack) {
+                    throw new Error('Windows loopback audio is unavailable for the selected source.');
+                }
+                setupWindowsLoopbackProcessing();
+                console.log('[Audio] Windows speaker capture enabled');
+            }
 
             if (audioMode === 'mic_only' || audioMode === 'both') {
                 let micStream = null;
@@ -344,9 +403,13 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
                         video: false,
                     });
                     console.log('Windows microphone capture started');
-                    setupLinuxMicProcessing(micStream);
+                    setupMicProcessing(micStream);
+                    console.log('[Audio] Windows microphone capture enabled');
                 } catch (micError) {
                     console.warn('Failed to get microphone access on Windows:', micError);
+                    if (audioMode !== 'speaker_only') {
+                        throw new Error('Failed to get microphone access on Windows.');
+                    }
                 }
             }
         }
@@ -356,18 +419,26 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
             hasAudio: mediaStream.getAudioTracks().length > 0,
             videoTrack: mediaStream.getVideoTracks()[0]?.getSettings(),
         });
+        console.log('[Audio] Capture mode summary:', {
+            mode: audioMode,
+            speakerTrackCount: mediaStream?.getAudioTracks().length || 0,
+            micTrackCount: micMediaStream?.getAudioTracks().length || 0,
+        });
 
         // Manual mode only - screenshots captured on demand via shortcut
         console.log('Manual mode enabled - screenshots will be captured on demand only');
+        return true;
     } catch (err) {
         console.error('Error starting capture:', err);
-        cheatingDaddy.setStatus('error');
+        stopCapture();
+        cheatingDaddy.setStatus(`error: ${err.message}`);
+        return false;
     }
 }
 
-function setupLinuxMicProcessing(micStream) {
-    // Setup microphone audio processing for Linux
-    const micAudioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
+function setupMicProcessing(micStream) {
+    micMediaStream = micStream;
+    micAudioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
     const micSource = micAudioContext.createMediaStreamSource(micStream);
     const micProcessor = micAudioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
 
@@ -376,6 +447,7 @@ function setupLinuxMicProcessing(micStream) {
 
     micProcessor.onaudioprocess = async e => {
         const inputData = e.inputBuffer.getChannelData(0);
+        logAudioDiagnostics('mic', inputData);
         audioBuffer.push(...inputData);
 
         // Process audio in chunks
@@ -384,7 +456,7 @@ function setupLinuxMicProcessing(micStream) {
             const pcmData16 = convertFloat32ToInt16(chunk);
             const base64Data = arrayBufferToBase64(pcmData16.buffer);
 
-            await ipcRenderer.invoke('send-mic-audio-content', {
+            await electronAPI.invoke('send-mic-audio-content', {
                 data: base64Data,
                 mimeType: 'audio/pcm;rate=24000',
             });
@@ -409,6 +481,7 @@ function setupLinuxSystemAudioProcessing() {
 
     audioProcessor.onaudioprocess = async e => {
         const inputData = e.inputBuffer.getChannelData(0);
+        logAudioDiagnostics('system', inputData);
         audioBuffer.push(...inputData);
 
         // Process audio in chunks
@@ -417,7 +490,7 @@ function setupLinuxSystemAudioProcessing() {
             const pcmData16 = convertFloat32ToInt16(chunk);
             const base64Data = arrayBufferToBase64(pcmData16.buffer);
 
-            await ipcRenderer.invoke('send-audio-content', {
+            await electronAPI.invoke('send-audio-content', {
                 data: base64Data,
                 mimeType: 'audio/pcm;rate=24000',
             });
@@ -439,6 +512,7 @@ function setupWindowsLoopbackProcessing() {
 
     audioProcessor.onaudioprocess = async e => {
         const inputData = e.inputBuffer.getChannelData(0);
+        logAudioDiagnostics('system', inputData);
         audioBuffer.push(...inputData);
 
         // Process audio in chunks
@@ -447,7 +521,7 @@ function setupWindowsLoopbackProcessing() {
             const pcmData16 = convertFloat32ToInt16(chunk);
             const base64Data = arrayBufferToBase64(pcmData16.buffer);
 
-            await ipcRenderer.invoke('send-audio-content', {
+            await electronAPI.invoke('send-audio-content', {
                 data: base64Data,
                 mimeType: 'audio/pcm;rate=24000',
             });
@@ -533,7 +607,7 @@ async function captureScreenshot(imageQuality = 'medium', isManual = false) {
                     return;
                 }
 
-                const result = await ipcRenderer.invoke('send-image-content', {
+                const result = await electronAPI.invoke('send-image-content', {
                     data: base64data,
                 });
 
@@ -638,7 +712,7 @@ async function captureManualScreenshot(imageQuality = null) {
                 console.log(`Sending image: ${destW}x${destH}, ~${Math.round(base64data.length / 1024)}KB`);
 
                 // Send image with prompt to HTTP API (response streams via IPC events)
-                const result = await ipcRenderer.invoke('send-image-content', {
+                const result = await electronAPI.invoke('send-image-content', {
                     data: base64data,
                     prompt: MANUAL_SCREENSHOT_PROMPT,
                 });
@@ -662,6 +736,7 @@ async function captureManualScreenshot(imageQuality = null) {
 window.captureManualScreenshot = captureManualScreenshot;
 
 function stopCapture() {
+    resetAudioDiagnostics();
     if (screenshotInterval) {
         clearInterval(screenshotInterval);
         screenshotInterval = null;
@@ -678,6 +753,11 @@ function stopCapture() {
         micAudioProcessor = null;
     }
 
+    if (micAudioContext) {
+        micAudioContext.close();
+        micAudioContext = null;
+    }
+
     if (audioContext) {
         audioContext.close();
         audioContext = null;
@@ -688,9 +768,14 @@ function stopCapture() {
         mediaStream = null;
     }
 
+    if (micMediaStream) {
+        micMediaStream.getTracks().forEach(track => track.stop());
+        micMediaStream = null;
+    }
+
     // Stop macOS audio capture if running
     if (isMacOS) {
-        ipcRenderer.invoke('stop-macos-audio').catch(err => {
+        electronAPI.invoke('stop-macos-audio').catch(err => {
             console.error('Error stopping macOS audio:', err);
         });
     }
@@ -713,7 +798,7 @@ async function sendTextMessage(text) {
     }
 
     try {
-        const result = await ipcRenderer.invoke('send-text-message', text);
+        const result = await electronAPI.invoke('send-text-message', text);
         if (result.success) {
             console.log('Text message sent successfully');
         } else {
@@ -727,17 +812,20 @@ async function sendTextMessage(text) {
 }
 
 // Listen for conversation data from main process and save to storage
-ipcRenderer.on('save-conversation-turn', async (event, data) => {
+cleanupListeners.push(
+    electronAPI.on('save-conversation-turn', async data => {
     try {
         await storage.saveSession(data.sessionId, { conversationHistory: data.fullHistory });
         console.log('Conversation session saved:', data.sessionId);
     } catch (error) {
         console.error('Error saving conversation session:', error);
     }
-});
+    })
+);
 
 // Listen for session context (profile info) when session starts
-ipcRenderer.on('save-session-context', async (event, data) => {
+cleanupListeners.push(
+    electronAPI.on('save-session-context', async data => {
     try {
         await storage.saveSession(data.sessionId, {
             profile: data.profile,
@@ -747,10 +835,12 @@ ipcRenderer.on('save-session-context', async (event, data) => {
     } catch (error) {
         console.error('Error saving session context:', error);
     }
-});
+    })
+);
 
 // Listen for screen analysis responses (from ctrl+enter)
-ipcRenderer.on('save-screen-analysis', async (event, data) => {
+cleanupListeners.push(
+    electronAPI.on('save-screen-analysis', async data => {
     try {
         await storage.saveSession(data.sessionId, {
             screenAnalysisHistory: data.fullHistory,
@@ -761,13 +851,22 @@ ipcRenderer.on('save-screen-analysis', async (event, data) => {
     } catch (error) {
         console.error('Error saving screen analysis:', error);
     }
-});
+    })
+);
 
 // Listen for emergency erase command from main process
-ipcRenderer.on('clear-sensitive-data', async () => {
+cleanupListeners.push(
+    electronAPI.on('clear-sensitive-data', async () => {
     console.log('Clearing all data...');
     await storage.clearAll();
-});
+    })
+);
+
+cleanupListeners.push(
+    electronAPI.on('shortcut-triggered', shortcutKey => {
+        handleShortcut(shortcutKey);
+    })
+);
 
 // Handle shortcuts based on current view
 function handleShortcut(shortcutKey) {
@@ -775,10 +874,23 @@ function handleShortcut(shortcutKey) {
 
     if (shortcutKey === 'ctrl+enter' || shortcutKey === 'cmd+enter') {
         if (currentView === 'main') {
+            console.log('[Shortcut] Start session triggered');
             cheatingDaddy.element().handleStart();
-        } else {
-            captureManualScreenshot();
+            return;
         }
+
+        if (currentView === 'assistant') {
+            console.log('[Shortcut] Analyze screen triggered');
+            const assistantView = cheatingDaddy.element()?.shadowRoot?.querySelector('assistant-view');
+            if (assistantView?.handleScreenAnswer) {
+                assistantView.handleScreenAnswer();
+            } else {
+                captureManualScreenshot();
+            }
+            return;
+        }
+
+        console.log(`[Shortcut] Ignored ${shortcutKey} on view: ${currentView}`);
     }
 }
 
@@ -1010,7 +1122,7 @@ const theme = {
 // Consolidated cheatingDaddy object - all functions in one place
 const cheatingDaddy = {
     // App version
-    getVersion: async () => ipcRenderer.invoke('get-app-version'),
+    getVersion: async () => electronAPI.invoke('get-app-version'),
 
     // Element access
     element: () => cheatingDaddyApp,
@@ -1046,6 +1158,7 @@ const cheatingDaddy = {
     // Platform detection
     isLinux: isLinux,
     isMacOS: isMacOS,
+    ipc: electronAPI,
 };
 
 // Make it globally available

@@ -317,6 +317,7 @@ export class AssistantView extends LitElement {
         this.onSendText = () => {};
         this.isAnalyzing = false;
         this._animFrame = null;
+        this._ipcCleanup = [];
     }
 
     getProfileNames() {
@@ -343,17 +344,102 @@ export class AssistantView extends LitElement {
                 window.marked.setOptions({
                     breaks: true,
                     gfm: true,
-                    sanitize: false,
                 });
                 let rendered = window.marked.parse(content);
                 rendered = this.wrapWordsInSpans(rendered);
-                return rendered;
+                return this.sanitizeRenderedHtml(rendered);
             } catch (error) {
                 console.warn('Error parsing markdown:', error);
                 return content;
             }
         }
         return content;
+    }
+
+    sanitizeRenderedHtml(html) {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const allowedTags = new Set([
+            'A',
+            'B',
+            'BLOCKQUOTE',
+            'BR',
+            'CODE',
+            'DEL',
+            'DIV',
+            'EM',
+            'H1',
+            'H2',
+            'H3',
+            'H4',
+            'H5',
+            'H6',
+            'HR',
+            'I',
+            'LI',
+            'OL',
+            'P',
+            'PRE',
+            'SPAN',
+            'STRONG',
+            'TABLE',
+            'TBODY',
+            'TD',
+            'TH',
+            'THEAD',
+            'TR',
+            'UL',
+        ]);
+        const allowedAttributes = new Set(['class', 'data-word']);
+
+        const sanitizeNode = node => {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+                if (!allowedTags.has(node.tagName)) {
+                    const fragment = document.createDocumentFragment();
+                    while (node.firstChild) {
+                        fragment.appendChild(node.firstChild);
+                    }
+                    node.replaceWith(fragment);
+                    return;
+                }
+
+                Array.from(node.attributes).forEach(attribute => {
+                    const name = attribute.name.toLowerCase();
+                    if (name.startsWith('on')) {
+                        node.removeAttribute(attribute.name);
+                        return;
+                    }
+
+                    if (node.tagName === 'A' && name === 'href') {
+                        try {
+                            const parsed = new URL(attribute.value, 'https://example.com');
+                            if (!['http:', 'https:'].includes(parsed.protocol)) {
+                                node.removeAttribute('href');
+                            } else {
+                                node.setAttribute('rel', 'noopener noreferrer');
+                                node.setAttribute('target', '_blank');
+                            }
+                        } catch {
+                            node.removeAttribute('href');
+                        }
+                        return;
+                    }
+
+                    if (node.tagName === 'A' && (name === 'rel' || name === 'target')) {
+                        return;
+                    }
+
+                    if (!allowedAttributes.has(attribute.name)) {
+                        node.removeAttribute(attribute.name);
+                    }
+                });
+            }
+
+            Array.from(node.childNodes).forEach(sanitizeNode);
+        };
+
+        Array.from(doc.body.childNodes).forEach(sanitizeNode);
+        return doc.body.innerHTML;
     }
 
     wrapWordsInSpans(html) {
@@ -426,33 +512,19 @@ export class AssistantView extends LitElement {
 
     connectedCallback() {
         super.connectedCallback();
-
-        if (window.require) {
-            const { ipcRenderer } = window.require('electron');
-
-            this.handlePreviousResponse = () => this.navigateToPreviousResponse();
-            this.handleNextResponse = () => this.navigateToNextResponse();
-            this.handleScrollUp = () => this.scrollResponseUp();
-            this.handleScrollDown = () => this.scrollResponseDown();
-
-            ipcRenderer.on('navigate-previous-response', this.handlePreviousResponse);
-            ipcRenderer.on('navigate-next-response', this.handleNextResponse);
-            ipcRenderer.on('scroll-response-up', this.handleScrollUp);
-            ipcRenderer.on('scroll-response-down', this.handleScrollDown);
-        }
+        this._ipcCleanup = [
+            cheatingDaddy.ipc.on('navigate-previous-response', () => this.navigateToPreviousResponse()),
+            cheatingDaddy.ipc.on('navigate-next-response', () => this.navigateToNextResponse()),
+            cheatingDaddy.ipc.on('scroll-response-up', () => this.scrollResponseUp()),
+            cheatingDaddy.ipc.on('scroll-response-down', () => this.scrollResponseDown()),
+        ];
     }
 
     disconnectedCallback() {
         super.disconnectedCallback();
         this._stopWaveformAnimation();
-
-        if (window.require) {
-            const { ipcRenderer } = window.require('electron');
-            if (this.handlePreviousResponse) ipcRenderer.removeListener('navigate-previous-response', this.handlePreviousResponse);
-            if (this.handleNextResponse) ipcRenderer.removeListener('navigate-next-response', this.handleNextResponse);
-            if (this.handleScrollUp) ipcRenderer.removeListener('scroll-response-up', this.handleScrollUp);
-            if (this.handleScrollDown) ipcRenderer.removeListener('scroll-response-down', this.handleScrollDown);
-        }
+        this._ipcCleanup.forEach(cleanup => cleanup());
+        this._ipcCleanup = [];
     }
 
     async handleSendText() {

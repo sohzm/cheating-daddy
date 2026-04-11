@@ -23,7 +23,7 @@ export class CheatingDaddyApp extends LitElement {
             display: block;
             width: 100%;
             height: 100vh;
-            background: var(--bg-app);
+            background: transparent;
             color: var(--text-primary);
         }
 
@@ -33,6 +33,7 @@ export class CheatingDaddyApp extends LitElement {
             display: flex;
             height: 100vh;
             overflow: hidden;
+            background: transparent;
         }
 
         .top-drag-bar {
@@ -45,6 +46,13 @@ export class CheatingDaddyApp extends LitElement {
             align-items: center;
             height: 38px;
             background: transparent;
+        }
+
+        .top-drag-bar.windows {
+            height: 44px;
+            background: rgba(10, 14, 18, 0.4);
+            border-bottom: 1px solid var(--border);
+            backdrop-filter: blur(14px);
         }
 
         .drag-region {
@@ -90,6 +98,34 @@ export class CheatingDaddyApp extends LitElement {
 
         .traffic-light.maximize {
             background: #28C840;
+        }
+
+        .window-controls {
+            display: flex;
+            align-items: stretch;
+            height: 100%;
+            margin-left: auto;
+            -webkit-app-region: no-drag;
+        }
+
+        .window-control {
+            width: 46px;
+            height: 100%;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 15px;
+            transition: background var(--transition), color var(--transition);
+        }
+
+        .window-control:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text-primary);
+        }
+
+        .window-control.close:hover {
+            background: #c42b1c;
+            color: white;
         }
 
         .sidebar {
@@ -223,7 +259,8 @@ export class CheatingDaddyApp extends LitElement {
             overflow: hidden;
             display: flex;
             flex-direction: column;
-            background: var(--bg-app);
+            background: rgba(8, 10, 14, 0.16);
+            backdrop-filter: blur(12px);
         }
 
         /* Live mode top bar */
@@ -321,7 +358,7 @@ export class CheatingDaddyApp extends LitElement {
             position: fixed;
             inset: 0;
             z-index: 100;
-            background: var(--bg-app);
+            background: rgba(8, 10, 14, 0.4);
         }
 
         ::-webkit-scrollbar {
@@ -389,6 +426,7 @@ export class CheatingDaddyApp extends LitElement {
         this._updateAvailable = false;
         this._whisperDownloading = false;
         this._localVersion = '';
+        this._ipcCleanup = [];
 
         this._loadFromStorage();
         this._checkForUpdates();
@@ -442,30 +480,25 @@ export class CheatingDaddyApp extends LitElement {
 
     connectedCallback() {
         super.connectedCallback();
-
-        if (window.require) {
-            const { ipcRenderer } = window.require('electron');
-            ipcRenderer.on('new-response', (_, response) => this.addNewResponse(response));
-            ipcRenderer.on('update-response', (_, response) => this.updateCurrentResponse(response));
-            ipcRenderer.on('update-status', (_, status) => this.setStatus(status));
-            ipcRenderer.on('click-through-toggled', (_, isEnabled) => { this._isClickThrough = isEnabled; });
-            ipcRenderer.on('reconnect-failed', (_, data) => this.addNewResponse(data.message));
-            ipcRenderer.on('whisper-downloading', (_, downloading) => { this._whisperDownloading = downloading; });
-        }
+        this._ipcCleanup = [
+            cheatingDaddy.ipc.on('new-response', response => this.addNewResponse(response)),
+            cheatingDaddy.ipc.on('update-response', response => this.updateCurrentResponse(response)),
+            cheatingDaddy.ipc.on('update-status', status => this.setStatus(status)),
+            cheatingDaddy.ipc.on('click-through-toggled', isEnabled => {
+                this._isClickThrough = isEnabled;
+            }),
+            cheatingDaddy.ipc.on('reconnect-failed', data => this.addNewResponse(data.message)),
+            cheatingDaddy.ipc.on('whisper-downloading', downloading => {
+                this._whisperDownloading = downloading;
+            }),
+        ];
     }
 
     disconnectedCallback() {
         super.disconnectedCallback();
         this._stopTimer();
-        if (window.require) {
-            const { ipcRenderer } = window.require('electron');
-            ipcRenderer.removeAllListeners('new-response');
-            ipcRenderer.removeAllListeners('update-response');
-            ipcRenderer.removeAllListeners('update-status');
-            ipcRenderer.removeAllListeners('click-through-toggled');
-            ipcRenderer.removeAllListeners('reconnect-failed');
-            ipcRenderer.removeAllListeners('whisper-downloading');
-        }
+        this._ipcCleanup.forEach(cleanup => cleanup());
+        this._ipcCleanup = [];
     }
 
     // ── Timer ──
@@ -533,33 +566,25 @@ export class CheatingDaddyApp extends LitElement {
     async handleClose() {
         if (this.currentView === 'assistant') {
             cheatingDaddy.stopCapture();
-            if (window.require) {
-                const { ipcRenderer } = window.require('electron');
-                await ipcRenderer.invoke('close-session');
-            }
+            await cheatingDaddy.ipc.invoke('close-session');
             this.sessionActive = false;
             this._stopTimer();
             this.currentView = 'main';
         } else {
-            if (window.require) {
-                const { ipcRenderer } = window.require('electron');
-                await ipcRenderer.invoke('quit-application');
-            }
+            await cheatingDaddy.ipc.invoke('quit-application');
         }
     }
 
     async _handleMinimize() {
-        if (window.require) {
-            const { ipcRenderer } = window.require('electron');
-            await ipcRenderer.invoke('window-minimize');
-        }
+        await cheatingDaddy.ipc.invoke('window-minimize');
+    }
+
+    async _handleToggleMaximize() {
+        await cheatingDaddy.ipc.invoke('window-toggle-maximize');
     }
 
     async handleHideToggle() {
-        if (window.require) {
-            const { ipcRenderer } = window.require('electron');
-            await ipcRenderer.invoke('toggle-window-visibility');
-        }
+        await cheatingDaddy.ipc.invoke('toggle-window-visibility');
     }
 
     // ── Session start ──
@@ -605,10 +630,21 @@ export class CheatingDaddyApp extends LitElement {
                 return;
             }
 
-            await cheatingDaddy.initializeGemini(this.selectedProfile, this.selectedLanguage);
+            const success = await cheatingDaddy.initializeGemini(this.selectedProfile, this.selectedLanguage);
+            if (!success) {
+                const mainView = this.shadowRoot.querySelector('main-view');
+                if (mainView && mainView.triggerApiKeyError) {
+                    mainView.triggerApiKeyError();
+                }
+                return;
+            }
         }
 
-        cheatingDaddy.startCapture(this.selectedScreenshotInterval, this.selectedImageQuality);
+        const captureStarted = await cheatingDaddy.startCapture(this.selectedScreenshotInterval, this.selectedImageQuality);
+        if (!captureStarted) {
+            await cheatingDaddy.ipc.invoke('close-session');
+            return;
+        }
         this.responses = [];
         this.currentResponseIndex = -1;
         this.startTime = Date.now();
@@ -618,17 +654,11 @@ export class CheatingDaddyApp extends LitElement {
     }
 
     async handleAPIKeyHelp() {
-        if (window.require) {
-            const { ipcRenderer } = window.require('electron');
-            await ipcRenderer.invoke('open-external', 'https://cheatingdaddy.com/help/api-key');
-        }
+        await cheatingDaddy.ipc.invoke('open-external', 'https://cheatingdaddy.com/help/api-key');
     }
 
     async handleGroqAPIKeyHelp() {
-        if (window.require) {
-            const { ipcRenderer } = window.require('electron');
-            await ipcRenderer.invoke('open-external', 'https://console.groq.com/keys');
-        }
+        await cheatingDaddy.ipc.invoke('open-external', 'https://console.groq.com/keys');
     }
 
     // ── Settings handlers ──
@@ -656,22 +686,16 @@ export class CheatingDaddyApp extends LitElement {
     async handleLayoutModeChange(layoutMode) {
         this.layoutMode = layoutMode;
         await cheatingDaddy.storage.updateConfig('layout', layoutMode);
-        if (window.require) {
-            try {
-                const { ipcRenderer } = window.require('electron');
-                await ipcRenderer.invoke('update-sizes');
-            } catch (error) {
-                console.error('Failed to update sizes:', error);
-            }
+        try {
+            await cheatingDaddy.ipc.invoke('update-sizes');
+        } catch (error) {
+            console.error('Failed to update sizes:', error);
         }
         this.requestUpdate();
     }
 
     async handleExternalLinkClick(url) {
-        if (window.require) {
-            const { ipcRenderer } = window.require('electron');
-            await ipcRenderer.invoke('open-external', url);
-        }
+        await cheatingDaddy.ipc.invoke('open-external', url);
     }
 
     async handleSendText(message) {
@@ -697,9 +721,8 @@ export class CheatingDaddyApp extends LitElement {
     updated(changedProperties) {
         super.updated(changedProperties);
 
-        if (changedProperties.has('currentView') && window.require) {
-            const { ipcRenderer } = window.require('electron');
-            ipcRenderer.send('view-changed', this.currentView);
+        if (changedProperties.has('currentView')) {
+            cheatingDaddy.ipc.send('view-changed', this.currentView);
         }
     }
 
@@ -873,16 +896,28 @@ export class CheatingDaddyApp extends LitElement {
         }
 
         const isLive = this._isLiveMode();
+        const isWindows = window.cheatingDaddyAPI?.platform?.isWindows;
 
         return html`
             <div class="app-shell">
-                <div class="top-drag-bar ${isLive ? 'hidden' : ''}">
-                    <div class="traffic-lights">
-                        <button class="traffic-light close" @click=${() => this.handleClose()} title="Close"></button>
-                        <button class="traffic-light minimize" @click=${() => this._handleMinimize()} title="Minimize"></button>
-                        <button class="traffic-light maximize" title="Maximize"></button>
-                    </div>
-                    <div class="drag-region"></div>
+                <div class="top-drag-bar ${isWindows ? 'windows' : ''} ${isLive ? 'hidden' : ''}">
+                    ${isWindows
+                        ? html`
+                              <div class="drag-region"></div>
+                              <div class="window-controls">
+                                  <button class="window-control" @click=${() => this._handleMinimize()} title="Minimize">_</button>
+                                  <button class="window-control" @click=${() => this._handleToggleMaximize()} title="Maximize or restore">&#9723;</button>
+                                  <button class="window-control close" @click=${() => this.handleClose()} title="Close">&#10005;</button>
+                              </div>
+                          `
+                        : html`
+                              <div class="traffic-lights">
+                                  <button class="traffic-light close" @click=${() => this.handleClose()} title="Close"></button>
+                                  <button class="traffic-light minimize" @click=${() => this._handleMinimize()} title="Minimize"></button>
+                                  <button class="traffic-light maximize" @click=${() => this._handleToggleMaximize()} title="Maximize"></button>
+                              </div>
+                              <div class="drag-region"></div>
+                          `}
                 </div>
                 ${this.renderSidebar()}
                 <div class="content">

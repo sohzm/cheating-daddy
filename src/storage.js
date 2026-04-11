@@ -1,19 +1,21 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { app, safeStorage } = require('electron');
 
-const CONFIG_VERSION = 1;
+const CONFIG_VERSION = 2;
 
-// Default values
 const DEFAULT_CONFIG = {
     configVersion: CONFIG_VERSION,
     onboarded: false,
-    layout: 'normal'
+    layout: 'normal',
 };
 
 const DEFAULT_CREDENTIALS = {
     apiKey: '',
-    groqApiKey: ''
+    groqApiKey: '',
+    cloudToken: '',
+    openaiKey: '',
 };
 
 const DEFAULT_PREFERENCES = {
@@ -24,37 +26,38 @@ const DEFAULT_PREFERENCES = {
     selectedImageQuality: 'medium',
     advancedMode: false,
     audioMode: 'speaker_only',
-    fontSize: 'medium',
+    fontSize: 20,
     backgroundTransparency: 0.8,
     googleSearchEnabled: false,
     ollamaHost: 'http://127.0.0.1:11434',
     ollamaModel: 'llama3.1',
     whisperModel: 'Xenova/whisper-small',
+    providerMode: 'cloud',
+    theme: 'dark',
 };
 
-const DEFAULT_KEYBINDS = null; // null means use system defaults
+const DEFAULT_KEYBINDS = null;
 
 const DEFAULT_LIMITS = {
-    data: [] // Array of { date: 'YYYY-MM-DD', flash: { count }, flashLite: { count }, groq: { 'qwen3-32b': { chars, limit }, 'gpt-oss-120b': { chars, limit }, 'gpt-oss-20b': { chars, limit } }, gemini: { 'gemma-3-27b-it': { chars } } }
+    data: [],
 };
 
-// Get the config directory path based on OS
-function getConfigDir() {
+function getLegacyConfigDir() {
     const platform = os.platform();
-    let configDir;
 
     if (platform === 'win32') {
-        configDir = path.join(os.homedir(), 'AppData', 'Roaming', 'cheating-daddy-config');
-    } else if (platform === 'darwin') {
-        configDir = path.join(os.homedir(), 'Library', 'Application Support', 'cheating-daddy-config');
-    } else {
-        configDir = path.join(os.homedir(), '.config', 'cheating-daddy-config');
+        return path.join(os.homedir(), 'AppData', 'Roaming', 'cheating-daddy-config');
     }
-
-    return configDir;
+    if (platform === 'darwin') {
+        return path.join(os.homedir(), 'Library', 'Application Support', 'cheating-daddy-config');
+    }
+    return path.join(os.homedir(), '.config', 'cheating-daddy-config');
 }
 
-// File paths
+function getConfigDir() {
+    return path.join(app.getPath('userData'), 'storage');
+}
+
 function getConfigPath() {
     return path.join(getConfigDir(), 'config.json');
 }
@@ -79,7 +82,12 @@ function getHistoryDir() {
     return path.join(getConfigDir(), 'history');
 }
 
-// Helper to read JSON file safely
+function ensureDir(dirPath) {
+    if (!fs.existsSync(dirPath)) {
+        fs.mkdirSync(dirPath, { recursive: true });
+    }
+}
+
 function readJsonFile(filePath, defaultValue) {
     try {
         if (fs.existsSync(filePath)) {
@@ -92,13 +100,9 @@ function readJsonFile(filePath, defaultValue) {
     return defaultValue;
 }
 
-// Helper to write JSON file safely
 function writeJsonFile(filePath, data) {
     try {
-        const dir = path.dirname(filePath);
-        if (!fs.existsSync(dir)) {
-            fs.mkdirSync(dir, { recursive: true });
-        }
+        ensureDir(path.dirname(filePath));
         fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
         return true;
     } catch (error) {
@@ -107,58 +111,126 @@ function writeJsonFile(filePath, data) {
     }
 }
 
-// Check if we need to reset (no configVersion or wrong version)
-function needsReset() {
-    const configPath = getConfigPath();
-    if (!fs.existsSync(configPath)) {
-        return true;
+function encryptString(value) {
+    if (safeStorage.isEncryptionAvailable()) {
+        return {
+            encrypted: true,
+            data: safeStorage.encryptString(value).toString('base64'),
+        };
+    }
+
+    return {
+        encrypted: false,
+        data: value,
+    };
+}
+
+function decryptString(payload) {
+    if (!payload || typeof payload !== 'object' || typeof payload.data !== 'string') {
+        return '';
+    }
+
+    if (!payload.encrypted) {
+        return payload.data;
     }
 
     try {
-        const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-        return !config.configVersion || config.configVersion !== CONFIG_VERSION;
-    } catch {
-        return true;
+        if (safeStorage.isEncryptionAvailable()) {
+            return safeStorage.decryptString(Buffer.from(payload.data, 'base64'));
+        }
+    } catch (error) {
+        console.warn('Failed to decrypt credential payload:', error.message);
+    }
+
+    return '';
+}
+
+function normalizeCredentials(credentials) {
+    return { ...DEFAULT_CREDENTIALS, ...(credentials || {}) };
+}
+
+function readCredentialsFile() {
+    const fallback = { ...DEFAULT_CREDENTIALS };
+
+    try {
+        if (!fs.existsSync(getCredentialsPath())) {
+            return fallback;
+        }
+
+        const raw = JSON.parse(fs.readFileSync(getCredentialsPath(), 'utf8'));
+
+        if (raw && raw.schemaVersion === 2) {
+            return {
+                apiKey: decryptString(raw.apiKey),
+                groqApiKey: decryptString(raw.groqApiKey),
+                cloudToken: decryptString(raw.cloudToken),
+                openaiKey: decryptString(raw.openaiKey),
+            };
+        }
+
+        return normalizeCredentials(raw);
+    } catch (error) {
+        console.warn(`Error reading credentials ${getCredentialsPath()}:`, error.message);
+        return fallback;
     }
 }
 
-// Wipe and reinitialize the config directory
-function resetConfigDir() {
+function writeCredentialsFile(credentials) {
+    const normalized = normalizeCredentials(credentials);
+
+    return writeJsonFile(getCredentialsPath(), {
+        schemaVersion: 2,
+        apiKey: encryptString(normalized.apiKey),
+        groqApiKey: encryptString(normalized.groqApiKey),
+        cloudToken: encryptString(normalized.cloudToken),
+        openaiKey: encryptString(normalized.openaiKey),
+    });
+}
+
+function ensureDefaultFile(filePath, defaultValue, readFn = readJsonFile, writeFn = writeJsonFile) {
+    const current = readFn(filePath, null);
+    if (current === null || current === undefined) {
+        writeFn(filePath, defaultValue);
+        return defaultValue;
+    }
+    return current;
+}
+
+function migrateLegacyStorage() {
+    const legacyDir = getLegacyConfigDir();
     const configDir = getConfigDir();
 
-    console.log('Resetting config directory...');
-
-    // Remove existing directory if it exists
-    if (fs.existsSync(configDir)) {
-        fs.rmSync(configDir, { recursive: true, force: true });
+    if (!fs.existsSync(legacyDir) || fs.existsSync(configDir)) {
+        return;
     }
 
-    // Create fresh directory structure
-    fs.mkdirSync(configDir, { recursive: true });
-    fs.mkdirSync(getHistoryDir(), { recursive: true });
-
-    // Initialize with defaults
-    writeJsonFile(getConfigPath(), DEFAULT_CONFIG);
-    writeJsonFile(getCredentialsPath(), DEFAULT_CREDENTIALS);
-    writeJsonFile(getPreferencesPath(), DEFAULT_PREFERENCES);
-
-    console.log('Config directory initialized with defaults');
+    console.log('Migrating legacy storage to userData...');
+    fs.cpSync(legacyDir, configDir, { recursive: true });
 }
 
-// Initialize storage - call this on app startup
 function initializeStorage() {
-    if (needsReset()) {
-        resetConfigDir();
-    } else {
-        // Ensure history directory exists
-        const historyDir = getHistoryDir();
-        if (!fs.existsSync(historyDir)) {
-            fs.mkdirSync(historyDir, { recursive: true });
-        }
-    }
-}
+    migrateLegacyStorage();
 
-// ============ CONFIG ============
+    ensureDir(getConfigDir());
+    ensureDir(getHistoryDir());
+
+    const config = ensureDefaultFile(getConfigPath(), DEFAULT_CONFIG);
+    const updatedConfig = { ...DEFAULT_CONFIG, ...(config || {}), configVersion: CONFIG_VERSION };
+    writeJsonFile(getConfigPath(), updatedConfig);
+
+    const credentials = readCredentialsFile();
+    writeCredentialsFile(credentials);
+
+    const preferences = { ...DEFAULT_PREFERENCES, ...readJsonFile(getPreferencesPath(), {}) };
+    writeJsonFile(getPreferencesPath(), preferences);
+
+    if (!fs.existsSync(getKeybindsPath())) {
+        writeJsonFile(getKeybindsPath(), DEFAULT_KEYBINDS);
+    }
+
+    const limits = readJsonFile(getLimitsPath(), DEFAULT_LIMITS);
+    writeJsonFile(getLimitsPath(), limits);
+}
 
 function getConfig() {
     return readJsonFile(getConfigPath(), DEFAULT_CONFIG);
@@ -166,26 +238,23 @@ function getConfig() {
 
 function setConfig(config) {
     const current = getConfig();
-    const updated = { ...current, ...config, configVersion: CONFIG_VERSION };
-    return writeJsonFile(getConfigPath(), updated);
+    return writeJsonFile(getConfigPath(), { ...current, ...config, configVersion: CONFIG_VERSION });
 }
 
 function updateConfig(key, value) {
     const config = getConfig();
     config[key] = value;
+    config.configVersion = CONFIG_VERSION;
     return writeJsonFile(getConfigPath(), config);
 }
 
-// ============ CREDENTIALS ============
-
 function getCredentials() {
-    return readJsonFile(getCredentialsPath(), DEFAULT_CREDENTIALS);
+    return readCredentialsFile();
 }
 
 function setCredentials(credentials) {
     const current = getCredentials();
-    const updated = { ...current, ...credentials };
-    return writeJsonFile(getCredentialsPath(), updated);
+    return writeCredentialsFile({ ...current, ...credentials });
 }
 
 function getApiKey() {
@@ -204,17 +273,13 @@ function setGroqApiKey(groqApiKey) {
     return setCredentials({ groqApiKey });
 }
 
-// ============ PREFERENCES ============
-
 function getPreferences() {
-    const saved = readJsonFile(getPreferencesPath(), {});
-    return { ...DEFAULT_PREFERENCES, ...saved };
+    return { ...DEFAULT_PREFERENCES, ...readJsonFile(getPreferencesPath(), {}) };
 }
 
 function setPreferences(preferences) {
     const current = getPreferences();
-    const updated = { ...current, ...preferences };
-    return writeJsonFile(getPreferencesPath(), updated);
+    return writeJsonFile(getPreferencesPath(), { ...current, ...preferences });
 }
 
 function updatePreference(key, value) {
@@ -223,8 +288,6 @@ function updatePreference(key, value) {
     return writeJsonFile(getPreferencesPath(), preferences);
 }
 
-// ============ KEYBINDS ============
-
 function getKeybinds() {
     return readJsonFile(getKeybindsPath(), DEFAULT_KEYBINDS);
 }
@@ -232,8 +295,6 @@ function getKeybinds() {
 function setKeybinds(keybinds) {
     return writeJsonFile(getKeybindsPath(), keybinds);
 }
-
-// ============ LIMITS (Rate Limiting) ============
 
 function getLimits() {
     return readJsonFile(getLimitsPath(), DEFAULT_LIMITS);
@@ -244,37 +305,32 @@ function setLimits(limits) {
 }
 
 function getTodayDateString() {
-    const now = new Date();
-    return now.toISOString().split('T')[0]; // YYYY-MM-DD
+    return new Date().toISOString().split('T')[0];
 }
 
 function getTodayLimits() {
     const limits = getLimits();
     const today = getTodayDateString();
-
-    // Find today's entry
     const todayEntry = limits.data.find(entry => entry.date === today);
 
     if (todayEntry) {
-        // ensure new fields exist
-        if(!todayEntry.groq) {
+        if (!todayEntry.groq) {
             todayEntry.groq = {
                 'qwen3-32b': { chars: 0, limit: 1500000 },
                 'gpt-oss-120b': { chars: 0, limit: 600000 },
                 'gpt-oss-20b': { chars: 0, limit: 600000 },
-                'kimi-k2-instruct': { chars: 0, limit: 600000 }
+                'kimi-k2-instruct': { chars: 0, limit: 600000 },
             };
         }
-        if(!todayEntry.gemini) {
+        if (!todayEntry.gemini) {
             todayEntry.gemini = {
-                'gemma-3-27b-it': { chars: 0 }
+                'gemma-3-27b-it': { chars: 0 },
             };
         }
         setLimits(limits);
         return todayEntry;
     }
 
-    // No entry for today - clean old entries and create new one
     limits.data = limits.data.filter(entry => entry.date === today);
     const newEntry = {
         date: today,
@@ -284,40 +340,34 @@ function getTodayLimits() {
             'qwen3-32b': { chars: 0, limit: 1500000 },
             'gpt-oss-120b': { chars: 0, limit: 600000 },
             'gpt-oss-20b': { chars: 0, limit: 600000 },
-            'kimi-k2-instruct': { chars: 0, limit: 600000 }
+            'kimi-k2-instruct': { chars: 0, limit: 600000 },
         },
         gemini: {
-            'gemma-3-27b-it': { chars: 0 }
-        }
+            'gemma-3-27b-it': { chars: 0 },
+        },
     };
     limits.data.push(newEntry);
     setLimits(limits);
-
     return newEntry;
 }
 
 function incrementLimitCount(model) {
     const limits = getLimits();
     const today = getTodayDateString();
-
-    // Find or create today's entry
     let todayEntry = limits.data.find(entry => entry.date === today);
 
     if (!todayEntry) {
-        // Clean old entries and create new one
         limits.data = [];
         todayEntry = {
             date: today,
             flash: { count: 0 },
-            flashLite: { count: 0 }
+            flashLite: { count: 0 },
         };
         limits.data.push(todayEntry);
     } else {
-        // Clean old entries, keep only today
         limits.data = limits.data.filter(entry => entry.date === today);
     }
 
-    // Increment the appropriate model count
     if (model === 'gemini-2.5-flash') {
         todayEntry.flash.count++;
     } else if (model === 'gemini-2.5-flash-lite') {
@@ -332,10 +382,9 @@ function incrementCharUsage(provider, model, charCount) {
     getTodayLimits();
 
     const limits = getLimits();
-    const today = getTodayDateString();
-    const todayEntry = limits.data.find(entry => entry.date === today);
+    const todayEntry = limits.data.find(entry => entry.date === getTodayDateString());
 
-    if(todayEntry[provider] && todayEntry[provider][model]) {
+    if (todayEntry?.[provider]?.[model]) {
         todayEntry[provider][model].chars += charCount;
         setLimits(limits);
     }
@@ -346,20 +395,18 @@ function incrementCharUsage(provider, model, charCount) {
 function getAvailableModel() {
     const todayLimits = getTodayLimits();
 
-    // RPD limits: flash = 20, flash-lite = 20
-    // After both exhausted, fall back to flash (for paid API users)
     if (todayLimits.flash.count < 20) {
         return 'gemini-2.5-flash';
-    } else if (todayLimits.flashLite.count < 20) {
+    }
+    if (todayLimits.flashLite.count < 20) {
         return 'gemini-2.5-flash-lite';
     }
 
-    return 'gemini-2.5-flash'; // Default to flash for paid API users
+    return 'gemini-2.5-flash';
 }
 
 function getModelForToday() {
-    const todayEntry = getTodayLimits();
-    const groq = todayEntry.groq;
+    const groq = getTodayLimits().groq;
 
     if (groq['qwen3-32b'].chars < groq['qwen3-32b'].limit) {
         return 'qwen/qwen3-32b';
@@ -374,11 +421,8 @@ function getModelForToday() {
         return 'moonshotai/kimi-k2-instruct';
     }
 
-    // All limits exhausted
     return null;
 }
-
-// ============ HISTORY ============
 
 function getSessionPath(sessionId) {
     return path.join(getHistoryDir(), `${sessionId}.json`);
@@ -386,22 +430,17 @@ function getSessionPath(sessionId) {
 
 function saveSession(sessionId, data) {
     const sessionPath = getSessionPath(sessionId);
-
-    // Load existing session to preserve metadata
     const existingSession = readJsonFile(sessionPath, null);
 
-    const sessionData = {
+    return writeJsonFile(sessionPath, {
         sessionId,
-        createdAt: existingSession?.createdAt || parseInt(sessionId),
+        createdAt: existingSession?.createdAt || parseInt(sessionId, 10),
         lastUpdated: Date.now(),
-        // Profile context - set once when session starts
         profile: data.profile || existingSession?.profile || null,
         customPrompt: data.customPrompt || existingSession?.customPrompt || null,
-        // Conversation data
         conversationHistory: data.conversationHistory || existingSession?.conversationHistory || [],
-        screenAnalysisHistory: data.screenAnalysisHistory || existingSession?.screenAnalysisHistory || []
-    };
-    return writeJsonFile(sessionPath, sessionData);
+        screenAnalysisHistory: data.screenAnalysisHistory || existingSession?.screenAnalysisHistory || [],
+    });
 }
 
 function getSession(sessionId) {
@@ -416,19 +455,18 @@ function getAllSessions() {
             return [];
         }
 
-        const files = fs.readdirSync(historyDir)
-            .filter(f => f.endsWith('.json'))
-            .sort((a, b) => {
-                // Sort by timestamp descending (newest first)
-                const tsA = parseInt(a.replace('.json', ''));
-                const tsB = parseInt(b.replace('.json', ''));
-                return tsB - tsA;
-            });
+        return fs
+            .readdirSync(historyDir)
+            .filter(file => file.endsWith('.json'))
+            .sort((a, b) => parseInt(b.replace('.json', ''), 10) - parseInt(a.replace('.json', ''), 10))
+            .map(file => {
+                const sessionId = file.replace('.json', '');
+                const data = readJsonFile(path.join(historyDir, file), null);
 
-        return files.map(file => {
-            const sessionId = file.replace('.json', '');
-            const data = readJsonFile(path.join(historyDir, file), null);
-            if (data) {
+                if (!data) {
+                    return null;
+                }
+
                 return {
                     sessionId,
                     createdAt: data.createdAt,
@@ -436,11 +474,10 @@ function getAllSessions() {
                     messageCount: data.conversationHistory?.length || 0,
                     screenAnalysisCount: data.screenAnalysisHistory?.length || 0,
                     profile: data.profile || null,
-                    customPrompt: data.customPrompt || null
+                    customPrompt: data.customPrompt || null,
                 };
-            }
-            return null;
-        }).filter(Boolean);
+            })
+            .filter(Boolean);
     } catch (error) {
         console.error('Error reading sessions:', error.message);
         return [];
@@ -448,8 +485,8 @@ function getAllSessions() {
 }
 
 function deleteSession(sessionId) {
-    const sessionPath = getSessionPath(sessionId);
     try {
+        const sessionPath = getSessionPath(sessionId);
         if (fs.existsSync(sessionPath)) {
             fs.unlinkSync(sessionPath);
             return true;
@@ -462,12 +499,14 @@ function deleteSession(sessionId) {
 
 function deleteAllSessions() {
     const historyDir = getHistoryDir();
+
     try {
         if (fs.existsSync(historyDir)) {
-            const files = fs.readdirSync(historyDir).filter(f => f.endsWith('.json'));
-            files.forEach(file => {
-                fs.unlinkSync(path.join(historyDir, file));
-            });
+            fs.readdirSync(historyDir)
+                .filter(file => file.endsWith('.json'))
+                .forEach(file => {
+                    fs.unlinkSync(path.join(historyDir, file));
+                });
         }
         return true;
     } catch (error) {
@@ -476,41 +515,36 @@ function deleteAllSessions() {
     }
 }
 
-// ============ CLEAR ALL DATA ============
-
 function clearAllData() {
-    resetConfigDir();
-    return true;
+    try {
+        if (fs.existsSync(getConfigDir())) {
+            fs.rmSync(getConfigDir(), { recursive: true, force: true });
+        }
+        initializeStorage();
+        return true;
+    } catch (error) {
+        console.error('Error clearing local data:', error.message);
+        return false;
+    }
 }
 
 module.exports = {
-    // Initialization
     initializeStorage,
     getConfigDir,
-
-    // Config
     getConfig,
     setConfig,
     updateConfig,
-
-    // Credentials
     getCredentials,
     setCredentials,
     getApiKey,
     setApiKey,
     getGroqApiKey,
     setGroqApiKey,
-
-    // Preferences
     getPreferences,
     setPreferences,
     updatePreference,
-
-    // Keybinds
     getKeybinds,
     setKeybinds,
-
-    // Limits (Rate Limiting)
     getLimits,
     setLimits,
     getTodayLimits,
@@ -518,14 +552,10 @@ module.exports = {
     getAvailableModel,
     incrementCharUsage,
     getModelForToday,
-
-    // History
     saveSession,
     getSession,
     getAllSessions,
     deleteSession,
     deleteAllSessions,
-
-    // Clear all
-    clearAllData
+    clearAllData,
 };
