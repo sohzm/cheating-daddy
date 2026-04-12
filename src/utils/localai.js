@@ -119,27 +119,87 @@ async function loadWhisperPipeline(modelName) {
     isWhisperLoading = true;
     console.log('[LocalAI] Loading Whisper model:', modelName);
     sendToRenderer('whisper-downloading', true);
-    sendToRenderer('update-status', 'Loading Whisper model (first time may take a while)...');
+    sendToRenderer('update-status', 'Loading Whisper...');
 
     try {
-        // Dynamic import for ESM module
-        const { pipeline, env } = await import('@huggingface/transformers');
-        // Cache models outside the asar archive so ONNX runtime can load them
+        const os = require('os');
+        const freeMem = os.freemem() / (1024 * 1024 * 1024);
+        console.log('[LocalAI] Free memory:', freeMem.toFixed(2), 'GB');
+
+        if (freeMem < 2) {
+            throw new Error('Need at least 2GB free RAM');
+        }
+
+        // Import with timeout
+        let pipeline, env;
+        try {
+            const imported = await Promise.race([
+                import('@huggingface/transformers'),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Import timeout (30s)')), 30000)),
+            ]);
+            pipeline = imported.pipeline;
+            env = imported.env;
+        } catch (importError) {
+            throw new Error('ML library failed. Try Cloud mode.');
+        }
+
         const { app } = require('electron');
         const path = require('path');
-        env.cacheDir = path.join(app.getPath('userData'), 'whisper-models');
-        whisperPipeline = await pipeline('automatic-speech-recognition', modelName, {
+        const cacheDir = path.join(app.getPath('userData'), 'whisper-models');
+
+        env.cacheDir = cacheDir;
+        env.allowLocal = true;
+
+        // Use tiny model - it's smaller and more reliable
+        const actualModel = 'Xenova/whisper-tiny';
+        console.log('[LocalAI] Loading:', actualModel);
+
+        whisperPipeline = await pipeline('automatic-speech-recognition', actualModel, {
             dtype: 'q8',
-            device: 'auto',
+            device: 'cpu',
+            parallel: 1,
         });
-        console.log('[LocalAI] Whisper model loaded successfully');
+
+        console.log('[LocalAI] Whisper loaded:', actualModel);
         sendToRenderer('whisper-downloading', false);
         isWhisperLoading = false;
         return whisperPipeline;
     } catch (error) {
-        console.error('[LocalAI] Failed to load Whisper model:', error);
+        console.error('[LocalAI] Whisper error:', error.message);
+
+        // Try clearing cache and retry once
+        if (!error.message.includes('cache') && !error.message.includes('timeout')) {
+            console.log('[LocalAI] Retrying with fresh download...');
+            try {
+                const { pipeline, env } = await import('@huggingface/transformers');
+                const { app } = require('electron');
+                const path = require('path');
+
+                // Delete cache dir
+                const cacheDir = path.join(app.getPath('userData'), 'whisper-models');
+                try {
+                    require('fs').rmSync(cacheDir, { recursive: true, force: true });
+                } catch (e) {}
+
+                env.cacheDir = cacheDir;
+                env.allowLocal = false;
+
+                whisperPipeline = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny', {
+                    dtype: 'q8',
+                    device: 'cpu',
+                });
+
+                console.log('[LocalAI] Whisper loaded after cache clear');
+                sendToRenderer('whisper-downloading', false);
+                isWhisperLoading = false;
+                return whisperPipeline;
+            } catch (retryError) {
+                console.error('[LocalAI] Retry failed:', retryError.message);
+            }
+        }
+
         sendToRenderer('whisper-downloading', false);
-        sendToRenderer('update-status', 'Failed to load Whisper model: ' + error.message);
+        sendToRenderer('update-status', 'Whisper failed. Try Cloud mode.');
         isWhisperLoading = false;
         return null;
     }
@@ -224,10 +284,7 @@ async function sendToOllama(transcription) {
     }
 
     try {
-        const messages = [
-            { role: 'system', content: currentSystemPrompt || 'You are a helpful assistant.' },
-            ...localConversationHistory,
-        ];
+        const messages = [{ role: 'system', content: currentSystemPrompt || 'You are a helpful assistant.' }, ...localConversationHistory];
 
         const response = await ollamaClient.chat({
             model: ollamaModel,

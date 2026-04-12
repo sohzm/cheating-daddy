@@ -50,6 +50,7 @@ const validEventChannels = new Set([
     'new-response',
     'update-response',
     'update-status',
+    'partial-question',
     'click-through-toggled',
     'reconnect-failed',
     'whisper-downloading',

@@ -5,6 +5,8 @@ const { saveDebugAudio } = require('../audioUtils');
 const { getSystemPrompt } = require('./prompts');
 const { getAvailableModel, incrementLimitCount, getApiKey, getGroqApiKey, incrementCharUsage, getModelForToday } = require('../storage');
 const { connectCloud, sendCloudAudio, sendCloudText, sendCloudImage, closeCloud, isCloudActive, setOnTurnComplete } = require('./cloud');
+const { getCachedResponse, setCachedResponse, getCacheStats, clearCache } = require('./cache');
+const { shouldUseFastModel } = require('./router');
 
 // Lazy-loaded to avoid circular dependency (localai.js imports from gemini.js)
 let _localai = null;
@@ -29,6 +31,34 @@ let currentCustomPrompt = null;
 let isInitializingSession = false;
 let currentSystemPrompt = null;
 
+// Fast response tracking
+let isProcessingResponse = false;
+let lastProcessedTranscription = '';
+let pendingTranscription = '';
+let pendingTranscriptionTimestamp = 0;
+let pauseTimer = null;
+let responseProcessedForCurrentTurn = false;
+
+// Check if question is complete (ends with ? or has complete sentences)
+function isQuestionComplete(text) {
+    const trimmed = text.trim();
+    return trimmed.endsWith('?') || (trimmed.match(/[.!?]+\s/g) || []).length >= 1;
+}
+
+// Check if new input looks like continuation of previous (not a new question)
+function isQuestionContinuation(newText, previousText) {
+    if (!previousText || previousText.trim().length === 0) return false;
+
+    // If new text is very short (< 10 chars) and doesn't start with capital, it's likely a fragment
+    if (newText.trim().length < 10 && !/^[A-Z]/.test(newText.trim())) {
+        return true;
+    }
+
+    // If previous text ends with a word (not punctuation), new text is likely continuation
+    const endsWithWord = /[a-zA-Z]$/.test(previousText.trim());
+    return endsWithWord;
+}
+
 function formatSpeakerResults(results) {
     let text = '';
     for (const result of results) {
@@ -45,7 +75,6 @@ module.exports.formatSpeakerResults = formatSpeakerResults;
 // Audio capture variables
 let systemAudioProc = null;
 let messageBuffer = '';
-
 
 // Reconnection variables
 let isUserClosing = false;
@@ -68,9 +97,7 @@ function buildContextMessage() {
 
     if (validTurns.length === 0) return null;
 
-    const contextLines = validTurns.map(turn =>
-        `[Interviewer]: ${turn.transcription.trim()}\n[Your answer]: ${turn.ai_response.trim()}`
-    );
+    const contextLines = validTurns.map(turn => `[Interviewer]: ${turn.transcription.trim()}\n[Your answer]: ${turn.ai_response.trim()}`);
 
     return `Session reconnected. Here's the conversation so far:\n\n${contextLines.join('\n\n')}\n\nContinue from here.`;
 }
@@ -91,7 +118,7 @@ function initializeNewSession(profile = null, customPrompt = null) {
         sendToRenderer('save-session-context', {
             sessionId: currentSessionId,
             profile: profile,
-            customPrompt: customPrompt || ''
+            customPrompt: customPrompt || '',
         });
     }
 }
@@ -127,7 +154,7 @@ function saveScreenAnalysis(prompt, response, model) {
         timestamp: Date.now(),
         prompt: prompt,
         response: response.trim(),
-        model: model
+        model: model,
     };
 
     screenAnalysisHistory.push(analysisEntry);
@@ -139,7 +166,7 @@ function saveScreenAnalysis(prompt, response, model) {
         analysis: analysisEntry,
         fullHistory: screenAnalysisHistory,
         profile: currentProfile,
-        customPrompt: currentCustomPrompt
+        customPrompt: currentCustomPrompt,
     });
 }
 
@@ -221,7 +248,7 @@ function summarizeLiveServerMessage(message) {
     }
 
     if (serverContent.modelTurn?.parts) {
-        return `modelTurn parts=${serverContent.modelTurn.parts.length}`;
+        // Log periodically - there are many chunks
     }
 
     return null;
@@ -230,19 +257,19 @@ function summarizeLiveServerMessage(message) {
 // helper to check if groq has been configured
 function hasGroqKey() {
     const key = getGroqApiKey();
-    return key && key.trim() != ''
+    return key && key.trim() != '';
 }
 
-function trimConversationHistoryForGemma(history, maxChars=42000) {
-    if(!history || history.length === 0) return [];
+function trimConversationHistoryForGemma(history, maxChars = 42000) {
+    if (!history || history.length === 0) return [];
     let totalChars = 0;
     const trimmed = [];
 
-    for(let i = history.length - 1; i >= 0; i--) {
+    for (let i = history.length - 1; i >= 0; i--) {
         const turn = history[i];
         const turnChars = (turn.content || '').length;
 
-        if(totalChars + turnChars > maxChars) break;
+        if (totalChars + turnChars > maxChars) break;
         totalChars += turnChars;
         trimmed.unshift(turn);
     }
@@ -250,10 +277,17 @@ function trimConversationHistoryForGemma(history, maxChars=42000) {
 }
 
 function stripThinkingTags(text) {
-    return text.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+    if (!text) return '';
+    let result = text;
+    // Remove ALL instances of thinking tags (using global flag)
+    result = result.replace(/<think>[\s\S]*?<\/think>/gi, '');
+    // Also handle cases where tags might be split across streamed chunks (incomplete)
+    result = result.replace(/<think>/gi, '');
+    result = result.replace(/<\/think>/gi, '');
+    return result.trim();
 }
 
-async function sendToGroq(transcription) {
+async function sendToGroq(transcription, isPartial = false, preferFastModel = null) {
     const groqApiKey = getGroqApiKey();
     if (!groqApiKey) {
         console.log('No Groq API key configured, skipping Groq response');
@@ -265,18 +299,73 @@ async function sendToGroq(transcription) {
         return;
     }
 
-    const modelToUse = getModelForToday();
-    if (!modelToUse) {
+    // Check cache for exact or similar questions (skip for partial transcriptions)
+    if (!isPartial) {
+        const cachedResponse = getCachedResponse(transcription);
+        if (cachedResponse) {
+            const { response } = cachedResponse;
+            console.log('[Cache] Using cached response');
+            sendToRenderer('new-response', response);
+
+            groqConversationHistory.push({
+                role: 'user',
+                content: transcription.trim(),
+            });
+            groqConversationHistory.push({
+                role: 'assistant',
+                content: response,
+            });
+
+            saveConversationTurn(transcription, response);
+            isProcessingResponse = false;
+            sendToRenderer('update-status', 'Listening... (cached)');
+            return;
+        }
+    }
+
+    // Determine which model to use based on query complexity
+    // preferFastModel can be: true (force fast), false (force complex), null (auto-detect)
+    let useFastModel = preferFastModel;
+    if (useFastModel === null) {
+        useFastModel = shouldUseFastModel(transcription);
+    }
+
+    // Select model based on complexity
+    // Fast models: llama-3.1-70b-versatile (default), mixtral-8x7b-32768
+    // Complex models: llama-3.1-405b-reasoning-ultra, deepseek-r1-distill-llama-70b
+    let modelToUse;
+    if (useFastModel) {
+        modelToUse = getModelForToday() || 'llama-3.1-70b-versatile';
+    } else {
+        // Use a more capable model for complex queries
+        modelToUse = 'llama-3.1-405b-reasoning-ultra';
+    }
+
+    // Check if we have the model available
+    const availableModel = getModelForToday();
+    if (!availableModel) {
         console.log('All Groq daily limits exhausted');
         sendToRenderer('update-status', 'Groq limits reached for today');
         return;
     }
 
-    console.log(`Sending to Groq (${modelToUse}):`, transcription.substring(0, 100) + '...');
+    // If the complex model isn't available in today's pool, fall back to available model
+    if (!useFastModel && availableModel !== modelToUse) {
+        console.log('[Router] Complex model not in daily pool, using available:', availableModel);
+        modelToUse = availableModel;
+    }
+
+    console.log(`Sending to Groq (${modelToUse}, fast=${useFastModel}):`, transcription.substring(0, 100) + '...');
+
+    // Mark as processing to prevent turnComplete from clearing state prematurely
+    isProcessingResponse = true;
+
+    // Clear previous response and show processing status
+    sendToRenderer('new-response', 'Processing...');
 
     groqConversationHistory.push({
         role: 'user',
-        content: transcription.trim()
+        content: transcription.trim(),
     });
 
     if (groqConversationHistory.length > 20) {
@@ -287,24 +376,34 @@ async function sendToGroq(transcription) {
         const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${groqApiKey}`,
-                'Content-Type': 'application/json'
+                Authorization: `Bearer ${groqApiKey}`,
+                'Content-Type': 'application/json',
             },
             body: JSON.stringify({
                 model: modelToUse,
-                messages: [
-                    { role: 'system', content: currentSystemPrompt || 'You are a helpful assistant.' },
-                    ...groqConversationHistory
-                ],
+                messages: [{ role: 'system', content: currentSystemPrompt || 'You are a helpful assistant.' }, ...groqConversationHistory],
                 stream: true,
-                temperature: 0.7,
-                max_tokens: 1024
-            })
+                temperature: useFastModel ? 0.7 : 0.3, // Lower temp for complex reasoning
+                max_tokens: useFastModel ? 1024 : 2048, // More tokens for complex
+            }),
         });
 
         if (!response.ok) {
             const errorText = await response.text();
             console.error('Groq API error:', response.status, errorText);
+
+            // Fallback to Gemini on rate limit (429)
+            if (response.status === 429) {
+                console.log('[Fast Mode] Groq rate limited, falling back to Gemini...');
+                sendToRenderer('update-status', 'Rate limited, using Gemini...');
+                // Retry with Gemini
+                const apiKey = getApiKey();
+                if (apiKey) {
+                    sendToGemma(transcription);
+                    return;
+                }
+            }
+
             sendToRenderer('update-status', `Groq error: ${response.status}`);
             return;
         }
@@ -333,6 +432,10 @@ async function sendToGroq(transcription) {
                             fullText += token;
                             const displayText = stripThinkingTags(fullText);
                             if (displayText) {
+                                // Only log occasionally to avoid spam
+                                if (displayText.length % 200 === 0) {
+                                    console.log('[Fast Mode Debug] Response chunk:', displayText.substring(0, 20) + '...');
+                                }
                                 sendToRenderer(isFirst ? 'new-response' : 'update-response', displayText);
                                 isFirst = false;
                             }
@@ -357,17 +460,24 @@ async function sendToGroq(transcription) {
         if (cleanedResponse) {
             groqConversationHistory.push({
                 role: 'assistant',
-                content: cleanedResponse
+                content: cleanedResponse,
             });
+
+            // Cache the response (skip partial transcriptions)
+            if (!isPartial) {
+                setCachedResponse(transcription, cleanedResponse);
+            }
 
             saveConversationTurn(transcription, cleanedResponse);
         }
 
         console.log(`Groq response completed (${modelToUse})`);
+        // Allow next question to be processed immediately
+        isProcessingResponse = false;
         sendToRenderer('update-status', 'Listening...');
-
     } catch (error) {
         console.error('Error calling Groq API:', error);
+        isProcessingResponse = false;
         sendToRenderer('update-status', 'Groq error: ' + error.message);
     }
 }
@@ -386,9 +496,15 @@ async function sendToGemma(transcription) {
 
     console.log('Sending to Gemma:', transcription.substring(0, 100) + '...');
 
+    // Mark as processing to prevent turnComplete from clearing state prematurely
+    isProcessingResponse = true;
+
+    // Clear previous response and show processing status
+    sendToRenderer('new-response', 'Processing...');
+
     groqConversationHistory.push({
         role: 'user',
-        content: transcription.trim()
+        content: transcription.trim(),
     });
 
     const trimmedHistory = trimConversationHistoryForGemma(groqConversationHistory, 42000);
@@ -398,14 +514,14 @@ async function sendToGemma(transcription) {
 
         const messages = trimmedHistory.map(msg => ({
             role: msg.role === 'assistant' ? 'model' : 'user',
-            parts: [{ text: msg.content }]
+            parts: [{ text: msg.content }],
         }));
 
         const systemPrompt = currentSystemPrompt || 'You are a helpful assistant.';
         const messagesWithSystem = [
             { role: 'user', parts: [{ text: systemPrompt }] },
             { role: 'model', parts: [{ text: 'Understood. I will follow these instructions.' }] },
-            ...messages
+            ...messages,
         ];
 
         const response = await ai.models.generateContentStream({
@@ -435,7 +551,7 @@ async function sendToGemma(transcription) {
         if (fullText.trim()) {
             groqConversationHistory.push({
                 role: 'assistant',
-                content: fullText.trim()
+                content: fullText.trim(),
             });
 
             if (groqConversationHistory.length > 40) {
@@ -446,10 +562,11 @@ async function sendToGemma(transcription) {
         }
 
         console.log('Gemma response completed');
+        isProcessingResponse = false;
         sendToRenderer('update-status', 'Listening...');
-
     } catch (error) {
         console.error('Error calling Gemma API:', error);
+        isProcessingResponse = false;
         sendToRenderer('update-status', 'Gemma error: ' + error.message);
     }
 }
@@ -495,6 +612,16 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
             callbacks: {
                 onopen: function () {
                     sendToRenderer('update-status', 'Live session connected');
+                    // Reset state for new session
+                    responseProcessedForCurrentTurn = false;
+                    lastProcessedTranscription = '';
+                    pendingTranscription = '';
+                    pendingTranscriptionTimestamp = 0;
+                    isProcessingResponse = false;
+                    if (pauseTimer) {
+                        clearTimeout(pauseTimer);
+                        pauseTimer = null;
+                    }
                 },
                 onmessage: function (message) {
                     const summary = summarizeLiveServerMessage(message);
@@ -503,31 +630,220 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                     }
 
                     // Handle input transcription (what was spoken)
+                    let newInputText = '';
                     if (message.serverContent?.inputTranscription?.results) {
                         currentTranscription += formatSpeakerResults(message.serverContent.inputTranscription.results);
+                        newInputText = formatSpeakerResults(message.serverContent.inputTranscription.results);
                     } else if (message.serverContent?.inputTranscription?.text) {
                         const text = message.serverContent.inputTranscription.text;
                         if (text.trim() !== '') {
                             currentTranscription += text;
+                            newInputText = text;
                         }
                     }
 
-                    // DISABLED: Gemini's outputTranscription - using Groq for faster responses instead
-                    // if (message.serverContent?.outputTranscription?.text) { ... }
+                    // FAST MODE: Wait for complete question before processing
+                    // A question is complete when:
+                    // 1. Ends with "?" OR
+                    // 2. Has complete sentence (ends with .!) OR
+                    // 3. No new speech for 2 seconds (pause detection)
+                    // 4. turnComplete fires
+                    const inputText = message.serverContent?.inputTranscription?.text;
 
-                    if (message.serverContent?.generationComplete) {
-                        if (currentTranscription.trim() !== '') {
-                            if (hasGroqKey()) {
-                                sendToGroq(currentTranscription);
+                    if (inputText && inputText.trim().length > 0) {
+                        // Check if this is a continuation of previous incomplete question
+                        const isContinuation = isQuestionContinuation(inputText, pendingTranscription);
+
+                        // DEBUG: Log full question state (only first few chars to reduce spam)
+                        console.log('[Fast Mode Debug]', {
+                            input: inputText.substring(0, 20),
+                            isContinuation,
+                            processing: isProcessingResponse,
+                        });
+
+                        if (isContinuation) {
+                            // Update pending transcription with new content
+                            pendingTranscription = inputText;
+                            pendingTranscriptionTimestamp = Date.now();
+                            console.log('[Fast Mode] Continuing question:', inputText.substring(0, 30) + '...');
+
+                            // If we have enough content now (25+ chars), process it
+                            if (inputText.trim().length >= 25) {
+                                console.log('[Fast Mode] Question now complete:', inputText.substring(0, 50) + '...');
+                                console.log('[Fast Mode Debug] Calling Groq/Gemma', { hasGroqKey: hasGroqKey() });
+                                sendToRenderer('update-status', 'Processing...');
+
+                                if (hasGroqKey()) {
+                                    sendToGroq(inputText.trim(), false);
+                                } else {
+                                    sendToGemma(inputText.trim());
+                                }
+
+                                lastProcessedTranscription = inputText;
+                                pendingTranscription = '';
+                                pendingTranscriptionTimestamp = 0;
+                                if (pauseTimer) {
+                                    clearTimeout(pauseTimer);
+                                    pauseTimer = null;
+                                }
                             } else {
-                                sendToGemma(currentTranscription);
+                                // Reset the pause timer - wait for more speech
+                                if (pauseTimer) {
+                                    clearTimeout(pauseTimer);
+                                }
+                                sendToRenderer('update-status', 'Listening... (collecting)');
+                                sendToRenderer('partial-question', pendingTranscription);
+
+                                // Wait 2 seconds of silence to process incomplete question
+                                pauseTimer = setTimeout(() => {
+                                    const timeSinceLastUpdate = Date.now() - pendingTranscriptionTimestamp;
+
+                                    // Use whichever has content: pendingTranscription OR currentTranscription
+                                    const questionToProcess =
+                                        pendingTranscription.trim().length > 10
+                                            ? pendingTranscription
+                                            : currentTranscription.trim().length > 10
+                                              ? currentTranscription
+                                              : '';
+
+                                    if (questionToProcess.trim().length > 10 && timeSinceLastUpdate >= 1800) {
+                                        console.log('[Fast Mode] Processing after pause:', questionToProcess.substring(0, 50) + '...');
+                                        sendToRenderer('update-status', 'Processing...');
+
+                                        if (hasGroqKey()) {
+                                            sendToGroq(questionToProcess.trim(), false);
+                                        } else {
+                                            sendToGemma(questionToProcess.trim());
+                                        }
+
+                                        lastProcessedTranscription = questionToProcess;
+                                        pendingTranscription = '';
+                                        pendingTranscriptionTimestamp = 0;
+                                        currentTranscription = '';
+                                        pauseTimer = null;
+                                    }
+                                }, 2000);
                             }
-                            currentTranscription = '';
+                        } else {
+                            // New question (not continuation) - check if complete
+                            const isPunctuationComplete = isQuestionComplete(inputText);
+                            const isLongEnough = inputText.trim().length >= 25;
+
+                            if (isPunctuationComplete || isLongEnough) {
+                                console.log('[Fast Mode] Complete question detected:', inputText.substring(0, 50) + '...');
+                                sendToRenderer('update-status', 'Processing...');
+
+                                if (hasGroqKey()) {
+                                    sendToGroq(inputText.trim(), false);
+                                } else {
+                                    sendToGemma(inputText.trim());
+                                }
+
+                                lastProcessedTranscription = inputText;
+                                pendingTranscription = '';
+                                pendingTranscriptionTimestamp = 0;
+                            } else {
+                                // Start new incomplete question
+                                pendingTranscription = inputText;
+                                pendingTranscriptionTimestamp = Date.now();
+                                console.log('[Fast Mode] New question started:', inputText.substring(0, 30) + '...');
+                                sendToRenderer('update-status', 'Listening... (collecting)');
+
+                                // Wait 2 seconds of silence to process
+                                if (pauseTimer) clearTimeout(pauseTimer);
+                                pauseTimer = setTimeout(() => {
+                                    const timeSinceLastUpdate = Date.now() - pendingTranscriptionTimestamp;
+
+                                    // Use whichever has content: pendingTranscription OR currentTranscription
+                                    const questionToProcess =
+                                        pendingTranscription.trim().length > 10
+                                            ? pendingTranscription
+                                            : currentTranscription.trim().length > 10
+                                              ? currentTranscription
+                                              : '';
+
+                                    if (questionToProcess.trim().length > 10 && timeSinceLastUpdate >= 1800) {
+                                        console.log('[Fast Mode] Processing after pause:', questionToProcess.substring(0, 50) + '...');
+                                        sendToRenderer('update-status', 'Processing...');
+
+                                        if (hasGroqKey()) {
+                                            sendToGroq(questionToProcess.trim(), false);
+                                        } else {
+                                            sendToGemma(questionToProcess.trim());
+                                        }
+
+                                        lastProcessedTranscription = questionToProcess;
+                                        pendingTranscription = '';
+                                        pendingTranscriptionTimestamp = 0;
+                                        currentTranscription = '';
+                                        pauseTimer = null;
+                                    }
+                                }, 2000);
+                            }
                         }
-                        messageBuffer = '';
                     }
 
+                    // Show Gemini's response as backup when Groq fails or is unavailable
+                    if (message.serverContent?.outputTranscription?.text) {
+                        const liveText = message.serverContent.outputTranscription.text.trim();
+                        if (liveText.length > 10) {
+                            // Only show if we haven't already shown a response
+                            // This serves as backup when Groq is rate limited
+                        }
+                    }
+
+                    // Legacy: generationComplete handler (now rarely triggered due to fast mode)
+                    if (message.serverContent?.generationComplete) {
+                        console.log('[Gemini] Generation complete');
+                    }
+
+                    // When turn is complete, check if there's a pending question to process
                     if (message.serverContent?.turnComplete) {
+                        console.log('[Fast Mode Debug] turnComplete fired', {
+                            pendingTranscription: pendingTranscription ? pendingTranscription.substring(0, 30) : '(empty)',
+                            pendingLen: pendingTranscription.trim().length,
+                            currentTranscription: currentTranscription ? currentTranscription.substring(0, 30) : '(empty)',
+                            currentLen: currentTranscription.trim().length,
+                            isProcessingResponse,
+                        });
+                        console.log('[Fast Mode] Turn complete, ready for next question');
+
+                        // Use pendingTranscription OR currentTranscription (whichever has content)
+                        const questionToProcess =
+                            pendingTranscription.trim().length > 10
+                                ? pendingTranscription
+                                : currentTranscription.trim().length > 10
+                                  ? currentTranscription
+                                  : '';
+
+                        // If there's a question that wasn't processed, process it now
+                        if (questionToProcess.trim().length > 10 && !isProcessingResponse) {
+                            console.log('[Fast Mode] Processing pending question on turnComplete:', questionToProcess.substring(0, 50) + '...');
+                            sendToRenderer('update-status', 'Processing...');
+
+                            if (hasGroqKey()) {
+                                sendToGroq(questionToProcess.trim(), false);
+                            } else {
+                                sendToGemma(questionToProcess.trim());
+                            }
+
+                            lastProcessedTranscription = questionToProcess;
+                            pendingTranscription = '';
+                            pendingTranscriptionTimestamp = 0;
+                            currentTranscription = '';
+                        } else {
+                            // Normal reset - no question to process
+                            isProcessingResponse = false;
+                            currentTranscription = '';
+                            lastProcessedTranscription = '';
+                            pendingTranscription = '';
+                            pendingTranscriptionTimestamp = 0;
+                        }
+
+                        if (pauseTimer) {
+                            clearTimeout(pauseTimer);
+                            pauseTimer = null;
+                        }
                         sendToRenderer('update-status', 'Listening...');
                     }
                 },
@@ -1139,6 +1455,57 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
             return { success: true };
         } catch (error) {
             console.error('Error updating Google Search setting:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    // Cache management IPC handlers
+    ipcMain.handle('get-cache-stats', async event => {
+        try {
+            return { success: true, data: getCacheStats() };
+        } catch (error) {
+            console.error('Error getting cache stats:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('clear-cache', async event => {
+        try {
+            clearCache();
+            return { success: true };
+        } catch (error) {
+            console.error('Error clearing cache:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    // Fast Response Mode - directly process text without Gemini Live
+    ipcMain.handle('fast-response', async (event, text) => {
+        try {
+            if (!text || typeof text !== 'string' || text.trim().length === 0) {
+                return { success: false, error: 'Invalid text' };
+            }
+
+            sendToRenderer('update-status', 'Processing...');
+
+            // Check cache first
+            const cachedResponse = getCachedResponse(text);
+            if (cachedResponse) {
+                const { response } = cachedResponse;
+                sendToRenderer('new-response', response);
+                sendToRenderer('update-status', 'Listening... (cached)');
+                return { success: true, cached: true };
+            }
+
+            // Send to Groq directly
+            if (hasGroqKey()) {
+                await sendToGroq(text.trim(), false);
+                return { success: true, cached: false };
+            } else {
+                return { success: false, error: 'No Groq API key configured' };
+            }
+        } catch (error) {
+            console.error('Error in fast response:', error);
             return { success: false, error: error.message };
         }
     });
