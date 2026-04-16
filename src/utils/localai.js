@@ -130,7 +130,7 @@ async function loadWhisperPipeline(modelName) {
         env.cacheDir = path.join(app.getPath('userData'), 'whisper-models');
         whisperPipeline = await pipeline('automatic-speech-recognition', modelName, {
             dtype: 'q8',
-            device: 'auto',
+            device: 'cpu',
         });
         console.log('[LocalAI] Whisper model loaded successfully');
         sendToRenderer('whisper-downloading', false);
@@ -195,6 +195,14 @@ async function handleSpeechEnd(audioData) {
 
     if (!transcription || transcription.trim() === '' || transcription.trim().length < 2) {
         console.log('[LocalAI] Empty transcription, skipping');
+        sendToRenderer('update-status', 'Listening...');
+        return;
+    }
+
+    // Filter out Whisper noise artifacts: [BLANK_AUDIO], (clinking), (clicking), etc.
+    const cleaned = transcription.trim();
+    if (cleaned === '[BLANK_AUDIO]' || /^\[.*\]$/.test(cleaned) || /^\(.*\)$/.test(cleaned)) {
+        console.log('[LocalAI] Noise artifact, skipping:', cleaned);
         sendToRenderer('update-status', 'Listening...');
         return;
     }

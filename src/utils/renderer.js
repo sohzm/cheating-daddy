@@ -310,58 +310,82 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
             console.log('Linux capture started - system audio:', mediaStream.getAudioTracks().length > 0, 'microphone mode:', audioMode);
         } else {
             // Windows - use display media with loopback for system audio
-            mediaStream = await navigator.mediaDevices.getDisplayMedia({
-                video: {
-                    frameRate: 1,
-                    width: { ideal: 1920 },
-                    height: { ideal: 1080 },
-                },
-                audio: {
-                    sampleRate: SAMPLE_RATE,
-                    channelCount: 1,
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true,
-                },
-            });
+            try {
+                mediaStream = await navigator.mediaDevices.getDisplayMedia({
+                    video: {
+                        frameRate: 1,
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 },
+                    },
+                    audio: {
+                        sampleRate: SAMPLE_RATE,
+                        channelCount: 1,
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true,
+                    },
+                });
 
-            console.log('Windows capture started with loopback audio');
+                console.log('Windows capture started with loopback audio');
+                setupWindowsLoopbackProcessing();
+            } catch (displayErr) {
+                console.warn('getDisplayMedia failed, trying getUserMedia with desktop source:', displayErr);
 
-            // Setup audio processing for Windows loopback audio only
-            setupWindowsLoopbackProcessing();
-
-            if (audioMode === 'mic_only' || audioMode === 'both') {
-                let micStream = null;
                 try {
-                    micStream = await navigator.mediaDevices.getUserMedia({
-                        audio: {
-                            sampleRate: SAMPLE_RATE,
-                            channelCount: 1,
-                            echoCancellation: true,
-                            noiseSuppression: true,
-                            autoGainControl: true,
-                        },
-                        video: false,
-                    });
-                    console.log('Windows microphone capture started');
-                    setupLinuxMicProcessing(micStream);
-                } catch (micError) {
-                    console.warn('Failed to get microphone access on Windows:', micError);
+                    const sources = await ipcRenderer.invoke('get-desktop-sources');
+                    if (sources && sources.length > 0) {
+                        mediaStream = await navigator.mediaDevices.getUserMedia({
+                            audio: false,
+                            video: {
+                                mandatory: {
+                                    chromeMediaSource: 'desktop',
+                                    chromeMediaSourceId: sources[0].id,
+                                    maxWidth: 1920,
+                                    maxHeight: 1080,
+                                    maxFrameRate: 1,
+                                },
+                            },
+                        });
+                        console.log('Windows capture started via desktopCapturer fallback (no audio)');
+                    } else {
+                        console.warn('No desktop sources found, mic-only mode');
+                    }
+                } catch (fallbackErr) {
+                    console.warn('Desktop capture fallback failed, mic-only mode:', fallbackErr);
                 }
+            }
+
+            // Always try microphone (required for local AI mode when screen capture fails)
+            try {
+                const micStream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        sampleRate: SAMPLE_RATE,
+                        channelCount: 1,
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true,
+                    },
+                    video: false,
+                });
+                console.log('Windows microphone capture started');
+                setupLinuxMicProcessing(micStream);
+            } catch (micError) {
+                console.warn('Failed to get microphone access on Windows:', micError);
             }
         }
 
-        console.log('MediaStream obtained:', {
-            hasVideo: mediaStream.getVideoTracks().length > 0,
-            hasAudio: mediaStream.getAudioTracks().length > 0,
-            videoTrack: mediaStream.getVideoTracks()[0]?.getSettings(),
-        });
+        if (mediaStream) {
+            console.log('MediaStream obtained:', {
+                hasVideo: mediaStream.getVideoTracks().length > 0,
+                hasAudio: mediaStream.getAudioTracks().length > 0,
+                videoTrack: mediaStream.getVideoTracks()[0]?.getSettings(),
+            });
+        }
 
         // Manual mode only - screenshots captured on demand via shortcut
         console.log('Manual mode enabled - screenshots will be captured on demand only');
     } catch (err) {
         console.error('Error starting capture:', err);
-        cheatingDaddy.setStatus('error');
     }
 }
 
