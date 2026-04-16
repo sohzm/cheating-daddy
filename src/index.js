@@ -3,6 +3,11 @@ if (require('electron-squirrel-startup')) {
 }
 
 const { app, BrowserWindow, shell, ipcMain } = require('electron');
+
+// Fix DXGI screen capture failure on multi-GPU Windows setups
+if (process.platform === 'win32') {
+    app.commandLine.appendSwitch('disable-gpu-sandbox');
+}
 const { createWindow, updateGlobalShortcuts } = require('./utils/window');
 const { setupGeminiIpcHandlers, stopMacOSAudioCapture, sendToRenderer } = require('./utils/gemini');
 const storage = require('./storage');
@@ -261,6 +266,16 @@ function setupStorageIpcHandlers() {
 function setupGeneralIpcHandlers() {
     ipcMain.handle('get-app-version', async () => {
         return app.getVersion();
+    });
+
+    ipcMain.handle('get-desktop-sources', async () => {
+        try {
+            const { desktopCapturer } = require('electron');
+            const sources = await desktopCapturer.getSources({ types: ['screen'] });
+            return sources.map(s => ({ id: s.id, name: s.name }));
+        } catch (e) {
+            return [];
+        }
     });
 
     ipcMain.handle('quit-application', async event => {
