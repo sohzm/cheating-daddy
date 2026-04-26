@@ -566,7 +566,7 @@ export class CheatingDaddyApp extends LitElement {
 
     async handleStart() {
         const prefs = await cheatingDaddy.storage.getPreferences();
-        const providerMode = prefs.providerMode || 'cloud';
+        const providerMode = prefs.providerMode === 'cloud' ? 'byok' : (prefs.providerMode || 'byok');
 
         if (providerMode === 'cloud') {
             const creds = await cheatingDaddy.storage.getCredentials();
@@ -656,14 +656,6 @@ export class CheatingDaddyApp extends LitElement {
     async handleLayoutModeChange(layoutMode) {
         this.layoutMode = layoutMode;
         await cheatingDaddy.storage.updateConfig('layout', layoutMode);
-        if (window.require) {
-            try {
-                const { ipcRenderer } = window.require('electron');
-                await ipcRenderer.invoke('update-sizes');
-            } catch (error) {
-                console.error('Failed to update sizes:', error);
-            }
-        }
         this.requestUpdate();
     }
 

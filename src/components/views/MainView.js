@@ -510,7 +510,7 @@ export class MainView extends LitElement {
         this.isInitializing = false;
         this.whisperDownloading = false;
 
-        this._mode = 'cloud';
+        this._mode = 'byok';
         this._token = '';
         this._geminiKey = '';
         this._groqKey = '';
@@ -538,7 +538,12 @@ export class MainView extends LitElement {
                 cheatingDaddy.storage.getCredentials().catch(() => ({})),
             ]);
 
-            this._mode = prefs.providerMode || 'cloud';
+            const storedMode = prefs.providerMode || 'byok';
+            this._mode = storedMode === 'cloud' ? 'byok' : storedMode;
+
+            if (storedMode === 'cloud') {
+                await cheatingDaddy.storage.updatePreference('providerMode', this._mode);
+            }
 
             // Load keys
             this._token = creds.cloudToken || '';
@@ -576,14 +581,6 @@ export class MainView extends LitElement {
                 cancelAnimationFrame(this._animId);
                 this._animId = null;
             }
-            // Only start aurora for cloud mode
-            if (this._mode === 'cloud') {
-                this._initButtonAurora();
-            }
-        }
-        // Initial boot — no _mode change yet but need to start
-        if (!this._animId && this._mode === 'cloud') {
-            this._initButtonAurora();
         }
     }
 
@@ -755,13 +752,7 @@ export class MainView extends LitElement {
     _handleStart() {
         if (this.isInitializing) return;
 
-        if (this._mode === 'cloud') {
-            if (!this._token.trim()) {
-                this._tokenError = true;
-                this.requestUpdate();
-                return;
-            }
-        } else if (this._mode === 'byok') {
+        if (this._mode === 'byok') {
             if (!this._geminiKey.trim()) {
                 this._keyError = true;
                 this.requestUpdate();
@@ -778,11 +769,7 @@ export class MainView extends LitElement {
     }
 
     triggerApiKeyError() {
-        if (this._mode === 'cloud') {
-            this._tokenError = true;
-        } else {
-            this._keyError = true;
-        }
+        this._keyError = this._mode !== 'local';
         this.requestUpdate();
         setTimeout(() => {
             this._tokenError = false;
@@ -826,36 +813,8 @@ export class MainView extends LitElement {
     }
 
     // ── Cloud mode ──
-
-    _renderCloudMode() {
-        return html`
-            <div class="form-group">
-                <label class="form-label">Invite Code</label>
-                <input
-                    type="password"
-                    placeholder="Enter your invite code"
-                    .value=${this._token}
-                    @input=${e => this._saveToken(e.target.value)}
-                    class=${this._tokenError ? 'error' : ''}
-                />
-                <div class="form-hint">DM soham to get your invite code</div>
-            </div>
-
-            ${this._renderStartButton()}
-            ${this._renderDivider()}
-
-            <div class="mode-cards">
-                <div class="mode-card" @click=${() => this._saveMode('byok')}>
-                    <span class="mode-card-title">Use your API keys</span>
-                    <span class="mode-card-desc">Bring your own Gemini / Groq keys</span>
-                </div>
-                <div class="mode-card" @click=${() => this._saveMode('local')}>
-                    <span class="mode-card-title">Use local AI</span>
-                    <span class="mode-card-desc">Run Ollama + Whisper on your machine</span>
-                </div>
-            </div>
-        `;
-    }
+    // Cloud UI intentionally disabled. Backend cloud wiring is still present in
+    // the codebase, but the renderer no longer exposes this setup path.
 
     // ── BYOK mode ──
 
@@ -891,14 +850,7 @@ export class MainView extends LitElement {
             ${this._renderStartButton()}
             ${this._renderDivider()}
 
-            <div class="cloud-promo" @click=${() => this._saveMode('cloud')}>
-                <div class="cloud-promo-glow"></div>
-                <div class="cloud-promo-header">
-                    <span class="cloud-promo-title">Switch to Cheating Daddy Cloud</span>
-                    <span class="cloud-promo-arrow">&rarr;</span>
-                </div>
-                <div class="cloud-promo-desc">No API keys, no setup, no billing headaches. It just works.</div>
-            </div>
+            <!-- Cloud promo intentionally removed from the active UI. -->
 
             <div class="mode-links">
                 <button class="mode-link" @click=${() => this._saveMode('local')}>Use local AI</button>
@@ -952,14 +904,7 @@ export class MainView extends LitElement {
             ${this._renderStartButton()}
             ${this._renderDivider()}
 
-            <div class="cloud-promo" @click=${() => this._saveMode('cloud')}>
-                <div class="cloud-promo-glow"></div>
-                <div class="cloud-promo-header">
-                    <span class="cloud-promo-title">Switch to Cheating Daddy Cloud</span>
-                    <span class="cloud-promo-arrow">&rarr;</span>
-                </div>
-                <div class="cloud-promo-desc">No API keys, no setup, no billing headaches. It just works.</div>
-            </div>
+            <!-- Cloud promo intentionally removed from the active UI. -->
 
             <div class="mode-links">
                 <button class="mode-link" @click=${() => this._saveMode('byok')}>Use own API keys</button>
@@ -982,14 +927,14 @@ export class MainView extends LitElement {
                     </div>
                 ` : html`
                     <div class="page-title">
-                        ${this._mode === 'cloud' ? 'Cheating Daddy Cloud' : html`Cheating Daddy <span class="mode-suffix">BYOK</span>`}
+                        ${html`Cheating Daddy <span class="mode-suffix">BYOK</span>`}
                     </div>
                 `}
                 <div class="page-subtitle">
-                    ${this._mode === 'cloud' ? 'Enter your invite code to get started' : this._mode === 'byok' ? 'Bring your own API keys' : 'Run models locally on your machine'}
+                    ${this._mode === 'byok' ? 'Bring your own API keys' : 'Run models locally on your machine'}
                 </div>
 
-                ${this._mode === 'cloud' ? this._renderCloudMode() : ''}
+                <!-- Cloud mode render branch intentionally disabled. -->
                 ${this._mode === 'byok' ? this._renderByokMode() : ''}
                 ${this._mode === 'local' ? (this._showLocalHelp ? this._renderLocalHelp() : this._renderLocalMode()) : ''}
             </div>
@@ -1043,10 +988,10 @@ export class MainView extends LitElement {
 
                 <div class="help-section">
                     <div class="help-section-title">Computer hanging or slow?</div>
-                    <div class="help-section-text">Running models locally uses a lot of RAM and CPU. If your computer slows down or freezes, it's likely the LLM. Cloud mode gives you faster, better responses without any load on your machine.</div>
+                    <div class="help-section-text">Running models locally uses a lot of RAM and CPU. If your computer slows down or freezes, it's likely the LLM. Switch back to BYOK mode if you want to use a hosted provider instead.</div>
                 </div>
 
-                <button class="help-cloud-btn" @click=${() => { this._showLocalHelp = false; this._saveMode('cloud'); }}>Switch to Cloud</button>
+                <button class="help-cloud-btn" @click=${() => { this._showLocalHelp = false; this._saveMode('byok'); }}>Switch to BYOK</button>
             </div>
         `;
     }
