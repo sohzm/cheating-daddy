@@ -912,7 +912,7 @@ const theme = {
         };
     },
 
-    applyBackgrounds(backgroundColor, alpha = 0.8) {
+    applyBackgrounds(backgroundColor, sessionTransparency = 0.8) {
         const root = document.documentElement;
         const baseRgb = this.hexToRgb(backgroundColor);
 
@@ -924,16 +924,30 @@ const theme = {
         const tertiary = adjust(baseRgb, 22);
         const hover = adjust(baseRgb, 28);
 
-        const bgBase = `rgba(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}, ${alpha})`;
-        const bgSurface = `rgba(${secondary.r}, ${secondary.g}, ${secondary.b}, ${alpha})`;
-        const bgElevated = `rgba(${tertiary.r}, ${tertiary.g}, ${tertiary.b}, ${alpha})`;
-        const bgHover = `rgba(${hover.r}, ${hover.g}, ${hover.b}, ${alpha})`;
+        const baseAlpha = 1;
+        const bgBase = `rgba(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}, ${baseAlpha})`;
+        const bgSurface = `rgba(${secondary.r}, ${secondary.g}, ${secondary.b}, ${baseAlpha})`;
+        const bgElevated = `rgba(${tertiary.r}, ${tertiary.g}, ${tertiary.b}, ${baseAlpha})`;
+        const bgHover = `rgba(${hover.r}, ${hover.g}, ${hover.b}, ${baseAlpha})`;
+
+        const clampedTransparency = Math.min(1, Math.max(0, sessionTransparency));
+        const sessionOpacity = 1 - clampedTransparency;
+        const sessionBgBase = `rgba(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}, ${sessionOpacity})`;
+        const sessionBgSurface = `rgba(${secondary.r}, ${secondary.g}, ${secondary.b}, ${sessionOpacity})`;
+        const sessionBgElevated = `rgba(${tertiary.r}, ${tertiary.g}, ${tertiary.b}, ${sessionOpacity})`;
+        const sessionBgHover = `rgba(${hover.r}, ${hover.g}, ${hover.b}, ${sessionOpacity})`;
 
         // New design tokens (used by components)
         root.style.setProperty('--bg-app', bgBase);
         root.style.setProperty('--bg-surface', bgSurface);
         root.style.setProperty('--bg-elevated', bgElevated);
         root.style.setProperty('--bg-hover', bgHover);
+
+        // Session-only backgrounds (used in live session scope)
+        root.style.setProperty('--session-bg-app', sessionBgBase);
+        root.style.setProperty('--session-bg-surface', sessionBgSurface);
+        root.style.setProperty('--session-bg-elevated', sessionBgElevated);
+        root.style.setProperty('--session-bg-hover', sessionBgHover);
 
         // Legacy aliases
         root.style.setProperty('--header-background', bgBase);

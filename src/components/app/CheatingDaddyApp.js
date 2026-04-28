@@ -226,6 +226,22 @@ export class CheatingDaddyApp extends LitElement {
             background: var(--bg-app);
         }
 
+        .content.session-scope {
+            --bg-app: var(--session-bg-app);
+            --bg-surface: var(--session-bg-surface);
+            --bg-elevated: var(--session-bg-elevated);
+            --bg-hover: var(--session-bg-hover);
+            --header-background: var(--session-bg-surface);
+            --main-content-background: var(--session-bg-app);
+            --bg-primary: var(--session-bg-app);
+            --bg-secondary: var(--session-bg-surface);
+            --bg-tertiary: var(--session-bg-elevated);
+            --input-background: var(--session-bg-elevated);
+            --input-focus-background: var(--session-bg-elevated);
+            --hover-background: var(--session-bg-hover);
+            --scrollbar-background: var(--session-bg-app);
+        }
+
         /* Live mode top bar */
         .live-bar {
             position: relative;
@@ -693,6 +709,13 @@ export class CheatingDaddyApp extends LitElement {
             const { ipcRenderer } = window.require('electron');
             ipcRenderer.send('view-changed', this.currentView);
         }
+
+        if (changedProperties.has('currentView')) {
+            const isSession = this.currentView === 'assistant';
+            if (document.body) {
+                document.body.classList.toggle('session-mode', isSession);
+            }
+        }
     }
 
     // ── Helpers ──
@@ -877,7 +900,7 @@ export class CheatingDaddyApp extends LitElement {
                     <div class="drag-region"></div>
                 </div>
                 ${this.renderSidebar()}
-                <div class="content">
+                <div class="content ${isLive ? 'session-scope' : ''}">
                     ${isLive ? this.renderLiveBar() : ''}
                     <div class="content-inner ${isLive ? 'live' : ''}">
                         ${this.renderCurrentView()}
