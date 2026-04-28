@@ -473,6 +473,9 @@ export class CheatingDaddyApp extends LitElement {
     disconnectedCallback() {
         super.disconnectedCallback();
         this._stopTimer();
+        if (document.body) {
+            document.body.classList.remove('session-mode');
+        }
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
             ipcRenderer.removeAllListeners('new-response');
