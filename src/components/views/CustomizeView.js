@@ -625,7 +625,7 @@ export class CustomizeView extends LitElement {
                     </div>
                     <div class="form-group slider-wrap">
                         <div class="slider-header">
-                            <label class="form-label">Background Transparency</label>
+                            <label class="form-label">Session Background Transparency</label>
                             <span class="slider-value">${Math.round(this.backgroundTransparency * 100)}%</span>
                         </div>
                         <input
@@ -637,6 +637,7 @@ export class CustomizeView extends LitElement {
                             .value=${this.backgroundTransparency}
                             @input=${this.handleBackgroundTransparencyChange}
                         />
+                        <div class="form-help">Applies only during live sessions.</div>
                     </div>
                     <div class="form-group slider-wrap">
                         <div class="slider-header">
