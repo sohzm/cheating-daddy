@@ -1101,6 +1101,17 @@ const theme = {
             const themeName = prefs.theme || 'dark';
             const alpha = prefs.backgroundTransparency ?? 0.8;
             this.apply(themeName, alpha);
+            // Restore persisted font opacity
+            const fontOpacity = prefs.fontOpacity ?? 1.0;
+            if (fontOpacity < 1.0) {
+                const root = document.documentElement;
+                const colors = this.get(themeName);
+                const textRgb = this.hexToRgb(colors.text);
+                const secRgb = this.hexToRgb(colors.textSecondary);
+                root.style.setProperty('--font-opacity', String(fontOpacity));
+                root.style.setProperty('--text-primary', `rgba(${textRgb.r}, ${textRgb.g}, ${textRgb.b}, ${fontOpacity})`);
+                root.style.setProperty('--text-secondary', `rgba(${secRgb.r}, ${secRgb.g}, ${secRgb.b}, ${fontOpacity})`);
+            }
             return themeName;
         } catch (err) {
             this.apply('dark');
@@ -1110,7 +1121,21 @@ const theme = {
 
     async save(themeName) {
         await storage.updatePreference('theme', themeName);
-        this.apply(themeName);
+        // Preserve current backgroundTransparency and fontOpacity across theme changes
+        const prefs = await storage.getPreferences();
+        const alpha = prefs.backgroundTransparency ?? 0.8;
+        this.apply(themeName, alpha);
+        // Re-apply font opacity if it was set
+        const fontOpacity = prefs.fontOpacity ?? 1.0;
+        if (fontOpacity < 1.0) {
+            const root = document.documentElement;
+            const colors = this.get(themeName);
+            const textRgb = this.hexToRgb(colors.text);
+            const secRgb = this.hexToRgb(colors.textSecondary);
+            root.style.setProperty('--font-opacity', String(fontOpacity));
+            root.style.setProperty('--text-primary', `rgba(${textRgb.r}, ${textRgb.g}, ${textRgb.b}, ${fontOpacity})`);
+            root.style.setProperty('--text-secondary', `rgba(${secRgb.r}, ${secRgb.g}, ${secRgb.b}, ${fontOpacity})`);
+        }
     },
 };
 
@@ -1130,22 +1155,33 @@ ipcRenderer.on('font-opacity-change', (_, delta) => {
     const root = document.documentElement;
     const current = parseFloat(root.style.getPropertyValue('--font-opacity') || '1');
     const next = Math.max(0.1, Math.min(1.0, parseFloat((current + delta).toFixed(2))));
-    root.style.setProperty('--font-opacity', next);
-    // Apply to text color via CSS variable
-    root.style.setProperty('--text-primary', `rgba(245, 245, 245, ${next})`);
-    root.style.setProperty('--text-secondary', `rgba(153, 153, 153, ${next})`);
+    root.style.setProperty('--font-opacity', String(next));
+    // Get current theme's text colors and apply with alpha
+    const colors = theme.get(theme.current);
+    const textRgb = theme.hexToRgb(colors.text);
+    const secRgb = theme.hexToRgb(colors.textSecondary);
+    root.style.setProperty('--text-primary', `rgba(${textRgb.r}, ${textRgb.g}, ${textRgb.b}, ${next})`);
+    root.style.setProperty('--text-secondary', `rgba(${secRgb.r}, ${secRgb.g}, ${secRgb.b}, ${next})`);
+    // Persist
+    storage.updatePreference('fontOpacity', next);
 });
 
-// Background opacity: changes background alpha only (Ctrl+Shift+[ / Ctrl+Shift+])
-ipcRenderer.on('bg-opacity-change', (_, delta) => {
-    const root = document.documentElement;
-    const current = parseFloat(root.style.getPropertyValue('--bg-opacity') || '1');
+// Background opacity: hooks into existing backgroundTransparency preference (Ctrl+Shift+[ / Ctrl+Shift+])
+// This is the SAME value the Settings slider controls — single source of truth.
+ipcRenderer.on('bg-opacity-change', async (_, delta) => {
+    const prefs = await storage.getPreferences();
+    const current = prefs.backgroundTransparency ?? 0.8;
     const next = Math.max(0.05, Math.min(1.0, parseFloat((current + delta).toFixed(2))));
-    root.style.setProperty('--bg-opacity', next);
-    // Apply to background colors via CSS variable with alpha
-    root.style.setProperty('--bg-app', `rgba(10, 10, 10, ${next})`);
-    root.style.setProperty('--bg-surface', `rgba(17, 17, 17, ${next})`);
-    root.style.setProperty('--bg-elevated', `rgba(25, 25, 25, ${next})`);
+    // Persist to the same preference the slider uses
+    await storage.updatePreference('backgroundTransparency', next);
+    // Re-apply backgrounds using the theme system (theme-aware, no hardcoded colors)
+    const colors = theme.get(theme.current);
+    theme.applyBackgrounds(colors.background, next);
+    // Notify any open settings view to update its slider
+    const app = document.querySelector('cheating-daddy-app');
+    if (app) {
+        app.dispatchEvent(new CustomEvent('bg-opacity-updated', { detail: { value: next } }));
+    }
 });
 
 ipcRenderer.on('ai-mode-toggled', (_, newMode) => {

@@ -227,6 +227,14 @@ export class CustomizeView extends LitElement {
         this.customPrompt = '';
         this.theme = 'dark';
         this._loadFromStorage();
+
+        // Listen for hotkey-driven opacity changes to sync slider in realtime
+        this._bgOpacityListener = (e) => {
+            this.backgroundTransparency = e.detail.value;
+            this.requestUpdate();
+        };
+        const app = document.querySelector('cheating-daddy-app');
+        if (app) app.addEventListener('bg-opacity-updated', this._bgOpacityListener);
     }
 
     getThemes() {
@@ -745,7 +753,6 @@ export class CustomizeView extends LitElement {
                     ${this.renderAudioSection()}
                     ${this.renderLanguageSection()}
                     ${this.renderAppearanceSection()}
-                    ${this.renderKeyboardSection()}
                     ${this.renderPrivacySection()}
                 </div>
             </div>
