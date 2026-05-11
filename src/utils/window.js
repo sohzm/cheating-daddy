@@ -5,7 +5,7 @@ const storage = require('../storage');
 let mouseEventsIgnored = false;
 let _programmaticMove = false;
 
-const KEYBINDS_VERSION = 4; // Increment when default keybinds change
+const KEYBINDS_VERSION = 5; // Bumped: remap opacity keys to font/bg split
 
 const DEFAULT_MAIN_WINDOW_SIZE = { width: 1100, height: 800 };
 const MIN_WINDOW_SIZE = { width: 400, height: 260 };
