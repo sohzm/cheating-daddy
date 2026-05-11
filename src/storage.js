@@ -12,9 +12,18 @@ const DEFAULT_CONFIG = {
 };
 
 const DEFAULT_CREDENTIALS = {
+    // Legacy single-key fields (kept for backwards compatibility; mirror the active key from the pool)
     apiKey: '',
-    groqApiKey: ''
+    groqApiKey: '',
+    // Provider key pools. Each entry:
+    //   { id, key, label, state: 'ready'|'exhausted'|'invalid'|'unknown',
+    //     lastCheckedAt, exhaustedUntil, errorReason, createdAt }
+    geminiKeys: [],
+    groqKeys: []
 };
+
+const API_KEY_PROVIDERS = ['gemini', 'groq'];
+const EXHAUSTION_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24h
 
 const DEFAULT_PREFERENCES = {
     customPrompt: '',
@@ -190,19 +199,244 @@ function setCredentials(credentials) {
 }
 
 function getApiKey() {
+    // Prefer the active ready key from the pool; fall back to legacy single field
+    const active = getActiveProviderKey('gemini');
+    if (active) return active.key;
     return getCredentials().apiKey || '';
 }
 
 function setApiKey(apiKey) {
+    // Mirror into legacy field; callers that actually want to manage the pool should use addProviderKey
     return setCredentials({ apiKey });
 }
 
 function getGroqApiKey() {
+    const active = getActiveProviderKey('groq');
+    if (active) return active.key;
     return getCredentials().groqApiKey || '';
 }
 
 function setGroqApiKey(groqApiKey) {
     return setCredentials({ groqApiKey });
+}
+
+// ============ PROVIDER KEY POOLS ============
+
+function _poolField(provider) {
+    if (provider === 'gemini') return 'geminiKeys';
+    if (provider === 'groq') return 'groqKeys';
+    throw new Error(`Unknown provider: ${provider}`);
+}
+
+function _legacyField(provider) {
+    if (provider === 'gemini') return 'apiKey';
+    if (provider === 'groq') return 'groqApiKey';
+    return null;
+}
+
+function _genId() {
+    // Not cryptographically secure; fine for local identifiers
+    return `k_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function _redact(key) {
+    if (!key) return '';
+    const s = String(key);
+    if (s.length <= 8) return '•'.repeat(s.length);
+    return `${s.slice(0, 4)}…${s.slice(-4)}`;
+}
+
+function _sanitizeEntry(entry) {
+    return {
+        id: entry.id,
+        label: entry.label || '',
+        masked: _redact(entry.key),
+        state: entry.state || 'unknown',
+        lastCheckedAt: entry.lastCheckedAt || null,
+        exhaustedUntil: entry.exhaustedUntil || null,
+        errorReason: entry.errorReason || null,
+        createdAt: entry.createdAt || null,
+    };
+}
+
+// Migrate legacy single-key field into the pool the first time we read it.
+// Returns { credentials, migrated } without persisting on the "not migrated" path.
+function _ensureMigrated(credentials) {
+    let changed = false;
+
+    for (const provider of API_KEY_PROVIDERS) {
+        const field = _poolField(provider);
+        if (!Array.isArray(credentials[field])) {
+            credentials[field] = [];
+            changed = true;
+        }
+    }
+
+    // Seed pool from legacy single-key fields if pool is empty
+    for (const provider of API_KEY_PROVIDERS) {
+        const poolField = _poolField(provider);
+        const legacyField = _legacyField(provider);
+        const legacyValue = (credentials[legacyField] || '').trim();
+        if (legacyValue && credentials[poolField].length === 0) {
+            credentials[poolField].push({
+                id: _genId(),
+                key: legacyValue,
+                label: 'Primary',
+                state: 'unknown',
+                lastCheckedAt: null,
+                exhaustedUntil: null,
+                errorReason: null,
+                createdAt: Date.now(),
+            });
+            changed = true;
+        }
+    }
+
+    if (changed) {
+        writeJsonFile(getCredentialsPath(), credentials);
+    }
+    return credentials;
+}
+
+function _readCredentialsMigrated() {
+    return _ensureMigrated(getCredentials());
+}
+
+function _saveCredentials(credentials) {
+    return writeJsonFile(getCredentialsPath(), credentials);
+}
+
+function _syncLegacyMirror(credentials, provider) {
+    // Point the legacy single-key field at the currently active (ready) key
+    // so code paths that still read getApiKey()/getGroqApiKey() directly stay working.
+    const legacyField = _legacyField(provider);
+    if (!legacyField) return;
+    const pool = credentials[_poolField(provider)] || [];
+    const active = pool.find(k => k.state === 'ready') || pool[0];
+    credentials[legacyField] = active ? active.key : '';
+}
+
+function listProviderKeys(provider) {
+    const creds = _readCredentialsMigrated();
+    return (creds[_poolField(provider)] || []).map(_sanitizeEntry);
+}
+
+function getProviderKeyRaw(provider, id) {
+    const creds = _readCredentialsMigrated();
+    return (creds[_poolField(provider)] || []).find(k => k.id === id) || null;
+}
+
+function getActiveProviderKey(provider) {
+    // Does NOT migrate here to avoid recursion from getApiKey()/getGroqApiKey().
+    const creds = readJsonFile(getCredentialsPath(), DEFAULT_CREDENTIALS);
+    const pool = creds[_poolField(provider)] || [];
+    // Prefer explicit ready keys; surface exhausted keys whose cooldown has elapsed as ready candidates.
+    const now = Date.now();
+    const readyPool = pool.filter(k => {
+        if (k.state === 'ready' || k.state === 'unknown') return true;
+        if (k.state === 'exhausted' && k.exhaustedUntil && k.exhaustedUntil <= now) return true;
+        return false;
+    });
+    return readyPool[0] || null;
+}
+
+function listReadyProviderKeys(provider) {
+    // Used by rotation; returns raw key objects (not sanitized) in the order they should be tried.
+    const creds = _readCredentialsMigrated();
+    const pool = creds[_poolField(provider)] || [];
+    const now = Date.now();
+    return pool.filter(k => {
+        if (k.state === 'ready' || k.state === 'unknown') return true;
+        if (k.state === 'exhausted' && k.exhaustedUntil && k.exhaustedUntil <= now) return true;
+        return false;
+    });
+}
+
+function listAllProviderKeysRaw(provider) {
+    const creds = _readCredentialsMigrated();
+    return creds[_poolField(provider)] || [];
+}
+
+function addProviderKey(provider, key, label = '') {
+    const trimmed = (key || '').trim();
+    if (!trimmed) {
+        return { ok: false, error: 'Key is empty' };
+    }
+    const creds = _readCredentialsMigrated();
+    const field = _poolField(provider);
+    const pool = creds[field] || [];
+    if (pool.some(k => k.key === trimmed)) {
+        return { ok: false, error: 'Key already exists' };
+    }
+    const entry = {
+        id: _genId(),
+        key: trimmed,
+        label: (label || '').trim(),
+        state: 'unknown',
+        lastCheckedAt: null,
+        exhaustedUntil: null,
+        errorReason: null,
+        createdAt: Date.now(),
+    };
+    pool.push(entry);
+    creds[field] = pool;
+    _syncLegacyMirror(creds, provider);
+    _saveCredentials(creds);
+    return { ok: true, id: entry.id, entry: _sanitizeEntry(entry) };
+}
+
+function removeProviderKey(provider, id) {
+    const creds = _readCredentialsMigrated();
+    const field = _poolField(provider);
+    const before = creds[field] || [];
+    const after = before.filter(k => k.id !== id);
+    if (after.length === before.length) {
+        return { ok: false, error: 'Key not found' };
+    }
+    creds[field] = after;
+    _syncLegacyMirror(creds, provider);
+    _saveCredentials(creds);
+    return { ok: true };
+}
+
+function updateProviderKey(provider, id, patch) {
+    const creds = _readCredentialsMigrated();
+    const field = _poolField(provider);
+    const pool = creds[field] || [];
+    const idx = pool.findIndex(k => k.id === id);
+    if (idx === -1) {
+        return { ok: false, error: 'Key not found' };
+    }
+    const current = pool[idx];
+    const allowed = ['label', 'state', 'lastCheckedAt', 'exhaustedUntil', 'errorReason'];
+    for (const k of allowed) {
+        if (Object.prototype.hasOwnProperty.call(patch, k)) {
+            current[k] = patch[k];
+        }
+    }
+    pool[idx] = current;
+    creds[field] = pool;
+    _syncLegacyMirror(creds, provider);
+    _saveCredentials(creds);
+    return { ok: true, entry: _sanitizeEntry(current) };
+}
+
+function markProviderKeyState(provider, id, state, opts = {}) {
+    const patch = {
+        state,
+        lastCheckedAt: Date.now(),
+        errorReason: opts.errorReason || null,
+    };
+    if (state === 'exhausted') {
+        patch.exhaustedUntil = opts.exhaustedUntil || (Date.now() + EXHAUSTION_COOLDOWN_MS);
+    } else {
+        patch.exhaustedUntil = null;
+    }
+    return updateProviderKey(provider, id, patch);
+}
+
+function sanitizeProviderKeyEntry(entry) {
+    return _sanitizeEntry(entry);
 }
 
 // ============ PREFERENCES ============
@@ -501,6 +735,20 @@ module.exports = {
     setApiKey,
     getGroqApiKey,
     setGroqApiKey,
+
+    // Provider key pools
+    API_KEY_PROVIDERS,
+    EXHAUSTION_COOLDOWN_MS,
+    listProviderKeys,
+    listAllProviderKeysRaw,
+    listReadyProviderKeys,
+    getProviderKeyRaw,
+    getActiveProviderKey,
+    addProviderKey,
+    removeProviderKey,
+    updateProviderKey,
+    markProviderKeyState,
+    sanitizeProviderKeyEntry,
 
     // Preferences
     getPreferences,

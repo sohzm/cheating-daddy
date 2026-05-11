@@ -109,6 +109,39 @@ const storage = {
     }
 };
 
+// ============ API KEYS API ============
+// Wrapper for multi-key / state-aware management of provider API keys.
+// The main process returns sanitized entries (masked key only). The raw key
+// value never leaves the main process once it's been added.
+const apiKeys = {
+    async list(provider) {
+        const result = await ipcRenderer.invoke('api-keys:list', provider);
+        return result.success ? result.data : [];
+    },
+    async listAll() {
+        const result = await ipcRenderer.invoke('api-keys:list-all');
+        return result.success ? result.data : {};
+    },
+    async add(provider, key, label = '') {
+        return ipcRenderer.invoke('api-keys:add', provider, key, label);
+    },
+    async remove(provider, id) {
+        return ipcRenderer.invoke('api-keys:remove', provider, id);
+    },
+    async revalidate(provider, id) {
+        return ipcRenderer.invoke('api-keys:revalidate', provider, id);
+    },
+    async revalidateAll(provider) {
+        return ipcRenderer.invoke('api-keys:revalidate-all', provider);
+    },
+    // Subscribe to updates. Returns an unsubscribe function.
+    onUpdated(handler) {
+        const listener = (_event, payload) => handler(payload);
+        ipcRenderer.on('api-keys:updated', listener);
+        return () => ipcRenderer.removeListener('api-keys:updated', listener);
+    }
+};
+
 // Cache for preferences to avoid async calls in hot paths
 let preferencesCache = null;
 
@@ -1036,6 +1069,9 @@ const cheatingDaddy = {
 
     // Storage API
     storage,
+
+    // API Keys API (multi-key management)
+    apiKeys,
 
     // Theme API
     theme,

@@ -5,6 +5,7 @@ if (require('electron-squirrel-startup')) {
 const { app, BrowserWindow, shell, ipcMain } = require('electron');
 const { createWindow, updateGlobalShortcuts } = require('./utils/window');
 const { setupGeminiIpcHandlers, stopMacOSAudioCapture, sendToRenderer } = require('./utils/gemini');
+const apiKeys = require('./utils/apiKeys');
 const storage = require('./storage');
 
 const geminiSessionRef = { current: null };
@@ -28,7 +29,12 @@ app.whenReady().then(async () => {
     createMainWindow();
     setupGeminiIpcHandlers(geminiSessionRef);
     setupStorageIpcHandlers();
+    setupApiKeysIpcHandlers();
     setupGeneralIpcHandlers();
+
+    // Kick off background validation of every stored API key. Never awaited
+    // so the window can open immediately.
+    apiKeys.startBackgroundValidation();
 });
 
 app.on('window-all-closed', () => {
@@ -40,6 +46,7 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
     stopMacOSAudioCapture();
+    apiKeys.stopBackgroundValidation();
 });
 
 app.on('activate', () => {
@@ -253,6 +260,82 @@ function setupStorageIpcHandlers() {
             return { success: true };
         } catch (error) {
             console.error('Error clearing all data:', error);
+            return { success: false, error: error.message };
+        }
+    });
+}
+
+function setupApiKeysIpcHandlers() {
+    // List sanitized keys for a provider
+    ipcMain.handle('api-keys:list', async (event, provider) => {
+        try {
+            return { success: true, data: apiKeys.listKeys(provider) };
+        } catch (error) {
+            console.error('Error listing API keys:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    // List keys for all providers in one call
+    ipcMain.handle('api-keys:list-all', async () => {
+        try {
+            const data = {};
+            for (const provider of storage.API_KEY_PROVIDERS) {
+                data[provider] = apiKeys.listKeys(provider);
+            }
+            return { success: true, data };
+        } catch (error) {
+            console.error('Error listing all API keys:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    // Add a key to a provider pool; fire-and-forget validation is triggered internally
+    ipcMain.handle('api-keys:add', async (event, provider, key, label) => {
+        try {
+            const result = await apiKeys.addKey(provider, key, label);
+            if (!result.ok) {
+                return { success: false, error: result.error };
+            }
+            return { success: true, data: result.entry };
+        } catch (error) {
+            console.error('Error adding API key:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    // Remove a key from a provider pool
+    ipcMain.handle('api-keys:remove', async (event, provider, id) => {
+        try {
+            const result = apiKeys.removeKey(provider, id);
+            if (!result.ok) {
+                return { success: false, error: result.error };
+            }
+            return { success: true };
+        } catch (error) {
+            console.error('Error removing API key:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    // Manually revalidate a specific key
+    ipcMain.handle('api-keys:revalidate', async (event, provider, id) => {
+        try {
+            const result = await apiKeys.revalidateKey(provider, id);
+            return result.ok ? { success: true } : { success: false, error: result.error };
+        } catch (error) {
+            console.error('Error revalidating API key:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    // Manually revalidate all keys for a provider
+    ipcMain.handle('api-keys:revalidate-all', async (event, provider) => {
+        try {
+            const result = await apiKeys.revalidateAll(provider);
+            return { success: true, data: result };
+        } catch (error) {
+            console.error('Error revalidating all API keys:', error);
             return { success: false, error: error.message };
         }
     });
