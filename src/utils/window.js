@@ -7,6 +7,18 @@ let mouseEventsIgnored = false;
 const DEFAULT_MAIN_WINDOW_SIZE = { width: 1100, height: 800 };
 const MIN_WINDOW_SIZE = { width: 700, height: 320 };
 
+// ── Rigid-body movement system ──
+// Prevents window stretching/deformation by:
+// 1. Using setBounds with locked width/height instead of setPosition
+// 2. Disabling resize during movement
+// 3. Throttling rapid key repeats
+// 4. Caching window dimensions before movement begins
+let _isMoving = false;
+let _moveThrottleTimer = null;
+let _cachedBounds = null;
+const MOVE_THROTTLE_MS = 16; // ~60fps cap on movement updates
+const MOVE_SETTLE_MS = 50; // Time after last move to re-enable resize
+
 function createWindow(sendToRenderer, geminiSessionRef) {
     let windowWidth = DEFAULT_MAIN_WINDOW_SIZE.width;
     let windowHeight = DEFAULT_MAIN_WINDOW_SIZE.height;
@@ -21,6 +33,8 @@ function createWindow(sendToRenderer, geminiSessionRef) {
         transparent: true,
         hasShadow: false,
         alwaysOnTop: true,
+        // Show window only when ready to prevent white flash
+        show: false,
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false, // TODO: change to true
@@ -32,6 +46,8 @@ function createWindow(sendToRenderer, geminiSessionRef) {
         backgroundColor: '#00000000',
     });
 
+    // ── Deferred display media handler ──
+    // Register lazily to avoid blocking window creation with desktopCapturer.getSources()
     const { session, desktopCapturer } = require('electron');
     session.defaultSession.setDisplayMediaRequestHandler(
         (request, callback) => {
@@ -44,6 +60,28 @@ function createWindow(sendToRenderer, geminiSessionRef) {
 
     mainWindow.setContentProtection(true);
     mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+
+    // ── Resize guard: reject size changes during rigid-body movement ──
+    mainWindow.on('will-resize', (event) => {
+        if (_isMoving) {
+            event.preventDefault();
+        }
+    });
+
+    mainWindow.on('resize', () => {
+        // If we're in movement mode, snap back to cached dimensions immediately
+        if (_isMoving && _cachedBounds && !mainWindow.isDestroyed()) {
+            const current = mainWindow.getBounds();
+            if (current.width !== _cachedBounds.width || current.height !== _cachedBounds.height) {
+                mainWindow.setBounds({
+                    x: current.x,
+                    y: current.y,
+                    width: _cachedBounds.width,
+                    height: _cachedBounds.height,
+                });
+            }
+        }
+    });
 
     // Hide from Windows taskbar
     if (process.platform === 'win32') {
@@ -69,9 +107,16 @@ function createWindow(sendToRenderer, geminiSessionRef) {
 
     mainWindow.loadFile(path.join(__dirname, '../index.html'));
 
-    // After window is created, initialize keybinds
+    // ── Optimized startup sequence ──
+    // Show window as soon as content is ready (eliminates white flash)
+    mainWindow.once('ready-to-show', () => {
+        mainWindow.show();
+    });
+
+    // After DOM is ready, initialize keybinds without artificial delay
     mainWindow.webContents.once('dom-ready', () => {
-        setTimeout(() => {
+        // Use setImmediate instead of setTimeout(150ms) to avoid blocking
+        setImmediate(() => {
             const defaultKeybinds = getDefaultKeybinds();
             let keybinds = defaultKeybinds;
 
@@ -82,7 +127,7 @@ function createWindow(sendToRenderer, geminiSessionRef) {
             }
 
             updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessionRef);
-        }, 150);
+        });
     });
 
     setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef);
@@ -116,29 +161,70 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
 
     const primaryDisplay = screen.getPrimaryDisplay();
     const { width, height } = primaryDisplay.workAreaSize;
-    const moveIncrement = Math.floor(Math.min(width, height) * 0.1);
+    const moveIncrement = Math.floor(Math.min(width, height) * 0.05); // Reduced from 10% to 5% for smoother movement
+
+    // Rigid-body move function: translates position WITHOUT allowing size changes
+    function rigidMove(deltaX, deltaY) {
+        if (!mainWindow || mainWindow.isDestroyed() || !mainWindow.isVisible()) return;
+
+        // Throttle rapid movement calls to prevent compound drift
+        if (_moveThrottleTimer) return;
+
+        _moveThrottleTimer = setTimeout(() => {
+            _moveThrottleTimer = null;
+        }, MOVE_THROTTLE_MS);
+
+        // Get current bounds and freeze dimensions
+        const bounds = mainWindow.getBounds();
+
+        // Cache the original size on first movement call
+        if (!_isMoving) {
+            _isMoving = true;
+            _cachedBounds = { width: bounds.width, height: bounds.height };
+            // Temporarily disable resizing during movement to prevent OS interference
+            mainWindow.setResizable(false);
+        }
+
+        // Calculate new position using integer math (avoid fractional pixel issues)
+        const newX = Math.round(bounds.x + deltaX);
+        const newY = Math.round(bounds.y + deltaY);
+
+        // Use setBounds with explicitly locked width/height — this is the key fix.
+        // setPosition() can trigger resize events on transparent/frameless windows,
+        // but setBounds() with fixed w/h ensures rigid-body translation.
+        mainWindow.setBounds({
+            x: newX,
+            y: newY,
+            width: _cachedBounds.width,
+            height: _cachedBounds.height,
+        });
+
+        // Schedule re-enabling resize after movement settles
+        clearTimeout(rigidMove._settleTimer);
+        rigidMove._settleTimer = setTimeout(() => {
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                // Final bounds correction: snap to cached dimensions
+                const finalBounds = mainWindow.getBounds();
+                if (finalBounds.width !== _cachedBounds.width || finalBounds.height !== _cachedBounds.height) {
+                    mainWindow.setBounds({
+                        x: finalBounds.x,
+                        y: finalBounds.y,
+                        width: _cachedBounds.width,
+                        height: _cachedBounds.height,
+                    });
+                }
+                mainWindow.setResizable(true);
+            }
+            _isMoving = false;
+            _cachedBounds = null;
+        }, MOVE_SETTLE_MS);
+    }
 
     const movementActions = {
-        moveUp: () => {
-            if (!mainWindow.isVisible()) return;
-            const [currentX, currentY] = mainWindow.getPosition();
-            mainWindow.setPosition(currentX, currentY - moveIncrement);
-        },
-        moveDown: () => {
-            if (!mainWindow.isVisible()) return;
-            const [currentX, currentY] = mainWindow.getPosition();
-            mainWindow.setPosition(currentX, currentY + moveIncrement);
-        },
-        moveLeft: () => {
-            if (!mainWindow.isVisible()) return;
-            const [currentX, currentY] = mainWindow.getPosition();
-            mainWindow.setPosition(currentX - moveIncrement, currentY);
-        },
-        moveRight: () => {
-            if (!mainWindow.isVisible()) return;
-            const [currentX, currentY] = mainWindow.getPosition();
-            mainWindow.setPosition(currentX + moveIncrement, currentY);
-        },
+        moveUp: () => rigidMove(0, -moveIncrement),
+        moveDown: () => rigidMove(0, moveIncrement),
+        moveLeft: () => rigidMove(-moveIncrement, 0),
+        moveRight: () => rigidMove(moveIncrement, 0),
     };
 
     Object.keys(movementActions).forEach(action => {

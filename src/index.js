@@ -16,19 +16,29 @@ function createMainWindow() {
 }
 
 app.whenReady().then(async () => {
-    // Initialize storage (checks version, resets if needed)
+    // ── Startup optimization: non-blocking initialization ──
+    // 1. Initialize storage asynchronously where possible
+    //    (initializeStorage uses sync fs but is fast — keep it first for data integrity)
     storage.initializeStorage();
 
-    // Trigger screen recording permission prompt on macOS if not already granted
-    if (process.platform === 'darwin') {
-        const { desktopCapturer } = require('electron');
-        desktopCapturer.getSources({ types: ['screen'] }).catch(() => {});
-    }
-
+    // 2. Create window IMMEDIATELY to reduce perceived startup time
+    //    (don't wait for permission checks or other I/O)
     createMainWindow();
+
+    // 3. Setup IPC handlers right after window (these are just registrations, very fast)
     setupGeminiIpcHandlers(geminiSessionRef);
     setupStorageIpcHandlers();
     setupGeneralIpcHandlers();
+
+    // 4. Defer non-critical startup tasks to avoid blocking first paint
+    setImmediate(() => {
+        // Trigger screen recording permission prompt on macOS in background
+        // This is deferred so it doesn't block window creation
+        if (process.platform === 'darwin') {
+            const { desktopCapturer } = require('electron');
+            desktopCapturer.getSources({ types: ['screen'] }).catch(() => {});
+        }
+    });
 });
 
 app.on('window-all-closed', () => {

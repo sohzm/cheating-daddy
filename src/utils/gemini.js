@@ -153,11 +153,13 @@ function getCurrentSessionData() {
 async function getEnabledTools() {
     const tools = [];
 
-    // Check if Google Search is enabled (default: true)
-    const googleSearchEnabled = await getStoredSetting('googleSearchEnabled', 'true');
+    // Read directly from storage module instead of blocking on renderer's localStorage
+    // This eliminates the 100ms+ delay from executeJavaScript during session init
+    const preferences = require('../storage').getPreferences();
+    const googleSearchEnabled = preferences.googleSearchEnabled !== false; // default true
     console.log('Google Search enabled:', googleSearchEnabled);
 
-    if (googleSearchEnabled === 'true') {
+    if (googleSearchEnabled) {
         tools.push({ googleSearch: {} });
         console.log('Added Google Search tool');
     } else {
@@ -168,35 +170,15 @@ async function getEnabledTools() {
 }
 
 async function getStoredSetting(key, defaultValue) {
+    // Optimized: read from storage module directly (synchronous, no IPC round-trip)
     try {
-        const windows = BrowserWindow.getAllWindows();
-        if (windows.length > 0) {
-            // Wait a bit for the renderer to be ready
-            await new Promise(resolve => setTimeout(resolve, 100));
-
-            // Try to get setting from renderer process localStorage
-            const value = await windows[0].webContents.executeJavaScript(`
-                (function() {
-                    try {
-                        if (typeof localStorage === 'undefined') {
-                            console.log('localStorage not available yet for ${key}');
-                            return '${defaultValue}';
-                        }
-                        const stored = localStorage.getItem('${key}');
-                        console.log('Retrieved setting ${key}:', stored);
-                        return stored || '${defaultValue}';
-                    } catch (e) {
-                        console.error('Error accessing localStorage for ${key}:', e);
-                        return '${defaultValue}';
-                    }
-                })()
-            `);
-            return value;
+        const preferences = require('../storage').getPreferences();
+        if (preferences[key] !== undefined) {
+            return String(preferences[key]);
         }
     } catch (error) {
         console.error('Error getting stored setting for', key, ':', error.message);
     }
-    console.log('Using default value for', key, ':', defaultValue);
     return defaultValue;
 }
 

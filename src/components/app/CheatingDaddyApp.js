@@ -391,7 +391,8 @@ export class CheatingDaddyApp extends LitElement {
         this._localVersion = '';
 
         this._loadFromStorage();
-        this._checkForUpdates();
+        // Defer update check to avoid competing with initial render for network/CPU
+        setTimeout(() => this._checkForUpdates(), 2000);
     }
 
     async _checkForUpdates() {
@@ -562,12 +563,13 @@ export class CheatingDaddyApp extends LitElement {
         }
     }
 
-    // ── Session start ──
+    // ── Session start (optimized: non-blocking UI transition) ──
 
     async handleStart() {
         const prefs = await cheatingDaddy.storage.getPreferences();
         const providerMode = prefs.providerMode === 'cloud' ? 'byok' : (prefs.providerMode || 'byok');
 
+        // ── Validate credentials BEFORE transitioning (fast, no network) ──
         if (providerMode === 'cloud') {
             const creds = await cheatingDaddy.storage.getCredentials();
             if (!creds.cloudToken || creds.cloudToken.trim() === '') {
@@ -577,25 +579,7 @@ export class CheatingDaddyApp extends LitElement {
                 }
                 return;
             }
-
-            const success = await cheatingDaddy.initializeCloud(this.selectedProfile);
-            if (!success) {
-                const mainView = this.shadowRoot.querySelector('main-view');
-                if (mainView && mainView.triggerApiKeyError) {
-                    mainView.triggerApiKeyError();
-                }
-                return;
-            }
-        } else if (providerMode === 'local') {
-            const success = await cheatingDaddy.initializeLocal(this.selectedProfile);
-            if (!success) {
-                const mainView = this.shadowRoot.querySelector('main-view');
-                if (mainView && mainView.triggerApiKeyError) {
-                    mainView.triggerApiKeyError();
-                }
-                return;
-            }
-        } else {
+        } else if (providerMode !== 'local') {
             const apiKey = await cheatingDaddy.storage.getApiKey();
             if (!apiKey || apiKey === '') {
                 const mainView = this.shadowRoot.querySelector('main-view');
@@ -604,17 +588,53 @@ export class CheatingDaddyApp extends LitElement {
                 }
                 return;
             }
-
-            await cheatingDaddy.initializeGemini(this.selectedProfile, this.selectedLanguage);
         }
 
-        cheatingDaddy.startCapture(this.selectedScreenshotInterval, this.selectedImageQuality);
+        // ── Transition to assistant view IMMEDIATELY (eliminates perceived freeze) ──
         this.responses = [];
         this.currentResponseIndex = -1;
         this.startTime = Date.now();
         this.sessionActive = true;
         this.currentView = 'assistant';
         this._startTimer();
+        this.setStatus('Connecting...');
+
+        // ── Initialize AI session in background (non-blocking) ──
+        // This allows the UI to render the assistant view while network connects
+        const initPromise = (async () => {
+            try {
+                if (providerMode === 'cloud') {
+                    const success = await cheatingDaddy.initializeCloud(this.selectedProfile);
+                    if (!success) {
+                        this.setStatus('Connection failed. Check credentials.');
+                        return false;
+                    }
+                } else if (providerMode === 'local') {
+                    const success = await cheatingDaddy.initializeLocal(this.selectedProfile);
+                    if (!success) {
+                        this.setStatus('Local AI connection failed.');
+                        return false;
+                    }
+                } else {
+                    await cheatingDaddy.initializeGemini(this.selectedProfile, this.selectedLanguage);
+                }
+                return true;
+            } catch (error) {
+                console.error('Session initialization error:', error);
+                this.setStatus('Error: ' + error.message);
+                return false;
+            }
+        })();
+
+        // ── Start capture in parallel with AI connection (no dependency) ──
+        cheatingDaddy.startCapture(this.selectedScreenshotInterval, this.selectedImageQuality);
+
+        // Await connection result (UI is already responsive)
+        const success = await initPromise;
+        if (!success && this.currentView === 'assistant') {
+            // Session failed but user is already in assistant view — show error status
+            // Don't force navigate back; let user see the error and close manually
+        }
     }
 
     async handleAPIKeyHelp() {
