@@ -53,16 +53,16 @@ const DEFAULT_WINDOW_STATE = {
     // Window size scale (1.0 = default size, 0.5 = half, 2.0 = double)
     scale: 1.0,
     scaleMin: 0.3,
-    scaleMax: 3.0,
+    scaleMax: 1.5,       // Reduced from 3.0 to prevent GPU overload
     scaleStep: 0.1,
     // Content zoom (Electron webContents zoomFactor, 1.0 = 100%)
     zoom: 1.0,
     zoomMin: 0.5,
-    zoomMax: 3.0,
+    zoomMax: 2.0,        // Reduced from 3.0 to prevent GPU overload
     zoomStep: 0.1,
     // Window opacity (0.0–1.0)
     opacity: 1.0,
-    opacityMin: 0.1,
+    opacityMin: 0.2,     // Raised from 0.1 so window stays visible
     opacityMax: 1.0,
     opacityStep: 0.05,
     // Visibility

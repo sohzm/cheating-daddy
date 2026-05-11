@@ -9,6 +9,21 @@ const KEYBINDS_VERSION = 2; // Increment when default keybinds change
 const DEFAULT_MAIN_WINDOW_SIZE = { width: 1100, height: 800 };
 const MIN_WINDOW_SIZE = { width: 400, height: 260 };
 
+// Hard safety limits - these cannot be exceeded regardless of user settings.
+// Prevents GPU crashes from oversized transparent windows on Windows.
+const HARD_LIMITS = {
+    scaleMax: 1.5,
+    scaleMin: 0.2,
+    zoomMax: 2.0,
+    zoomMin: 0.3,
+    opacityMax: 1.0,
+    opacityMin: 0.2,
+    // Minimum step values to prevent rapid-fire redraws
+    scaleStepMin: 0.05,
+    zoomStepMin: 0.05,
+    opacityStepMin: 0.05,
+};
+
 // ──────────────────────────────────────────────────────────────
 // Default keybinds — full action set
 // ──────────────────────────────────────────────────────────────
@@ -214,20 +229,24 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
     // ── Scale (window size — grows/shrinks from centre) ──
     if (winState().scaleEnabled !== false) {
         tryRegister('scaleUp', keybinds.scaleUp, () => {
-            applyScale(mainWindow, winState().scaleStep ?? 0.1, winState().scaleMax ?? 3.0);
+            const step = Math.max(HARD_LIMITS.scaleStepMin, winState().scaleStep ?? 0.1);
+            applyScale(mainWindow, step, winState().scaleMax ?? 1.5);
         });
         tryRegister('scaleDown', keybinds.scaleDown, () => {
-            applyScale(mainWindow, -(winState().scaleStep ?? 0.1), winState().scaleMin ?? 0.3);
+            const step = Math.max(HARD_LIMITS.scaleStepMin, winState().scaleStep ?? 0.1);
+            applyScale(mainWindow, -step, winState().scaleMin ?? 0.3);
         });
     }
 
     // ── Zoom (content) ──
     if (winState().zoomEnabled !== false) {
         tryRegister('zoomIn', keybinds.zoomIn, () => {
-            applyZoom(mainWindow, winState().zoomStep ?? 0.1, winState().zoomMax ?? 3.0);
+            const step = Math.max(HARD_LIMITS.zoomStepMin, winState().zoomStep ?? 0.1);
+            applyZoom(mainWindow, step, winState().zoomMax ?? 2.0);
         });
         tryRegister('zoomOut', keybinds.zoomOut, () => {
-            applyZoom(mainWindow, -(winState().zoomStep ?? 0.1), winState().zoomMin ?? 0.5);
+            const step = Math.max(HARD_LIMITS.zoomStepMin, winState().zoomStep ?? 0.1);
+            applyZoom(mainWindow, -step, winState().zoomMin ?? 0.5);
         });
         tryRegister('zoomReset', keybinds.zoomReset, () => {
             mainWindow.webContents.setZoomFactor(1.0);
@@ -239,10 +258,12 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
     // ── Opacity ──
     if (winState().opacityEnabled !== false) {
         tryRegister('opacityUp', keybinds.opacityUp, () => {
-            applyOpacity(mainWindow, winState().opacityStep ?? 0.05, winState().opacityMax ?? 1.0);
+            const step = Math.max(HARD_LIMITS.opacityStepMin, winState().opacityStep ?? 0.05);
+            applyOpacity(mainWindow, step, winState().opacityMax ?? 1.0);
         });
         tryRegister('opacityDown', keybinds.opacityDown, () => {
-            applyOpacity(mainWindow, -(winState().opacityStep ?? 0.05), winState().opacityMin ?? 0.1);
+            const step = Math.max(HARD_LIMITS.opacityStepMin, winState().opacityStep ?? 0.05);
+            applyOpacity(mainWindow, -step, winState().opacityMin ?? 0.2);
         });
     }
 
@@ -336,9 +357,13 @@ function safeMove(win, dx, dy) {
 function applyScale(win, delta, limit) {
     const ws = storage.getWindowState();
     const current = ws.scale ?? 1.0;
+    // Enforce hard limits
+    const effectiveLimit = delta > 0
+        ? Math.min(limit, HARD_LIMITS.scaleMax)
+        : Math.max(limit, HARD_LIMITS.scaleMin);
     const next = delta > 0
-        ? Math.min(current + Math.abs(delta), limit)
-        : Math.max(current - Math.abs(delta), limit);
+        ? Math.min(current + Math.abs(delta), effectiveLimit)
+        : Math.max(current - Math.abs(delta), effectiveLimit);
     if (next === current) return;
 
     const [cx, cy] = win.getPosition();
@@ -349,7 +374,6 @@ function applyScale(win, delta, limit) {
     const nw2 = Math.max(MIN_WINDOW_SIZE.width, nw);
     const nh2 = Math.max(MIN_WINDOW_SIZE.height, nh);
 
-    // Grow/shrink from centre: adjust position so centre stays fixed
     const nx = Math.round(cx + (cw - nw2) / 2);
     const ny = Math.round(cy + (ch - nh2) / 2);
 
@@ -357,7 +381,6 @@ function applyScale(win, delta, limit) {
     win.setPosition(nx, ny);
     storage.setWindowState({ scale: next, x: nx, y: ny });
 
-    // Notify renderer
     const { BrowserWindow: BW } = require('electron');
     const windows = BW.getAllWindows();
     for (const w of windows) w.webContents.send('scale-changed', next);
@@ -366,9 +389,13 @@ function applyScale(win, delta, limit) {
 function applyZoom(win, delta, limit) {
     const ws = storage.getWindowState();
     const current = ws.zoom ?? 1.0;
+    // Enforce hard limits
+    const effectiveLimit = delta > 0
+        ? Math.min(limit, HARD_LIMITS.zoomMax)
+        : Math.max(limit, HARD_LIMITS.zoomMin);
     const next = delta > 0
-        ? Math.min(parseFloat((current + Math.abs(delta)).toFixed(2)), limit)
-        : Math.max(parseFloat((current - Math.abs(delta)).toFixed(2)), limit);
+        ? Math.min(parseFloat((current + Math.abs(delta)).toFixed(2)), effectiveLimit)
+        : Math.max(parseFloat((current - Math.abs(delta)).toFixed(2)), effectiveLimit);
     if (next === current) return;
     try { win.webContents.setZoomFactor(next); } catch (_) {}
     storage.updateWindowState('zoom', next);
@@ -378,9 +405,13 @@ function applyZoom(win, delta, limit) {
 function applyOpacity(win, delta, limit) {
     const ws = storage.getWindowState();
     const current = ws.opacity ?? 1.0;
+    // Enforce hard limits
+    const effectiveLimit = delta > 0
+        ? Math.min(limit, HARD_LIMITS.opacityMax)
+        : Math.max(limit, HARD_LIMITS.opacityMin);
     const next = delta > 0
-        ? Math.min(parseFloat((current + Math.abs(delta)).toFixed(2)), limit)
-        : Math.max(parseFloat((current - Math.abs(delta)).toFixed(2)), limit);
+        ? Math.min(parseFloat((current + Math.abs(delta)).toFixed(2)), effectiveLimit)
+        : Math.max(parseFloat((current - Math.abs(delta)).toFixed(2)), effectiveLimit);
     if (next === current) return;
     try { win.setOpacity(next); } catch (_) {}
     storage.updateWindowState('opacity', next);
@@ -439,15 +470,14 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
     });
 
     ipcMain.handle('window:set-scale', (event, scale) => {
+        const clamped = Math.max(HARD_LIMITS.scaleMin, Math.min(HARD_LIMITS.scaleMax, scale));
         const ws = storage.getWindowState();
-        const clamped = Math.max(ws.scaleMin ?? 0.3, Math.min(ws.scaleMax ?? 3.0, scale));
-        applyScale(mainWindow, clamped - (ws.scale ?? 1.0), ws.scaleMax ?? 3.0);
+        applyScale(mainWindow, clamped - (ws.scale ?? 1.0), HARD_LIMITS.scaleMax);
         return { success: true };
     });
 
     ipcMain.handle('window:set-zoom', (event, zoom) => {
-        const ws = storage.getWindowState();
-        const clamped = Math.max(ws.zoomMin ?? 0.5, Math.min(ws.zoomMax ?? 3.0, zoom));
+        const clamped = Math.max(HARD_LIMITS.zoomMin, Math.min(HARD_LIMITS.zoomMax, zoom));
         try { mainWindow.webContents.setZoomFactor(clamped); } catch (_) {}
         storage.updateWindowState('zoom', clamped);
         mainWindow.webContents.send('zoom-changed', clamped);
@@ -455,8 +485,7 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
     });
 
     ipcMain.handle('window:set-opacity', (event, opacity) => {
-        const ws = storage.getWindowState();
-        const clamped = Math.max(ws.opacityMin ?? 0.1, Math.min(ws.opacityMax ?? 1.0, opacity));
+        const clamped = Math.max(HARD_LIMITS.opacityMin, Math.min(HARD_LIMITS.opacityMax, opacity));
         try { mainWindow.setOpacity(clamped); } catch (_) {}
         storage.updateWindowState('opacity', clamped);
         mainWindow.webContents.send('opacity-changed', clamped);
@@ -472,14 +501,17 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
 
 function _applyStatePatch(win, patch) {
     if (patch.opacity !== undefined) {
-        try { win.setOpacity(patch.opacity); } catch (_) {}
+        const clamped = Math.max(HARD_LIMITS.opacityMin, Math.min(HARD_LIMITS.opacityMax, patch.opacity));
+        try { win.setOpacity(clamped); } catch (_) {}
     }
     if (patch.zoom !== undefined) {
-        try { win.webContents.setZoomFactor(patch.zoom); } catch (_) {}
+        const clamped = Math.max(HARD_LIMITS.zoomMin, Math.min(HARD_LIMITS.zoomMax, patch.zoom));
+        try { win.webContents.setZoomFactor(clamped); } catch (_) {}
     }
     if (patch.scale !== undefined) {
-        const nw = Math.max(MIN_WINDOW_SIZE.width,  Math.round(DEFAULT_MAIN_WINDOW_SIZE.width  * patch.scale));
-        const nh = Math.max(MIN_WINDOW_SIZE.height, Math.round(DEFAULT_MAIN_WINDOW_SIZE.height * patch.scale));
+        const clamped = Math.max(HARD_LIMITS.scaleMin, Math.min(HARD_LIMITS.scaleMax, patch.scale));
+        const nw = Math.max(MIN_WINDOW_SIZE.width,  Math.round(DEFAULT_MAIN_WINDOW_SIZE.width  * clamped));
+        const nh = Math.max(MIN_WINDOW_SIZE.height, Math.round(DEFAULT_MAIN_WINDOW_SIZE.height * clamped));
         const [cx, cy] = win.getPosition();
         const [cw, ch] = win.getSize();
         const nx = Math.round(cx + (cw - nw) / 2);
@@ -497,4 +529,5 @@ module.exports = {
     applyScale,
     applyZoom,
     applyOpacity,
+    HARD_LIMITS,
 };

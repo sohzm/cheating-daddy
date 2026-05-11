@@ -419,13 +419,13 @@ export class HotkeysView extends LitElement {
                         <div class="surface-title">Window Settings</div>
                         <div class="surface-subtitle">Changes apply immediately. Persisted across restarts.</div>
                         <div class="settings-grid">
-                            ${this._renderSlider('Scale',          'scale',        this._state.scaleMin   ?? 0.3, this._state.scaleMax   ?? 3.0, 0.05, 1, 'scaleMin', 'scaleMax')}
-                            ${this._renderSlider('Content Zoom',   'zoom',         this._state.zoomMin    ?? 0.5, this._state.zoomMax    ?? 3.0, 0.05, 1, 'zoomMin', 'zoomMax')}
-                            ${this._renderSlider('Opacity',        'opacity',      this._state.opacityMin ?? 0.1, this._state.opacityMax ?? 1.0,  0.05, 1, 'opacityMin', 'opacityMax')}
+                            ${this._renderSlider('Scale',          'scale',        0.3, 1.5, 0.05, 1)}
+                            ${this._renderSlider('Content Zoom',   'zoom',         0.5, 2.0, 0.05, 1)}
+                            ${this._renderSlider('Opacity',        'opacity',      0.2, 1.0, 0.05, 1)}
                             ${this._renderSlider('Move Step (px)', 'moveStep',     1,   500, 1, 0)}
-                            ${this._renderSlider('Scale Step',     'scaleStep',    0.01, 0.5, 0.01)}
-                            ${this._renderSlider('Zoom Step',      'zoomStep',     0.01, 0.5, 0.01)}
-                            ${this._renderSlider('Opacity Step',   'opacityStep',  0.01, 0.2, 0.01)}
+                            ${this._renderSlider('Scale Step',     'scaleStep',    0.05, 0.5, 0.01)}
+                            ${this._renderSlider('Zoom Step',      'zoomStep',     0.05, 0.5, 0.01)}
+                            ${this._renderSlider('Opacity Step',   'opacityStep',  0.05, 0.2, 0.01)}
                         </div>
                     </section>
 
