@@ -90,6 +90,8 @@ function createWindow(sendToRenderer, geminiSessionRef) {
     const baseW = Math.round(DEFAULT_MAIN_WINDOW_SIZE.width * (winState.scale || 1.0));
     const baseH = Math.round(DEFAULT_MAIN_WINDOW_SIZE.height * (winState.scale || 1.0));
 
+    const isWin = process.platform === 'win32';
+
     const mainWindow = new BrowserWindow({
         width: Math.max(MIN_WINDOW_SIZE.width, baseW),
         height: Math.max(MIN_WINDOW_SIZE.height, baseH),
@@ -99,7 +101,7 @@ function createWindow(sendToRenderer, geminiSessionRef) {
         minHeight: MIN_WINDOW_SIZE.height,
         resizable: true,
         frame: false,
-        transparent: true,
+        transparent: !isWin,
         hasShadow: false,
         alwaysOnTop: true,
         paintWhenInitiallyHidden: false,
@@ -112,7 +114,7 @@ function createWindow(sendToRenderer, geminiSessionRef) {
             webSecurity: true,
             allowRunningInsecureContent: false,
         },
-        backgroundColor: '#01010101',
+        backgroundColor: isWin ? '#1a1a1a' : '#01010101',
     });
 
     const { session, desktopCapturer } = require('electron');

@@ -43,6 +43,17 @@ if (!gotTheLock) {
         setupApiKeysIpcHandlers();
         setupGeneralIpcHandlers();
 
+        // Pre-warm screen capture subsystem to avoid first-session freeze on Windows
+        setTimeout(() => {
+            const { desktopCapturer } = require('electron');
+            desktopCapturer
+                .getSources({ types: ['screen'] })
+                .then(sources => {
+                    console.log(`Screen capture pre-warmed: ${sources.length} source(s)`);
+                })
+                .catch(() => {});
+        }, 1500);
+
         // Defer validation to avoid competing with initial render and GPU setup
         setTimeout(() => {
             apiKeys.startBackgroundValidation();
