@@ -6,7 +6,7 @@ let mouseEventsIgnored = false;
 let _programmaticMove = false;
 let _moveDebounce = null;
 
-const KEYBINDS_VERSION = 3; // Increment when default keybinds change
+const KEYBINDS_VERSION = 4; // Increment when default keybinds change
 
 const DEFAULT_MAIN_WINDOW_SIZE = { width: 1100, height: 800 };
 const MIN_WINDOW_SIZE = { width: 400, height: 260 };
@@ -71,6 +71,10 @@ function getDefaultKeybinds() {
         aiModeToggle:       isMac ? 'Cmd+Shift+U'    : 'Ctrl+Shift+U',
         // ── Emergency ──
         emergencyQuit:      isMac ? 'Cmd+Q'          : 'Ctrl+Q',
+        // ── Model Management ──
+        debugToggle:        'Alt+D',
+        cycleSolutionModel: isMac ? 'Cmd+Y'          : 'Ctrl+Y',
+        cycleExtractionModel: isMac ? "Cmd+'"        : "Ctrl+'",
     };
 }
 
@@ -346,6 +350,34 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
         const newMode = current === 'byok' ? 'local' : 'byok';
         storage.updatePreference('providerMode', newMode);
         sendToRenderer('ai-mode-toggled', newMode);
+    });
+
+    // ── Model Management ──
+    tryRegister('debugToggle', keybinds.debugToggle, () => {
+        const prefs = storage.getPreferences();
+        const enabled = !prefs.debugModeEnabled;
+        storage.updatePreference('debugModeEnabled', enabled);
+        sendToRenderer('debug-mode-toggled', enabled);
+    });
+
+    tryRegister('cycleSolutionModel', keybinds.cycleSolutionModel, () => {
+        const prefs = storage.getPreferences();
+        const models = storage.GEMINI_MODELS;
+        const current = prefs.modelSolution || models[0].id;
+        const idx = models.findIndex(m => m.id === current);
+        const next = models[(idx + 1) % models.length].id;
+        storage.updatePreference('modelSolution', next);
+        sendToRenderer('model-changed', { task: 'solution', model: next });
+    });
+
+    tryRegister('cycleExtractionModel', keybinds.cycleExtractionModel, () => {
+        const prefs = storage.getPreferences();
+        const models = storage.GEMINI_MODELS;
+        const current = prefs.modelExtraction || models[0].id;
+        const idx = models.findIndex(m => m.id === current);
+        const next = models[(idx + 1) % models.length].id;
+        storage.updatePreference('modelExtraction', next);
+        sendToRenderer('model-changed', { task: 'extraction', model: next });
     });
 }
 

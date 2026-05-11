@@ -386,6 +386,8 @@ async function sendToGemma(transcription) {
 
     const trimmedHistory = trimConversationHistoryForGemma(groqConversationHistory, 42000);
 
+    const prefs = storage.getPreferences();
+
     try {
         await apiKeys.withKeyRotation('gemini', async (apiKey, entry) => {
             const ai = new GoogleGenAI({ apiKey: apiKey });
@@ -403,7 +405,7 @@ async function sendToGemma(transcription) {
             ];
 
             const response = await ai.models.generateContentStream({
-                model: 'gemma-3-27b-it',
+                model: prefs.modelExtraction || 'gemma-3-27b-it',
                 contents: messagesWithSystem,
             });
 
@@ -428,7 +430,7 @@ async function sendToGemma(transcription) {
             const inputChars = systemPromptChars + historyChars;
             const outputChars = fullText.length;
 
-            incrementCharUsage('gemini', 'gemma-3-27b-it', inputChars + outputChars);
+            incrementCharUsage('gemini', prefs.modelExtraction || 'gemma-3-27b-it', inputChars + outputChars);
 
             if (fullText.trim()) {
                 groqConversationHistory.push({
@@ -807,8 +809,12 @@ async function sendAudioToGemini(base64Data, geminiSessionRef) {
 }
 
 async function sendImageToGeminiHttp(base64Data, prompt) {
-    // Get available model based on rate limits
-    const model = getAvailableModel();
+    // Use solution model from preferences; fall back to rate-limited model selection
+    const prefs = storage.getPreferences();
+    const debugMode = prefs.debugModeEnabled || false;
+    const model = debugMode
+        ? (prefs.modelDebugging || 'gemini-2.5-flash')
+        : (prefs.modelSolution || getAvailableModel());
 
     // Pick a ready key; fall back to legacy single-key for users that haven't migrated yet.
     const readyKeys = storage.listReadyProviderKeys('gemini');

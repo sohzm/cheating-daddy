@@ -388,6 +388,10 @@ function setupGeneralIpcHandlers() {
         return app.getVersion();
     });
 
+    ipcMain.handle('get-gemini-models', async () => {
+        return { success: true, data: storage.GEMINI_MODELS };
+    });
+
     ipcMain.handle('quit-application', async event => {
         try {
             stopMacOSAudioCapture();

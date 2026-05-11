@@ -75,6 +75,10 @@ const HOTKEY_GROUPS = [
             { id: 'fontSizeUp',    label: 'Font Size +',     desc: 'Increase app font size',                toggle: null },
             { id: 'fontSizeDown',  label: 'Font Size -',     desc: 'Decrease app font size',                toggle: null },
             { id: 'aiModeToggle',  label: 'Toggle AI Mode',  desc: 'Switch between Local/Online AI',        toggle: null },
+            { id: 'debugToggle',   label: 'Debug Mode',      desc: 'Toggle debugging-focused workflow',     toggle: null },
+            { id: 'cycleSolutionModel',   label: 'Cycle Solution Model',   desc: 'Cycle Solution Generation model',   toggle: null },
+            { id: 'cycleExtractionModel', label: 'Cycle Extraction Model', desc: 'Cycle Problem Extraction model',    toggle: null },
+            { id: 'emergencyQuit', label: 'Quit App',        desc: 'Quit the application immediately',      toggle: null },
         ],
     },
 ];

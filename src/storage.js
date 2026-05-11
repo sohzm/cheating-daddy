@@ -25,6 +25,16 @@ const DEFAULT_CREDENTIALS = {
 const API_KEY_PROVIDERS = ['gemini', 'groq'];
 const EXHAUSTION_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24h
 
+// Available Gemini models for pipeline task assignment
+const GEMINI_MODELS = [
+    { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', shortName: 'Gem 2.5 Flash' },
+    { id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite', shortName: 'Gem 2.5 Lite' },
+    { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', shortName: 'Gem 2.5 Pro' },
+    { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', shortName: 'Gem 2.0 Flash' },
+    { id: 'gemini-2.0-flash-lite', name: 'Gemini 2.0 Flash Lite', shortName: 'Gem 2.0 Lite' },
+    { id: 'gemma-3-27b-it', name: 'Gemma 3 27B', shortName: 'Gemma 27B' },
+];
+
 const DEFAULT_PREFERENCES = {
     customPrompt: '',
     providerMode: 'byok',
@@ -41,6 +51,11 @@ const DEFAULT_PREFERENCES = {
     ollamaModel: 'llama3.1',
     whisperModel: 'Xenova/whisper-small',
     aiHearingEnabled: false,
+    // Model assignments per pipeline task
+    modelExtraction: 'gemini-2.5-flash',
+    modelSolution: 'gemini-2.5-flash',
+    modelDebugging: 'gemini-2.5-flash',
+    debugModeEnabled: false,
 };
 
 const DEFAULT_KEYBINDS = null; // null means use defaults from getDefaultKeybinds()
@@ -793,6 +808,7 @@ module.exports = {
     // Provider key pools
     API_KEY_PROVIDERS,
     EXHAUSTION_COOLDOWN_MS,
+    GEMINI_MODELS,
     listProviderKeys,
     listAllProviderKeysRaw,
     listReadyProviderKeys,

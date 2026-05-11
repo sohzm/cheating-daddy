@@ -151,6 +151,9 @@ const windowControls = {
             fontSizeDown:       isMac ? 'Cmd+Shift+9'   : 'Ctrl+Shift+9',
             aiModeToggle:       isMac ? 'Cmd+Shift+U'   : 'Ctrl+Shift+U',
             emergencyQuit:      isMac ? 'Cmd+Q'         : 'Ctrl+Q',
+            debugToggle:        'Alt+D',
+            cycleSolutionModel: isMac ? 'Cmd+Y'        : 'Ctrl+Y',
+            cycleExtractionModel: isMac ? "Cmd+'"      : "Ctrl+'",
         };
     },
     // Subscribe to state change events. Returns an unsubscribe function.
@@ -1139,6 +1142,20 @@ ipcRenderer.on('ai-mode-toggled', (_, newMode) => {
     const app = document.querySelector('cheating-daddy-app');
     if (app) {
         app.dispatchEvent(new CustomEvent('ai-mode-changed', { detail: { mode: newMode } }));
+    }
+});
+
+ipcRenderer.on('debug-mode-toggled', (_, enabled) => {
+    const app = document.querySelector('cheating-daddy-app');
+    if (app) {
+        app.dispatchEvent(new CustomEvent('debug-mode-changed', { detail: { enabled } }));
+    }
+});
+
+ipcRenderer.on('model-changed', (_, data) => {
+    const app = document.querySelector('cheating-daddy-app');
+    if (app) {
+        app.dispatchEvent(new CustomEvent('model-changed', { detail: data }));
     }
 });
 
