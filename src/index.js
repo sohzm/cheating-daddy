@@ -16,44 +16,56 @@ function createMainWindow() {
     return mainWindow;
 }
 
-app.whenReady().then(async () => {
-    // Initialize storage (checks version, resets if needed)
-    storage.initializeStorage();
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+    app.quit();
+} else {
+    app.on('second-instance', () => {
+        if (mainWindow) {
+            if (mainWindow.isMinimized()) mainWindow.restore();
+            mainWindow.focus();
+        }
+    });
 
-    // Trigger screen recording permission prompt on macOS if not already granted
-    if (process.platform === 'darwin') {
-        const { desktopCapturer } = require('electron');
-        desktopCapturer.getSources({ types: ['screen'] }).catch(() => {});
-    }
+    app.whenReady().then(async () => {
+        // Initialize storage (checks version, resets if needed)
+        storage.initializeStorage();
 
-    createMainWindow();
-    setupGeminiIpcHandlers(geminiSessionRef);
-    setupStorageIpcHandlers();
-    setupApiKeysIpcHandlers();
-    setupGeneralIpcHandlers();
+        // Trigger screen recording permission prompt on macOS if not already granted
+        if (process.platform === 'darwin') {
+            const { desktopCapturer } = require('electron');
+            desktopCapturer.getSources({ types: ['screen'] }).catch(() => {});
+        }
 
-    // Kick off background validation of every stored API key. Never awaited
-    // so the window can open immediately.
-    apiKeys.startBackgroundValidation();
-});
-
-app.on('window-all-closed', () => {
-    stopMacOSAudioCapture();
-    if (process.platform !== 'darwin') {
-        app.quit();
-    }
-});
-
-app.on('before-quit', () => {
-    stopMacOSAudioCapture();
-    apiKeys.stopBackgroundValidation();
-});
-
-app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
         createMainWindow();
-    }
-});
+        setupGeminiIpcHandlers(geminiSessionRef);
+        setupStorageIpcHandlers();
+        setupApiKeysIpcHandlers();
+        setupGeneralIpcHandlers();
+
+        // Kick off background validation of every stored API key. Never awaited
+        // so the window can open immediately.
+        apiKeys.startBackgroundValidation();
+    });
+
+    app.on('window-all-closed', () => {
+        stopMacOSAudioCapture();
+        if (process.platform !== 'darwin') {
+            app.quit();
+        }
+    });
+
+    app.on('before-quit', () => {
+        stopMacOSAudioCapture();
+        apiKeys.stopBackgroundValidation();
+    });
+
+    app.on('activate', () => {
+        if (BrowserWindow.getAllWindows().length === 0) {
+            createMainWindow();
+        }
+    });
+}
 
 function setupStorageIpcHandlers() {
     // ============ CONFIG ============

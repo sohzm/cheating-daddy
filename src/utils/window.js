@@ -4,6 +4,8 @@ const storage = require('../storage');
 
 let mouseEventsIgnored = false;
 
+const KEYBINDS_VERSION = 2; // Increment when default keybinds change
+
 const DEFAULT_MAIN_WINDOW_SIZE = { width: 1100, height: 800 };
 const MIN_WINDOW_SIZE = { width: 400, height: 260 };
 
@@ -116,10 +118,17 @@ function createWindow(sendToRenderer, geminiSessionRef) {
 
         setTimeout(() => {
             const defaultKB = getDefaultKeybinds();
-            const saved     = storage.getKeybinds();
-            const keybinds  = saved ? { ...defaultKB, ...saved } : defaultKB;
+            const saved = storage.getKeybinds();
+            let keybinds;
+            // If saved keybinds exist but are from an older version, reset to defaults
+            if (saved && saved._version === KEYBINDS_VERSION) {
+                keybinds = { ...defaultKB, ...saved };
+            } else {
+                keybinds = { ...defaultKB, _version: KEYBINDS_VERSION };
+                storage.setKeybinds(keybinds);
+            }
             updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessionRef);
-        }, 150);
+        }, 500);
     });
 
     // Persist window position on move
@@ -150,10 +159,25 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
 
     function tryRegister(action, kb, handler) {
         if (!kb) return;
+        // Skip internal metadata keys
+        if (action.startsWith('_')) return;
         try {
             const success = globalShortcut.register(kb, handler);
             if (!success) {
-                console.error(`Failed to register shortcut ${action} (${kb}): registration returned false`);
+                console.warn(`Shortcut ${action} (${kb}) registration returned false, will retry...`);
+                // Retry once after a short delay
+                setTimeout(() => {
+                    try {
+                        const retrySuccess = globalShortcut.register(kb, handler);
+                        if (!retrySuccess) {
+                            console.error(`Shortcut ${action} (${kb}) retry also failed`);
+                        } else {
+                            console.log(`Shortcut ${action} (${kb}) registered on retry`);
+                        }
+                    } catch (retryErr) {
+                        console.error(`Shortcut ${action} (${kb}) retry error:`, retryErr.message);
+                    }
+                }, 500);
             }
         } catch (e) {
             console.error(`Failed to register ${action} (${kb}):`, e.message);
