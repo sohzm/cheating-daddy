@@ -104,7 +104,7 @@ src/
 │       ├── HistoryView.js      # Session history
 │       ├── OnboardingView.js   # First-run onboarding
 │       ├── HelpView.js         # Help documentation
-│       ├── FeedbackView.js     # Feedback form
+│       ├── HotkeysView.js      # Hotkey configuration UI
 │       └── sharedPageStyles.js # Shared CSS (surfaces, controls, forms)
 └── assets/                     # Vendored libs, icons, audio binary
 ```
@@ -114,9 +114,10 @@ src/
 ## Current TODOs / Known Issues
 
 - [ ] MainView still has legacy single-key input fields (functional but could link to ApiKeysView)
-- [ ] `sendImageToGeminiHttp` uses `getApiKey()` which resolves pool → works, but could use explicit `withKeyRotation` for the live session init too
+- [ ] `sendImageToGeminiHttp` uses `getApiKey()` which resolves pool -> works, but could use explicit `withKeyRotation` for the live session init too
 - [ ] No unit tests
 - [ ] PR creation via GitHub API returns 422 (likely repo permission issue)
+- [x] ~~FeedbackView.js removed~~ (was an embedded Google Form, no longer needed)
 
 ---
 
@@ -137,6 +138,7 @@ src/
 | File | Date | Summary |
 |------|------|---------|
 | `sessions/001-api-key-management.md` | 2025-05-11 | Full API key pool system implementation |
+| `sessions/002-ui-features-hotkeys.md` | 2025-05-11 | Hotkeys, AI Hearing, settings UI, feedback removal |
 
 ---
 
