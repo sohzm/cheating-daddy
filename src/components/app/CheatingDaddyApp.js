@@ -621,7 +621,7 @@ export class CheatingDaddyApp extends LitElement {
             await cheatingDaddy.initializeGemini(this.selectedProfile, this.selectedLanguage);
         }
 
-        cheatingDaddy.startCapture(this.selectedScreenshotInterval, this.selectedImageQuality);
+        cheatingDaddy.startCapture(this.selectedScreenshotInterval, this.selectedImageQuality, aiHearingEnabled);
         this.responses = [];
         this.currentResponseIndex = -1;
         this.startTime = Date.now();

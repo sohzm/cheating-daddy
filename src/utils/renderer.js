@@ -278,7 +278,7 @@ ipcRenderer.on('update-status', (event, status) => {
     cheatingDaddy.setStatus(status);
 });
 
-async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'medium') {
+async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'medium', aiHearingEnabled = true) {
     // Store the image quality for manual screenshots
     currentImageQuality = imageQuality;
 
@@ -291,10 +291,12 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
             // On macOS, use SystemAudioDump for audio and getDisplayMedia for screen
             console.log('Starting macOS capture with SystemAudioDump...');
 
-            // Start macOS audio capture
-            const audioResult = await ipcRenderer.invoke('start-macos-audio');
-            if (!audioResult.success) {
-                throw new Error('Failed to start macOS audio capture: ' + audioResult.error);
+            // Start macOS audio capture only if AI hearing is enabled
+            if (aiHearingEnabled) {
+                const audioResult = await ipcRenderer.invoke('start-macos-audio');
+                if (!audioResult.success) {
+                    throw new Error('Failed to start macOS audio capture: ' + audioResult.error);
+                }
             }
 
             // Get screen capture for screenshots
@@ -309,7 +311,7 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
 
             console.log('macOS screen capture started - audio handled by SystemAudioDump');
 
-            if (audioMode === 'mic_only' || audioMode === 'both') {
+            if (aiHearingEnabled && (audioMode === 'mic_only' || audioMode === 'both')) {
                 let micStream = null;
                 try {
                     micStream = await navigator.mediaDevices.getUserMedia({
@@ -330,31 +332,43 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
             }
         } else if (isLinux) {
             // Linux - use display media for screen capture and try to get system audio
-            try {
-                // First try to get system audio via getDisplayMedia (works on newer browsers)
-                mediaStream = await navigator.mediaDevices.getDisplayMedia({
-                    video: {
-                        frameRate: 1,
-                        width: { ideal: 1920 },
-                        height: { ideal: 1080 },
-                    },
-                    audio: {
-                        sampleRate: SAMPLE_RATE,
-                        channelCount: 1,
-                        echoCancellation: false, // Don't cancel system audio
-                        noiseSuppression: false,
-                        autoGainControl: false,
-                    },
-                });
+            if (aiHearingEnabled) {
+                try {
+                    // First try to get system audio via getDisplayMedia (works on newer browsers)
+                    mediaStream = await navigator.mediaDevices.getDisplayMedia({
+                        video: {
+                            frameRate: 1,
+                            width: { ideal: 1920 },
+                            height: { ideal: 1080 },
+                        },
+                        audio: {
+                            sampleRate: SAMPLE_RATE,
+                            channelCount: 1,
+                            echoCancellation: false, // Don't cancel system audio
+                            noiseSuppression: false,
+                            autoGainControl: false,
+                        },
+                    });
 
-                console.log('Linux system audio capture via getDisplayMedia succeeded');
+                    console.log('Linux system audio capture via getDisplayMedia succeeded');
 
-                // Setup audio processing for Linux system audio
-                setupLinuxSystemAudioProcessing();
-            } catch (systemAudioError) {
-                console.warn('System audio via getDisplayMedia failed, trying screen-only capture:', systemAudioError);
+                    // Setup audio processing for Linux system audio
+                    setupLinuxSystemAudioProcessing();
+                } catch (systemAudioError) {
+                    console.warn('System audio via getDisplayMedia failed, trying screen-only capture:', systemAudioError);
 
-                // Fallback to screen-only capture
+                    // Fallback to screen-only capture
+                    mediaStream = await navigator.mediaDevices.getDisplayMedia({
+                        video: {
+                            frameRate: 1,
+                            width: { ideal: 1920 },
+                            height: { ideal: 1080 },
+                        },
+                        audio: false,
+                    });
+                }
+            } else {
+                // No audio needed, screen-only capture
                 mediaStream = await navigator.mediaDevices.getDisplayMedia({
                     video: {
                         frameRate: 1,
@@ -366,7 +380,7 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
             }
 
             // Additionally get microphone input for Linux based on audio mode
-            if (audioMode === 'mic_only' || audioMode === 'both') {
+            if (aiHearingEnabled && (audioMode === 'mic_only' || audioMode === 'both')) {
                 let micStream = null;
                 try {
                     micStream = await navigator.mediaDevices.getUserMedia({
@@ -393,27 +407,40 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
             console.log('Linux capture started - system audio:', mediaStream.getAudioTracks().length > 0, 'microphone mode:', audioMode);
         } else {
             // Windows - use display media with loopback for system audio
-            mediaStream = await navigator.mediaDevices.getDisplayMedia({
-                video: {
-                    frameRate: 1,
-                    width: { ideal: 1920 },
-                    height: { ideal: 1080 },
-                },
-                audio: {
-                    sampleRate: SAMPLE_RATE,
-                    channelCount: 1,
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true,
-                },
-            });
+            if (aiHearingEnabled) {
+                mediaStream = await navigator.mediaDevices.getDisplayMedia({
+                    video: {
+                        frameRate: 1,
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 },
+                    },
+                    audio: {
+                        sampleRate: SAMPLE_RATE,
+                        channelCount: 1,
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true,
+                    },
+                });
 
-            console.log('Windows capture started with loopback audio');
+                console.log('Windows capture started with loopback audio');
 
-            // Setup audio processing for Windows loopback audio only
-            setupWindowsLoopbackProcessing();
+                // Setup audio processing for Windows loopback audio only
+                setupWindowsLoopbackProcessing();
+            } else {
+                mediaStream = await navigator.mediaDevices.getDisplayMedia({
+                    video: {
+                        frameRate: 1,
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 },
+                    },
+                    audio: false,
+                });
 
-            if (audioMode === 'mic_only' || audioMode === 'both') {
+                console.log('Windows capture started without audio (AI hearing disabled)');
+            }
+
+            if (aiHearingEnabled && (audioMode === 'mic_only' || audioMode === 'both')) {
                 let micStream = null;
                 try {
                     micStream = await navigator.mediaDevices.getUserMedia({
@@ -1161,9 +1188,19 @@ const cheatingDaddy = {
 // Make it globally available
 window.cheatingDaddy = cheatingDaddy;
 
+// Apply persisted font size CSS variable on load
+async function applyPersistedFontSize() {
+    try {
+        const prefs = await storage.getPreferences();
+        const fontSize = typeof prefs.fontSize === 'number' ? prefs.fontSize : 20;
+        document.documentElement.style.setProperty('--response-font-size', `${fontSize}px`);
+    } catch (_) {}
+}
+
 // Load theme after DOM is ready
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => theme.load());
+    document.addEventListener('DOMContentLoaded', () => { theme.load(); applyPersistedFontSize(); });
 } else {
     theme.load();
+    applyPersistedFontSize();
 }

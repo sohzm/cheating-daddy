@@ -34,7 +34,7 @@ const DEFAULT_PREFERENCES = {
     selectedImageQuality: 'medium',
     advancedMode: false,
     audioMode: 'speaker_only',
-    fontSize: 'medium',
+    fontSize: 20,
     backgroundTransparency: 0.8,
     googleSearchEnabled: false,
     ollamaHost: 'http://127.0.0.1:11434',

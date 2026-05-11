@@ -261,7 +261,7 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
     tryRegister('fontSizeUp', keybinds.fontSizeUp, () => {
         const prefs = storage.getPreferences();
         let fontSize = parseInt(prefs.fontSize, 10);
-        if (isNaN(fontSize)) fontSize = 16;
+        if (isNaN(fontSize)) fontSize = 20;
         const newSize = Math.min(48, fontSize + 1);
         storage.updatePreference('fontSize', newSize);
         sendToRenderer('font-size-changed', newSize);
@@ -270,13 +270,17 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
     tryRegister('fontSizeDown', keybinds.fontSizeDown, () => {
         const prefs = storage.getPreferences();
         let fontSize = parseInt(prefs.fontSize, 10);
-        if (isNaN(fontSize)) fontSize = 16;
+        if (isNaN(fontSize)) fontSize = 20;
         const newSize = Math.max(8, fontSize - 1);
         storage.updatePreference('fontSize', newSize);
         sendToRenderer('font-size-changed', newSize);
     });
 
     tryRegister('aiModeToggle', keybinds.aiModeToggle, () => {
+        if (geminiSessionRef && geminiSessionRef.current) {
+            sendToRenderer('ai-mode-toggle-blocked');
+            return;
+        }
         const prefs = storage.getPreferences();
         const current = prefs.providerMode || 'byok';
         const newMode = current === 'byok' ? 'local' : 'byok';
