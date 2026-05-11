@@ -268,6 +268,32 @@ export class MainView extends LitElement {
             font-family: var(--font-mono);
         }
 
+        /* ── Checkbox ── */
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+            padding: 4px 0;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--accent);
+            cursor: pointer;
+            margin: 0;
+            padding: 0;
+            border: 1px solid var(--border);
+            border-radius: 3px;
+        }
+
+        .checkbox-group label {
+            font-size: var(--font-size-sm);
+            color: var(--text-secondary);
+            cursor: pointer;
+        }
+
         /* ── Divider ── */
 
         .divider {
@@ -499,6 +525,8 @@ export class MainView extends LitElement {
         _ollamaModel: { state: true },
         _whisperModel: { state: true },
         _showLocalHelp: { state: true },
+        // AI Hearing
+        _aiHearingEnabled: { state: true },
     };
 
     constructor() {
@@ -521,6 +549,7 @@ export class MainView extends LitElement {
         this._ollamaHost = 'http://127.0.0.1:11434';
         this._ollamaModel = 'llama3.1';
         this._whisperModel = 'Xenova/whisper-small';
+        this._aiHearingEnabled = false;
 
         this._animId = null;
         this._time = 0;
@@ -555,6 +584,9 @@ export class MainView extends LitElement {
             this._ollamaHost = prefs.ollamaHost || 'http://127.0.0.1:11434';
             this._ollamaModel = prefs.ollamaModel || 'llama3.1';
             this._whisperModel = prefs.whisperModel || 'Xenova/whisper-small';
+
+            // Load AI Hearing preference
+            this._aiHearingEnabled = prefs.aiHearingEnabled || false;
 
             this.requestUpdate();
         } catch (e) {
@@ -747,6 +779,12 @@ export class MainView extends LitElement {
         this.onProfileChange(e.target.value);
     }
 
+    async _saveAiHearing(val) {
+        this._aiHearingEnabled = val;
+        await cheatingDaddy.storage.updatePreference('aiHearingEnabled', val);
+        this.requestUpdate();
+    }
+
     // ── Start ──
 
     _handleStart() {
@@ -847,6 +885,16 @@ export class MainView extends LitElement {
                 </div>
             </div>
 
+            <div class="checkbox-group">
+                <input
+                    type="checkbox"
+                    id="ai-hearing-byok"
+                    .checked=${this._aiHearingEnabled}
+                    @change=${e => this._saveAiHearing(e.target.checked)}
+                />
+                <label for="ai-hearing-byok">Enable AI Hearing</label>
+            </div>
+
             ${this._renderStartButton()}
             ${this._renderDivider()}
 
@@ -899,6 +947,16 @@ export class MainView extends LitElement {
                     <option value="Xenova/whisper-medium" ?selected=${this._whisperModel === 'Xenova/whisper-medium'}>Medium (most accurate, slowest)</option>
                 </select>
                 <div class="form-hint">${this.whisperDownloading ? 'Downloading model...' : 'Downloaded automatically on first use'}</div>
+            </div>
+
+            <div class="checkbox-group">
+                <input
+                    type="checkbox"
+                    id="ai-hearing-local"
+                    .checked=${this._aiHearingEnabled}
+                    @change=${e => this._saveAiHearing(e.target.checked)}
+                />
+                <label for="ai-hearing-local">Enable AI Hearing</label>
             </div>
 
             ${this._renderStartButton()}

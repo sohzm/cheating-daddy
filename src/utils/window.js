@@ -45,6 +45,11 @@ function getDefaultKeybinds() {
         // ── Dev ──
         reloadApp:          isMac ? 'Cmd+Shift+R'    : 'Ctrl+Shift+R',
         devRefresh:         isMac ? 'Cmd+Shift+E'    : 'Ctrl+Shift+E',
+        // ── Global Controls ──
+        themeToggle:        isMac ? 'Cmd+Shift+T'    : 'Ctrl+Shift+T',
+        fontSizeUp:         isMac ? 'Cmd+Shift+)'    : 'Ctrl+Shift+)',
+        fontSizeDown:       isMac ? 'Cmd+Shift+('    : 'Ctrl+Shift+(',
+        aiModeToggle:       isMac ? 'Cmd+Shift+U'    : 'Ctrl+Shift+U',
     };
 }
 
@@ -247,6 +252,37 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
             app.exit(0);
         });
     }
+
+    // ── Global Controls ──
+    tryRegister('themeToggle', keybinds.themeToggle, () => {
+        sendToRenderer('theme-toggled');
+    });
+
+    tryRegister('fontSizeUp', keybinds.fontSizeUp, () => {
+        const prefs = storage.getPreferences();
+        let fontSize = parseInt(prefs.fontSize, 10);
+        if (isNaN(fontSize)) fontSize = 16;
+        const newSize = Math.min(48, fontSize + 1);
+        storage.updatePreference('fontSize', newSize);
+        sendToRenderer('font-size-changed', newSize);
+    });
+
+    tryRegister('fontSizeDown', keybinds.fontSizeDown, () => {
+        const prefs = storage.getPreferences();
+        let fontSize = parseInt(prefs.fontSize, 10);
+        if (isNaN(fontSize)) fontSize = 16;
+        const newSize = Math.max(8, fontSize - 1);
+        storage.updatePreference('fontSize', newSize);
+        sendToRenderer('font-size-changed', newSize);
+    });
+
+    tryRegister('aiModeToggle', keybinds.aiModeToggle, () => {
+        const prefs = storage.getPreferences();
+        const current = prefs.providerMode || 'byok';
+        const newMode = current === 'byok' ? 'local' : 'byok';
+        storage.updatePreference('providerMode', newMode);
+        sendToRenderer('ai-mode-toggled', newMode);
+    });
 }
 
 // ──────────────────────────────────────────────────────────────

@@ -146,6 +146,10 @@ const windowControls = {
             toggleVoice:        isMac ? 'Cmd+Shift+L'   : 'Ctrl+Shift+L',
             reloadApp:          isMac ? 'Cmd+Shift+R'   : 'Ctrl+Shift+R',
             devRefresh:         isMac ? 'Cmd+Shift+E'   : 'Ctrl+Shift+E',
+            themeToggle:        isMac ? 'Cmd+Shift+T'   : 'Ctrl+Shift+T',
+            fontSizeUp:         isMac ? 'Cmd+Shift+)'   : 'Ctrl+Shift+)',
+            fontSizeDown:       isMac ? 'Cmd+Shift+('   : 'Ctrl+Shift+(',
+            aiModeToggle:       isMac ? 'Cmd+Shift+U'   : 'Ctrl+Shift+U',
         };
     },
     // Subscribe to state change events. Returns an unsubscribe function.
@@ -1085,6 +1089,27 @@ const theme = {
         this.apply(themeName);
     }
 };
+
+// ============ HOTKEY IPC LISTENERS ============
+
+ipcRenderer.on('theme-toggled', () => {
+    const themeNames = Object.keys(theme.themes);
+    const currentIdx = themeNames.indexOf(theme.current);
+    const nextIdx = (currentIdx + 1) % themeNames.length;
+    const next = currentIdx === -1 ? 'light' : themeNames[nextIdx];
+    theme.save(next);
+});
+
+ipcRenderer.on('font-size-changed', (_, newSize) => {
+    document.documentElement.style.setProperty('--response-font-size', `${newSize}px`);
+});
+
+ipcRenderer.on('ai-mode-toggled', (_, newMode) => {
+    const app = document.querySelector('cheating-daddy-app');
+    if (app) {
+        app.dispatchEvent(new CustomEvent('ai-mode-changed', { detail: { mode: newMode } }));
+    }
+});
 
 // Consolidated cheatingDaddy object - all functions in one place
 const cheatingDaddy = {

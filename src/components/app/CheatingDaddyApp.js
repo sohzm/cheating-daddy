@@ -365,6 +365,7 @@ export class CheatingDaddyApp extends LitElement {
         _storageLoaded: { state: true },
         _updateAvailable: { state: true },
         _whisperDownloading: { state: true },
+        _aiMode: { state: true },
     };
 
     constructor() {
@@ -391,6 +392,7 @@ export class CheatingDaddyApp extends LitElement {
         this._updateAvailable = false;
         this._whisperDownloading = false;
         this._localVersion = '';
+        this._aiMode = 'byok';
 
         this._loadFromStorage();
         this._checkForUpdates();
@@ -432,6 +434,7 @@ export class CheatingDaddyApp extends LitElement {
             this.selectedScreenshotInterval = prefs.selectedScreenshotInterval || '5';
             this.selectedImageQuality = prefs.selectedImageQuality || 'medium';
             this.layoutMode = config.layout || 'normal';
+            this._aiMode = prefs.providerMode || 'byok';
 
             this._storageLoaded = true;
             this.requestUpdate();
@@ -444,6 +447,13 @@ export class CheatingDaddyApp extends LitElement {
 
     connectedCallback() {
         super.connectedCallback();
+
+        // Listen for AI mode changes from hotkey
+        this._aiModeHandler = (e) => {
+            this._aiMode = e.detail.mode;
+            this.requestUpdate();
+        };
+        this.addEventListener('ai-mode-changed', this._aiModeHandler);
 
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
@@ -459,6 +469,7 @@ export class CheatingDaddyApp extends LitElement {
     disconnectedCallback() {
         super.disconnectedCallback();
         this._stopTimer();
+        this.removeEventListener('ai-mode-changed', this._aiModeHandler);
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
             ipcRenderer.removeAllListeners('new-response');
@@ -569,6 +580,7 @@ export class CheatingDaddyApp extends LitElement {
     async handleStart() {
         const prefs = await cheatingDaddy.storage.getPreferences();
         const providerMode = prefs.providerMode === 'cloud' ? 'byok' : (prefs.providerMode || 'byok');
+        const aiHearingEnabled = prefs.aiHearingEnabled || false;
 
         if (providerMode === 'cloud') {
             const creds = await cheatingDaddy.storage.getCredentials();
@@ -615,6 +627,7 @@ export class CheatingDaddyApp extends LitElement {
         this.currentResponseIndex = -1;
         this.startTime = Date.now();
         this.sessionActive = true;
+        this._aiMode = providerMode;
         this.currentView = 'assistant';
         this._startTimer();
     }
@@ -856,6 +869,7 @@ export class CheatingDaddyApp extends LitElement {
                 </div>
                 <div class="live-bar-right">
                     ${this.statusText ? html`<span class="live-bar-text">${this.statusText}</span>` : ''}
+                    <span class="live-bar-text">${this._aiMode === 'local' ? 'Local' : 'Online'}</span>
                     <span class="live-bar-text">${this.getElapsedTime()}</span>
                     ${this._isClickThrough ? html`<span class="live-bar-text">[click through]</span>` : ''}
                     <span class="live-bar-text clickable" @click=${() => this.handleHideToggle()}>[hide]</span>

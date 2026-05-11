@@ -66,6 +66,17 @@ const HOTKEY_GROUPS = [
             { id: 'devRefresh',  label: 'Full Restart', desc: 'Relaunch the entire app',            toggle: 'reloadEnabled' },
         ],
     },
+    {
+        id: 'global',
+        label: 'Global Controls',
+        icon: '\uD83C\uDF10',
+        actions: [
+            { id: 'themeToggle',   label: 'Toggle Theme',    desc: 'Cycle through available themes',        toggle: null },
+            { id: 'fontSizeUp',    label: 'Font Size +',     desc: 'Increase app font size',                toggle: null },
+            { id: 'fontSizeDown',  label: 'Font Size -',     desc: 'Decrease app font size',                toggle: null },
+            { id: 'aiModeToggle',  label: 'Toggle AI Mode',  desc: 'Switch between Local/Online AI',        toggle: null },
+        ],
+    },
 ];
 
 export class HotkeysView extends LitElement {
