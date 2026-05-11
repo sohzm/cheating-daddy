@@ -1125,6 +1125,29 @@ ipcRenderer.on('font-size-changed', (_, newSize) => {
     document.documentElement.style.setProperty('--response-font-size', `${newSize}px`);
 });
 
+// Font opacity: changes text color alpha only (Ctrl+[ / Ctrl+])
+ipcRenderer.on('font-opacity-change', (_, delta) => {
+    const root = document.documentElement;
+    const current = parseFloat(root.style.getPropertyValue('--font-opacity') || '1');
+    const next = Math.max(0.1, Math.min(1.0, parseFloat((current + delta).toFixed(2))));
+    root.style.setProperty('--font-opacity', next);
+    // Apply to text color via CSS variable
+    root.style.setProperty('--text-primary', `rgba(245, 245, 245, ${next})`);
+    root.style.setProperty('--text-secondary', `rgba(153, 153, 153, ${next})`);
+});
+
+// Background opacity: changes background alpha only (Ctrl+Shift+[ / Ctrl+Shift+])
+ipcRenderer.on('bg-opacity-change', (_, delta) => {
+    const root = document.documentElement;
+    const current = parseFloat(root.style.getPropertyValue('--bg-opacity') || '1');
+    const next = Math.max(0.05, Math.min(1.0, parseFloat((current + delta).toFixed(2))));
+    root.style.setProperty('--bg-opacity', next);
+    // Apply to background colors via CSS variable with alpha
+    root.style.setProperty('--bg-app', `rgba(10, 10, 10, ${next})`);
+    root.style.setProperty('--bg-surface', `rgba(17, 17, 17, ${next})`);
+    root.style.setProperty('--bg-elevated', `rgba(25, 25, 25, ${next})`);
+});
+
 ipcRenderer.on('ai-mode-toggled', (_, newMode) => {
     const app = document.querySelector('cheating-daddy-app');
     if (app) {
