@@ -106,61 +106,94 @@ const storage = {
     async getTodayLimits() {
         const result = await ipcRenderer.invoke('storage:get-today-limits');
         return result.success ? result.data : { flash: { count: 0 }, flashLite: { count: 0 } };
-    }
+    },
 };
 
 // ============ WINDOW CONTROLS API ============
 // Wraps all window:* IPC channels for use from components
 
 const windowControls = {
-    async getState()              { const r = await ipcRenderer.invoke('window:get-state');           return r; },
-    async setState(patch)         { return ipcRenderer.invoke('window:set-state', patch); },
-    async setScale(v)             { return ipcRenderer.invoke('window:set-scale', v); },
-    async setZoom(v)              { return ipcRenderer.invoke('window:set-zoom', v); },
-    async setOpacity(v)           { return ipcRenderer.invoke('window:set-opacity', v); },
-    async setVoice(enabled)       { return ipcRenderer.invoke('window:set-voice', enabled); },
-    async updateKeybinds(kb)      { return ipcRenderer.invoke('window:update-keybinds', kb); },
-    async resetKeybinds()         { return ipcRenderer.invoke('window:reset-keybinds'); },
-    async getDefaultKeybinds()    {
+    async getState() {
+        const r = await ipcRenderer.invoke('window:get-state');
+        return r;
+    },
+    async setState(patch) {
+        return ipcRenderer.invoke('window:set-state', patch);
+    },
+    async setScale(v) {
+        return ipcRenderer.invoke('window:set-scale', v);
+    },
+    async setZoom(v) {
+        return ipcRenderer.invoke('window:set-zoom', v);
+    },
+    async setOpacity(v) {
+        return ipcRenderer.invoke('window:set-opacity', v);
+    },
+    async setVoice(enabled) {
+        return ipcRenderer.invoke('window:set-voice', enabled);
+    },
+    async updateKeybinds(kb) {
+        return ipcRenderer.invoke('window:update-keybinds', kb);
+    },
+    async resetKeybinds() {
+        return ipcRenderer.invoke('window:reset-keybinds');
+    },
+    async getDefaultKeybinds() {
         // Derive defaults from current platform in renderer
         const isMac = isMacOS;
         return {
-            moveUp:             isMac ? 'Alt+Up'        : 'Ctrl+Up',
-            moveDown:           isMac ? 'Alt+Down'      : 'Ctrl+Down',
-            moveLeft:           isMac ? 'Alt+Left'      : 'Ctrl+Left',
-            moveRight:          isMac ? 'Alt+Right'     : 'Ctrl+Right',
-            toggleVisibility:   isMac ? 'Cmd+\\'        : 'Ctrl+\\',
-            toggleClickThrough: isMac ? 'Cmd+M'         : 'Ctrl+M',
-            scaleUp:            isMac ? 'Cmd+Shift+='   : 'Ctrl+Shift+=',
-            scaleDown:          isMac ? 'Cmd+Shift+-'   : 'Ctrl+Shift+-',
-            zoomIn:             isMac ? 'Cmd+='         : 'Ctrl+=',
-            zoomOut:            isMac ? 'Cmd+-'         : 'Ctrl+-',
-            zoomReset:          isMac ? 'Cmd+0'         : 'Ctrl+0',
-            opacityUp:          isMac ? 'Cmd+Shift+]'   : 'Ctrl+Shift+]',
-            opacityDown:        isMac ? 'Cmd+Shift+['   : 'Ctrl+Shift+[',
-            nextStep:           isMac ? 'Cmd+Enter'     : 'Ctrl+Enter',
-            previousResponse:   isMac ? 'Cmd+Shift+Left'  : 'Ctrl+Shift+Left',
-            nextResponse:       isMac ? 'Cmd+Shift+Right' : 'Ctrl+Shift+Right',
-            scrollUp:           isMac ? 'Cmd+['           : 'Ctrl+[',
-            scrollDown:         isMac ? 'Cmd+]'           : 'Ctrl+]',
-            toggleVoice:        isMac ? 'Cmd+Shift+L'   : 'Ctrl+Shift+L',
-            reloadApp:          isMac ? 'Cmd+Shift+R'   : 'Ctrl+Shift+R',
-            devRefresh:         isMac ? 'Cmd+Shift+E'   : 'Ctrl+Shift+E',
-            themeToggle:        isMac ? 'Cmd+Shift+T'   : 'Ctrl+Shift+T',
-            fontSizeUp:         isMac ? 'Cmd+Shift+0'   : 'Ctrl+Shift+0',
-            fontSizeDown:       isMac ? 'Cmd+Shift+9'   : 'Ctrl+Shift+9',
-            aiModeToggle:       isMac ? 'Cmd+Shift+U'   : 'Ctrl+Shift+U',
-            emergencyQuit:      isMac ? 'Cmd+Q'         : 'Ctrl+Q',
-            debugToggle:        'Alt+D',
-            cycleSolutionModel: isMac ? 'Cmd+Y'        : 'Ctrl+Y',
-            cycleExtractionModel: isMac ? "Cmd+'"      : "Ctrl+'",
+            moveUp: isMac ? 'Alt+Up' : 'Ctrl+Up',
+            moveDown: isMac ? 'Alt+Down' : 'Ctrl+Down',
+            moveLeft: isMac ? 'Alt+Left' : 'Ctrl+Left',
+            moveRight: isMac ? 'Alt+Right' : 'Ctrl+Right',
+            toggleVisibility: isMac ? 'Cmd+\\' : 'Ctrl+\\',
+            toggleClickThrough: isMac ? 'Cmd+M' : 'Ctrl+M',
+            scaleUp: isMac ? 'Cmd+Shift+=' : 'Ctrl+Shift+=',
+            scaleDown: isMac ? 'Cmd+Shift+-' : 'Ctrl+Shift+-',
+            zoomIn: isMac ? 'Cmd+=' : 'Ctrl+=',
+            zoomOut: isMac ? 'Cmd+-' : 'Ctrl+-',
+            zoomReset: isMac ? 'Cmd+0' : 'Ctrl+0',
+            opacityUp: isMac ? 'Cmd+Shift+]' : 'Ctrl+Shift+]',
+            opacityDown: isMac ? 'Cmd+Shift+[' : 'Ctrl+Shift+[',
+            nextStep: isMac ? 'Cmd+Enter' : 'Ctrl+Enter',
+            previousResponse: isMac ? 'Cmd+Shift+Left' : 'Ctrl+Shift+Left',
+            nextResponse: isMac ? 'Cmd+Shift+Right' : 'Ctrl+Shift+Right',
+            scrollUp: isMac ? 'Cmd+[' : 'Ctrl+[',
+            scrollDown: isMac ? 'Cmd+]' : 'Ctrl+]',
+            toggleVoice: isMac ? 'Cmd+Shift+L' : 'Ctrl+Shift+L',
+            reloadApp: isMac ? 'Cmd+Shift+R' : 'Ctrl+Shift+R',
+            devRefresh: isMac ? 'Cmd+Shift+E' : 'Ctrl+Shift+E',
+            themeToggle: isMac ? 'Cmd+Shift+T' : 'Ctrl+Shift+T',
+            fontSizeUp: isMac ? 'Cmd+Shift+0' : 'Ctrl+Shift+0',
+            fontSizeDown: isMac ? 'Cmd+Shift+9' : 'Ctrl+Shift+9',
+            aiModeToggle: isMac ? 'Cmd+Shift+U' : 'Ctrl+Shift+U',
+            emergencyQuit: isMac ? 'Cmd+Q' : 'Ctrl+Q',
+            debugToggle: 'Alt+D',
+            cycleSolutionModel: isMac ? 'Cmd+Y' : 'Ctrl+Y',
+            cycleExtractionModel: isMac ? "Cmd+'" : "Ctrl+'",
         };
     },
     // Subscribe to state change events. Returns an unsubscribe function.
-    onScaleChanged(fn)   { const l = (_, v) => fn(v); ipcRenderer.on('scale-changed',   l); return () => ipcRenderer.removeListener('scale-changed',   l); },
-    onZoomChanged(fn)    { const l = (_, v) => fn(v); ipcRenderer.on('zoom-changed',    l); return () => ipcRenderer.removeListener('zoom-changed',    l); },
-    onOpacityChanged(fn) { const l = (_, v) => fn(v); ipcRenderer.on('opacity-changed', l); return () => ipcRenderer.removeListener('opacity-changed', l); },
-    onVoiceToggled(fn)   { const l = (_, v) => fn(v); ipcRenderer.on('voice-toggled',   l); return () => ipcRenderer.removeListener('voice-toggled',   l); },
+    onScaleChanged(fn) {
+        const l = (_, v) => fn(v);
+        ipcRenderer.on('scale-changed', l);
+        return () => ipcRenderer.removeListener('scale-changed', l);
+    },
+    onZoomChanged(fn) {
+        const l = (_, v) => fn(v);
+        ipcRenderer.on('zoom-changed', l);
+        return () => ipcRenderer.removeListener('zoom-changed', l);
+    },
+    onOpacityChanged(fn) {
+        const l = (_, v) => fn(v);
+        ipcRenderer.on('opacity-changed', l);
+        return () => ipcRenderer.removeListener('opacity-changed', l);
+    },
+    onVoiceToggled(fn) {
+        const l = (_, v) => fn(v);
+        ipcRenderer.on('voice-toggled', l);
+        return () => ipcRenderer.removeListener('voice-toggled', l);
+    },
 };
 
 // ============ API KEYS API ============
@@ -193,7 +226,7 @@ const apiKeys = {
         const listener = (_event, payload) => handler(payload);
         ipcRenderer.on('api-keys:updated', listener);
         return () => ipcRenderer.removeListener('api-keys:updated', listener);
-    }
+    },
 };
 
 // Cache for preferences to avoid async calls in hot paths
@@ -855,7 +888,7 @@ ipcRenderer.on('save-session-context', async (event, data) => {
     try {
         await storage.saveSession(data.sessionId, {
             profile: data.profile,
-            customPrompt: data.customPrompt
+            customPrompt: data.customPrompt,
         });
         console.log('Session context saved:', data.sessionId, 'profile:', data.profile);
     } catch (error) {
@@ -869,7 +902,7 @@ ipcRenderer.on('save-screen-analysis', async (event, data) => {
         await storage.saveSession(data.sessionId, {
             screenAnalysisHistory: data.fullHistory,
             profile: data.profile,
-            customPrompt: data.customPrompt
+            customPrompt: data.customPrompt,
         });
         console.log('Screen analysis saved:', data.sessionId);
     } catch (error) {
@@ -907,75 +940,31 @@ const theme = {
     themes: {
         dark: {
             background: '#101010',
-            text: '#e0e0e0', textSecondary: '#a0a0a0', textMuted: '#6b6b6b',
-            border: '#2a2a2a', accent: '#ffffff',
-            btnPrimaryBg: '#ffffff', btnPrimaryText: '#000000', btnPrimaryHover: '#e0e0e0',
-            tooltipBg: '#1a1a1a', tooltipText: '#ffffff',
-            keyBg: 'rgba(255,255,255,0.1)'
+            text: '#e0e0e0',
+            textSecondary: '#a0a0a0',
+            textMuted: '#6b6b6b',
+            border: '#2a2a2a',
+            accent: '#ffffff',
+            btnPrimaryBg: '#ffffff',
+            btnPrimaryText: '#000000',
+            btnPrimaryHover: '#e0e0e0',
+            tooltipBg: '#1a1a1a',
+            tooltipText: '#ffffff',
+            keyBg: 'rgba(255,255,255,0.1)',
         },
         light: {
             background: '#ffffff',
-            text: '#1a1a1a', textSecondary: '#555555', textMuted: '#888888',
-            border: '#e0e0e0', accent: '#000000',
-            btnPrimaryBg: '#1a1a1a', btnPrimaryText: '#ffffff', btnPrimaryHover: '#333333',
-            tooltipBg: '#1a1a1a', tooltipText: '#ffffff',
-            keyBg: 'rgba(0,0,0,0.1)'
-        },
-        midnight: {
-            background: '#0d1117',
-            text: '#c9d1d9', textSecondary: '#8b949e', textMuted: '#6e7681',
-            border: '#30363d', accent: '#58a6ff',
-            btnPrimaryBg: '#58a6ff', btnPrimaryText: '#0d1117', btnPrimaryHover: '#79b8ff',
-            tooltipBg: '#161b22', tooltipText: '#c9d1d9',
-            keyBg: 'rgba(88,166,255,0.15)'
-        },
-        sepia: {
-            background: '#f4ecd8',
-            text: '#5c4b37', textSecondary: '#7a6a56', textMuted: '#998875',
-            border: '#d4c8b0', accent: '#8b4513',
-            btnPrimaryBg: '#5c4b37', btnPrimaryText: '#f4ecd8', btnPrimaryHover: '#7a6a56',
-            tooltipBg: '#5c4b37', tooltipText: '#f4ecd8',
-            keyBg: 'rgba(92,75,55,0.15)'
-        },
-        catppuccin: {
-            background: '#1e1e2e',
-            text: '#cdd6f4', textSecondary: '#a6adc8', textMuted: '#585b70',
-            border: '#313244', accent: '#cba6f7',
-            btnPrimaryBg: '#cba6f7', btnPrimaryText: '#1e1e2e', btnPrimaryHover: '#b4befe',
-            tooltipBg: '#313244', tooltipText: '#cdd6f4',
-            keyBg: 'rgba(203,166,247,0.12)'
-        },
-        gruvbox: {
-            background: '#1d2021',
-            text: '#ebdbb2', textSecondary: '#a89984', textMuted: '#665c54',
-            border: '#3c3836', accent: '#fe8019',
-            btnPrimaryBg: '#fe8019', btnPrimaryText: '#1d2021', btnPrimaryHover: '#fabd2f',
-            tooltipBg: '#3c3836', tooltipText: '#ebdbb2',
-            keyBg: 'rgba(254,128,25,0.12)'
-        },
-        rosepine: {
-            background: '#191724',
-            text: '#e0def4', textSecondary: '#908caa', textMuted: '#6e6a86',
-            border: '#26233a', accent: '#ebbcba',
-            btnPrimaryBg: '#ebbcba', btnPrimaryText: '#191724', btnPrimaryHover: '#f6c177',
-            tooltipBg: '#26233a', tooltipText: '#e0def4',
-            keyBg: 'rgba(235,188,186,0.12)'
-        },
-        solarized: {
-            background: '#002b36',
-            text: '#93a1a1', textSecondary: '#839496', textMuted: '#586e75',
-            border: '#073642', accent: '#2aa198',
-            btnPrimaryBg: '#2aa198', btnPrimaryText: '#002b36', btnPrimaryHover: '#268bd2',
-            tooltipBg: '#073642', tooltipText: '#93a1a1',
-            keyBg: 'rgba(42,161,152,0.12)'
-        },
-        tokyonight: {
-            background: '#1a1b26',
-            text: '#c0caf5', textSecondary: '#9aa5ce', textMuted: '#565f89',
-            border: '#292e42', accent: '#7aa2f7',
-            btnPrimaryBg: '#7aa2f7', btnPrimaryText: '#1a1b26', btnPrimaryHover: '#bb9af7',
-            tooltipBg: '#292e42', tooltipText: '#c0caf5',
-            keyBg: 'rgba(122,162,247,0.12)'
+            text: '#1a1a1a',
+            textSecondary: '#555555',
+            textMuted: '#888888',
+            border: '#e0e0e0',
+            accent: '#000000',
+            btnPrimaryBg: '#1a1a1a',
+            btnPrimaryText: '#ffffff',
+            btnPrimaryHover: '#333333',
+            tooltipBg: '#1a1a1a',
+            tooltipText: '#ffffff',
+            keyBg: 'rgba(0,0,0,0.1)',
         },
     },
 
@@ -989,35 +978,30 @@ const theme = {
         const names = {
             dark: 'Dark',
             light: 'Light',
-            midnight: 'Midnight Blue',
-            sepia: 'Sepia',
-            catppuccin: 'Catppuccin Mocha',
-            gruvbox: 'Gruvbox Dark',
-            rosepine: 'Ros\u00e9 Pine',
-            solarized: 'Solarized Dark',
-            tokyonight: 'Tokyo Night'
         };
         return Object.keys(this.themes).map(key => ({
             value: key,
             name: names[key] || key,
-            colors: this.themes[key]
+            colors: this.themes[key],
         }));
     },
 
     hexToRgb(hex) {
         const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-        return result ? {
-            r: parseInt(result[1], 16),
-            g: parseInt(result[2], 16),
-            b: parseInt(result[3], 16)
-        } : { r: 30, g: 30, b: 30 };
+        return result
+            ? {
+                  r: parseInt(result[1], 16),
+                  g: parseInt(result[2], 16),
+                  b: parseInt(result[3], 16),
+              }
+            : { r: 30, g: 30, b: 30 };
     },
 
     lightenColor(rgb, amount) {
         return {
             r: Math.min(255, rgb.r + amount),
             g: Math.min(255, rgb.g + amount),
-            b: Math.min(255, rgb.b + amount)
+            b: Math.min(255, rgb.b + amount),
         };
     },
 
@@ -1025,7 +1009,7 @@ const theme = {
         return {
             r: Math.max(0, rgb.r - amount),
             g: Math.max(0, rgb.g - amount),
-            b: Math.max(0, rgb.b - amount)
+            b: Math.max(0, rgb.b - amount),
         };
     },
 
@@ -1121,16 +1105,13 @@ const theme = {
     async save(themeName) {
         await storage.updatePreference('theme', themeName);
         this.apply(themeName);
-    }
+    },
 };
 
 // ============ HOTKEY IPC LISTENERS ============
 
 ipcRenderer.on('theme-toggled', () => {
-    const themeNames = Object.keys(theme.themes);
-    const currentIdx = themeNames.indexOf(theme.current);
-    const nextIdx = (currentIdx + 1) % themeNames.length;
-    const next = currentIdx === -1 ? 'light' : themeNames[nextIdx];
+    const next = theme.current === 'dark' ? 'light' : 'dark';
     theme.save(next);
 });
 
@@ -1220,7 +1201,10 @@ async function applyPersistedFontSize() {
 
 // Load theme after DOM is ready
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => { theme.load(); applyPersistedFontSize(); });
+    document.addEventListener('DOMContentLoaded', () => {
+        theme.load();
+        applyPersistedFontSize();
+    });
 } else {
     theme.load();
     applyPersistedFontSize();
