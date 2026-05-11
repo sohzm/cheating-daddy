@@ -102,6 +102,7 @@ function createWindow(sendToRenderer, geminiSessionRef) {
         transparent: true,
         hasShadow: false,
         alwaysOnTop: true,
+        paintWhenInitiallyHidden: false,
         opacity: winState.opacity ?? 1.0,
         webPreferences: {
             nodeIntegration: true,
@@ -146,6 +147,7 @@ function createWindow(sendToRenderer, geminiSessionRef) {
     }
 
     mainWindow.loadFile(path.join(__dirname, '../index.html'));
+    mainWindow.webContents.setFrameRate(60);
 
     // Apply persisted zoom after DOM ready
     mainWindow.webContents.once('dom-ready', () => {

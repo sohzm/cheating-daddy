@@ -43,10 +43,10 @@ if (!gotTheLock) {
         setupApiKeysIpcHandlers();
         setupGeneralIpcHandlers();
 
-        // Defer background key validation to avoid competing with window rendering
+        // Defer validation to avoid competing with initial render and GPU setup
         setTimeout(() => {
             apiKeys.startBackgroundValidation();
-        }, 3000);
+        }, 8000);
     });
 
     app.on('window-all-closed', () => {

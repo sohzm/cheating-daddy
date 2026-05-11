@@ -429,7 +429,7 @@ export class CheatingDaddyApp extends LitElement {
         this._modelDebugging = 'gemini-2.5-flash';
 
         this._loadFromStorage();
-        this._checkForUpdates();
+        setTimeout(() => this._checkForUpdates(), 10000);
     }
 
     async _checkForUpdates() {
@@ -509,16 +509,23 @@ export class CheatingDaddyApp extends LitElement {
 
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
-            ipcRenderer.on('new-response', (_, response) => this.addNewResponse(response));
-            ipcRenderer.on('update-response', (_, response) => this.updateCurrentResponse(response));
-            ipcRenderer.on('update-status', (_, status) => this.setStatus(status));
-            ipcRenderer.on('click-through-toggled', (_, isEnabled) => {
+            this._ipcNewResponse = (_, response) => this.addNewResponse(response);
+            this._ipcUpdateResponse = (_, response) => this.updateCurrentResponse(response);
+            this._ipcUpdateStatus = (_, status) => this.setStatus(status);
+            this._ipcClickThrough = (_, isEnabled) => {
                 this._isClickThrough = isEnabled;
-            });
-            ipcRenderer.on('reconnect-failed', (_, data) => this.addNewResponse(data.message));
-            ipcRenderer.on('whisper-downloading', (_, downloading) => {
+            };
+            this._ipcReconnectFailed = (_, data) => this.addNewResponse(data.message);
+            this._ipcWhisperDownloading = (_, downloading) => {
                 this._whisperDownloading = downloading;
-            });
+            };
+
+            ipcRenderer.on('new-response', this._ipcNewResponse);
+            ipcRenderer.on('update-response', this._ipcUpdateResponse);
+            ipcRenderer.on('update-status', this._ipcUpdateStatus);
+            ipcRenderer.on('click-through-toggled', this._ipcClickThrough);
+            ipcRenderer.on('reconnect-failed', this._ipcReconnectFailed);
+            ipcRenderer.on('whisper-downloading', this._ipcWhisperDownloading);
         }
     }
 
@@ -530,12 +537,12 @@ export class CheatingDaddyApp extends LitElement {
         this.removeEventListener('model-changed', this._modelChangeHandler);
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
-            ipcRenderer.removeAllListeners('new-response');
-            ipcRenderer.removeAllListeners('update-response');
-            ipcRenderer.removeAllListeners('update-status');
-            ipcRenderer.removeAllListeners('click-through-toggled');
-            ipcRenderer.removeAllListeners('reconnect-failed');
-            ipcRenderer.removeAllListeners('whisper-downloading');
+            ipcRenderer.removeListener('new-response', this._ipcNewResponse);
+            ipcRenderer.removeListener('update-response', this._ipcUpdateResponse);
+            ipcRenderer.removeListener('update-status', this._ipcUpdateStatus);
+            ipcRenderer.removeListener('click-through-toggled', this._ipcClickThrough);
+            ipcRenderer.removeListener('reconnect-failed', this._ipcReconnectFailed);
+            ipcRenderer.removeListener('whisper-downloading', this._ipcWhisperDownloading);
         }
     }
 

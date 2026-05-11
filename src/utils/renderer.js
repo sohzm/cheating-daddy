@@ -233,6 +233,12 @@ const apiKeys = {
 let preferencesCache = null;
 
 async function loadPreferencesCache() {
+    if (preferencesCache !== null) return preferencesCache;
+    preferencesCache = await storage.getPreferences();
+    return preferencesCache;
+}
+
+async function refreshPreferencesCache() {
     preferencesCache = await storage.getPreferences();
     return preferencesCache;
 }
@@ -626,7 +632,7 @@ async function captureScreenshot(imageQuality = 'medium', isManual = false) {
         offscreenCanvas = document.createElement('canvas');
         offscreenCanvas.width = hiddenVideo.videoWidth;
         offscreenCanvas.height = hiddenVideo.videoHeight;
-        offscreenContext = offscreenCanvas.getContext('2d');
+        offscreenContext = offscreenCanvas.getContext('2d', { willReadFrequently: true });
     }
 
     // Check if video is ready
@@ -728,7 +734,7 @@ async function captureManualScreenshot(imageQuality = null) {
         offscreenCanvas = document.createElement('canvas');
         offscreenCanvas.width = hiddenVideo.videoWidth;
         offscreenCanvas.height = hiddenVideo.videoHeight;
-        offscreenContext = offscreenCanvas.getContext('2d');
+        offscreenContext = offscreenCanvas.getContext('2d', { willReadFrequently: true });
     }
 
     // Check if video is ready
@@ -1180,7 +1186,7 @@ const cheatingDaddy = {
     theme,
 
     // Refresh preferences cache (call after updating preferences)
-    refreshPreferencesCache: loadPreferencesCache,
+    refreshPreferencesCache: refreshPreferencesCache,
 
     // Platform detection
     isLinux: isLinux,

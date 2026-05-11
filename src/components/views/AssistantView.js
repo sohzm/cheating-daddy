@@ -370,6 +370,8 @@ export class AssistantView extends LitElement {
     }
 
     wrapWordsInSpans(html) {
+        // Skip word wrapping for short responses - not noticeable and saves DOM parsing
+        if (html.length < 500) return html;
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, 'text/html');
         const tagsToSkip = ['PRE'];
