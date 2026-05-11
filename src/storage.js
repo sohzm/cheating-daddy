@@ -331,26 +331,16 @@ function getActiveProviderKey(provider) {
     // Does NOT migrate here to avoid recursion from getApiKey()/getGroqApiKey().
     const creds = readJsonFile(getCredentialsPath(), DEFAULT_CREDENTIALS);
     const pool = creds[_poolField(provider)] || [];
-    // Prefer explicit ready keys; surface exhausted keys whose cooldown has elapsed as ready candidates.
-    const now = Date.now();
-    const readyPool = pool.filter(k => {
-        if (k.state === 'ready' || k.state === 'unknown') return true;
-        if (k.state === 'exhausted' && k.exhaustedUntil && k.exhaustedUntil <= now) return true;
-        return false;
-    });
-    return readyPool[0] || null;
+    // Only return keys that are explicitly 'ready'. Never 'unknown', 'checking', 'exhausted', or 'invalid'.
+    return pool.find(k => k.state === 'ready') || null;
 }
 
 function listReadyProviderKeys(provider) {
-    // Used by rotation; returns raw key objects (not sanitized) in the order they should be tried.
+    // Used by rotation — ONLY returns state === 'ready' keys.
+    // 'unknown' and 'checking' are NOT ready for use; they must be validated first.
     const creds = _readCredentialsMigrated();
     const pool = creds[_poolField(provider)] || [];
-    const now = Date.now();
-    return pool.filter(k => {
-        if (k.state === 'ready' || k.state === 'unknown') return true;
-        if (k.state === 'exhausted' && k.exhaustedUntil && k.exhaustedUntil <= now) return true;
-        return false;
-    });
+    return pool.filter(k => k.state === 'ready');
 }
 
 function listAllProviderKeysRaw(provider) {
