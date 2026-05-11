@@ -7,47 +7,6 @@ let mouseEventsIgnored = false;
 const DEFAULT_MAIN_WINDOW_SIZE = { width: 1100, height: 800 };
 const MIN_WINDOW_SIZE = { width: 700, height: 320 };
 
-// ══════════════════════════════════════════════════════════════════════════════
-// RIGID-BODY MOVEMENT SYSTEM v2
-// ══════════════════════════════════════════════════════════════════════════════
-//
-// Problem: On transparent+frameless Electron windows, calling setPosition() or
-// setBounds() causes the OS window compositor (DWM on Windows, Quartz on macOS)
-// to recomposite the entire window surface with per-pixel alpha blending.
-// This takes 1-3 frames, during which the OLD texture lingers at the old position
-// creating a visible "stretching" or "trailing edge" artifact.
-//
-// Solution: A multi-layered approach that eliminates compositor lag:
-//
-// 1. OPACITY TRICK: Set opacity to 0.99 during movement. This switches the
-//    compositor from expensive per-pixel-alpha path to the fast opaque-window
-//    path. The 0.01 difference is visually imperceptible but changes the
-//    underlying rendering pipeline entirely.
-//
-// 2. CSS FREEZE: Inject a style that disables ALL CSS transitions/animations
-//    in the renderer during movement. This prevents any layout thrashing or
-//    transition-induced repaints that could compound the compositor lag.
-//
-// 3. POSITION-ONLY UPDATES: Use setPosition() instead of setBounds() to avoid
-//    any possible size recalculation. Lock resizable=false during movement.
-//
-// 4. VSYNC-GATED: Only allow one position update per animation frame tick (16ms)
-//    to prevent queue buildup in the compositor's message pipe.
-//
-// 5. INTEGER SNAPPING: All coordinates are Math.round()'d to avoid subpixel
-//    positioning which forces additional anti-aliasing passes.
-//
-// 6. ATOMIC SETTLE: After movement ends, restore opacity and transitions in a
-//    single synchronous batch to prevent intermediate flicker states.
-//
-// ══════════════════════════════════════════════════════════════════════════════
-
-let _isMoving = false;
-let _moveThrottled = false;
-let _settleTimer = null;
-let _cachedSize = null; // { width, height } frozen during movement
-const MOVE_SETTLE_MS = 80; // Time after last move before restoring full compositing
-
 function createWindow(sendToRenderer, geminiSessionRef) {
     let windowWidth = DEFAULT_MAIN_WINDOW_SIZE.width;
     let windowHeight = DEFAULT_MAIN_WINDOW_SIZE.height;
@@ -65,7 +24,7 @@ function createWindow(sendToRenderer, geminiSessionRef) {
         show: false,
         webPreferences: {
             nodeIntegration: true,
-            contextIsolation: false,
+            contextIsolation: false, // TODO: change to true
             backgroundThrottling: false,
             enableBlinkFeatures: 'GetDisplayMedia',
             webSecurity: true,
@@ -86,13 +45,6 @@ function createWindow(sendToRenderer, geminiSessionRef) {
 
     mainWindow.setContentProtection(true);
     mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-
-    // ── Resize guard: block ALL resize during movement ──
-    mainWindow.on('will-resize', (event) => {
-        if (_isMoving) {
-            event.preventDefault();
-        }
-    });
 
     // Hide from Windows taskbar
     if (process.platform === 'win32') {
@@ -118,17 +70,18 @@ function createWindow(sendToRenderer, geminiSessionRef) {
 
     mainWindow.loadFile(path.join(__dirname, '../index.html'));
 
-    // Show window only when renderer is painted (eliminates white flash)
+    // Show window only when ready to prevent white flash
     mainWindow.once('ready-to-show', () => {
         mainWindow.show();
     });
 
-    // Initialize keybinds after DOM is ready
+    // After window is created, initialize keybinds
     mainWindow.webContents.once('dom-ready', () => {
         setImmediate(() => {
             const defaultKeybinds = getDefaultKeybinds();
             let keybinds = defaultKeybinds;
 
+            // Load keybinds from storage
             const savedKeybinds = storage.getKeybinds();
             if (savedKeybinds) {
                 keybinds = { ...defaultKeybinds, ...savedKeybinds };
@@ -142,121 +95,6 @@ function createWindow(sendToRenderer, geminiSessionRef) {
 
     return mainWindow;
 }
-
-// ══════════════════════════════════════════════════════════════════════════════
-// MOVEMENT ENGINE
-// ══════════════════════════════════════════════════════════════════════════════
-
-/**
- * Enter movement mode: switches compositor to fast path and freezes layout.
- */
-function enterMovementMode(mainWindow) {
-    if (_isMoving) return;
-    _isMoving = true;
-
-    // Cache current size to enforce immutability
-    const bounds = mainWindow.getBounds();
-    _cachedSize = { width: bounds.width, height: bounds.height };
-
-    // Lock resize to prevent ANY size change
-    mainWindow.setResizable(false);
-
-    // ─── COMPOSITOR TRICK ───
-    // Setting opacity to 0.99 on a transparent window switches DWM/Quartz
-    // from per-pixel-alpha compositing (expensive, causes trailing) to
-    // near-opaque fast path. Visually indistinguishable from 1.0.
-    mainWindow.setOpacity(0.99);
-
-    // ─── CSS FREEZE ───
-    // Inject a style that kills ALL transitions/animations in the renderer.
-    // This prevents any CSS-driven repaints during movement.
-    mainWindow.webContents.insertCSS(
-        `*, *::before, *::after { transition: none !important; animation: none !important; }`,
-        { cssOrigin: 'user' }
-    ).then(key => {
-        // Store the key so we can remove it later
-        mainWindow._movementCssKey = key;
-    }).catch(() => {});
-}
-
-/**
- * Exit movement mode: restores full transparency and CSS transitions.
- */
-function exitMovementMode(mainWindow) {
-    if (!_isMoving) return;
-    _isMoving = false;
-
-    // Restore full transparency (re-enables per-pixel alpha path)
-    mainWindow.setOpacity(1.0);
-
-    // Re-enable resize
-    mainWindow.setResizable(true);
-
-    // Remove the injected CSS freeze
-    if (mainWindow._movementCssKey) {
-        mainWindow.webContents.removeInsertedCSS(mainWindow._movementCssKey).catch(() => {});
-        mainWindow._movementCssKey = null;
-    }
-
-    // Final size enforcement: snap back if OS drifted dimensions
-    if (_cachedSize) {
-        const finalBounds = mainWindow.getBounds();
-        if (finalBounds.width !== _cachedSize.width || finalBounds.height !== _cachedSize.height) {
-            mainWindow.setBounds({
-                x: finalBounds.x,
-                y: finalBounds.y,
-                width: _cachedSize.width,
-                height: _cachedSize.height,
-            });
-        }
-        _cachedSize = null;
-    }
-}
-
-/**
- * Core movement function. Performs a single rigid-body translation.
- * - Vsync-gated (max 1 update per 16ms frame)
- * - Integer-snapped coordinates
- * - No size changes permitted
- */
-function rigidMove(mainWindow, deltaX, deltaY) {
-    if (!mainWindow || mainWindow.isDestroyed() || !mainWindow.isVisible()) return;
-
-    // ─── VSYNC GATE ───
-    // Only allow one position update per frame (~16ms).
-    // This prevents compositor queue buildup from rapid key repeats.
-    if (_moveThrottled) return;
-    _moveThrottled = true;
-    setTimeout(() => { _moveThrottled = false; }, 16);
-
-    // Enter movement mode on first call
-    if (!_isMoving) {
-        enterMovementMode(mainWindow);
-    }
-
-    // ─── POSITION UPDATE ───
-    // Use getPosition + setPosition (NOT getBounds/setBounds) to avoid
-    // any internal size recalculation path.
-    const [currentX, currentY] = mainWindow.getPosition();
-    const newX = Math.round(currentX + deltaX);
-    const newY = Math.round(currentY + deltaY);
-
-    // setPosition with explicit integer coordinates.
-    // On macOS, passing `false` as third arg (animate) prevents AppKit animation.
-    mainWindow.setPosition(newX, newY, false);
-
-    // ─── SETTLE DEBOUNCE ───
-    // Reset the settle timer on every movement. Only exit movement mode
-    // after the user stops moving for MOVE_SETTLE_MS.
-    clearTimeout(_settleTimer);
-    _settleTimer = setTimeout(() => {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-            exitMovementMode(mainWindow);
-        }
-    }, MOVE_SETTLE_MS);
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
 
 function getDefaultKeybinds() {
     const isMac = process.platform === 'darwin';
@@ -279,18 +117,35 @@ function getDefaultKeybinds() {
 function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessionRef) {
     console.log('Updating global shortcuts with:', keybinds);
 
+    // Unregister all existing shortcuts
     globalShortcut.unregisterAll();
 
     const primaryDisplay = screen.getPrimaryDisplay();
     const { width, height } = primaryDisplay.workAreaSize;
-    // Movement step: 5% of smallest screen dimension, integer-snapped
-    const moveIncrement = Math.round(Math.min(width, height) * 0.05);
+    const moveIncrement = Math.floor(Math.min(width, height) * 0.1);
 
+    // Movement: simple getPosition + setPosition (proven stable, no side effects)
     const movementActions = {
-        moveUp: () => rigidMove(mainWindow, 0, -moveIncrement),
-        moveDown: () => rigidMove(mainWindow, 0, moveIncrement),
-        moveLeft: () => rigidMove(mainWindow, -moveIncrement, 0),
-        moveRight: () => rigidMove(mainWindow, moveIncrement, 0),
+        moveUp: () => {
+            if (!mainWindow.isVisible()) return;
+            const [currentX, currentY] = mainWindow.getPosition();
+            mainWindow.setPosition(currentX, currentY - moveIncrement);
+        },
+        moveDown: () => {
+            if (!mainWindow.isVisible()) return;
+            const [currentX, currentY] = mainWindow.getPosition();
+            mainWindow.setPosition(currentX, currentY + moveIncrement);
+        },
+        moveLeft: () => {
+            if (!mainWindow.isVisible()) return;
+            const [currentX, currentY] = mainWindow.getPosition();
+            mainWindow.setPosition(currentX - moveIncrement, currentY);
+        },
+        moveRight: () => {
+            if (!mainWindow.isVisible()) return;
+            const [currentX, currentY] = mainWindow.getPosition();
+            mainWindow.setPosition(currentX + moveIncrement, currentY);
+        },
     };
 
     Object.keys(movementActions).forEach(action => {
@@ -315,8 +170,9 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
                     mainWindow.showInactive();
                 }
             });
+            console.log(`Registered toggleVisibility: ${keybinds.toggleVisibility}`);
         } catch (error) {
-            console.error(`Failed to register toggleVisibility:`, error);
+            console.error(`Failed to register toggleVisibility (${keybinds.toggleVisibility}):`, error);
         }
     }
 
@@ -327,23 +183,30 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
                 mouseEventsIgnored = !mouseEventsIgnored;
                 if (mouseEventsIgnored) {
                     mainWindow.setIgnoreMouseEvents(true, { forward: true });
+                    console.log('Mouse events ignored');
                 } else {
                     mainWindow.setIgnoreMouseEvents(false);
+                    console.log('Mouse events enabled');
                 }
                 mainWindow.webContents.send('click-through-toggled', mouseEventsIgnored);
             });
+            console.log(`Registered toggleClickThrough: ${keybinds.toggleClickThrough}`);
         } catch (error) {
-            console.error(`Failed to register toggleClickThrough:`, error);
+            console.error(`Failed to register toggleClickThrough (${keybinds.toggleClickThrough}):`, error);
         }
     }
 
-    // Register next step shortcut
+    // Register next step shortcut (either starts session or takes screenshot based on view)
     if (keybinds.nextStep) {
         try {
             globalShortcut.register(keybinds.nextStep, async () => {
+                console.log('Next step shortcut triggered');
                 try {
+                    // Determine the shortcut key format
                     const isMac = process.platform === 'darwin';
                     const shortcutKey = isMac ? 'cmd+enter' : 'ctrl+enter';
+
+                    // Use the new handleShortcut function
                     mainWindow.webContents.executeJavaScript(`
                         cheatingDaddy.handleShortcut('${shortcutKey}');
                     `);
@@ -351,8 +214,9 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
                     console.error('Error handling next step shortcut:', error);
                 }
             });
+            console.log(`Registered nextStep: ${keybinds.nextStep}`);
         } catch (error) {
-            console.error(`Failed to register nextStep:`, error);
+            console.error(`Failed to register nextStep (${keybinds.nextStep}):`, error);
         }
     }
 
@@ -360,10 +224,12 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
     if (keybinds.previousResponse) {
         try {
             globalShortcut.register(keybinds.previousResponse, () => {
+                console.log('Previous response shortcut triggered');
                 sendToRenderer('navigate-previous-response');
             });
+            console.log(`Registered previousResponse: ${keybinds.previousResponse}`);
         } catch (error) {
-            console.error(`Failed to register previousResponse:`, error);
+            console.error(`Failed to register previousResponse (${keybinds.previousResponse}):`, error);
         }
     }
 
@@ -371,10 +237,12 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
     if (keybinds.nextResponse) {
         try {
             globalShortcut.register(keybinds.nextResponse, () => {
+                console.log('Next response shortcut triggered');
                 sendToRenderer('navigate-next-response');
             });
+            console.log(`Registered nextResponse: ${keybinds.nextResponse}`);
         } catch (error) {
-            console.error(`Failed to register nextResponse:`, error);
+            console.error(`Failed to register nextResponse (${keybinds.nextResponse}):`, error);
         }
     }
 
@@ -382,10 +250,12 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
     if (keybinds.scrollUp) {
         try {
             globalShortcut.register(keybinds.scrollUp, () => {
+                console.log('Scroll up shortcut triggered');
                 sendToRenderer('scroll-response-up');
             });
+            console.log(`Registered scrollUp: ${keybinds.scrollUp}`);
         } catch (error) {
-            console.error(`Failed to register scrollUp:`, error);
+            console.error(`Failed to register scrollUp (${keybinds.scrollUp}):`, error);
         }
     }
 
@@ -393,10 +263,12 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
     if (keybinds.scrollDown) {
         try {
             globalShortcut.register(keybinds.scrollDown, () => {
+                console.log('Scroll down shortcut triggered');
                 sendToRenderer('scroll-response-down');
             });
+            console.log(`Registered scrollDown: ${keybinds.scrollDown}`);
         } catch (error) {
-            console.error(`Failed to register scrollDown:`, error);
+            console.error(`Failed to register scrollDown (${keybinds.scrollDown}):`, error);
         }
     }
 
@@ -421,8 +293,9 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
                     }, 300);
                 }
             });
+            console.log(`Registered emergencyErase: ${keybinds.emergencyErase}`);
         } catch (error) {
-            console.error(`Failed to register emergencyErase:`, error);
+            console.error(`Failed to register emergencyErase (${keybinds.emergencyErase}):`, error);
         }
     }
 }
