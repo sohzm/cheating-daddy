@@ -218,15 +218,31 @@ async function revalidateKey(provider, id, forceRevalidate = false) {
     try {
         const verdict = await probeKey(provider, raw.key);
 
+        // IMPORTANT: The probe only tests auth (401/403) and basic connectivity.
+        // It CANNOT detect quota/rate-limit exhaustion — the /models endpoint always returns 200
+        // for quota-exhausted keys because listing models doesn't consume quota.
+        // Therefore: a 'ready' verdict from probe means "auth is valid" ONLY.
+        // We must NEVER overwrite an existing 'exhausted' state with 'ready' from the probe,
+        // because the exhaustion was set by an actual API call failure (the real signal).
         if (verdict.state === 'ready') {
-            storage.markProviderKeyState(provider, id, 'ready', { errorReason: null });
+            const current = storage.getProviderKeyRaw(provider, id);
+            if (current?.state === 'exhausted' && current?.exhaustedUntil && current.exhaustedUntil > Date.now()) {
+                // Key is exhausted by real usage — probe says auth is fine but quota is gone.
+                // Leave as exhausted, just update lastCheckedAt.
+                storage.updateProviderKey(provider, id, {
+                    lastCheckedAt: Date.now(),
+                    errorReason: 'Auth valid, but quota may still be exhausted',
+                });
+            } else {
+                // Key was not exhausted, or cooldown has elapsed — mark ready.
+                storage.markProviderKeyState(provider, id, 'ready', { errorReason: null });
+            }
         } else if (verdict.state === 'exhausted') {
             storage.markProviderKeyState(provider, id, 'exhausted', { errorReason: verdict.reason });
         } else if (verdict.state === 'invalid') {
             storage.markProviderKeyState(provider, id, 'invalid', { errorReason: verdict.reason });
         } else {
-            // null state = transient/timeout — keep previous state but update timestamp + reason
-            // If was 'checking', restore to 'unknown' so it gets retried
+            // null state = transient/timeout — restore state, don't mark ready or invalid
             const current = storage.getProviderKeyRaw(provider, id);
             const restoreState = (current?.state === 'checking') ? 'unknown' : (current?.state || 'unknown');
             storage.updateProviderKey(provider, id, {

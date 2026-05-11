@@ -109,6 +109,52 @@ const storage = {
     }
 };
 
+// ============ WINDOW CONTROLS API ============
+// Wraps all window:* IPC channels for use from components
+
+const windowControls = {
+    async getState()              { const r = await ipcRenderer.invoke('window:get-state');           return r; },
+    async setState(patch)         { return ipcRenderer.invoke('window:set-state', patch); },
+    async setScale(v)             { return ipcRenderer.invoke('window:set-scale', v); },
+    async setZoom(v)              { return ipcRenderer.invoke('window:set-zoom', v); },
+    async setOpacity(v)           { return ipcRenderer.invoke('window:set-opacity', v); },
+    async setVoice(enabled)       { return ipcRenderer.invoke('window:set-voice', enabled); },
+    async updateKeybinds(kb)      { return ipcRenderer.invoke('window:update-keybinds', kb); },
+    async resetKeybinds()         { return ipcRenderer.invoke('window:reset-keybinds'); },
+    async getDefaultKeybinds()    {
+        // Derive defaults from current platform in renderer
+        const isMac = isMacOS;
+        return {
+            moveUp:             isMac ? 'Alt+Up'        : 'Ctrl+Up',
+            moveDown:           isMac ? 'Alt+Down'      : 'Ctrl+Down',
+            moveLeft:           isMac ? 'Alt+Left'      : 'Ctrl+Left',
+            moveRight:          isMac ? 'Alt+Right'     : 'Ctrl+Right',
+            toggleVisibility:   isMac ? 'Cmd+\\'        : 'Ctrl+\\',
+            toggleClickThrough: isMac ? 'Cmd+M'         : 'Ctrl+M',
+            scaleUp:            isMac ? 'Cmd+Shift+='   : 'Ctrl+Shift+=',
+            scaleDown:          isMac ? 'Cmd+Shift+-'   : 'Ctrl+Shift+-',
+            zoomIn:             isMac ? 'Cmd+='         : 'Ctrl+=',
+            zoomOut:            isMac ? 'Cmd+-'         : 'Ctrl+-',
+            zoomReset:          isMac ? 'Cmd+0'         : 'Ctrl+0',
+            opacityUp:          isMac ? 'Cmd+Shift+]'   : 'Ctrl+Shift+]',
+            opacityDown:        isMac ? 'Cmd+Shift+['   : 'Ctrl+Shift+[',
+            nextStep:           isMac ? 'Cmd+Enter'     : 'Ctrl+Enter',
+            previousResponse:   isMac ? 'Cmd+Shift+Left'  : 'Ctrl+Shift+Left',
+            nextResponse:       isMac ? 'Cmd+Shift+Right' : 'Ctrl+Shift+Right',
+            scrollUp:           isMac ? 'Cmd+['           : 'Ctrl+[',
+            scrollDown:         isMac ? 'Cmd+]'           : 'Ctrl+]',
+            toggleVoice:        isMac ? 'Cmd+Shift+L'   : 'Ctrl+Shift+L',
+            reloadApp:          isMac ? 'Cmd+Shift+R'   : 'Ctrl+Shift+R',
+            devRefresh:         isMac ? 'Cmd+Shift+E'   : 'Ctrl+Shift+E',
+        };
+    },
+    // Subscribe to state change events. Returns an unsubscribe function.
+    onScaleChanged(fn)   { const l = (_, v) => fn(v); ipcRenderer.on('scale-changed',   l); return () => ipcRenderer.removeListener('scale-changed',   l); },
+    onZoomChanged(fn)    { const l = (_, v) => fn(v); ipcRenderer.on('zoom-changed',    l); return () => ipcRenderer.removeListener('zoom-changed',    l); },
+    onOpacityChanged(fn) { const l = (_, v) => fn(v); ipcRenderer.on('opacity-changed', l); return () => ipcRenderer.removeListener('opacity-changed', l); },
+    onVoiceToggled(fn)   { const l = (_, v) => fn(v); ipcRenderer.on('voice-toggled',   l); return () => ipcRenderer.removeListener('voice-toggled',   l); },
+};
+
 // ============ API KEYS API ============
 // Wrapper for multi-key / state-aware management of provider API keys.
 // The main process returns sanitized entries (masked key only). The raw key
@@ -1072,6 +1118,9 @@ const cheatingDaddy = {
 
     // API Keys API (multi-key management)
     apiKeys,
+
+    // Window Controls API
+    window: windowControls,
 
     // Theme API
     theme,

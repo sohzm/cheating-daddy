@@ -194,6 +194,23 @@ function setupStorageIpcHandlers() {
         }
     });
 
+    ipcMain.handle('storage:get-window-state', async () => {
+        try {
+            return { success: true, data: storage.getWindowState() };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('storage:set-window-state', async (event, patch) => {
+        try {
+            storage.setWindowState(patch);
+            return { success: true };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    });
+
     // ============ HISTORY ============
     ipcMain.handle('storage:get-all-sessions', async () => {
         try {

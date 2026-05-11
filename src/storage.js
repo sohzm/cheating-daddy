@@ -42,7 +42,45 @@ const DEFAULT_PREFERENCES = {
     whisperModel: 'Xenova/whisper-small',
 };
 
-const DEFAULT_KEYBINDS = null; // null means use system defaults
+const DEFAULT_KEYBINDS = null; // null means use defaults from getDefaultKeybinds()
+
+// Default window state — persisted across restarts
+const DEFAULT_WINDOW_STATE = {
+    // Position (null = center on screen at startup)
+    x: null,
+    y: null,
+    // Window size scale (1.0 = default size, 0.5 = half, 2.0 = double)
+    scale: 1.0,
+    scaleMin: 0.3,
+    scaleMax: 3.0,
+    scaleStep: 0.1,
+    // Content zoom (Electron webContents zoomFactor, 1.0 = 100%)
+    zoom: 1.0,
+    zoomMin: 0.5,
+    zoomMax: 3.0,
+    zoomStep: 0.1,
+    // Window opacity (0.0–1.0)
+    opacity: 1.0,
+    opacityMin: 0.1,
+    opacityMax: 1.0,
+    opacityStep: 0.05,
+    // Visibility
+    visible: true,
+    // Window movement step in pixels
+    moveStep: 60,
+    moveSteMin: 1,
+    moveStepMax: 500,
+    // Voice listening enabled
+    voiceEnabled: true,
+    // Feature toggles
+    scaleEnabled: true,
+    zoomEnabled: true,
+    opacityEnabled: true,
+    moveEnabled: true,
+    voiceToggleEnabled: true,
+    sessionEnabled: true,
+    reloadEnabled: true,
+};
 
 const DEFAULT_LIMITS = {
     data: [] // Array of { date: 'YYYY-MM-DD', flash: { count }, flashLite: { count }, groq: { 'qwen3-32b': { chars, limit }, 'gpt-oss-120b': { chars, limit }, 'gpt-oss-20b': { chars, limit } }, gemini: { 'gemma-3-27b-it': { chars } } }
@@ -461,6 +499,28 @@ function setKeybinds(keybinds) {
     return writeJsonFile(getKeybindsPath(), keybinds);
 }
 
+// ============ WINDOW STATE ============
+
+function getWindowStatePath() {
+    return path.join(getConfigDir(), 'window-state.json');
+}
+
+function getWindowState() {
+    return { ...DEFAULT_WINDOW_STATE, ...readJsonFile(getWindowStatePath(), {}) };
+}
+
+function setWindowState(state) {
+    const current = getWindowState();
+    const updated = { ...current, ...state };
+    return writeJsonFile(getWindowStatePath(), updated);
+}
+
+function updateWindowState(key, value) {
+    const state = getWindowState();
+    state[key] = value;
+    return writeJsonFile(getWindowStatePath(), state);
+}
+
 // ============ LIMITS (Rate Limiting) ============
 
 function getLimits() {
@@ -751,6 +811,12 @@ module.exports = {
     // Keybinds
     getKeybinds,
     setKeybinds,
+
+    // Window State
+    getWindowState,
+    setWindowState,
+    updateWindowState,
+    DEFAULT_WINDOW_STATE,
 
     // Limits (Rate Limiting)
     getLimits,
