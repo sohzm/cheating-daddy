@@ -93,7 +93,7 @@ export class HotkeysView extends LitElement {
 
             /* Action row */
             .action-row {
-                display: grid; grid-template-columns: 1fr 180px 32px;
+                display: grid; grid-template-columns: 1fr 180px 42px;
                 align-items: center; gap: var(--space-sm);
                 padding: 7px 12px; border-bottom: 1px solid var(--border);
                 background: var(--bg-elevated); min-height: 40px;
@@ -132,18 +132,21 @@ export class HotkeysView extends LitElement {
 
             /* Toggle */
             .toggle-btn {
-                width: 28px; height: 16px; border-radius: 999px; border: none;
-                cursor: pointer; transition: background var(--transition); flex-shrink: 0;
-                position: relative;
+                width: 38px; height: 20px; border-radius: 999px; border: none;
+                cursor: pointer; transition: background 0.25s ease, box-shadow 0.25s ease; flex-shrink: 0;
+                position: relative; outline: none;
             }
-            .toggle-btn.on  { background: var(--success); }
-            .toggle-btn.off { background: var(--border-strong); }
+            .toggle-btn.on  { background: var(--accent, #3B82F6); box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); }
+            .toggle-btn.off { background: var(--border-strong, #333); box-shadow: none; }
+            .toggle-btn:hover { box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15); }
+            .toggle-btn:focus-visible { box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.4); }
             .toggle-btn::after {
                 content: ''; position: absolute; top: 2px;
-                width: 12px; height: 12px; border-radius: 50%; background: #fff;
-                transition: left var(--transition);
+                width: 16px; height: 16px; border-radius: 50%; background: #fff;
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+                transition: left 0.25s cubic-bezier(0.4, 0, 0.2, 1);
             }
-            .toggle-btn.on::after  { left: 14px; }
+            .toggle-btn.on::after  { left: 20px; }
             .toggle-btn.off::after { left: 2px; }
 
             /* Slider settings */
@@ -160,12 +163,28 @@ export class HotkeysView extends LitElement {
                 background: var(--text-primary); border: none;
             }
             .setting-num {
-                width: 52px; background: var(--bg-elevated); color: var(--text-primary);
+                width: 66px; background: var(--bg-elevated); color: var(--text-primary);
                 border: 1px solid var(--border); border-radius: var(--radius-sm);
-                padding: 3px 6px; font-size: var(--font-size-xs); text-align: center;
+                padding: 4px 6px; font-size: var(--font-size-xs); text-align: center;
                 font-family: var(--font-mono);
             }
             .setting-num:focus { outline: none; border-color: var(--accent); }
+
+            /* Min/Max bounds below sliders */
+            .setting-bounds {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                margin-top: 4px;
+                padding-left: 2px;
+            }
+            .bounds-label {
+                font-size: 10px;
+                color: var(--text-muted);
+            }
+            .bounds-input {
+                width: 60px !important;
+            }
 
             /* Reset button */
             .reset-btn {
@@ -306,7 +325,7 @@ export class HotkeysView extends LitElement {
         this.requestUpdate();
     }
 
-    _renderSlider(label, stateKey, min, max, step, decimals = 1) {
+    _renderSlider(label, stateKey, min, max, step, decimals = 1, minKey = null, maxKey = null) {
         const val = this._state?.[stateKey] ?? 0;
         return html`
             <div class="setting-row">
@@ -321,6 +340,18 @@ export class HotkeysView extends LitElement {
                         .value=${val.toFixed(decimals)}
                         @change=${e => this._updateSlider(stateKey, Math.max(min, Math.min(max, parseFloat(e.target.value) || 0)))} />
                 </div>
+                ${minKey && maxKey ? html`
+                    <div class="setting-bounds">
+                        <span class="bounds-label">Min:</span>
+                        <input class="setting-num bounds-input" type="number" step=${step}
+                            .value=${String(this._state?.[minKey] ?? min)}
+                            @change=${e => this._updateSlider(minKey, parseFloat(e.target.value) || min)} />
+                        <span class="bounds-label">Max:</span>
+                        <input class="setting-num bounds-input" type="number" step=${step}
+                            .value=${String(this._state?.[maxKey] ?? max)}
+                            @change=${e => this._updateSlider(maxKey, parseFloat(e.target.value) || max)} />
+                    </div>
+                ` : ''}
             </div>
         `;
     }
@@ -388,35 +419,13 @@ export class HotkeysView extends LitElement {
                         <div class="surface-title">Window Settings</div>
                         <div class="surface-subtitle">Changes apply immediately. Persisted across restarts.</div>
                         <div class="settings-grid">
-                            ${this._renderSlider('Scale',          'scale',        this._state.scaleMin   ?? 0.3, this._state.scaleMax   ?? 3.0, 0.05)}
-                            ${this._renderSlider('Content Zoom',   'zoom',         this._state.zoomMin    ?? 0.5, this._state.zoomMax    ?? 3.0, 0.05)}
-                            ${this._renderSlider('Opacity',        'opacity',      this._state.opacityMin ?? 0.1, this._state.opacityMax ?? 1.0,  0.05)}
+                            ${this._renderSlider('Scale',          'scale',        this._state.scaleMin   ?? 0.3, this._state.scaleMax   ?? 3.0, 0.05, 1, 'scaleMin', 'scaleMax')}
+                            ${this._renderSlider('Content Zoom',   'zoom',         this._state.zoomMin    ?? 0.5, this._state.zoomMax    ?? 3.0, 0.05, 1, 'zoomMin', 'zoomMax')}
+                            ${this._renderSlider('Opacity',        'opacity',      this._state.opacityMin ?? 0.1, this._state.opacityMax ?? 1.0,  0.05, 1, 'opacityMin', 'opacityMax')}
                             ${this._renderSlider('Move Step (px)', 'moveStep',     1,   500, 1, 0)}
                             ${this._renderSlider('Scale Step',     'scaleStep',    0.01, 0.5, 0.01)}
                             ${this._renderSlider('Zoom Step',      'zoomStep',     0.01, 0.5, 0.01)}
                             ${this._renderSlider('Opacity Step',   'opacityStep',  0.01, 0.2, 0.01)}
-                        </div>
-                        <div style="display:flex;gap:8px;margin-top:var(--space-sm);">
-                            <div style="font-size:10px;color:var(--text-muted);">
-                                Scale min/max:
-                                <input class="setting-num" type="number" style="width:44px;" .value=${String(this._state.scaleMin ?? 0.3)}
-                                    @change=${e => this._updateSlider('scaleMin', parseFloat(e.target.value) || 0.1)} />
-                                –
-                                <input class="setting-num" type="number" style="width:44px;" .value=${String(this._state.scaleMax ?? 3.0)}
-                                    @change=${e => this._updateSlider('scaleMax', parseFloat(e.target.value) || 3)} />
-                                &nbsp;&nbsp;Zoom:
-                                <input class="setting-num" type="number" style="width:44px;" .value=${String(this._state.zoomMin ?? 0.5)}
-                                    @change=${e => this._updateSlider('zoomMin', parseFloat(e.target.value) || 0.1)} />
-                                –
-                                <input class="setting-num" type="number" style="width:44px;" .value=${String(this._state.zoomMax ?? 3.0)}
-                                    @change=${e => this._updateSlider('zoomMax', parseFloat(e.target.value) || 3)} />
-                                &nbsp;&nbsp;Opacity:
-                                <input class="setting-num" type="number" style="width:44px;" .value=${String(this._state.opacityMin ?? 0.1)}
-                                    @change=${e => this._updateSlider('opacityMin', parseFloat(e.target.value) || 0.05)} />
-                                –
-                                <input class="setting-num" type="number" style="width:44px;" .value=${String(this._state.opacityMax ?? 1.0)}
-                                    @change=${e => this._updateSlider('opacityMax', parseFloat(e.target.value) || 1)} />
-                            </div>
                         </div>
                     </section>
 

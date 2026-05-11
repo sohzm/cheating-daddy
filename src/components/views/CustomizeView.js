@@ -86,29 +86,39 @@ export class CustomizeView extends LitElement {
                 -webkit-appearance: none;
                 appearance: none;
                 width: 100%;
-                height: 4px;
-                border-radius: 2px;
+                height: 5px;
+                border-radius: 3px;
                 background: var(--border);
                 outline: none;
                 cursor: pointer;
+                transition: background 0.15s;
             }
 
             .slider-input::-webkit-slider-thumb {
                 -webkit-appearance: none;
                 appearance: none;
-                width: 14px;
-                height: 14px;
+                width: 16px;
+                height: 16px;
                 border-radius: 50%;
                 background: var(--text-primary);
                 border: none;
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+                cursor: pointer;
+                transition: transform 0.15s ease;
+            }
+
+            .slider-input::-webkit-slider-thumb:hover {
+                transform: scale(1.15);
             }
 
             .slider-input::-moz-range-thumb {
-                width: 14px;
-                height: 14px;
+                width: 16px;
+                height: 16px;
                 border-radius: 50%;
                 background: var(--text-primary);
                 border: none;
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+                cursor: pointer;
             }
 
             .keybind-row {
@@ -405,6 +415,13 @@ export class CustomizeView extends LitElement {
         document.documentElement.style.setProperty('--response-font-size', `${this.fontSize}px`);
     }
 
+    async _resetFontSize() {
+        this.fontSize = 20;
+        await cheatingDaddy.storage.updatePreference('fontSize', 20);
+        this.updateFontSize();
+        this.requestUpdate();
+    }
+
     handleKeybindChange(action, value) {
         this.keybinds = { ...this.keybinds, [action]: value };
         this.saveKeybinds();
@@ -641,17 +658,35 @@ export class CustomizeView extends LitElement {
                     <div class="form-group slider-wrap">
                         <div class="slider-header">
                             <label class="form-label">Response Font Size</label>
-                            <span class="slider-value">${this.fontSize}px</span>
+                            <div style="display:flex;align-items:center;gap:6px;">
+                                <input
+                                    type="number"
+                                    min="8"
+                                    max="48"
+                                    step="1"
+                                    .value=${String(this.fontSize)}
+                                    @change=${e => this.handleFontSizeChange(e)}
+                                    style="width:60px;background:var(--bg-elevated);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius-sm);padding:4px 8px;font-size:var(--font-size-xs);font-family:var(--font-mono);text-align:center;"
+                                />
+                                <span class="slider-value">${this.fontSize}px</span>
+                            </div>
                         </div>
                         <input
                             class="slider-input"
                             type="range"
-                            min="12"
-                            max="32"
+                            min="8"
+                            max="48"
                             step="1"
                             .value=${this.fontSize}
                             @input=${this.handleFontSizeChange}
                         />
+                        <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
+                            <span style="font-size:10px;color:var(--text-muted);">Min:</span>
+                            <input type="number" value="8" style="width:50px;background:var(--bg-elevated);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius-sm);padding:3px 6px;font-size:10px;font-family:var(--font-mono);text-align:center;" readonly />
+                            <span style="font-size:10px;color:var(--text-muted);">Max:</span>
+                            <input type="number" value="48" style="width:50px;background:var(--bg-elevated);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius-sm);padding:3px 6px;font-size:10px;font-family:var(--font-mono);text-align:center;" readonly />
+                            <button @click=${this._resetFontSize} style="margin-left:auto;background:transparent;border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-secondary);padding:3px 8px;font-size:10px;cursor:pointer;">Reset</button>
+                        </div>
                     </div>
                 </div>
             </section>
