@@ -47,8 +47,8 @@ function getDefaultKeybinds() {
         devRefresh:         isMac ? 'Cmd+Shift+E'    : 'Ctrl+Shift+E',
         // ── Global Controls ──
         themeToggle:        isMac ? 'Cmd+Shift+T'    : 'Ctrl+Shift+T',
-        fontSizeUp:         isMac ? 'Cmd+Shift+)'    : 'Ctrl+Shift+)',
-        fontSizeDown:       isMac ? 'Cmd+Shift+('    : 'Ctrl+Shift+(',
+        fontSizeUp:         isMac ? 'Cmd+Shift+0'    : 'Ctrl+Shift+0',
+        fontSizeDown:       isMac ? 'Cmd+Shift+9'    : 'Ctrl+Shift+9',
         aiModeToggle:       isMac ? 'Cmd+Shift+U'    : 'Ctrl+Shift+U',
     };
 }
@@ -151,7 +151,10 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
     function tryRegister(action, kb, handler) {
         if (!kb) return;
         try {
-            globalShortcut.register(kb, handler);
+            const success = globalShortcut.register(kb, handler);
+            if (!success) {
+                console.error(`Failed to register shortcut ${action} (${kb}): registration returned false`);
+            }
         } catch (e) {
             console.error(`Failed to register ${action} (${kb}):`, e.message);
         }

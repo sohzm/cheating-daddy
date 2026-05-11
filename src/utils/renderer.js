@@ -147,8 +147,8 @@ const windowControls = {
             reloadApp:          isMac ? 'Cmd+Shift+R'   : 'Ctrl+Shift+R',
             devRefresh:         isMac ? 'Cmd+Shift+E'   : 'Ctrl+Shift+E',
             themeToggle:        isMac ? 'Cmd+Shift+T'   : 'Ctrl+Shift+T',
-            fontSizeUp:         isMac ? 'Cmd+Shift+)'   : 'Ctrl+Shift+)',
-            fontSizeDown:       isMac ? 'Cmd+Shift+('   : 'Ctrl+Shift+(',
+            fontSizeUp:         isMac ? 'Cmd+Shift+0'   : 'Ctrl+Shift+0',
+            fontSizeDown:       isMac ? 'Cmd+Shift+9'   : 'Ctrl+Shift+9',
             aiModeToggle:       isMac ? 'Cmd+Shift+U'   : 'Ctrl+Shift+U',
         };
     },
