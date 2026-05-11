@@ -29,6 +29,7 @@ let screenAnalysisHistory = [];
 let currentProfile = null;
 let currentCustomPrompt = null;
 let isInitializingSession = false;
+let _sessionAborted = false;
 let currentSystemPrompt = null;
 
 function formatSpeakerResults(results) {
@@ -460,6 +461,10 @@ async function sendToGemma(transcription) {
 }
 
 async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'interview', language = 'en-US', isReconnect = false) {
+    if (_sessionAborted) {
+        _sessionAborted = false;
+        return null;
+    }
     if (isInitializingSession) {
         console.log('Session initialization already in progress');
         return false;
@@ -1137,6 +1142,8 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
 
     ipcMain.handle('close-session', async event => {
         try {
+            _sessionAborted = true;  // Signal any in-progress initialization to stop
+            isInitializingSession = false;
             stopMacOSAudioCapture();
 
             if (currentProviderMode === 'cloud') {

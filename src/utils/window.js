@@ -217,10 +217,10 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
 
     // ── Movement ──
     const moveActions = {
-        moveUp:    () => safeMove(mainWindow, 0, -winState().moveStep),
-        moveDown:  () => safeMove(mainWindow, 0, +winState().moveStep),
-        moveLeft:  () => safeMove(mainWindow, -winState().moveStep, 0),
-        moveRight: () => safeMove(mainWindow, +winState().moveStep, 0),
+        moveUp:    () => safeMove(mainWindow, 0, -(Math.max(10, winState().moveStep))),
+        moveDown:  () => safeMove(mainWindow, 0, +(Math.max(10, winState().moveStep))),
+        moveLeft:  () => safeMove(mainWindow, -(Math.max(10, winState().moveStep)), 0),
+        moveRight: () => safeMove(mainWindow, +(Math.max(10, winState().moveStep)), 0),
     };
     for (const [action, fn] of Object.entries(moveActions)) {
         if (winState().moveEnabled !== false) tryRegister(action, keybinds[action], fn);
@@ -387,19 +387,21 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
 
 function safeMove(win, dx, dy) {
     if (!win.isVisible()) return;
-    const [x, y] = win.getPosition();
-    const nx = x + dx;
-    const ny = y + dy;
+    const bounds = win.getBounds();
+    const nx = bounds.x + dx;
+    const ny = bounds.y + dy;
     _programmaticMove = true;
-    win.setPosition(nx, ny);
-    // Reset flag after event loop processes the 'moved' event
+    // Use setBounds with same width/height - this is atomic and avoids
+    // the DWM stretch effect that happens with separate setPosition calls
+    // on transparent frameless windows on Windows.
+    win.setBounds({ x: nx, y: ny, width: bounds.width, height: bounds.height });
     setImmediate(() => { _programmaticMove = false; });
     // Debounce storage persistence to prevent disk thrashing during rapid key repeat
     if (_moveDebounce) clearTimeout(_moveDebounce);
     _moveDebounce = setTimeout(() => {
         if (!win.isDestroyed()) {
-            const [fx, fy] = win.getPosition();
-            storage.setWindowState({ x: fx, y: fy });
+            const finalBounds = win.getBounds();
+            storage.setWindowState({ x: finalBounds.x, y: finalBounds.y });
         }
     }, 150);
 }
