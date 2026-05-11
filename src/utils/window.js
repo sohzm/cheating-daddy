@@ -3,8 +3,10 @@ const path = require('node:path');
 const storage = require('../storage');
 
 let mouseEventsIgnored = false;
+let _programmaticMove = false;
+let _moveDebounce = null;
 
-const KEYBINDS_VERSION = 2; // Increment when default keybinds change
+const KEYBINDS_VERSION = 3; // Increment when default keybinds change
 
 const DEFAULT_MAIN_WINDOW_SIZE = { width: 1100, height: 800 };
 const MIN_WINDOW_SIZE = { width: 400, height: 260 };
@@ -67,6 +69,8 @@ function getDefaultKeybinds() {
         fontSizeUp:         isMac ? 'Cmd+Shift+0'    : 'Ctrl+Shift+0',
         fontSizeDown:       isMac ? 'Cmd+Shift+9'    : 'Ctrl+Shift+9',
         aiModeToggle:       isMac ? 'Cmd+Shift+U'    : 'Ctrl+Shift+U',
+        // ── Emergency ──
+        emergencyQuit:      isMac ? 'Cmd+Q'          : 'Ctrl+Q',
     };
 }
 
@@ -146,17 +150,30 @@ function createWindow(sendToRenderer, geminiSessionRef) {
         }, 500);
     });
 
-    // Persist window position on move
+    // Persist window position on user-initiated move (drag) only
+    let _userMoveTimer = null;
     mainWindow.on('moved', () => {
-        const [x, y] = mainWindow.getPosition();
-        storage.setWindowState({ x, y });
+        if (_programmaticMove) return;
+        if (_userMoveTimer) clearTimeout(_userMoveTimer);
+        _userMoveTimer = setTimeout(() => {
+            if (!mainWindow.isDestroyed()) {
+                const [x, y] = mainWindow.getPosition();
+                storage.setWindowState({ x, y });
+            }
+        }, 250);
     });
 
-    // Persist window size on resize
+    // Persist window size on resize (debounced)
+    let _resizeTimer = null;
     mainWindow.on('resized', () => {
-        const [w, h] = mainWindow.getSize();
-        const scale = w / DEFAULT_MAIN_WINDOW_SIZE.width;
-        storage.setWindowState({ scale });
+        if (_resizeTimer) clearTimeout(_resizeTimer);
+        _resizeTimer = setTimeout(() => {
+            if (!mainWindow.isDestroyed()) {
+                const [w, h] = mainWindow.getSize();
+                const scale = w / DEFAULT_MAIN_WINDOW_SIZE.width;
+                storage.setWindowState({ scale });
+            }
+        }, 250);
     });
 
     setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef);
@@ -198,6 +215,15 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
             console.error(`Failed to register ${action} (${kb}):`, e.message);
         }
     }
+
+    // ── Emergency Quit — always registered, no guards ──
+    tryRegister('emergencyQuit', keybinds.emergencyQuit, () => {
+        try {
+            const { stopMacOSAudioCapture } = require('./gemini');
+            stopMacOSAudioCapture();
+        } catch (_) {}
+        app.exit(0);
+    });
 
     // ── Movement ──
     const moveActions = {
@@ -346,8 +372,18 @@ function safeMove(win, dx, dy) {
     const [x, y] = win.getPosition();
     const nx = x + dx;
     const ny = y + dy;
+    _programmaticMove = true;
     win.setPosition(nx, ny);
-    storage.setWindowState({ x: nx, y: ny });
+    // Reset flag after event loop processes the 'moved' event
+    setImmediate(() => { _programmaticMove = false; });
+    // Debounce storage persistence to prevent disk thrashing during rapid key repeat
+    if (_moveDebounce) clearTimeout(_moveDebounce);
+    _moveDebounce = setTimeout(() => {
+        if (!win.isDestroyed()) {
+            const [fx, fy] = win.getPosition();
+            storage.setWindowState({ x: fx, y: fy });
+        }
+    }, 150);
 }
 
 /**

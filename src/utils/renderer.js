@@ -150,6 +150,7 @@ const windowControls = {
             fontSizeUp:         isMac ? 'Cmd+Shift+0'   : 'Ctrl+Shift+0',
             fontSizeDown:       isMac ? 'Cmd+Shift+9'   : 'Ctrl+Shift+9',
             aiModeToggle:       isMac ? 'Cmd+Shift+U'   : 'Ctrl+Shift+U',
+            emergencyQuit:      isMac ? 'Cmd+Q'         : 'Ctrl+Q',
         };
     },
     // Subscribe to state change events. Returns an unsubscribe function.
@@ -881,13 +882,16 @@ ipcRenderer.on('clear-sensitive-data', async () => {
 
 // Handle shortcuts based on current view
 function handleShortcut(shortcutKey) {
-    const currentView = cheatingDaddy.getCurrentView();
-
     if (shortcutKey === 'ctrl+enter' || shortcutKey === 'cmd+enter') {
-        if (currentView === 'main') {
-            cheatingDaddy.element().handleStart();
-        } else {
+        const appEl = cheatingDaddy.element();
+        if (!appEl) return;
+
+        if (appEl.sessionActive) {
+            // Session running — trigger manual screenshot/analysis
             captureManualScreenshot();
+        } else {
+            // No session — start one regardless of current view
+            appEl.handleStart();
         }
     }
 }
