@@ -24,8 +24,10 @@ export class CheatingDaddyApp extends LitElement {
             display: block;
             width: 100%;
             height: 100vh;
+            max-height: 100vh;
             background: var(--bg-app);
             color: var(--text-primary);
+            overflow: hidden;
         }
 
         /* ── Full app shell: top bar + sidebar/content ── */
@@ -33,6 +35,7 @@ export class CheatingDaddyApp extends LitElement {
         .app-shell {
             display: flex;
             height: 100vh;
+            max-height: 100vh;
             overflow: hidden;
         }
 
@@ -96,12 +99,15 @@ export class CheatingDaddyApp extends LitElement {
         .sidebar {
             width: var(--sidebar-width);
             min-width: var(--sidebar-width);
+            max-width: var(--sidebar-width);
+            flex-shrink: 0;
             background: var(--bg-surface);
             border-right: 1px solid var(--border);
             display: flex;
             flex-direction: column;
             padding: 42px 0 var(--space-md) 0;
             transition: width var(--transition), min-width var(--transition), opacity var(--transition);
+            overflow: hidden;
         }
 
         .sidebar.hidden {
@@ -221,6 +227,7 @@ export class CheatingDaddyApp extends LitElement {
 
         .content {
             flex: 1;
+            min-width: 0;
             overflow: hidden;
             display: flex;
             flex-direction: column;
@@ -307,6 +314,7 @@ export class CheatingDaddyApp extends LitElement {
         /* Content inner */
         .content-inner {
             flex: 1;
+            min-height: 0;
             overflow-y: auto;
             overflow-x: hidden;
         }
@@ -544,14 +552,20 @@ export class CheatingDaddyApp extends LitElement {
 
     async handleClose() {
         if (this.currentView === 'assistant') {
-            cheatingDaddy.stopCapture();
-            if (window.require) {
-                const { ipcRenderer } = window.require('electron');
-                await ipcRenderer.invoke('close-session');
-            }
+            // Update UI IMMEDIATELY (non-blocking)
             this.sessionActive = false;
             this._stopTimer();
             this.currentView = 'main';
+            this.requestUpdate();
+
+            // Clean up in background (fire-and-forget)
+            cheatingDaddy.stopCapture();
+            if (window.require) {
+                const { ipcRenderer } = window.require('electron');
+                ipcRenderer.invoke('close-session').catch(err => {
+                    console.error('Error closing session:', err);
+                });
+            }
         } else {
             if (window.require) {
                 const { ipcRenderer } = window.require('electron');
@@ -581,54 +595,69 @@ export class CheatingDaddyApp extends LitElement {
         const providerMode = prefs.providerMode === 'cloud' ? 'byok' : (prefs.providerMode || 'byok');
         const aiHearingEnabled = prefs.aiHearingEnabled || false;
 
+        // Validate keys exist BEFORE switching view (fast, no network)
         if (providerMode === 'cloud') {
             const creds = await cheatingDaddy.storage.getCredentials();
             if (!creds.cloudToken || creds.cloudToken.trim() === '') {
                 const mainView = this.shadowRoot.querySelector('main-view');
-                if (mainView && mainView.triggerApiKeyError) {
-                    mainView.triggerApiKeyError();
-                }
+                if (mainView && mainView.triggerApiKeyError) mainView.triggerApiKeyError();
                 return;
             }
-
-            const success = await cheatingDaddy.initializeCloud(this.selectedProfile);
-            if (!success) {
-                const mainView = this.shadowRoot.querySelector('main-view');
-                if (mainView && mainView.triggerApiKeyError) {
-                    mainView.triggerApiKeyError();
-                }
-                return;
-            }
-        } else if (providerMode === 'local') {
-            const success = await cheatingDaddy.initializeLocal(this.selectedProfile);
-            if (!success) {
-                const mainView = this.shadowRoot.querySelector('main-view');
-                if (mainView && mainView.triggerApiKeyError) {
-                    mainView.triggerApiKeyError();
-                }
-                return;
-            }
-        } else {
+        } else if (providerMode === 'byok') {
             const apiKey = await cheatingDaddy.storage.getApiKey();
             if (!apiKey || apiKey === '') {
                 const mainView = this.shadowRoot.querySelector('main-view');
-                if (mainView && mainView.triggerApiKeyError) {
-                    mainView.triggerApiKeyError();
-                }
+                if (mainView && mainView.triggerApiKeyError) mainView.triggerApiKeyError();
                 return;
             }
-
-            await cheatingDaddy.initializeGemini(this.selectedProfile, this.selectedLanguage);
         }
 
-        cheatingDaddy.startCapture(this.selectedScreenshotInterval, this.selectedImageQuality, aiHearingEnabled);
+        // Switch to assistant view IMMEDIATELY (optimistic update)
         this.responses = [];
         this.currentResponseIndex = -1;
         this.startTime = Date.now();
         this.sessionActive = true;
         this._aiMode = providerMode;
         this.currentView = 'assistant';
+        this.statusText = 'Connecting...';
         this._startTimer();
+        this.requestUpdate();
+
+        // Initialize provider in background (non-blocking)
+        this._initializeProviderAsync(providerMode, aiHearingEnabled);
+    }
+
+    async _initializeProviderAsync(providerMode, aiHearingEnabled) {
+        try {
+            let success = false;
+            if (providerMode === 'cloud') {
+                success = await cheatingDaddy.initializeCloud(this.selectedProfile);
+            } else if (providerMode === 'local') {
+                success = await cheatingDaddy.initializeLocal(this.selectedProfile);
+            } else {
+                await cheatingDaddy.initializeGemini(this.selectedProfile, this.selectedLanguage);
+                success = true;
+            }
+
+            if (!success && providerMode !== 'byok') {
+                this.sessionActive = false;
+                this._stopTimer();
+                this.currentView = 'main';
+                this.statusText = 'Connection failed';
+                this.requestUpdate();
+                return;
+            }
+
+            // Start capture after provider is ready
+            cheatingDaddy.startCapture(this.selectedScreenshotInterval, this.selectedImageQuality, aiHearingEnabled);
+        } catch (error) {
+            console.error('Provider initialization failed:', error);
+            this.sessionActive = false;
+            this._stopTimer();
+            this.currentView = 'main';
+            this.statusText = 'Error: ' + (error.message || 'Connection failed');
+            this.requestUpdate();
+        }
     }
 
     async handleAPIKeyHelp() {

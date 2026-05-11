@@ -147,7 +147,7 @@ function createWindow(sendToRenderer, geminiSessionRef) {
                 storage.setKeybinds(keybinds);
             }
             updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessionRef);
-        }, 500);
+        }, 100);
     });
 
     // Persist window position on user-initiated move (drag) only
@@ -191,25 +191,11 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
 
     function tryRegister(action, kb, handler) {
         if (!kb) return;
-        // Skip internal metadata keys
         if (action.startsWith('_')) return;
         try {
             const success = globalShortcut.register(kb, handler);
             if (!success) {
-                console.warn(`Shortcut ${action} (${kb}) registration returned false, will retry...`);
-                // Retry once after a short delay
-                setTimeout(() => {
-                    try {
-                        const retrySuccess = globalShortcut.register(kb, handler);
-                        if (!retrySuccess) {
-                            console.error(`Shortcut ${action} (${kb}) retry also failed`);
-                        } else {
-                            console.log(`Shortcut ${action} (${kb}) registered on retry`);
-                        }
-                    } catch (retryErr) {
-                        console.error(`Shortcut ${action} (${kb}) retry error:`, retryErr.message);
-                    }
-                }, 500);
+                console.warn(`Shortcut ${action} (${kb}) failed to register`);
             }
         } catch (e) {
             console.error(`Failed to register ${action} (${kb}):`, e.message);

@@ -43,9 +43,10 @@ if (!gotTheLock) {
         setupApiKeysIpcHandlers();
         setupGeneralIpcHandlers();
 
-        // Kick off background validation of every stored API key. Never awaited
-        // so the window can open immediately.
-        apiKeys.startBackgroundValidation();
+        // Defer background key validation to avoid competing with window rendering
+        setTimeout(() => {
+            apiKeys.startBackgroundValidation();
+        }, 3000);
     });
 
     app.on('window-all-closed', () => {
