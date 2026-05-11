@@ -48,16 +48,18 @@ function getDefaultKeybinds() {
         zoomOut: isMac ? 'Cmd+-' : 'Ctrl+-',
         zoomReset: isMac ? 'Cmd+0' : 'Ctrl+0',
         // ── Opacity ──
-        opacityUp: isMac ? 'Cmd+Shift+]' : 'Ctrl+Shift+]',
-        opacityDown: isMac ? 'Cmd+Shift+[' : 'Ctrl+Shift+[',
+        fontOpacityUp: isMac ? 'Cmd+]' : 'Ctrl+]',
+        fontOpacityDown: isMac ? 'Cmd+[' : 'Ctrl+[',
+        bgOpacityUp: isMac ? 'Cmd+Shift+]' : 'Ctrl+Shift+]',
+        bgOpacityDown: isMac ? 'Cmd+Shift+[' : 'Ctrl+Shift+[',
         // ── Session ──
         nextStep: isMac ? 'Cmd+Enter' : 'Ctrl+Enter',
         // Response navigation: Ctrl+Shift+Left / Ctrl+Shift+Right
         previousResponse: isMac ? 'Cmd+Shift+Left' : 'Ctrl+Shift+Left',
         nextResponse: isMac ? 'Cmd+Shift+Right' : 'Ctrl+Shift+Right',
-        // Scroll: Ctrl+[ / Ctrl+]
-        scrollUp: isMac ? 'Cmd+[' : 'Ctrl+[',
-        scrollDown: isMac ? 'Cmd+]' : 'Ctrl+]',
+        // Scroll: Ctrl+Shift+Up / Ctrl+Shift+Down
+        scrollUp: isMac ? 'Cmd+Shift+Up' : 'Ctrl+Shift+Up',
+        scrollDown: isMac ? 'Cmd+Shift+Down' : 'Ctrl+Shift+Down',
         // ── Audio ──
         toggleVoice: isMac ? 'Cmd+Shift+L' : 'Ctrl+Shift+L',
         // ── Dev ──
@@ -86,8 +88,6 @@ function createWindow(sendToRenderer, geminiSessionRef) {
     const baseW = Math.round(DEFAULT_MAIN_WINDOW_SIZE.width * (winState.scale || 1.0));
     const baseH = Math.round(DEFAULT_MAIN_WINDOW_SIZE.height * (winState.scale || 1.0));
 
-    const isWin = process.platform === 'win32';
-
     const mainWindow = new BrowserWindow({
         width: Math.max(MIN_WINDOW_SIZE.width, baseW),
         height: Math.max(MIN_WINDOW_SIZE.height, baseH),
@@ -97,11 +97,9 @@ function createWindow(sendToRenderer, geminiSessionRef) {
         minHeight: MIN_WINDOW_SIZE.height,
         resizable: true,
         frame: false,
-        transparent: !isWin,
+        transparent: true,
         hasShadow: false,
         alwaysOnTop: true,
-        paintWhenInitiallyHidden: false,
-        opacity: winState.opacity ?? 1.0,
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false,
@@ -110,7 +108,7 @@ function createWindow(sendToRenderer, geminiSessionRef) {
             webSecurity: true,
             allowRunningInsecureContent: false,
         },
-        backgroundColor: isWin ? '#1a1a1a' : '#01010101',
+        backgroundColor: '#00000000',
     });
 
     const { session, desktopCapturer } = require('electron');
@@ -280,17 +278,21 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
         });
     }
 
-    // ── Opacity ──
-    if (winState().opacityEnabled !== false) {
-        tryRegister('opacityUp', keybinds.opacityUp, () => {
-            const step = Math.max(HARD_LIMITS.opacityStepMin, winState().opacityStep ?? 0.05);
-            applyOpacity(mainWindow, step, winState().opacityMax ?? 1.0);
-        });
-        tryRegister('opacityDown', keybinds.opacityDown, () => {
-            const step = Math.max(HARD_LIMITS.opacityStepMin, winState().opacityStep ?? 0.05);
-            applyOpacity(mainWindow, -step, winState().opacityMin ?? 0.2);
-        });
-    }
+    // ── Font Opacity (Ctrl+[ / Ctrl+]) ──
+    tryRegister('fontOpacityUp', keybinds.fontOpacityUp, () => {
+        sendToRenderer('font-opacity-change', 0.1);
+    });
+    tryRegister('fontOpacityDown', keybinds.fontOpacityDown, () => {
+        sendToRenderer('font-opacity-change', -0.1);
+    });
+
+    // ── Background Opacity (Ctrl+Shift+[ / Ctrl+Shift+]) ──
+    tryRegister('bgOpacityUp', keybinds.bgOpacityUp, () => {
+        sendToRenderer('bg-opacity-change', 0.05);
+    });
+    tryRegister('bgOpacityDown', keybinds.bgOpacityDown, () => {
+        sendToRenderer('bg-opacity-change', -0.05);
+    });
 
     // ── Session ──
     if (winState().sessionEnabled !== false) {
