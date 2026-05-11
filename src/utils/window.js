@@ -131,8 +131,6 @@ function createWindow(sendToRenderer, geminiSessionRef) {
             mainWindow.setSkipTaskbar(true);
         } catch (_) {}
         mainWindow.setAlwaysOnTop(true, 'screen-saver', 1);
-        // Disable user-drag to prevent OS rubber-banding; programmatic setPosition still works
-        mainWindow.setMovable(false);
     }
     if (process.platform === 'darwin') {
         try {
