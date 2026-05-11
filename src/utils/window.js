@@ -4,10 +4,6 @@ const storage = require('../storage');
 
 let mouseEventsIgnored = false;
 let _programmaticMove = false;
-let _moveDebounce = null;
-let _pendingDx = 0;
-let _pendingDy = 0;
-let _moveScheduled = false;
 
 const KEYBINDS_VERSION = 4; // Increment when default keybinds change
 
@@ -135,11 +131,7 @@ function createWindow(sendToRenderer, geminiSessionRef) {
             mainWindow.setSkipTaskbar(true);
         } catch (_) {}
         mainWindow.setAlwaysOnTop(true, 'screen-saver', 1);
-        // Prevent DWM from initiating its own animation on programmatic moves
-        mainWindow.on('will-move', e => {
-            if (_programmaticMove) e.preventDefault();
-        });
-        // Disable user-drag to prevent OS rubber-banding; programmatic setBounds still works
+        // Disable user-drag to prevent OS rubber-banding; programmatic setPosition still works
         mainWindow.setMovable(false);
     }
     if (process.platform === 'darwin') {
@@ -405,40 +397,15 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
 // ──────────────────────────────────────────────────────────────
 
 function safeMove(win, dx, dy) {
-    if (!win.isVisible()) return;
-    // Accumulate movement deltas for coalescing during rapid key repeat
-    _pendingDx += dx;
-    _pendingDy += dy;
-    if (!_moveScheduled) {
-        _moveScheduled = true;
-        setImmediate(() => {
-            _moveScheduled = false;
-            const flushDx = _pendingDx;
-            const flushDy = _pendingDy;
-            _pendingDx = 0;
-            _pendingDy = 0;
-            if (win.isDestroyed() || !win.isVisible()) return;
-            const bounds = win.getBounds();
-            const nx = bounds.x + flushDx;
-            const ny = bounds.y + flushDy;
-            _programmaticMove = true;
-            // Use setBounds with same width/height - this is atomic and avoids
-            // the DWM stretch effect that happens with separate setPosition calls
-            // on transparent frameless windows on Windows.
-            win.setBounds({ x: nx, y: ny, width: bounds.width, height: bounds.height });
-            setImmediate(() => {
-                _programmaticMove = false;
-            });
-        });
-    }
-    // Debounce storage persistence to prevent disk thrashing during rapid key repeat
-    if (_moveDebounce) clearTimeout(_moveDebounce);
-    _moveDebounce = setTimeout(() => {
-        if (!win.isDestroyed()) {
-            const finalBounds = win.getBounds();
-            storage.setWindowState({ x: finalBounds.x, y: finalBounds.y });
-        }
-    }, 150);
+    if (!win || win.isDestroyed() || !win.isVisible()) return;
+    // Direct synchronous position update — the proven stable approach.
+    // No deferred scheduling, no setBounds, no delta accumulation.
+    // getPosition + setPosition is the simplest atomic path in Electron
+    // and does NOT trigger resize/recomposite artifacts.
+    const [currentX, currentY] = win.getPosition();
+    _programmaticMove = true;
+    win.setPosition(currentX + dx, currentY + dy);
+    _programmaticMove = false;
 }
 
 /**
