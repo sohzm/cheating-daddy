@@ -5,6 +5,9 @@ const storage = require('../storage');
 let mouseEventsIgnored = false;
 let _programmaticMove = false;
 let _moveDebounce = null;
+let _pendingDx = 0;
+let _pendingDy = 0;
+let _moveScheduled = false;
 
 const KEYBINDS_VERSION = 4; // Increment when default keybinds change
 
@@ -34,47 +37,47 @@ function getDefaultKeybinds() {
     const isMac = process.platform === 'darwin';
     return {
         // ── Window movement ──
-        moveUp:             isMac ? 'Alt+Up'         : 'Ctrl+Up',
-        moveDown:           isMac ? 'Alt+Down'       : 'Ctrl+Down',
-        moveLeft:           isMac ? 'Alt+Left'       : 'Ctrl+Left',
-        moveRight:          isMac ? 'Alt+Right'      : 'Ctrl+Right',
+        moveUp: isMac ? 'Alt+Up' : 'Ctrl+Up',
+        moveDown: isMac ? 'Alt+Down' : 'Ctrl+Down',
+        moveLeft: isMac ? 'Alt+Left' : 'Ctrl+Left',
+        moveRight: isMac ? 'Alt+Right' : 'Ctrl+Right',
         // ── Visibility ──
-        toggleVisibility:   isMac ? 'Cmd+\\'         : 'Ctrl+\\',
-        toggleClickThrough: isMac ? 'Cmd+M'          : 'Ctrl+M',
+        toggleVisibility: isMac ? 'Cmd+\\' : 'Ctrl+\\',
+        toggleClickThrough: isMac ? 'Cmd+M' : 'Ctrl+M',
         // ── Scale (window size) ──
-        scaleUp:            isMac ? 'Cmd+Shift+='    : 'Ctrl+Shift+=',
-        scaleDown:          isMac ? 'Cmd+Shift+-'    : 'Ctrl+Shift+-',
+        scaleUp: isMac ? 'Cmd+Shift+=' : 'Ctrl+Shift+=',
+        scaleDown: isMac ? 'Cmd+Shift+-' : 'Ctrl+Shift+-',
         // ── Zoom (content) ──
-        zoomIn:             isMac ? 'Cmd+='          : 'Ctrl+=',
-        zoomOut:            isMac ? 'Cmd+-'          : 'Ctrl+-',
-        zoomReset:          isMac ? 'Cmd+0'          : 'Ctrl+0',
+        zoomIn: isMac ? 'Cmd+=' : 'Ctrl+=',
+        zoomOut: isMac ? 'Cmd+-' : 'Ctrl+-',
+        zoomReset: isMac ? 'Cmd+0' : 'Ctrl+0',
         // ── Opacity ──
-        opacityUp:          isMac ? 'Cmd+Shift+]'    : 'Ctrl+Shift+]',
-        opacityDown:        isMac ? 'Cmd+Shift+['    : 'Ctrl+Shift+[',
+        opacityUp: isMac ? 'Cmd+Shift+]' : 'Ctrl+Shift+]',
+        opacityDown: isMac ? 'Cmd+Shift+[' : 'Ctrl+Shift+[',
         // ── Session ──
-        nextStep:           isMac ? 'Cmd+Enter'      : 'Ctrl+Enter',
+        nextStep: isMac ? 'Cmd+Enter' : 'Ctrl+Enter',
         // Response navigation: Ctrl+Shift+Left / Ctrl+Shift+Right
-        previousResponse:   isMac ? 'Cmd+Shift+Left' : 'Ctrl+Shift+Left',
-        nextResponse:       isMac ? 'Cmd+Shift+Right': 'Ctrl+Shift+Right',
+        previousResponse: isMac ? 'Cmd+Shift+Left' : 'Ctrl+Shift+Left',
+        nextResponse: isMac ? 'Cmd+Shift+Right' : 'Ctrl+Shift+Right',
         // Scroll: Ctrl+[ / Ctrl+]
-        scrollUp:           isMac ? 'Cmd+['          : 'Ctrl+[',
-        scrollDown:         isMac ? 'Cmd+]'          : 'Ctrl+]',
+        scrollUp: isMac ? 'Cmd+[' : 'Ctrl+[',
+        scrollDown: isMac ? 'Cmd+]' : 'Ctrl+]',
         // ── Audio ──
-        toggleVoice:        isMac ? 'Cmd+Shift+L'    : 'Ctrl+Shift+L',
+        toggleVoice: isMac ? 'Cmd+Shift+L' : 'Ctrl+Shift+L',
         // ── Dev ──
-        reloadApp:          isMac ? 'Cmd+Shift+R'    : 'Ctrl+Shift+R',
-        devRefresh:         isMac ? 'Cmd+Shift+E'    : 'Ctrl+Shift+E',
+        reloadApp: isMac ? 'Cmd+Shift+R' : 'Ctrl+Shift+R',
+        devRefresh: isMac ? 'Cmd+Shift+E' : 'Ctrl+Shift+E',
         // ── Global Controls ──
-        themeToggle:        isMac ? 'Cmd+Shift+T'    : 'Ctrl+Shift+T',
-        fontSizeUp:         isMac ? 'Cmd+Shift+0'    : 'Ctrl+Shift+0',
-        fontSizeDown:       isMac ? 'Cmd+Shift+9'    : 'Ctrl+Shift+9',
-        aiModeToggle:       isMac ? 'Cmd+Shift+U'    : 'Ctrl+Shift+U',
+        themeToggle: isMac ? 'Cmd+Shift+T' : 'Ctrl+Shift+T',
+        fontSizeUp: isMac ? 'Cmd+Shift+0' : 'Ctrl+Shift+0',
+        fontSizeDown: isMac ? 'Cmd+Shift+9' : 'Ctrl+Shift+9',
+        aiModeToggle: isMac ? 'Cmd+Shift+U' : 'Ctrl+Shift+U',
         // ── Emergency ──
-        emergencyQuit:      isMac ? 'Cmd+Q'          : 'Ctrl+Q',
+        emergencyQuit: isMac ? 'Cmd+Q' : 'Ctrl+Q',
         // ── Model Management ──
-        debugToggle:        'Alt+D',
-        cycleSolutionModel: isMac ? 'Cmd+Y'          : 'Ctrl+Y',
-        cycleExtractionModel: isMac ? "Cmd+'"        : "Ctrl+'",
+        debugToggle: 'Alt+D',
+        cycleSolutionModel: isMac ? 'Cmd+Y' : 'Ctrl+Y',
+        cycleExtractionModel: isMac ? "Cmd+'" : "Ctrl+'",
     };
 }
 
@@ -88,27 +91,27 @@ function createWindow(sendToRenderer, geminiSessionRef) {
     const baseH = Math.round(DEFAULT_MAIN_WINDOW_SIZE.height * (winState.scale || 1.0));
 
     const mainWindow = new BrowserWindow({
-        width:  Math.max(MIN_WINDOW_SIZE.width,  baseW),
+        width: Math.max(MIN_WINDOW_SIZE.width, baseW),
         height: Math.max(MIN_WINDOW_SIZE.height, baseH),
         x: winState.x ?? undefined,
         y: winState.y ?? undefined,
-        minWidth:  MIN_WINDOW_SIZE.width,
+        minWidth: MIN_WINDOW_SIZE.width,
         minHeight: MIN_WINDOW_SIZE.height,
-        resizable:   true,
-        frame:       false,
+        resizable: true,
+        frame: false,
         transparent: true,
-        hasShadow:   false,
+        hasShadow: false,
         alwaysOnTop: true,
         opacity: winState.opacity ?? 1.0,
         webPreferences: {
-            nodeIntegration:      true,
-            contextIsolation:     false,
+            nodeIntegration: true,
+            contextIsolation: false,
             backgroundThrottling: false,
-            enableBlinkFeatures:  'GetDisplayMedia',
-            webSecurity:          true,
+            enableBlinkFeatures: 'GetDisplayMedia',
+            webSecurity: true,
             allowRunningInsecureContent: false,
         },
-        backgroundColor: '#00000000',
+        backgroundColor: '#01010101',
     });
 
     const { session, desktopCapturer } = require('electron');
@@ -125,11 +128,21 @@ function createWindow(sendToRenderer, geminiSessionRef) {
     mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 
     if (process.platform === 'win32') {
-        try { mainWindow.setSkipTaskbar(true); } catch (_) {}
+        try {
+            mainWindow.setSkipTaskbar(true);
+        } catch (_) {}
         mainWindow.setAlwaysOnTop(true, 'screen-saver', 1);
+        // Prevent DWM from initiating its own animation on programmatic moves
+        mainWindow.on('will-move', e => {
+            if (_programmaticMove) e.preventDefault();
+        });
+        // Disable user-drag to prevent OS rubber-banding; programmatic setBounds still works
+        mainWindow.setMovable(false);
     }
     if (process.platform === 'darwin') {
-        try { mainWindow.setHiddenInMissionControl(true); } catch (_) {}
+        try {
+            mainWindow.setHiddenInMissionControl(true);
+        } catch (_) {}
     }
 
     mainWindow.loadFile(path.join(__dirname, '../index.html'));
@@ -137,7 +150,9 @@ function createWindow(sendToRenderer, geminiSessionRef) {
     // Apply persisted zoom after DOM ready
     mainWindow.webContents.once('dom-ready', () => {
         const z = storage.getWindowState().zoom ?? 1.0;
-        try { mainWindow.webContents.setZoomFactor(z); } catch (_) {}
+        try {
+            mainWindow.webContents.setZoomFactor(z);
+        } catch (_) {}
 
         setTimeout(() => {
             const defaultKB = getDefaultKeybinds();
@@ -217,10 +232,10 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
 
     // ── Movement ──
     const moveActions = {
-        moveUp:    () => safeMove(mainWindow, 0, -(Math.max(10, winState().moveStep))),
-        moveDown:  () => safeMove(mainWindow, 0, +(Math.max(10, winState().moveStep))),
-        moveLeft:  () => safeMove(mainWindow, -(Math.max(10, winState().moveStep)), 0),
-        moveRight: () => safeMove(mainWindow, +(Math.max(10, winState().moveStep)), 0),
+        moveUp: () => safeMove(mainWindow, 0, -Math.max(10, winState().moveStep)),
+        moveDown: () => safeMove(mainWindow, 0, +Math.max(10, winState().moveStep)),
+        moveLeft: () => safeMove(mainWindow, -Math.max(10, winState().moveStep), 0),
+        moveRight: () => safeMove(mainWindow, +Math.max(10, winState().moveStep), 0),
     };
     for (const [action, fn] of Object.entries(moveActions)) {
         if (winState().moveEnabled !== false) tryRegister(action, keybinds[action], fn);
@@ -287,13 +302,13 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
     if (winState().sessionEnabled !== false) {
         tryRegister('nextStep', keybinds.nextStep, () => {
             const isMac = process.platform === 'darwin';
-            const key   = isMac ? 'cmd+enter' : 'ctrl+enter';
+            const key = isMac ? 'cmd+enter' : 'ctrl+enter';
             mainWindow.webContents.executeJavaScript(`cheatingDaddy.handleShortcut('${key}');`).catch(() => {});
         });
         tryRegister('previousResponse', keybinds.previousResponse, () => sendToRenderer('navigate-previous-response'));
-        tryRegister('nextResponse',     keybinds.nextResponse,     () => sendToRenderer('navigate-next-response'));
-        tryRegister('scrollUp',         keybinds.scrollUp,         () => sendToRenderer('scroll-response-up'));
-        tryRegister('scrollDown',       keybinds.scrollDown,       () => sendToRenderer('scroll-response-down'));
+        tryRegister('nextResponse', keybinds.nextResponse, () => sendToRenderer('navigate-next-response'));
+        tryRegister('scrollUp', keybinds.scrollUp, () => sendToRenderer('scroll-response-up'));
+        tryRegister('scrollDown', keybinds.scrollDown, () => sendToRenderer('scroll-response-down'));
     }
 
     // ── Voice ──
@@ -387,15 +402,31 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
 
 function safeMove(win, dx, dy) {
     if (!win.isVisible()) return;
-    const bounds = win.getBounds();
-    const nx = bounds.x + dx;
-    const ny = bounds.y + dy;
-    _programmaticMove = true;
-    // Use setBounds with same width/height - this is atomic and avoids
-    // the DWM stretch effect that happens with separate setPosition calls
-    // on transparent frameless windows on Windows.
-    win.setBounds({ x: nx, y: ny, width: bounds.width, height: bounds.height });
-    setImmediate(() => { _programmaticMove = false; });
+    // Accumulate movement deltas for coalescing during rapid key repeat
+    _pendingDx += dx;
+    _pendingDy += dy;
+    if (!_moveScheduled) {
+        _moveScheduled = true;
+        setImmediate(() => {
+            _moveScheduled = false;
+            const flushDx = _pendingDx;
+            const flushDy = _pendingDy;
+            _pendingDx = 0;
+            _pendingDy = 0;
+            if (win.isDestroyed() || !win.isVisible()) return;
+            const bounds = win.getBounds();
+            const nx = bounds.x + flushDx;
+            const ny = bounds.y + flushDy;
+            _programmaticMove = true;
+            // Use setBounds with same width/height - this is atomic and avoids
+            // the DWM stretch effect that happens with separate setPosition calls
+            // on transparent frameless windows on Windows.
+            win.setBounds({ x: nx, y: ny, width: bounds.width, height: bounds.height });
+            setImmediate(() => {
+                _programmaticMove = false;
+            });
+        });
+    }
     // Debounce storage persistence to prevent disk thrashing during rapid key repeat
     if (_moveDebounce) clearTimeout(_moveDebounce);
     _moveDebounce = setTimeout(() => {
@@ -414,18 +445,14 @@ function applyScale(win, delta, limit) {
     const ws = storage.getWindowState();
     const current = ws.scale ?? 1.0;
     // Enforce hard limits
-    const effectiveLimit = delta > 0
-        ? Math.min(limit, HARD_LIMITS.scaleMax)
-        : Math.max(limit, HARD_LIMITS.scaleMin);
-    const next = delta > 0
-        ? Math.min(current + Math.abs(delta), effectiveLimit)
-        : Math.max(current - Math.abs(delta), effectiveLimit);
+    const effectiveLimit = delta > 0 ? Math.min(limit, HARD_LIMITS.scaleMax) : Math.max(limit, HARD_LIMITS.scaleMin);
+    const next = delta > 0 ? Math.min(current + Math.abs(delta), effectiveLimit) : Math.max(current - Math.abs(delta), effectiveLimit);
     if (next === current) return;
 
     const [cx, cy] = win.getPosition();
     const [cw, ch] = win.getSize();
 
-    const nw = Math.round(DEFAULT_MAIN_WINDOW_SIZE.width  * next);
+    const nw = Math.round(DEFAULT_MAIN_WINDOW_SIZE.width * next);
     const nh = Math.round(DEFAULT_MAIN_WINDOW_SIZE.height * next);
     const nw2 = Math.max(MIN_WINDOW_SIZE.width, nw);
     const nh2 = Math.max(MIN_WINDOW_SIZE.height, nh);
@@ -446,14 +473,15 @@ function applyZoom(win, delta, limit) {
     const ws = storage.getWindowState();
     const current = ws.zoom ?? 1.0;
     // Enforce hard limits
-    const effectiveLimit = delta > 0
-        ? Math.min(limit, HARD_LIMITS.zoomMax)
-        : Math.max(limit, HARD_LIMITS.zoomMin);
-    const next = delta > 0
-        ? Math.min(parseFloat((current + Math.abs(delta)).toFixed(2)), effectiveLimit)
-        : Math.max(parseFloat((current - Math.abs(delta)).toFixed(2)), effectiveLimit);
+    const effectiveLimit = delta > 0 ? Math.min(limit, HARD_LIMITS.zoomMax) : Math.max(limit, HARD_LIMITS.zoomMin);
+    const next =
+        delta > 0
+            ? Math.min(parseFloat((current + Math.abs(delta)).toFixed(2)), effectiveLimit)
+            : Math.max(parseFloat((current - Math.abs(delta)).toFixed(2)), effectiveLimit);
     if (next === current) return;
-    try { win.webContents.setZoomFactor(next); } catch (_) {}
+    try {
+        win.webContents.setZoomFactor(next);
+    } catch (_) {}
     storage.updateWindowState('zoom', next);
     win.webContents.send('zoom-changed', next);
 }
@@ -462,14 +490,15 @@ function applyOpacity(win, delta, limit) {
     const ws = storage.getWindowState();
     const current = ws.opacity ?? 1.0;
     // Enforce hard limits
-    const effectiveLimit = delta > 0
-        ? Math.min(limit, HARD_LIMITS.opacityMax)
-        : Math.max(limit, HARD_LIMITS.opacityMin);
-    const next = delta > 0
-        ? Math.min(parseFloat((current + Math.abs(delta)).toFixed(2)), effectiveLimit)
-        : Math.max(parseFloat((current - Math.abs(delta)).toFixed(2)), effectiveLimit);
+    const effectiveLimit = delta > 0 ? Math.min(limit, HARD_LIMITS.opacityMax) : Math.max(limit, HARD_LIMITS.opacityMin);
+    const next =
+        delta > 0
+            ? Math.min(parseFloat((current + Math.abs(delta)).toFixed(2)), effectiveLimit)
+            : Math.max(parseFloat((current - Math.abs(delta)).toFixed(2)), effectiveLimit);
     if (next === current) return;
-    try { win.setOpacity(next); } catch (_) {}
+    try {
+        win.setOpacity(next);
+    } catch (_) {}
     storage.updateWindowState('opacity', next);
     win.webContents.send('opacity-changed', next);
 }
@@ -491,8 +520,11 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
 
     ipcMain.handle('toggle-window-visibility', () => {
         if (mainWindow.isDestroyed()) return { success: false };
-        if (mainWindow.isVisible()) { mainWindow.hide(); }
-        else { mainWindow.showInactive(); }
+        if (mainWindow.isVisible()) {
+            mainWindow.hide();
+        } else {
+            mainWindow.showInactive();
+        }
         return { success: true };
     });
 
@@ -534,7 +566,9 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
 
     ipcMain.handle('window:set-zoom', (event, zoom) => {
         const clamped = Math.max(HARD_LIMITS.zoomMin, Math.min(HARD_LIMITS.zoomMax, zoom));
-        try { mainWindow.webContents.setZoomFactor(clamped); } catch (_) {}
+        try {
+            mainWindow.webContents.setZoomFactor(clamped);
+        } catch (_) {}
         storage.updateWindowState('zoom', clamped);
         mainWindow.webContents.send('zoom-changed', clamped);
         return { success: true };
@@ -542,7 +576,9 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
 
     ipcMain.handle('window:set-opacity', (event, opacity) => {
         const clamped = Math.max(HARD_LIMITS.opacityMin, Math.min(HARD_LIMITS.opacityMax, opacity));
-        try { mainWindow.setOpacity(clamped); } catch (_) {}
+        try {
+            mainWindow.setOpacity(clamped);
+        } catch (_) {}
         storage.updateWindowState('opacity', clamped);
         mainWindow.webContents.send('opacity-changed', clamped);
         return { success: true };
@@ -558,15 +594,19 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
 function _applyStatePatch(win, patch) {
     if (patch.opacity !== undefined) {
         const clamped = Math.max(HARD_LIMITS.opacityMin, Math.min(HARD_LIMITS.opacityMax, patch.opacity));
-        try { win.setOpacity(clamped); } catch (_) {}
+        try {
+            win.setOpacity(clamped);
+        } catch (_) {}
     }
     if (patch.zoom !== undefined) {
         const clamped = Math.max(HARD_LIMITS.zoomMin, Math.min(HARD_LIMITS.zoomMax, patch.zoom));
-        try { win.webContents.setZoomFactor(clamped); } catch (_) {}
+        try {
+            win.webContents.setZoomFactor(clamped);
+        } catch (_) {}
     }
     if (patch.scale !== undefined) {
         const clamped = Math.max(HARD_LIMITS.scaleMin, Math.min(HARD_LIMITS.scaleMax, patch.scale));
-        const nw = Math.max(MIN_WINDOW_SIZE.width,  Math.round(DEFAULT_MAIN_WINDOW_SIZE.width  * clamped));
+        const nw = Math.max(MIN_WINDOW_SIZE.width, Math.round(DEFAULT_MAIN_WINDOW_SIZE.width * clamped));
         const nh = Math.max(MIN_WINDOW_SIZE.height, Math.round(DEFAULT_MAIN_WINDOW_SIZE.height * clamped));
         const [cx, cy] = win.getPosition();
         const [cw, ch] = win.getSize();
