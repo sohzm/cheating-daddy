@@ -253,6 +253,7 @@ function _sanitizeEntry(entry) {
         masked: _redact(entry.key),
         state: entry.state || 'unknown',
         lastCheckedAt: entry.lastCheckedAt || null,
+        exhaustedAt: entry.exhaustedAt || null,
         exhaustedUntil: entry.exhaustedUntil || null,
         errorReason: entry.errorReason || null,
         createdAt: entry.createdAt || null,
@@ -408,7 +409,7 @@ function updateProviderKey(provider, id, patch) {
         return { ok: false, error: 'Key not found' };
     }
     const current = pool[idx];
-    const allowed = ['label', 'state', 'lastCheckedAt', 'exhaustedUntil', 'errorReason'];
+    const allowed = ['label', 'state', 'lastCheckedAt', 'exhaustedAt', 'exhaustedUntil', 'errorReason'];
     for (const k of allowed) {
         if (Object.prototype.hasOwnProperty.call(patch, k)) {
             current[k] = patch[k];
@@ -428,8 +429,10 @@ function markProviderKeyState(provider, id, state, opts = {}) {
         errorReason: opts.errorReason || null,
     };
     if (state === 'exhausted') {
+        patch.exhaustedAt = opts.exhaustedAt || Date.now();
         patch.exhaustedUntil = opts.exhaustedUntil || (Date.now() + EXHAUSTION_COOLDOWN_MS);
     } else {
+        patch.exhaustedAt = null;
         patch.exhaustedUntil = null;
     }
     return updateProviderKey(provider, id, patch);

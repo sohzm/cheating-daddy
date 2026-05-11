@@ -16,7 +16,7 @@ const storage = require('../storage');
 
 let _broadcastEnabled = true;
 let _revalidationInterval = null;
-const REVALIDATION_INTERVAL_MS = 60 * 60 * 1000; // 1h
+const REVALIDATION_INTERVAL_MS = 5 * 60 * 1000; // 5min - check for expired cooldowns frequently
 
 // ──────────────────────────────────────────────────────────────
 // Error classification
@@ -166,7 +166,11 @@ async function revalidateKey(provider, id) {
     const raw = storage.getProviderKeyRaw(provider, id);
     if (!raw) return { ok: false, error: 'Key not found' };
 
-    // Best-effort probe
+    // If key is exhausted and cooldown hasn't expired, skip revalidation
+    if (raw.state === 'exhausted' && raw.exhaustedUntil && raw.exhaustedUntil > Date.now()) {
+        return { ok: true, skipped: true, reason: 'Cooldown active' };
+    }
+
     const verdict = await probeKey(provider, raw.key);
     if (verdict.state === 'ready') {
         storage.markProviderKeyState(provider, id, 'ready', { errorReason: null });
@@ -175,7 +179,7 @@ async function revalidateKey(provider, id) {
     } else if (verdict.state === 'invalid') {
         storage.markProviderKeyState(provider, id, 'invalid', { errorReason: verdict.reason });
     } else {
-        // Transient — just touch lastCheckedAt
+        // Transient / network error - don't change state, just update check time
         storage.updateProviderKey(provider, id, { lastCheckedAt: Date.now(), errorReason: verdict.reason });
     }
     broadcastUpdate(provider);
@@ -203,13 +207,28 @@ async function revalidateStale() {
     for (const provider of storage.API_KEY_PROVIDERS) {
         const keys = storage.listAllProviderKeysRaw(provider);
         for (const k of keys) {
-            const shouldRetry =
-                (k.state === 'exhausted' && k.exhaustedUntil && k.exhaustedUntil <= now) ||
-                (k.state === 'unknown') ||
-                (k.state === 'invalid' && k.lastCheckedAt && (now - k.lastCheckedAt) > storage.EXHAUSTION_COOLDOWN_MS);
+            let shouldRetry = false;
+
+            if (k.state === 'unknown') {
+                shouldRetry = true;
+            } else if (k.state === 'exhausted' && k.exhaustedUntil && k.exhaustedUntil <= now) {
+                // Cooldown expired - try to recover
+                shouldRetry = true;
+            } else if (k.state === 'invalid' && k.lastCheckedAt && (now - k.lastCheckedAt) > storage.EXHAUSTION_COOLDOWN_MS) {
+                // Invalid keys get retried after 24h too
+                shouldRetry = true;
+            }
+
             if (shouldRetry) {
-                // Fire-and-forget; don't chain serially to avoid long walls
-                revalidateKey(provider, k.id).catch(() => {});
+                try {
+                    // Force revalidation by temporarily clearing exhaustedUntil for expired keys
+                    if (k.state === 'exhausted' && k.exhaustedUntil && k.exhaustedUntil <= now) {
+                        storage.updateProviderKey(provider, k.id, { exhaustedUntil: null });
+                    }
+                    await revalidateKey(provider, k.id);
+                } catch (e) {
+                    console.error(`Revalidation failed for ${provider}/${k.id}:`, e.message);
+                }
             }
         }
     }
@@ -236,20 +255,28 @@ async function withKeyRotation(provider, fn) {
     }
 
     let lastError = null;
+    let attemptIndex = 0;
     for (const entry of candidates) {
         try {
-            return await fn(entry.key, entry);
+            const result = await fn(entry.key, entry);
+            // If we skipped previous keys (they failed), notify about the switch
+            if (attemptIndex > 0) {
+                broadcastRotation(provider, entry, candidates[0]);
+            }
+            return result;
         } catch (err) {
             lastError = err;
             const verdict = classifyError(err);
             if (verdict === 'invalid') {
                 storage.markProviderKeyState(provider, entry.id, 'invalid', { errorReason: err.message });
                 broadcastUpdate(provider);
+                attemptIndex++;
                 continue;
             }
             if (verdict === 'exhausted') {
                 storage.markProviderKeyState(provider, entry.id, 'exhausted', { errorReason: err.message });
                 broadcastUpdate(provider);
+                attemptIndex++;
                 continue;
             }
             // Transient — bubble up; we don't know if next key would help
@@ -279,6 +306,45 @@ async function handleResponseStatus(provider, keyId, response) {
         broadcastUpdate(provider);
     }
     return verdict;
+}
+
+/**
+ * Mark a key based on an HTTP status code from a failed request.
+ * Use this when the Response body has already been consumed.
+ */
+function handleKeyFailure(provider, keyId, statusCode, errorText = '') {
+    let state = 'transient';
+    if (statusCode === 401 || statusCode === 403) state = 'invalid';
+    else if (statusCode === 429) state = 'exhausted';
+    else if (statusCode === 400 && /quota|rate[_ ]?limit|exhausted/i.test(errorText)) state = 'exhausted';
+
+    if (state === 'invalid') {
+        storage.markProviderKeyState(provider, keyId, 'invalid', { errorReason: `HTTP ${statusCode}` });
+        broadcastUpdate(provider);
+    } else if (state === 'exhausted') {
+        storage.markProviderKeyState(provider, keyId, 'exhausted', { errorReason: `HTTP ${statusCode}` });
+        broadcastUpdate(provider);
+    }
+    return state;
+}
+
+/**
+ * Broadcast a key rotation event to the renderer for UI notification.
+ */
+function broadcastRotation(provider, newKey, oldKey) {
+    try {
+        const windows = BrowserWindow.getAllWindows();
+        const payload = {
+            provider,
+            from: { id: oldKey.id, label: oldKey.label || 'Unnamed' },
+            to: { id: newKey.id, label: newKey.label || 'Unnamed' },
+        };
+        for (const w of windows) {
+            w.webContents.send('api-keys:rotated', payload);
+        }
+    } catch (err) {
+        console.error('Failed to broadcast rotation:', err.message);
+    }
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -328,6 +394,7 @@ module.exports = {
     classifyError,
     classifyFetchResponse,
     handleResponseStatus,
+    handleKeyFailure,
 
     // Lifecycle
     startBackgroundValidation,
@@ -335,4 +402,5 @@ module.exports = {
 
     // For IPC layer
     broadcastUpdate,
+    broadcastRotation,
 };

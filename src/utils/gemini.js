@@ -286,7 +286,7 @@ async function sendToGroq(transcription) {
                 const errorText = await response.text().catch(() => '');
                 // Mark the key invalid/exhausted based on the status, then throw to let
                 // withKeyRotation classify + move on to the next key.
-                await apiKeys.handleResponseStatus('groq', entry.id, response);
+                apiKeys.handleKeyFailure('groq', entry.id, response.status, errorText);
                 const err = new Error(`Groq API error ${response.status}: ${errorText.slice(0, 200)}`);
                 err.status = response.status;
                 throw err;
