@@ -339,6 +339,18 @@ function setupApiKeysIpcHandlers() {
             return { success: false, error: error.message };
         }
     });
+
+    // Update label for a key
+    ipcMain.handle('api-keys:update-label', async (event, provider, id, label) => {
+        try {
+            const result = storage.updateProviderKey(provider, id, { label: (label || '').trim() });
+            if (result.ok) apiKeys.broadcastUpdate(provider);
+            return result.ok ? { success: true } : { success: false, error: result.error };
+        } catch (error) {
+            console.error('Error updating API key label:', error);
+            return { success: false, error: error.message };
+        }
+    });
 }
 
 function setupGeneralIpcHandlers() {

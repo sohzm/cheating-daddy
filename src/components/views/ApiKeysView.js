@@ -26,7 +26,7 @@ export class ApiKeysView extends LitElement {
                 border: 1px solid var(--border); border-radius: var(--radius-sm);
             }
             .key-row {
-                display: grid; grid-template-columns: 10px 1fr 130px 70px 90px;
+                display: grid; grid-template-columns: 10px 1fr 130px 60px 110px;
                 align-items: center; gap: var(--space-sm); padding: 7px 10px;
                 background: var(--bg-elevated); min-height: 38px;
                 font-size: var(--font-size-xs); border-bottom: 1px solid var(--border);
@@ -49,6 +49,7 @@ export class ApiKeysView extends LitElement {
                 white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
             }
             .key-status { font-size: 10px; color: var(--text-secondary); white-space: nowrap; }
+            .key-status.in-use { color: var(--success); font-weight: var(--font-weight-medium); }
             .key-status.countdown { color: var(--warning); font-family: var(--font-mono); }
             .key-status.error-text { color: var(--danger); }
             .key-state-label {
@@ -57,9 +58,19 @@ export class ApiKeysView extends LitElement {
                 letter-spacing: 0.4px; white-space: nowrap; text-align: center;
             }
             .key-state-label.ready { color: var(--success); background: rgba(34,197,94,0.1); }
+            .key-state-label.in-use { color: var(--success); background: rgba(34,197,94,0.15); font-weight: 600; }
             .key-state-label.exhausted { color: var(--warning); background: rgba(212,160,23,0.1); }
             .key-state-label.invalid { color: var(--danger); background: rgba(239,68,68,0.1); }
             .key-state-label.unknown { color: var(--text-muted); background: rgba(85,85,85,0.1); }
+            .in-use-row { background: rgba(34,197,94,0.03); }
+            .status-dot.pulse { animation: dotPulse 2s ease-in-out infinite; }
+            @keyframes dotPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+            .edit-input {
+                background: var(--bg-app); color: var(--text-primary); border: 1px solid var(--accent);
+                border-radius: 3px; padding: 2px 6px; font-size: var(--font-size-xs); width: 100%;
+                font-family: var(--font);
+            }
+            .edit-input:focus { outline: none; }
             .key-actions { display: flex; gap: 4px; justify-content: flex-end; }
             .sm-btn {
                 background: transparent; border: 1px solid var(--border); border-radius: 3px;
@@ -118,6 +129,9 @@ export class ApiKeysView extends LitElement {
         _loading: { state: true },
         _notification: { state: true },
         _now: { state: true },
+        _editingId: { state: true },
+        _editingProvider: { state: true },
+        _editLabel: { state: true },
     };
 
     constructor() {
@@ -134,6 +148,9 @@ export class ApiKeysView extends LitElement {
         this._loading = false;
         this._notification = null;
         this._now = Date.now();
+        this._editingId = null;
+        this._editingProvider = null;
+        this._editLabel = '';
         this._unsubscribe = null;
         this._rotationListener = null;
         this._countdownInterval = null;
@@ -247,6 +264,50 @@ export class ApiKeysView extends LitElement {
         return [...keys].sort((a, b) => (order[a.state] ?? 9) - (order[b.state] ?? 9));
     }
 
+    _getStatusText(k, isFirstReady) {
+        if (k.state === 'exhausted' && k.exhaustedUntil) {
+            return { text: `Retry in: ${this._formatCountdown(k.exhaustedUntil)}`, cls: 'countdown' };
+        }
+        if (k.state === 'invalid') {
+            return { text: k.errorReason || 'Invalid key', cls: 'error-text' };
+        }
+        if (k.state === 'ready' && isFirstReady) {
+            return { text: 'In Use', cls: 'in-use' };
+        }
+        if (k.state === 'ready') {
+            return { text: 'Standby', cls: '' };
+        }
+        if (k.state === 'unknown') {
+            return { text: 'Validating...', cls: '' };
+        }
+        return { text: '', cls: '' };
+    }
+
+    _startEdit(provider, k) {
+        this._editingId = k.id;
+        this._editingProvider = provider;
+        this._editLabel = k.label || '';
+        this.requestUpdate();
+    }
+
+    _cancelEdit() {
+        this._editingId = null;
+        this._editingProvider = null;
+        this._editLabel = '';
+        this.requestUpdate();
+    }
+
+    async _saveEdit(provider, id) {
+        if (window.require) {
+            const { ipcRenderer } = window.require('electron');
+            await ipcRenderer.invoke('api-keys:update-label', provider, id, this._editLabel);
+        }
+        this._editingId = null;
+        this._editingProvider = null;
+        this._editLabel = '';
+        await this._loadKeys();
+    }
+
     _renderKeyTable(provider, keys, filter) {
         const filtered = this._filterKeys(keys, filter);
         const sorted = this._sortKeys(filtered);
@@ -255,31 +316,46 @@ export class ApiKeysView extends LitElement {
             return html`<div class="empty-state">${keys.length === 0 ? 'No keys added yet' : 'No keys match filter'}</div>`;
         }
 
+        // Find the first ready key — that's the "in use" one
+        let firstReadyFound = false;
+
         return html`
             <div class="key-table">
-                ${sorted.map(k => html`
-                    <div class="key-row">
-                        <div class="status-dot ${k.state}"></div>
+                ${sorted.map(k => {
+                    const isFirstReady = (k.state === 'ready' || k.state === 'unknown') && !firstReadyFound;
+                    if (isFirstReady) firstReadyFound = true;
+                    const status = this._getStatusText(k, isFirstReady);
+                    const isEditing = this._editingId === k.id && this._editingProvider === provider;
+
+                    return html`
+                    <div class="key-row ${isFirstReady ? 'in-use-row' : ''}">
+                        <div class="status-dot ${k.state} ${isFirstReady ? 'pulse' : ''}"></div>
                         <div class="key-identity">
-                            <div class="key-name">${k.label || 'Unnamed'}</div>
+                            ${isEditing ? html`
+                                <input class="edit-input" type="text" .value=${this._editLabel}
+                                    @input=${e => { this._editLabel = e.target.value; }}
+                                    @keydown=${e => { if (e.key === 'Enter') this._saveEdit(provider, k.id); if (e.key === 'Escape') this._cancelEdit(); }}
+                                    autofocus
+                                />
+                            ` : html`
+                                <div class="key-name">${k.label || 'Unnamed'}</div>
+                            `}
                             <div class="key-masked">${k.masked}</div>
                         </div>
-                        <div class="key-status ${k.state === 'exhausted' ? 'countdown' : k.state === 'invalid' ? 'error-text' : ''}">
-                            ${k.state === 'exhausted' && k.exhaustedUntil
-                                ? html`Retry in: ${this._formatCountdown(k.exhaustedUntil)}`
-                                : k.state === 'invalid'
-                                    ? (k.errorReason || 'Invalid')
-                                    : k.state === 'ready'
-                                        ? 'Active'
-                                        : 'Pending...'}
-                        </div>
-                        <span class="key-state-label ${k.state}">${k.state}</span>
+                        <div class="key-status ${status.cls}">${status.text}</div>
+                        <span class="key-state-label ${k.state}">${isFirstReady ? 'in use' : k.state}</span>
                         <div class="key-actions">
-                            <button class="sm-btn" @click=${() => this._revalidateKey(provider, k.id)}>Test</button>
-                            <button class="sm-btn danger" @click=${() => this._removeKey(provider, k.id)}>Del</button>
+                            ${isEditing ? html`
+                                <button class="sm-btn" @click=${() => this._saveEdit(provider, k.id)}>Save</button>
+                                <button class="sm-btn" @click=${() => this._cancelEdit()}>X</button>
+                            ` : html`
+                                <button class="sm-btn" @click=${() => this._startEdit(provider, k)} title="Edit">&#9998;</button>
+                                <button class="sm-btn" @click=${() => this._revalidateKey(provider, k.id)} title="Test">Test</button>
+                                <button class="sm-btn danger" @click=${() => this._removeKey(provider, k.id)} title="Remove">Del</button>
+                            `}
                         </div>
                     </div>
-                `)}
+                `})}
             </div>
         `;
     }
