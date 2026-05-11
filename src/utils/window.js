@@ -462,8 +462,7 @@ function applyScale(win, delta, limit) {
     const nx = Math.round(cx + (cw - nw2) / 2);
     const ny = Math.round(cy + (ch - nh2) / 2);
 
-    win.setSize(nw2, nh2);
-    win.setPosition(nx, ny);
+    win.setBounds({ x: nx, y: ny, width: nw2, height: nh2 });
     storage.setWindowState({ scale: next, x: nx, y: ny });
 
     const { BrowserWindow: BW } = require('electron');
@@ -614,8 +613,7 @@ function _applyStatePatch(win, patch) {
         const [cw, ch] = win.getSize();
         const nx = Math.round(cx + (cw - nw) / 2);
         const ny = Math.round(cy + (ch - nh) / 2);
-        win.setSize(nw, nh);
-        win.setPosition(nx, ny);
+        win.setBounds({ x: nx, y: ny, width: nw, height: nh });
     }
 }
 
