@@ -1119,6 +1119,8 @@ const theme = {
                 root.style.setProperty('--font-opacity', String(fontOpacity));
                 root.style.setProperty('--text-primary', `rgba(${textRgb.r}, ${textRgb.g}, ${textRgb.b}, ${fontOpacity})`);
                 root.style.setProperty('--text-secondary', `rgba(${secRgb.r}, ${secRgb.g}, ${secRgb.b}, ${fontOpacity})`);
+                const mutedRgb = this.hexToRgb(colors.textMuted);
+                root.style.setProperty('--text-muted', `rgba(${mutedRgb.r}, ${mutedRgb.g}, ${mutedRgb.b}, ${Math.max(0.3, fontOpacity * 0.6)})`);
             }
             return themeName;
         } catch (err) {
@@ -1143,6 +1145,8 @@ const theme = {
             root.style.setProperty('--font-opacity', String(fontOpacity));
             root.style.setProperty('--text-primary', `rgba(${textRgb.r}, ${textRgb.g}, ${textRgb.b}, ${fontOpacity})`);
             root.style.setProperty('--text-secondary', `rgba(${secRgb.r}, ${secRgb.g}, ${secRgb.b}, ${fontOpacity})`);
+            const mutedRgb = this.hexToRgb(colors.textMuted);
+            root.style.setProperty('--text-muted', `rgba(${mutedRgb.r}, ${mutedRgb.g}, ${mutedRgb.b}, ${Math.max(0.3, fontOpacity * 0.6)})`);
         }
     },
 };

@@ -701,11 +701,11 @@ function saveSession(sessionId, data) {
         createdAt: existingSession?.createdAt || parseInt(sessionId),
         lastUpdated: Date.now(),
         // Profile context - set once when session starts
-        profile: data.profile || existingSession?.profile || null,
-        customPrompt: data.customPrompt || existingSession?.customPrompt || null,
+        profile: data.profile !== undefined ? data.profile : (existingSession?.profile ?? null),
+        customPrompt: data.customPrompt !== undefined ? data.customPrompt : (existingSession?.customPrompt ?? null),
         // Conversation data
-        conversationHistory: data.conversationHistory || existingSession?.conversationHistory || [],
-        screenAnalysisHistory: data.screenAnalysisHistory || existingSession?.screenAnalysisHistory || [],
+        conversationHistory: data.conversationHistory !== undefined ? data.conversationHistory : (existingSession?.conversationHistory ?? []),
+        screenAnalysisHistory: data.screenAnalysisHistory !== undefined ? data.screenAnalysisHistory : (existingSession?.screenAnalysisHistory ?? []),
     };
     return writeJsonFile(sessionPath, sessionData);
 }
@@ -826,7 +826,12 @@ function getRecentSessionContext(maxSessions = 3, maxTurnsPerSession = 5) {
     }
 
     if (contextParts.length === 0) return '';
-    return '\n\n--- Previous Session Context ---\n' + contextParts.join('\n\n');
+    const fullContext = '\n\n--- Previous Session Context ---\n' + contextParts.join('\n\n');
+    // Cap at ~4000 characters to avoid consuming too much of the model's context window
+    if (fullContext.length > 4000) {
+        return fullContext.substring(0, 4000) + '\n[...truncated]';
+    }
+    return fullContext;
 }
 
 // ============ CLEAR ALL DATA ============
