@@ -1,0 +1,26 @@
+{
+    "id": "FEAT-002",
+    "type": "fix",
+    "description": "Fix AppHeader layout/overlap issues (issue #5) - improve header text alignment, spacing, and responsive behavior",
+    "status": "completed",
+    "steps": [
+        "1. In src/components/app/CheatingDaddyApp.js, refactor the .live-bar-right styles: add flex-wrap: nowrap, overflow: hidden, text-overflow: ellipsis to prevent text overlap. Add min-width: 0 to allow flex children to shrink.",
+        "2. In the .live-bar CSS, change the layout to use a proper 3-column flex with explicit widths: left (flex-shrink:0), center (position:absolute centered), right (flex-shrink:0, margin-left:auto). Ensure the center text does not overlap with left/right by adding max-width and overflow:hidden to .live-bar-center.",
+        "3. Add gap between items in .live-bar-right using gap: var(--space-sm) (already there, value is --space-md). Reduce gap to 8px and add white-space: nowrap to all .live-bar-text items to prevent wrapping.",
+        "4. Add overflow: hidden and text-overflow: ellipsis to .live-bar-center to handle long profile names.",
+        "5. In the renderLiveBar() template, ensure the model info text in .live-bar-right does not grow too wide by capping with max-width or truncating. Add a max-width: 200px and overflow: hidden to the model span.",
+        "6. Ensure left/right sections cannot overlap the center by giving them explicit flex-basis or max-width constraints."
+    ],
+    "acceptance_criteria": [
+        "Live bar header elements do not overlap each other",
+        "Text truncates with ellipsis when space is limited",
+        "Left back button, center profile label, and right status indicators are properly spaced",
+        "No text wrapping occurs in the live bar"
+    ],
+    "verification": [
+        "Run 'node -e \"require('./src/storage.js')\"' from /projects/sandbox/cd to validate main process files parse correctly",
+        "Run 'npx prettier --check src/' to verify formatting compliance"
+    ],
+    "blocked_reason": null,
+    "findings": "Replaced flex+absolute positioning with CSS Grid (grid-template-columns: auto 1fr auto) for the live-bar. Removed z-index from left/right sections. Added overflow/ellipsis handling to center and right sections. Reduced gap in right section from --space-md to --space-sm. Added max-width: 180px to live-bar-text items."
+}

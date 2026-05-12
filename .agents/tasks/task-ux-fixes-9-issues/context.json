@@ -1,0 +1,31 @@
+{
+    "project_type": "Electron desktop app using LitElement web components with electron-forge",
+    "language": "JavaScript (ES Modules in renderer, CommonJS in main)",
+    "build_system": "electron-forge (npm start for dev)",
+    "test_framework": "No automated tests. Manual verification via 'npm install && npm start'",
+    "build_command": "npm install",
+    "test_command": "npm start (manual - verify it launches without errors)",
+    "verification_instructions": "1. Run 'npm install' to verify dependencies install. 2. Run 'npx prettier --check src/' to verify formatting. 3. AST validate key files with node -e require syntax.",
+    "snapshot_or_generated_files": null,
+    "setup_instructions": "npm install",
+    "environment_constraints": "OPEN_INTERNET - full network access. No test suite exists. Verify via AST parsing and prettier check.",
+    "contribution_requirements": "Run 'npx prettier --write .' before committing. Prettier uses .prettierrc (4-space indent, 150 print width, semicolons, single quotes). src/assets is ignored.",
+    "key_patterns": "LitElement components with static styles/properties. IPC between main (CommonJS) and renderer (renderer.js exposes window.cheatingDaddy). Theme system in renderer.js sets CSS vars on document.documentElement. Storage is JSON files on disk. Window management in window.js with global shortcuts. State sync via ipcRenderer events.",
+    "relevant_files": [
+        "src/storage.js",
+        "src/utils/window.js",
+        "src/utils/renderer.js",
+        "src/utils/gemini.js",
+        "src/index.js",
+        "src/index.html",
+        "src/components/app/CheatingDaddyApp.js",
+        "src/components/app/AppHeader.js",
+        "src/components/views/CustomizeView.js",
+        "src/components/views/AssistantView.js",
+        "src/components/views/HistoryView.js",
+        "src/components/views/HotkeysView.js",
+        "src/components/views/MainView.js",
+        "src/components/views/sharedPageStyles.js"
+    ],
+    "directory_structure": "src/ - app source. src/index.js - main process entry. src/utils/ - main process utilities (window, gemini, renderer, apiKeys). src/components/ - LitElement web components. src/assets/ - bundled libraries and logos. docs/ - AI context documentation."
+}

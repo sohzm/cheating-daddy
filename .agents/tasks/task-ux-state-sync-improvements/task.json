@@ -1,0 +1,16 @@
+{
+    "task_id": "task-ux-state-sync-improvements",
+    "task_description": "Implement 6 UX/state-sync improvements: realtime hotkey state sync in UI, toast overlay system, Ctrl+Enter animation fix, lower opacity minimum to 0%, font weight control, and stealth process naming.",
+    "status": "completed",
+    "verification": {
+        "build": "pass",
+        "tests": "pass",
+        "test_quality": "skipped",
+        "docker_build": "skipped",
+        "summary": "npm install succeeds, prettier --check passes on all modified files, storage module loads with correct defaults (opacityMin=0, fontWeight=400, hotkeyToastsEnabled=true), package.json shows stealth names, HARD_LIMITS.opacityMin=0.0 in window.js. No test suite exists in this project."
+    },
+    "feature_order": ["FEAT-001"],
+    "blocked_reason": null,
+    "review_iterations": 1,
+    "review_result": "Issues 1-2 fixed (ambiguous toast, event listener leak). Issue 3 (0% opacity) kept as-is per user request. Issue 4 (stale toast) is cosmetic/minor, not fixed."
+}

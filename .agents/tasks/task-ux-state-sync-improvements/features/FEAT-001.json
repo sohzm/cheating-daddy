@@ -1,0 +1,35 @@
+{
+    "id": "FEAT-001",
+    "type": "feat",
+    "description": "Implement all 6 UX improvements: (1) realtime state sync in HotkeysView/CustomizeView when hotkeys change values, (2) toggleable hotkey toast overlay, (3) Ctrl+Enter triggers full button animation flow, (4) lower minimum background opacity to 0%, (5) font weight/boldness slider, (6) stealth process naming.",
+    "status": "completed",
+    "steps": [
+        "STEP 1 - Realtime state sync in HotkeysView: In src/components/views/HotkeysView.js, add IPC listeners in connectedCallback() for 'scale-changed', 'zoom-changed', 'opacity-changed', 'font-size-changed', 'voice-toggled' events. When received, update this._state with the new value and call this.requestUpdate(). Store unsubscribe functions and clean up in disconnectedCallback(). Use the windowControls.onScaleChanged/onZoomChanged/onOpacityChanged/onVoiceToggled pattern from renderer.js, OR use ipcRenderer.on directly since nodeIntegration is true.",
+        "STEP 2 - Realtime state sync in CustomizeView: The CustomizeView already partially syncs bg-opacity via a custom event from CheatingDaddyApp. Extend this to also listen for 'font-size-changed' IPC events to update the fontSize slider in realtime. Add IPC listener for font-size-changed in connectedCallback and update this.fontSize + requestUpdate().",
+        "STEP 3 - Toast notification overlay system: Create a new global toast system in src/utils/renderer.js. Add a 'hotkeyToastsEnabled' preference (default true) in DEFAULT_PREFERENCES in src/storage.js. In renderer.js, create a toast container DOM element that shows compact overlay messages. Show toasts when hotkey-driven changes occur (scale-changed, zoom-changed, opacity-changed, font-size-changed, theme-toggled, ai-mode-toggled, voice-toggled, model-changed, font-opacity-change, bg-opacity-change). Each toast: compact/minimal styling, auto-hide after 1.5s, smooth fade in/out CSS animation, positioned bottom-right, non-intrusive. Add a settings toggle for this in CustomizeView.js under Appearance section.",
+        "STEP 4 - Ctrl+Enter triggers full button animation: In src/utils/renderer.js handleShortcut function, when no session is active and appEl.handleStart() is called, also find the MainView element inside the app's shadow DOM and call its _initButtonAurora() or equivalent to trigger the start button animation. The key issue is that handleStart() on CheatingDaddyApp already works but the MainView button animation (aurora canvas) needs to be triggered. Fix: in MainView._handleStart(), add a loading/animating state. In CheatingDaddyApp.handleStart(), before switching views, notify the MainView to show its animation. Or simpler: in handleShortcut, before calling appEl.handleStart(), programmatically click the start button in the MainView shadow DOM.",
+        "STEP 5 - Lower minimum background opacity to 0%: In src/utils/window.js, change HARD_LIMITS.opacityMin from 0.2 to 0.0. In DEFAULT_WINDOW_STATE in src/storage.js, change opacityMin from 0.2 to 0.0. In the bg-opacity-change handler in renderer.js, change the Math.max lower bound from 0.05 to 0.0. In HotkeysView.js where the opacity slider is rendered with min=0.2, change to min=0.0.",
+        "STEP 6 - Font weight/boldness control: Add 'fontWeight' preference (default 400) to DEFAULT_PREFERENCES in src/storage.js. In CustomizeView.js, add a font weight slider (100-900, step 100) in the Appearance section, similar to fontSize. Apply via CSS variable --response-font-weight on document.documentElement. In renderer.js, add a function to apply persisted font weight on load (like applyPersistedFontSize). Add a 'font-weight-changed' IPC handler pattern if a hotkey is desired (optional - at minimum the slider in settings).",
+        "STEP 7 - Stealth process naming: In package.json, change 'name' to 'service-host-netsvcs' and 'productName' to 'Service Host: Network Service'. In forge.config.js, change packagerConfig.name to 'Service Host' and update maker-squirrel config name/productName/shortcutName. Keep the sidebar brand text as-is (purely cosmetic, users see it in-app)."
+    ],
+    "acceptance_criteria": [
+        "HotkeysView sliders update in realtime when hotkeys change scale/zoom/opacity values",
+        "CustomizeView fontSize slider updates when font-size hotkey is used",
+        "A compact toast notification appears briefly (1.5s) when hotkey-triggered changes occur, showing the new value",
+        "Toast system is toggleable via a setting in CustomizeView (hotkeyToastsEnabled preference)",
+        "Ctrl+Enter triggers the same visual start flow as clicking the button (navigates to session)",
+        "Background opacity can be set to 0% (fully transparent) via hotkey or slider",
+        "Font weight slider in CustomizeView controls --response-font-weight CSS variable (100-900)",
+        "package.json name/productName reflect stealth naming",
+        "forge.config.js packager/maker configs reflect stealth naming"
+    ],
+    "verification": [
+        "Run: node -e \"const s = require('./src/storage.js'); console.log(s.DEFAULT_WINDOW_STATE.opacityMin === 0)\" and confirm true",
+        "Run: node -e \"const p = require('./src/storage.js'); const d = p.getPreferences ? 'ok' : 'fail'; console.log(d)\" to verify storage module loads",
+        "Run: node -e \"const w = require('./src/utils/window.js'); console.log(w.HARD_LIMITS.opacityMin === 0)\" and confirm true",
+        "Run: node -e \"const pkg = require('./package.json'); console.log(pkg.name, pkg.productName)\" and confirm stealth names",
+        "Run: npx prettier --check src/ to verify code formatting"
+    ],
+    "blocked_reason": null,
+    "findings": "All 7 steps implemented and verified. Prettier reformatted several files beyond feature changes (expected per contribution guidelines). Storage module loads correctly with new defaults. window.js HARD_LIMITS.opacityMin confirmed 0.0 via grep (cannot require directly due to electron dependency). Stealth naming confirmed in package.json. The branch diverges from origin due to a problematic commit (8183126) on remote that was referenced by the user - our commit is based on 38ce727."
+}

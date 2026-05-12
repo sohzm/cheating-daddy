@@ -1,0 +1,30 @@
+{
+    "id": "FEAT-003",
+    "type": "fix",
+    "description": "Fix history system - sessions save but content is blank (issue #6), and improve AI context persistence (issue #7)",
+    "status": "completed",
+    "steps": [
+        "1. DIAGNOSIS: The history system saves sessions via IPC events from renderer.js ('save-conversation-turn', 'save-session-context', 'save-screen-analysis'). These are emitted by gemini.js via sendToRenderer(). The issue is that gemini.js calls saveConversationTurn() which sends 'save-conversation-turn' to renderer, then renderer calls storage.saveSession(). However, gemini.js also directly uses 'sendToRenderer' and the data flow is: main->renderer->main (IPC round-trip). The data arrives correctly because storage.saveSession() in the main process is invoked via 'storage:save-session' IPC handler. The actual fix needed: in gemini.js saveConversationTurn() and saveScreenAnalysis(), ALSO call storage.saveSession() directly in the main process (not just relay through renderer). This ensures data persists even if renderer doesn't process the event.",
+        "2. In src/utils/gemini.js, modify saveConversationTurn() to ALSO call storage.saveSession() directly: storage.saveSession(currentSessionId, { conversationHistory: conversationHistory }). This way the data is saved both via IPC to renderer AND directly in main process.",
+        "3. In src/utils/gemini.js, modify saveScreenAnalysis() to ALSO call storage.saveSession() directly: storage.saveSession(currentSessionId, { screenAnalysisHistory: screenAnalysisHistory, profile: currentProfile, customPrompt: currentCustomPrompt }).",
+        "4. In src/utils/gemini.js, modify initializeNewSession() to ALSO call storage.saveSession() directly to persist the initial session metadata (profile, customPrompt) immediately.",
+        "5. For AI context persistence (issue #7): Add a new function in gemini.js called loadPreviousContext() that on session init, reads the last N sessions from storage.getAllSessions(), extracts their conversation summaries, and passes them as context to the AI system prompt. This gives the AI memory of past sessions.",
+        "6. In src/utils/gemini.js, modify the session initialization (initializeNewSession or wherever the system prompt is built) to append a context section from previous sessions: read the last 3 sessions using storage.getAllSessions() and storage.getSession(), extract key Q&A pairs, and append them to the system prompt as 'Previous session context'.",
+        "7. Create a new storage function getRecentSessionContext() in src/storage.js that returns summarized context from the last 3 sessions (last 5 turns from each). This provides cross-session memory.",
+        "8. In gemini.js setupGeminiIpcHandlers or the session setup flow, call getRecentSessionContext() and inject it into the system prompt when building it."
+    ],
+    "acceptance_criteria": [
+        "When a session ends and user opens History, the session shows actual conversation content (not blank)",
+        "saveConversationTurn in gemini.js persists data directly to disk in addition to IPC relay",
+        "saveScreenAnalysis in gemini.js persists data directly to disk",
+        "AI sessions include context from the last 3 previous sessions in their system prompt",
+        "getRecentSessionContext() function exists in storage.js and returns useful prior context"
+    ],
+    "verification": [
+        "Run 'node -e \"require('./src/storage.js')\"' from /projects/sandbox/cd to validate storage.js parses correctly",
+        "Run 'node -e \"require('./src/utils/gemini.js')\"' from /projects/sandbox/cd to validate gemini.js parses correctly",
+        "Run 'npx prettier --check src/' to verify formatting compliance"
+    ],
+    "blocked_reason": null,
+    "findings": "gemini.js cannot be require()'d in isolation due to missing @google/genai dependency (expected for Electron app), but node --check confirms syntax is valid. storage.js requires cleanly. All prettier checks pass."
+}

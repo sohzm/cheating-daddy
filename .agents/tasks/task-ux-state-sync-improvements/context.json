@@ -1,0 +1,27 @@
+{
+    "project_type": "Electron desktop app with LitElement web components",
+    "language": "JavaScript (ES modules in renderer, CommonJS in main process)",
+    "build_system": "electron-forge with npm scripts",
+    "test_framework": "None (no automated tests exist)",
+    "build_command": "npm install",
+    "test_command": "npm run lint",
+    "verification_instructions": "1. Run npm install to ensure dependencies resolve. 2. Run npx prettier --check src/ to verify formatting. 3. Verify no syntax errors by running node -e \"require('./src/index.js')\" (checks main process modules parse correctly).",
+    "snapshot_or_generated_files": null,
+    "setup_instructions": "npm install",
+    "environment_constraints": "OPEN_INTERNET - full network access. No test suite exists. Verification is limited to syntax checks and prettier.",
+    "contribution_requirements": "Run npx prettier --write . before committing. Use .prettierrc settings (4-space indent, 150 print width, semicolons, single quotes).",
+    "key_patterns": "Main process (src/index.js, src/utils/window.js, src/storage.js) uses CommonJS require(). Renderer (src/utils/renderer.js) uses require('electron').ipcRenderer directly (nodeIntegration=true, contextIsolation=false). UI components use LitElement from vendored lit-core-2.7.4.min.js. Global cheatingDaddy object exposes storage/window/theme APIs to components. IPC pattern: main registers handlers via ipcMain.handle(), renderer wraps them in the storage/windowControls objects. Window state persisted in window-state.json via storage.getWindowState()/setWindowState(). Preferences persisted in preferences.json. Theme system in renderer.js applies CSS variables. Hotkeys registered as globalShortcuts in window.js, emit IPC events to renderer (e.g. 'scale-changed', 'zoom-changed', 'opacity-changed', 'font-size-changed').",
+    "relevant_files": [
+        "src/index.js",
+        "src/utils/window.js",
+        "src/utils/renderer.js",
+        "src/storage.js",
+        "src/components/views/HotkeysView.js",
+        "src/components/views/CustomizeView.js",
+        "src/components/views/MainView.js",
+        "src/components/app/CheatingDaddyApp.js",
+        "package.json",
+        "forge.config.js"
+    ],
+    "directory_structure": "src/index.js (main process entry), src/utils/window.js (window creation + global shortcuts), src/utils/renderer.js (renderer process globals + IPC wrappers + theme + cheatingDaddy object), src/storage.js (filesystem persistence), src/components/app/CheatingDaddyApp.js (root LitElement), src/components/views/ (page views as LitElement components)"
+}

@@ -1,0 +1,7 @@
+{
+    "task_id": "task-ux-fixes-9-issues",
+    "task_description": "Fix 9 UX issues: remove extra languages, fix bg opacity min, global font weight, font opacity on headers, header layout, history persistence, AI context persistence, hotkey UI state sync, and analyze button animation sync",
+    "status": "in_progress",
+    "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003", "FEAT-004"],
+    "blocked_reason": null
+}
