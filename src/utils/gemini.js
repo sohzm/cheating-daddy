@@ -94,6 +94,14 @@ function initializeNewSession(profile = null, customPrompt = null) {
             customPrompt: customPrompt || '',
         });
     }
+
+    // Persist initial session immediately
+    storage.saveSession(currentSessionId, {
+        profile: profile,
+        customPrompt: customPrompt || '',
+        conversationHistory: [],
+        screenAnalysisHistory: [],
+    });
 }
 
 function saveConversationTurn(transcription, aiResponse) {
@@ -116,6 +124,9 @@ function saveConversationTurn(transcription, aiResponse) {
         turn: conversationTurn,
         fullHistory: conversationHistory,
     });
+
+    // Also persist directly to ensure data is saved regardless of renderer state
+    storage.saveSession(currentSessionId, { conversationHistory: conversationHistory });
 }
 
 function saveScreenAnalysis(prompt, response, model) {
@@ -138,6 +149,13 @@ function saveScreenAnalysis(prompt, response, model) {
         sessionId: currentSessionId,
         analysis: analysisEntry,
         fullHistory: screenAnalysisHistory,
+        profile: currentProfile,
+        customPrompt: currentCustomPrompt,
+    });
+
+    // Also persist directly to ensure data is saved regardless of renderer state
+    storage.saveSession(currentSessionId, {
+        screenAnalysisHistory: screenAnalysisHistory,
         profile: currentProfile,
         customPrompt: currentCustomPrompt,
     });
@@ -487,6 +505,12 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
 
     const systemPrompt = getSystemPrompt(profile, customPrompt, googleSearchEnabled);
     currentSystemPrompt = systemPrompt; // Store for Groq
+
+    // Append cross-session context for AI memory
+    const sessionContext = storage.getRecentSessionContext();
+    if (sessionContext) {
+        currentSystemPrompt += sessionContext;
+    }
 
     // Initialize new conversation session only on first connect
     if (!isReconnect) {

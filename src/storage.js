@@ -785,6 +785,50 @@ function deleteAllSessions() {
     }
 }
 
+// ============ AI CONTEXT (Cross-session memory) ============
+
+function getRecentSessionContext(maxSessions = 3, maxTurnsPerSession = 5) {
+    const sessions = getAllSessions();
+    if (!sessions || sessions.length === 0) return '';
+
+    const recentSessions = sessions.slice(0, maxSessions);
+    const contextParts = [];
+
+    for (const sessionMeta of recentSessions) {
+        const session = readJsonFile(getSessionPath(sessionMeta.sessionId), null);
+        if (!session) continue;
+
+        const turns = (session.conversationHistory || []).slice(-maxTurnsPerSession);
+        if (turns.length === 0 && (!session.screenAnalysisHistory || session.screenAnalysisHistory.length === 0)) continue;
+
+        const sessionDate = new Date(session.createdAt || parseInt(sessionMeta.sessionId)).toLocaleDateString();
+        const profileLabel = session.profile || 'general';
+        let sessionContext = `[Session: ${profileLabel} on ${sessionDate}]`;
+
+        for (const turn of turns) {
+            if (turn.transcription) {
+                sessionContext += `\nQ: ${turn.transcription.substring(0, 200)}`;
+            }
+            if (turn.ai_response) {
+                sessionContext += `\nA: ${turn.ai_response.substring(0, 300)}`;
+            }
+        }
+
+        // Include last screen analysis if any
+        const screenItems = (session.screenAnalysisHistory || []).slice(-2);
+        for (const item of screenItems) {
+            if (item.response) {
+                sessionContext += `\n[Screen Analysis]: ${item.response.substring(0, 200)}`;
+            }
+        }
+
+        contextParts.push(sessionContext);
+    }
+
+    if (contextParts.length === 0) return '';
+    return '\n\n--- Previous Session Context ---\n' + contextParts.join('\n\n');
+}
+
 // ============ CLEAR ALL DATA ============
 
 function clearAllData() {
@@ -853,6 +897,7 @@ module.exports = {
     saveSession,
     getSession,
     getAllSessions,
+    getRecentSessionContext,
     deleteSession,
     deleteAllSessions,
 
