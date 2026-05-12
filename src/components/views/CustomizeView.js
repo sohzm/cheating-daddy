@@ -237,8 +237,8 @@ export class CustomizeView extends LitElement {
             this.backgroundTransparency = e.detail.value;
             this.requestUpdate();
         };
-        const app = document.querySelector('cheating-daddy-app');
-        if (app) app.addEventListener('bg-opacity-updated', this._bgOpacityListener);
+        this._appElement = document.querySelector('cheating-daddy-app');
+        if (this._appElement) this._appElement.addEventListener('bg-opacity-updated', this._bgOpacityListener);
 
         // Listen for hotkey-driven font size changes
         this._ipcCleanups = [];
@@ -259,6 +259,9 @@ export class CustomizeView extends LitElement {
 
     disconnectedCallback() {
         super.disconnectedCallback();
+        if (this._appElement) {
+            this._appElement.removeEventListener('bg-opacity-updated', this._bgOpacityListener);
+        }
         this._ipcCleanups.forEach(fn => fn());
         this._ipcCleanups = [];
     }

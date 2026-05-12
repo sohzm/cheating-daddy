@@ -1244,7 +1244,7 @@ ipcRenderer.on('bg-opacity-change', async (_, delta) => {
     if (app) {
         app.dispatchEvent(new CustomEvent('bg-opacity-updated', { detail: { value: next } }));
     }
-    showToast(`Opacity: ${Math.round(next * 100)}%`);
+    showToast(`Background: ${Math.round(next * 100)}%`);
 });
 
 ipcRenderer.on('ai-mode-toggled', (_, newMode) => {
@@ -1280,7 +1280,7 @@ ipcRenderer.on('zoom-changed', (_, val) => {
 });
 
 ipcRenderer.on('opacity-changed', (_, val) => {
-    showToast(`Opacity: ${Math.round(val * 100)}%`);
+    showToast(`Window Opacity: ${Math.round(val * 100)}%`);
 });
 
 ipcRenderer.on('voice-toggled', (_, enabled) => {
