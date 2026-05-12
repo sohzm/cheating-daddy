@@ -49,7 +49,6 @@ module.exports.formatSpeakerResults = formatSpeakerResults;
 let systemAudioProc = null;
 let messageBuffer = '';
 
-
 // Reconnection variables
 let isUserClosing = false;
 let sessionParams = null;
@@ -71,9 +70,7 @@ function buildContextMessage() {
 
     if (validTurns.length === 0) return null;
 
-    const contextLines = validTurns.map(turn =>
-        `[Interviewer]: ${turn.transcription.trim()}\n[Your answer]: ${turn.ai_response.trim()}`
-    );
+    const contextLines = validTurns.map(turn => `[Interviewer]: ${turn.transcription.trim()}\n[Your answer]: ${turn.ai_response.trim()}`);
 
     return `Session reconnected. Here's the conversation so far:\n\n${contextLines.join('\n\n')}\n\nContinue from here.`;
 }
@@ -94,7 +91,7 @@ function initializeNewSession(profile = null, customPrompt = null) {
         sendToRenderer('save-session-context', {
             sessionId: currentSessionId,
             profile: profile,
-            customPrompt: customPrompt || ''
+            customPrompt: customPrompt || '',
         });
     }
 }
@@ -130,7 +127,7 @@ function saveScreenAnalysis(prompt, response, model) {
         timestamp: Date.now(),
         prompt: prompt,
         response: response.trim(),
-        model: model
+        model: model,
     };
 
     screenAnalysisHistory.push(analysisEntry);
@@ -142,7 +139,7 @@ function saveScreenAnalysis(prompt, response, model) {
         analysis: analysisEntry,
         fullHistory: screenAnalysisHistory,
         profile: currentProfile,
-        customPrompt: currentCustomPrompt
+        customPrompt: currentCustomPrompt,
     });
 }
 
@@ -209,19 +206,19 @@ function hasGroqKey() {
     const pool = storage.listProviderKeys('groq') || [];
     if (pool.length > 0) return true;
     const key = getGroqApiKey();
-    return key && key.trim() != ''
+    return key && key.trim() != '';
 }
 
-function trimConversationHistoryForGemma(history, maxChars=42000) {
-    if(!history || history.length === 0) return [];
+function trimConversationHistoryForGemma(history, maxChars = 42000) {
+    if (!history || history.length === 0) return [];
     let totalChars = 0;
     const trimmed = [];
 
-    for(let i = history.length - 1; i >= 0; i--) {
+    for (let i = history.length - 1; i >= 0; i--) {
         const turn = history[i];
         const turnChars = (turn.content || '').length;
 
-        if(totalChars + turnChars > maxChars) break;
+        if (totalChars + turnChars > maxChars) break;
         totalChars += turnChars;
         trimmed.unshift(turn);
     }
@@ -256,7 +253,7 @@ async function sendToGroq(transcription) {
 
     groqConversationHistory.push({
         role: 'user',
-        content: transcription.trim()
+        content: transcription.trim(),
     });
 
     if (groqConversationHistory.length > 20) {
@@ -268,19 +265,16 @@ async function sendToGroq(transcription) {
             const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${groqApiKey}`,
-                    'Content-Type': 'application/json'
+                    Authorization: `Bearer ${groqApiKey}`,
+                    'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
                     model: modelToUse,
-                    messages: [
-                        { role: 'system', content: currentSystemPrompt || 'You are a helpful assistant.' },
-                        ...groqConversationHistory
-                    ],
+                    messages: [{ role: 'system', content: currentSystemPrompt || 'You are a helpful assistant.' }, ...groqConversationHistory],
                     stream: true,
                     temperature: 0.7,
-                    max_tokens: 1024
-                })
+                    max_tokens: 1024,
+                }),
             });
 
             if (!response.ok) {
@@ -345,7 +339,7 @@ async function sendToGroq(transcription) {
             if (cleanedResponse) {
                 groqConversationHistory.push({
                     role: 'assistant',
-                    content: cleanedResponse
+                    content: cleanedResponse,
                 });
 
                 saveConversationTurn(transcription, cleanedResponse);
@@ -382,7 +376,7 @@ async function sendToGemma(transcription) {
 
     groqConversationHistory.push({
         role: 'user',
-        content: transcription.trim()
+        content: transcription.trim(),
     });
 
     const trimmedHistory = trimConversationHistoryForGemma(groqConversationHistory, 42000);
@@ -395,14 +389,14 @@ async function sendToGemma(transcription) {
 
             const messages = trimmedHistory.map(msg => ({
                 role: msg.role === 'assistant' ? 'model' : 'user',
-                parts: [{ text: msg.content }]
+                parts: [{ text: msg.content }],
             }));
 
             const systemPrompt = currentSystemPrompt || 'You are a helpful assistant.';
             const messagesWithSystem = [
                 { role: 'user', parts: [{ text: systemPrompt }] },
                 { role: 'model', parts: [{ text: 'Understood. I will follow these instructions.' }] },
-                ...messages
+                ...messages,
             ];
 
             const response = await ai.models.generateContentStream({
@@ -436,7 +430,7 @@ async function sendToGemma(transcription) {
             if (fullText.trim()) {
                 groqConversationHistory.push({
                     role: 'assistant',
-                    content: fullText.trim()
+                    content: fullText.trim(),
                 });
 
                 if (groqConversationHistory.length > 40) {
@@ -817,9 +811,7 @@ async function sendImageToGeminiHttp(base64Data, prompt) {
     // Use solution model from preferences; fall back to rate-limited model selection
     const prefs = storage.getPreferences();
     const debugMode = prefs.debugModeEnabled || false;
-    const model = debugMode
-        ? (prefs.modelDebugging || 'gemini-2.5-flash')
-        : (prefs.modelSolution || getAvailableModel());
+    const model = debugMode ? prefs.modelDebugging || 'gemini-2.5-flash' : prefs.modelSolution || getAvailableModel();
 
     // Pick a ready key; fall back to legacy single-key for users that haven't migrated yet.
     const readyKeys = storage.listReadyProviderKeys('gemini');
@@ -912,9 +904,7 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
 
         // Prefer the pool; fall back to any apiKey the renderer passed (for back-compat).
         const readyKeys = storage.listReadyProviderKeys('gemini');
-        const candidates = readyKeys.length > 0
-            ? readyKeys
-            : (apiKey ? [{ id: null, key: apiKey }] : []);
+        const candidates = readyKeys.length > 0 ? readyKeys : apiKey ? [{ id: null, key: apiKey }] : [];
 
         if (candidates.length === 0) {
             console.error('initialize-gemini: no ready Gemini API keys');
@@ -1142,7 +1132,7 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
 
     ipcMain.handle('close-session', async event => {
         try {
-            _sessionAborted = true;  // Signal any in-progress initialization to stop
+            _sessionAborted = true; // Signal any in-progress initialization to stop
             isInitializingSession = false;
             stopMacOSAudioCapture();
 

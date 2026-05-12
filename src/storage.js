@@ -8,7 +8,7 @@ const CONFIG_VERSION = 1;
 const DEFAULT_CONFIG = {
     configVersion: CONFIG_VERSION,
     onboarded: false,
-    layout: 'normal'
+    layout: 'normal',
 };
 
 const DEFAULT_CREDENTIALS = {
@@ -19,7 +19,7 @@ const DEFAULT_CREDENTIALS = {
     //   { id, key, label, state: 'ready'|'exhausted'|'invalid'|'unknown',
     //     lastCheckedAt, exhaustedUntil, errorReason, createdAt }
     geminiKeys: [],
-    groqKeys: []
+    groqKeys: [],
 };
 
 const API_KEY_PROVIDERS = ['gemini', 'groq'];
@@ -56,6 +56,8 @@ const DEFAULT_PREFERENCES = {
     modelSolution: 'gemini-2.5-flash',
     modelDebugging: 'gemini-2.5-flash',
     debugModeEnabled: false,
+    hotkeyToastsEnabled: true,
+    fontWeight: 400,
 };
 
 const DEFAULT_KEYBINDS = null; // null means use defaults from getDefaultKeybinds()
@@ -68,16 +70,16 @@ const DEFAULT_WINDOW_STATE = {
     // Window size scale (1.0 = default size, 0.5 = half, 2.0 = double)
     scale: 1.0,
     scaleMin: 0.3,
-    scaleMax: 1.5,       // Reduced from 3.0 to prevent GPU overload
+    scaleMax: 1.5, // Reduced from 3.0 to prevent GPU overload
     scaleStep: 0.1,
     // Content zoom (Electron webContents zoomFactor, 1.0 = 100%)
     zoom: 1.0,
     zoomMin: 0.5,
-    zoomMax: 2.0,        // Reduced from 3.0 to prevent GPU overload
+    zoomMax: 2.0, // Reduced from 3.0 to prevent GPU overload
     zoomStep: 0.1,
     // Window opacity (0.0–1.0)
     opacity: 1.0,
-    opacityMin: 0.2,     // Raised from 0.1 so window stays visible
+    opacityMin: 0.0, // Allow fully transparent
     opacityMax: 1.0,
     opacityStep: 0.05,
     // Visibility
@@ -99,7 +101,7 @@ const DEFAULT_WINDOW_STATE = {
 };
 
 const DEFAULT_LIMITS = {
-    data: [] // Array of { date: 'YYYY-MM-DD', flash: { count }, flashLite: { count }, groq: { 'qwen3-32b': { chars, limit }, 'gpt-oss-120b': { chars, limit }, 'gpt-oss-20b': { chars, limit } }, gemini: { 'gemma-3-27b-it': { chars } } }
+    data: [], // Array of { date: 'YYYY-MM-DD', flash: { count }, flashLite: { count }, groq: { 'qwen3-32b': { chars, limit }, 'gpt-oss-120b': { chars, limit }, 'gpt-oss-20b': { chars, limit } }, gemini: { 'gemma-3-27b-it': { chars } } }
 };
 
 // Get the config directory path based on OS
@@ -474,7 +476,7 @@ function markProviderKeyState(provider, id, state, opts = {}) {
     };
     if (state === 'exhausted') {
         patch.exhaustedAt = opts.exhaustedAt || Date.now();
-        patch.exhaustedUntil = opts.exhaustedUntil || (Date.now() + EXHAUSTION_COOLDOWN_MS);
+        patch.exhaustedUntil = opts.exhaustedUntil || Date.now() + EXHAUSTION_COOLDOWN_MS;
     } else {
         patch.exhaustedAt = null;
         patch.exhaustedUntil = null;
@@ -561,17 +563,17 @@ function getTodayLimits() {
 
     if (todayEntry) {
         // ensure new fields exist
-        if(!todayEntry.groq) {
+        if (!todayEntry.groq) {
             todayEntry.groq = {
                 'qwen3-32b': { chars: 0, limit: 1500000 },
                 'gpt-oss-120b': { chars: 0, limit: 600000 },
                 'gpt-oss-20b': { chars: 0, limit: 600000 },
-                'kimi-k2-instruct': { chars: 0, limit: 600000 }
+                'kimi-k2-instruct': { chars: 0, limit: 600000 },
             };
         }
-        if(!todayEntry.gemini) {
+        if (!todayEntry.gemini) {
             todayEntry.gemini = {
-                'gemma-3-27b-it': { chars: 0 }
+                'gemma-3-27b-it': { chars: 0 },
             };
         }
         setLimits(limits);
@@ -588,11 +590,11 @@ function getTodayLimits() {
             'qwen3-32b': { chars: 0, limit: 1500000 },
             'gpt-oss-120b': { chars: 0, limit: 600000 },
             'gpt-oss-20b': { chars: 0, limit: 600000 },
-            'kimi-k2-instruct': { chars: 0, limit: 600000 }
+            'kimi-k2-instruct': { chars: 0, limit: 600000 },
         },
         gemini: {
-            'gemma-3-27b-it': { chars: 0 }
-        }
+            'gemma-3-27b-it': { chars: 0 },
+        },
     };
     limits.data.push(newEntry);
     setLimits(limits);
@@ -613,7 +615,7 @@ function incrementLimitCount(model) {
         todayEntry = {
             date: today,
             flash: { count: 0 },
-            flashLite: { count: 0 }
+            flashLite: { count: 0 },
         };
         limits.data.push(todayEntry);
     } else {
@@ -639,7 +641,7 @@ function incrementCharUsage(provider, model, charCount) {
     const today = getTodayDateString();
     const todayEntry = limits.data.find(entry => entry.date === today);
 
-    if(todayEntry[provider] && todayEntry[provider][model]) {
+    if (todayEntry[provider] && todayEntry[provider][model]) {
         todayEntry[provider][model].chars += charCount;
         setLimits(limits);
     }
@@ -703,7 +705,7 @@ function saveSession(sessionId, data) {
         customPrompt: data.customPrompt || existingSession?.customPrompt || null,
         // Conversation data
         conversationHistory: data.conversationHistory || existingSession?.conversationHistory || [],
-        screenAnalysisHistory: data.screenAnalysisHistory || existingSession?.screenAnalysisHistory || []
+        screenAnalysisHistory: data.screenAnalysisHistory || existingSession?.screenAnalysisHistory || [],
     };
     return writeJsonFile(sessionPath, sessionData);
 }
@@ -720,7 +722,8 @@ function getAllSessions() {
             return [];
         }
 
-        const files = fs.readdirSync(historyDir)
+        const files = fs
+            .readdirSync(historyDir)
             .filter(f => f.endsWith('.json'))
             .sort((a, b) => {
                 // Sort by timestamp descending (newest first)
@@ -729,22 +732,24 @@ function getAllSessions() {
                 return tsB - tsA;
             });
 
-        return files.map(file => {
-            const sessionId = file.replace('.json', '');
-            const data = readJsonFile(path.join(historyDir, file), null);
-            if (data) {
-                return {
-                    sessionId,
-                    createdAt: data.createdAt,
-                    lastUpdated: data.lastUpdated,
-                    messageCount: data.conversationHistory?.length || 0,
-                    screenAnalysisCount: data.screenAnalysisHistory?.length || 0,
-                    profile: data.profile || null,
-                    customPrompt: data.customPrompt || null
-                };
-            }
-            return null;
-        }).filter(Boolean);
+        return files
+            .map(file => {
+                const sessionId = file.replace('.json', '');
+                const data = readJsonFile(path.join(historyDir, file), null);
+                if (data) {
+                    return {
+                        sessionId,
+                        createdAt: data.createdAt,
+                        lastUpdated: data.lastUpdated,
+                        messageCount: data.conversationHistory?.length || 0,
+                        screenAnalysisCount: data.screenAnalysisHistory?.length || 0,
+                        profile: data.profile || null,
+                        customPrompt: data.customPrompt || null,
+                    };
+                }
+                return null;
+            })
+            .filter(Boolean);
     } catch (error) {
         console.error('Error reading sessions:', error.message);
         return [];
@@ -852,5 +857,5 @@ module.exports = {
     deleteAllSessions,
 
     // Clear all
-    clearAllData
+    clearAllData,
 };

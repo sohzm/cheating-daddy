@@ -202,59 +202,131 @@ export class OnboardingView extends LitElement {
         resize();
 
         const blobs = [
-            { parts: [
-                { ox: 0, oy: 0, r: 1.0 },
-                { ox: 0.22, oy: 0.1, r: 0.85 },
-                { ox: 0.11, oy: 0.05, r: 0.5 },
-            ], color: [180, 200, 230], x: 0.15, y: 0.2, vx: 0.35, vy: 0.25, phase: 0 },
+            {
+                parts: [
+                    { ox: 0, oy: 0, r: 1.0 },
+                    { ox: 0.22, oy: 0.1, r: 0.85 },
+                    { ox: 0.11, oy: 0.05, r: 0.5 },
+                ],
+                color: [180, 200, 230],
+                x: 0.15,
+                y: 0.2,
+                vx: 0.35,
+                vy: 0.25,
+                phase: 0,
+            },
 
-            { parts: [
-                { ox: 0, oy: 0, r: 0.95 },
-                { ox: 0.18, oy: -0.08, r: 0.75 },
-                { ox: 0.09, oy: -0.04, r: 0.4 },
-            ], color: [190, 180, 220], x: 0.75, y: 0.2, vx: -0.3, vy: 0.35, phase: 1.2 },
+            {
+                parts: [
+                    { ox: 0, oy: 0, r: 0.95 },
+                    { ox: 0.18, oy: -0.08, r: 0.75 },
+                    { ox: 0.09, oy: -0.04, r: 0.4 },
+                ],
+                color: [190, 180, 220],
+                x: 0.75,
+                y: 0.2,
+                vx: -0.3,
+                vy: 0.35,
+                phase: 1.2,
+            },
 
-            { parts: [
-                { ox: 0, oy: 0, r: 0.9 },
-                { ox: 0.24, oy: 0.12, r: 0.9 },
-                { ox: 0.12, oy: 0.06, r: 0.35 },
-            ], color: [210, 195, 215], x: 0.5, y: 0.65, vx: 0.25, vy: -0.3, phase: 2.4 },
+            {
+                parts: [
+                    { ox: 0, oy: 0, r: 0.9 },
+                    { ox: 0.24, oy: 0.12, r: 0.9 },
+                    { ox: 0.12, oy: 0.06, r: 0.35 },
+                ],
+                color: [210, 195, 215],
+                x: 0.5,
+                y: 0.65,
+                vx: 0.25,
+                vy: -0.3,
+                phase: 2.4,
+            },
 
-            { parts: [
-                { ox: 0, oy: 0, r: 0.8 },
-                { ox: -0.15, oy: 0.18, r: 0.7 },
-                { ox: -0.07, oy: 0.09, r: 0.45 },
-            ], color: [175, 210, 210], x: 0.1, y: 0.75, vx: 0.4, vy: 0.2, phase: 3.6 },
+            {
+                parts: [
+                    { ox: 0, oy: 0, r: 0.8 },
+                    { ox: -0.15, oy: 0.18, r: 0.7 },
+                    { ox: -0.07, oy: 0.09, r: 0.45 },
+                ],
+                color: [175, 210, 210],
+                x: 0.1,
+                y: 0.75,
+                vx: 0.4,
+                vy: 0.2,
+                phase: 3.6,
+            },
 
-            { parts: [
-                { ox: 0, oy: 0, r: 0.75 },
-                { ox: 0.12, oy: -0.15, r: 0.65 },
-                { ox: 0.06, oy: -0.07, r: 0.35 },
-            ], color: [220, 210, 195], x: 0.85, y: 0.55, vx: -0.28, vy: -0.32, phase: 4.8 },
+            {
+                parts: [
+                    { ox: 0, oy: 0, r: 0.75 },
+                    { ox: 0.12, oy: -0.15, r: 0.65 },
+                    { ox: 0.06, oy: -0.07, r: 0.35 },
+                ],
+                color: [220, 210, 195],
+                x: 0.85,
+                y: 0.55,
+                vx: -0.28,
+                vy: -0.32,
+                phase: 4.8,
+            },
 
-            { parts: [
-                { ox: 0, oy: 0, r: 0.95 },
-                { ox: -0.2, oy: -0.12, r: 0.75 },
-                { ox: -0.1, oy: -0.06, r: 0.4 },
-            ], color: [170, 190, 225], x: 0.6, y: 0.1, vx: -0.2, vy: 0.38, phase: 6.0 },
+            {
+                parts: [
+                    { ox: 0, oy: 0, r: 0.95 },
+                    { ox: -0.2, oy: -0.12, r: 0.75 },
+                    { ox: -0.1, oy: -0.06, r: 0.4 },
+                ],
+                color: [170, 190, 225],
+                x: 0.6,
+                y: 0.1,
+                vx: -0.2,
+                vy: 0.38,
+                phase: 6.0,
+            },
 
-            { parts: [
-                { ox: 0, oy: 0, r: 0.85 },
-                { ox: 0.17, oy: 0.15, r: 0.75 },
-                { ox: 0.08, oy: 0.07, r: 0.35 },
-            ], color: [200, 190, 220], x: 0.35, y: 0.4, vx: 0.32, vy: -0.22, phase: 7.2 },
+            {
+                parts: [
+                    { ox: 0, oy: 0, r: 0.85 },
+                    { ox: 0.17, oy: 0.15, r: 0.75 },
+                    { ox: 0.08, oy: 0.07, r: 0.35 },
+                ],
+                color: [200, 190, 220],
+                x: 0.35,
+                y: 0.4,
+                vx: 0.32,
+                vy: -0.22,
+                phase: 7.2,
+            },
 
-            { parts: [
-                { ox: 0, oy: 0, r: 0.75 },
-                { ox: -0.13, oy: 0.18, r: 0.65 },
-                { ox: -0.06, oy: 0.1, r: 0.4 },
-            ], color: [215, 205, 200], x: 0.9, y: 0.85, vx: -0.35, vy: -0.25, phase: 8.4 },
+            {
+                parts: [
+                    { ox: 0, oy: 0, r: 0.75 },
+                    { ox: -0.13, oy: 0.18, r: 0.65 },
+                    { ox: -0.06, oy: 0.1, r: 0.4 },
+                ],
+                color: [215, 205, 200],
+                x: 0.9,
+                y: 0.85,
+                vx: -0.35,
+                vy: -0.25,
+                phase: 8.4,
+            },
 
-            { parts: [
-                { ox: 0, oy: 0, r: 0.7 },
-                { ox: 0.16, oy: -0.1, r: 0.6 },
-                { ox: 0.08, oy: -0.05, r: 0.35 },
-            ], color: [185, 210, 205], x: 0.45, y: 0.9, vx: 0.22, vy: -0.4, phase: 9.6 },
+            {
+                parts: [
+                    { ox: 0, oy: 0, r: 0.7 },
+                    { ox: 0.16, oy: -0.1, r: 0.6 },
+                    { ox: 0.08, oy: -0.05, r: 0.35 },
+                ],
+                color: [185, 210, 205],
+                x: 0.45,
+                y: 0.9,
+                vx: 0.22,
+                vy: -0.4,
+                phase: 9.6,
+            },
         ];
 
         const baseRadius = 0.32;
@@ -315,7 +387,14 @@ export class OnboardingView extends LitElement {
                     <div class="slide-title">Cheating Daddy</div>
                     <div class="slide-text">Real-time AI that listens, watches, and helps during interviews, meetings, and exams.</div>
                     <div class="actions">
-                        <button class="btn-primary" @click=${() => { this.currentSlide = 1; }}>Continue</button>
+                        <button
+                            class="btn-primary"
+                            @click=${() => {
+                                this.currentSlide = 1;
+                            }}
+                        >
+                            Continue
+                        </button>
                     </div>
                 </div>
             `;
@@ -333,7 +412,14 @@ export class OnboardingView extends LitElement {
                 ></textarea>
                 <div class="actions">
                     <button class="btn-primary" @click=${this.completeOnboarding}>Get Started</button>
-                    <button class="btn-back" @click=${() => { this.currentSlide = 0; }}>Back</button>
+                    <button
+                        class="btn-back"
+                        @click=${() => {
+                            this.currentSlide = 0;
+                        }}
+                    >
+                        Back
+                    </button>
                 </div>
             </div>
         `;

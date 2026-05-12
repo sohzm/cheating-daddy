@@ -76,7 +76,7 @@ export class ModelSettingsView extends LitElement {
                 height: 16px;
                 border-radius: 50%;
                 background: var(--bg-app);
-                box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
                 transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
             }
 
@@ -102,7 +102,7 @@ export class ModelSettingsView extends LitElement {
                 border-radius: var(--radius-sm);
                 padding: 1px 6px;
             }
-        `
+        `,
     ];
 
     static properties = {
@@ -165,11 +165,8 @@ export class ModelSettingsView extends LitElement {
 
     _renderModelSelect(task, currentValue) {
         return html`
-            <select class="control model-select"
-                @change=${(e) => this._handleModelChange(task, e)}>
-                ${this._models.map(m => html`
-                    <option value=${m.id} ?selected=${m.id === currentValue}>${m.name}</option>
-                `)}
+            <select class="control model-select" @change=${e => this._handleModelChange(task, e)}>
+                ${this._models.map(m => html` <option value=${m.id} ?selected=${m.id === currentValue}>${m.name}</option> `)}
             </select>
         `;
     }
@@ -193,7 +190,9 @@ export class ModelSettingsView extends LitElement {
                                         <span class="active-indicator"></span>
                                         Problem Extraction
                                     </span>
-                                    <span class="model-card-desc">Transcription analysis and problem identification <span class="hotkey-hint">Ctrl+'</span></span>
+                                    <span class="model-card-desc"
+                                        >Transcription analysis and problem identification <span class="hotkey-hint">Ctrl+'</span></span
+                                    >
                                 </div>
                                 ${this._renderModelSelect('extraction', this._modelExtraction)}
                             </div>
@@ -230,8 +229,7 @@ export class ModelSettingsView extends LitElement {
                                 <span class="model-card-title">${this._debugMode ? 'Debug Mode Active' : 'Debug Mode Off'}</span>
                                 <span class="model-card-desc">Toggle with <span class="hotkey-hint">Alt+D</span></span>
                             </div>
-                            <div class="toggle-switch ${this._debugMode ? 'on' : ''}"
-                                @click=${() => this._toggleDebugMode()}></div>
+                            <div class="toggle-switch ${this._debugMode ? 'on' : ''}" @click=${() => this._toggleDebugMode()}></div>
                         </div>
                     </div>
 

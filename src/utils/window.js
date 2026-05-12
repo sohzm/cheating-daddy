@@ -18,7 +18,7 @@ const HARD_LIMITS = {
     zoomMax: 2.0,
     zoomMin: 0.3,
     opacityMax: 1.0,
-    opacityMin: 0.2,
+    opacityMin: 0.0,
     // Minimum step values to prevent rapid-fire redraws
     scaleStepMin: 0.05,
     zoomStepMin: 0.05,

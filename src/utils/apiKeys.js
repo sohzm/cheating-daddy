@@ -30,12 +30,7 @@ const _validating = new Set(); // Set<`${provider}:${id}`>
 // ──────────────────────────────────────────────────────────────
 
 function withTimeout(promise, ms, label) {
-    return Promise.race([
-        promise,
-        new Promise((_, reject) =>
-            setTimeout(() => reject(new Error(`Probe timeout after ${ms}ms: ${label}`)), ms)
-        ),
-    ]);
+    return Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error(`Probe timeout after ${ms}ms: ${label}`)), ms))]);
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -244,7 +239,7 @@ async function revalidateKey(provider, id, forceRevalidate = false) {
         } else {
             // null state = transient/timeout — restore state, don't mark ready or invalid
             const current = storage.getProviderKeyRaw(provider, id);
-            const restoreState = (current?.state === 'checking') ? 'unknown' : (current?.state || 'unknown');
+            const restoreState = current?.state === 'checking' ? 'unknown' : current?.state || 'unknown';
             storage.updateProviderKey(provider, id, {
                 state: restoreState,
                 lastCheckedAt: Date.now(),
@@ -266,9 +261,7 @@ async function revalidateAll(provider) {
 }
 
 async function revalidateAllProviders() {
-    await Promise.allSettled(
-        storage.API_KEY_PROVIDERS.map(p => revalidateAll(p))
-    );
+    await Promise.allSettled(storage.API_KEY_PROVIDERS.map(p => revalidateAll(p)));
 }
 
 /**
@@ -293,7 +286,7 @@ async function revalidateStale() {
                 shouldRetry = true;
             } else if (k.state === 'exhausted' && k.exhaustedUntil && k.exhaustedUntil <= now) {
                 shouldRetry = true;
-            } else if (k.state === 'invalid' && k.lastCheckedAt && (now - k.lastCheckedAt) > storage.EXHAUSTION_COOLDOWN_MS) {
+            } else if (k.state === 'invalid' && k.lastCheckedAt && now - k.lastCheckedAt > storage.EXHAUSTION_COOLDOWN_MS) {
                 shouldRetry = true;
             }
 

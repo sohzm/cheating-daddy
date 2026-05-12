@@ -224,10 +224,7 @@ async function sendToOllama(transcription) {
     }
 
     try {
-        const messages = [
-            { role: 'system', content: currentSystemPrompt || 'You are a helpful assistant.' },
-            ...localConversationHistory,
-        ];
+        const messages = [{ role: 'system', content: currentSystemPrompt || 'You are a helpful assistant.' }, ...localConversationHistory];
 
         const response = await ollamaClient.chat({
             model: ollamaModel,

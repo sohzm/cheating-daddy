@@ -194,6 +194,7 @@ export class CustomizeView extends LitElement {
         googleSearchEnabled: { type: Boolean },
         backgroundTransparency: { type: Number },
         fontSize: { type: Number },
+        fontWeight: { type: Number },
         theme: { type: String },
         onProfileChange: { type: Function },
         onLanguageChange: { type: Function },
@@ -203,6 +204,7 @@ export class CustomizeView extends LitElement {
         isRestoring: { type: Boolean },
         clearStatusMessage: { type: String },
         clearStatusType: { type: String },
+        hotkeyToastsEnabled: { type: Boolean },
     };
 
     constructor() {
@@ -223,22 +225,42 @@ export class CustomizeView extends LitElement {
         this.clearStatusType = '';
         this.backgroundTransparency = 0.8;
         this.fontSize = 20;
+        this.fontWeight = 400;
         this.audioMode = 'speaker_only';
         this.customPrompt = '';
         this.theme = 'dark';
+        this.hotkeyToastsEnabled = true;
         this._loadFromStorage();
 
         // Listen for hotkey-driven opacity changes to sync slider in realtime
-        this._bgOpacityListener = (e) => {
+        this._bgOpacityListener = e => {
             this.backgroundTransparency = e.detail.value;
             this.requestUpdate();
         };
         const app = document.querySelector('cheating-daddy-app');
         if (app) app.addEventListener('bg-opacity-updated', this._bgOpacityListener);
+
+        // Listen for hotkey-driven font size changes
+        this._ipcCleanups = [];
+        if (window.require) {
+            const { ipcRenderer } = window.require('electron');
+            const onFontSize = (_, v) => {
+                this.fontSize = v;
+                this.requestUpdate();
+            };
+            ipcRenderer.on('font-size-changed', onFontSize);
+            this._ipcCleanups.push(() => ipcRenderer.removeListener('font-size-changed', onFontSize));
+        }
     }
 
     getThemes() {
         return cheatingDaddy.theme.getAll();
+    }
+
+    disconnectedCallback() {
+        super.disconnectedCallback();
+        this._ipcCleanups.forEach(fn => fn());
+        this._ipcCleanups = [];
     }
 
     async _loadFromStorage() {
@@ -247,9 +269,11 @@ export class CustomizeView extends LitElement {
             this.googleSearchEnabled = prefs.googleSearchEnabled ?? true;
             this.backgroundTransparency = prefs.backgroundTransparency ?? 0.8;
             this.fontSize = prefs.fontSize ?? 20;
+            this.fontWeight = prefs.fontWeight ?? 400;
             this.audioMode = prefs.audioMode ?? 'speaker_only';
             this.customPrompt = prefs.customPrompt ?? '';
             this.theme = prefs.theme ?? 'dark';
+            this.hotkeyToastsEnabled = prefs.hotkeyToastsEnabled !== false;
             if (keybinds) {
                 this.keybinds = { ...this.getDefaultKeybinds(), ...keybinds };
             }
@@ -430,6 +454,24 @@ export class CustomizeView extends LitElement {
         this.requestUpdate();
     }
 
+    async handleFontWeightChange(e) {
+        this.fontWeight = parseInt(e.target.value, 10);
+        await cheatingDaddy.storage.updatePreference('fontWeight', this.fontWeight);
+        this.updateFontWeight();
+        this.requestUpdate();
+    }
+
+    updateFontWeight() {
+        document.documentElement.style.setProperty('--response-font-weight', String(this.fontWeight));
+    }
+
+    async handleHotkeyToastsChange(e) {
+        this.hotkeyToastsEnabled = e.target.checked;
+        await cheatingDaddy.storage.updatePreference('hotkeyToastsEnabled', this.hotkeyToastsEnabled);
+        cheatingDaddy.setHotkeyToastsEnabled(this.hotkeyToastsEnabled);
+        this.requestUpdate();
+    }
+
     handleKeybindChange(action, value) {
         this.keybinds = { ...this.keybinds, [action]: value };
         this.saveKeybinds();
@@ -605,9 +647,9 @@ export class CustomizeView extends LitElement {
                             <option value="both">Both Speaker and Microphone</option>
                         </select>
                     </div>
-                    ${this.audioMode !== 'speaker_only' ? html`
-                        <div class="warning-callout">May cause unexpected behavior. Only change this if you know what you're doing.</div>
-                    ` : ''}
+                    ${this.audioMode !== 'speaker_only'
+                        ? html` <div class="warning-callout">May cause unexpected behavior. Only change this if you know what you're doing.</div> `
+                        : ''}
                     <div class="form-group">
                         <label class="form-label">Image Quality</label>
                         <select class="control" .value=${this.selectedImageQuality} @change=${this.handleImageQualitySelect}>
@@ -690,11 +732,51 @@ export class CustomizeView extends LitElement {
                         />
                         <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
                             <span style="font-size:10px;color:var(--text-muted);">Min:</span>
-                            <input type="number" value="8" style="width:50px;background:var(--bg-elevated);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius-sm);padding:3px 6px;font-size:10px;font-family:var(--font-mono);text-align:center;" readonly />
+                            <input
+                                type="number"
+                                value="8"
+                                style="width:50px;background:var(--bg-elevated);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius-sm);padding:3px 6px;font-size:10px;font-family:var(--font-mono);text-align:center;"
+                                readonly
+                            />
                             <span style="font-size:10px;color:var(--text-muted);">Max:</span>
-                            <input type="number" value="48" style="width:50px;background:var(--bg-elevated);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius-sm);padding:3px 6px;font-size:10px;font-family:var(--font-mono);text-align:center;" readonly />
-                            <button @click=${this._resetFontSize} style="margin-left:auto;background:transparent;border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-secondary);padding:3px 8px;font-size:10px;cursor:pointer;">Reset</button>
+                            <input
+                                type="number"
+                                value="48"
+                                style="width:50px;background:var(--bg-elevated);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius-sm);padding:3px 6px;font-size:10px;font-family:var(--font-mono);text-align:center;"
+                                readonly
+                            />
+                            <button
+                                @click=${this._resetFontSize}
+                                style="margin-left:auto;background:transparent;border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-secondary);padding:3px 8px;font-size:10px;cursor:pointer;"
+                            >
+                                Reset
+                            </button>
                         </div>
+                    </div>
+                    <div class="form-group slider-wrap">
+                        <div class="slider-header">
+                            <label class="form-label">Font Weight</label>
+                            <span class="slider-value">${this.fontWeight}</span>
+                        </div>
+                        <input
+                            class="slider-input"
+                            type="range"
+                            min="100"
+                            max="900"
+                            step="100"
+                            .value=${this.fontWeight}
+                            @input=${this.handleFontWeightChange}
+                        />
+                    </div>
+                    <div class="toggle-row">
+                        <input
+                            class="toggle-input"
+                            type="checkbox"
+                            id="hotkeyToasts"
+                            .checked=${this.hotkeyToastsEnabled}
+                            @change=${this.handleHotkeyToastsChange}
+                        />
+                        <label class="toggle-label" for="hotkeyToasts">Show hotkey notifications</label>
                     </div>
                 </div>
             </section>
@@ -705,20 +787,22 @@ export class CustomizeView extends LitElement {
         return html`
             <section class="surface">
                 <div class="surface-title">Keyboard Shortcuts</div>
-                ${this.getKeybindActions().map(action => html`
-                    <div class="keybind-row">
-                        <span class="keybind-name">${action.name}</span>
-                        <input
-                            type="text"
-                            class="control keybind-input"
-                            .value=${this.keybinds[action.key]}
-                            data-action=${action.key}
-                            @keydown=${this.handleKeybindInput}
-                            @focus=${this.handleKeybindFocus}
-                            readonly
-                        />
-                    </div>
-                `)}
+                ${this.getKeybindActions().map(
+                    action => html`
+                        <div class="keybind-row">
+                            <span class="keybind-name">${action.name}</span>
+                            <input
+                                type="text"
+                                class="control keybind-input"
+                                .value=${this.keybinds[action.key]}
+                                data-action=${action.key}
+                                @keydown=${this.handleKeybindInput}
+                                @focus=${this.handleKeybindFocus}
+                                readonly
+                            />
+                        </div>
+                    `
+                )}
                 <div style="margin-top: var(--space-sm);">
                     <button class="control" style="width:auto;padding:8px 10px;" @click=${this.resetKeybinds}>Reset to defaults</button>
                 </div>
@@ -738,9 +822,9 @@ export class CustomizeView extends LitElement {
                         ${this.isClearing ? 'Clearing...' : 'Delete all data'}
                     </button>
                 </div>
-                ${this.clearStatusMessage ? html`
-                    <div class="status ${this.clearStatusType === 'success' ? 'success' : 'error'}">${this.clearStatusMessage}</div>
-                ` : ''}
+                ${this.clearStatusMessage
+                    ? html` <div class="status ${this.clearStatusType === 'success' ? 'success' : 'error'}">${this.clearStatusMessage}</div> `
+                    : ''}
             </section>
         `;
     }
@@ -750,10 +834,7 @@ export class CustomizeView extends LitElement {
             <div class="unified-page">
                 <div class="unified-wrap">
                     <div class="page-title">Settings</div>
-                    ${this.renderAudioSection()}
-                    ${this.renderLanguageSection()}
-                    ${this.renderAppearanceSection()}
-                    ${this.renderPrivacySection()}
+                    ${this.renderAudioSection()} ${this.renderLanguageSection()} ${this.renderAppearanceSection()} ${this.renderPrivacySection()}
                 </div>
             </div>
         `;

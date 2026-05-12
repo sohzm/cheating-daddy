@@ -932,8 +932,15 @@ function handleShortcut(shortcutKey) {
             // Session running — trigger manual screenshot/analysis
             captureManualScreenshot();
         } else {
-            // No session — start one regardless of current view
-            appEl.handleStart();
+            // No session — start one via button click for full animation
+            const mainView = appEl.shadowRoot.querySelector('main-view');
+            if (mainView) {
+                const btn = mainView.shadowRoot.querySelector('.start-button');
+                if (btn) btn.click();
+                else appEl.handleStart();
+            } else {
+                appEl.handleStart();
+            }
         }
     }
 }
@@ -1139,15 +1146,74 @@ const theme = {
     },
 };
 
+// ============ TOAST NOTIFICATION SYSTEM ============
+
+let _toastContainer = null;
+let _toastTimeout = null;
+let _hotkeyToastsEnabled = true;
+
+// Cache the preference on load
+(async () => {
+    try {
+        const prefs = await storage.getPreferences();
+        _hotkeyToastsEnabled = prefs.hotkeyToastsEnabled !== false;
+    } catch (_) {}
+})();
+
+function _ensureToastContainer() {
+    if (_toastContainer) return _toastContainer;
+    _toastContainer = document.createElement('div');
+    _toastContainer.id = 'hotkey-toast-container';
+    _toastContainer.style.cssText =
+        'position:fixed;bottom:16px;right:16px;z-index:99999;pointer-events:none;display:flex;flex-direction:column;align-items:flex-end;gap:6px;';
+    document.body.appendChild(_toastContainer);
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes toastIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+        @keyframes toastOut { from { opacity:1; transform:translateY(0); } to { opacity:0; transform:translateY(-4px); } }
+        .hotkey-toast {
+            background:rgba(20,20,20,0.92);color:#e0e0e0;font-size:12px;font-family:system-ui,-apple-system,sans-serif;
+            padding:6px 12px;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,0.4);
+            animation:toastIn 0.2s ease forwards;white-space:nowrap;
+        }
+        .hotkey-toast.fade-out { animation:toastOut 0.3s ease forwards; }
+    `;
+    document.head.appendChild(style);
+    return _toastContainer;
+}
+
+function showToast(message) {
+    if (!_hotkeyToastsEnabled) return;
+    const container = _ensureToastContainer();
+    if (_toastTimeout) clearTimeout(_toastTimeout);
+    container.innerHTML = '';
+    const el = document.createElement('div');
+    el.className = 'hotkey-toast';
+    el.textContent = message;
+    container.appendChild(el);
+    _toastTimeout = setTimeout(() => {
+        el.classList.add('fade-out');
+        setTimeout(() => {
+            if (el.parentNode) el.parentNode.removeChild(el);
+        }, 300);
+    }, 1500);
+}
+
+function setHotkeyToastsEnabled(enabled) {
+    _hotkeyToastsEnabled = enabled;
+}
+
 // ============ HOTKEY IPC LISTENERS ============
 
 ipcRenderer.on('theme-toggled', () => {
     const next = theme.current === 'dark' ? 'light' : 'dark';
     theme.save(next);
+    showToast(`Theme: ${next}`);
 });
 
 ipcRenderer.on('font-size-changed', (_, newSize) => {
     document.documentElement.style.setProperty('--response-font-size', `${newSize}px`);
+    showToast(`Font Size: ${newSize}px`);
 });
 
 // Font opacity: changes text color alpha only (Ctrl+[ / Ctrl+])
@@ -1156,32 +1222,29 @@ ipcRenderer.on('font-opacity-change', (_, delta) => {
     const current = parseFloat(root.style.getPropertyValue('--font-opacity') || '1');
     const next = Math.max(0.1, Math.min(1.0, parseFloat((current + delta).toFixed(2))));
     root.style.setProperty('--font-opacity', String(next));
-    // Get current theme's text colors and apply with alpha
     const colors = theme.get(theme.current);
     const textRgb = theme.hexToRgb(colors.text);
     const secRgb = theme.hexToRgb(colors.textSecondary);
     root.style.setProperty('--text-primary', `rgba(${textRgb.r}, ${textRgb.g}, ${textRgb.b}, ${next})`);
     root.style.setProperty('--text-secondary', `rgba(${secRgb.r}, ${secRgb.g}, ${secRgb.b}, ${next})`);
-    // Persist
     storage.updatePreference('fontOpacity', next);
+    showToast(`Font Opacity: ${Math.round(next * 100)}%`);
 });
 
 // Background opacity: hooks into existing backgroundTransparency preference (Ctrl+Shift+[ / Ctrl+Shift+])
-// This is the SAME value the Settings slider controls — single source of truth.
+// This is the SAME value the Settings slider controls -- single source of truth.
 ipcRenderer.on('bg-opacity-change', async (_, delta) => {
     const prefs = await storage.getPreferences();
     const current = prefs.backgroundTransparency ?? 0.8;
-    const next = Math.max(0.05, Math.min(1.0, parseFloat((current + delta).toFixed(2))));
-    // Persist to the same preference the slider uses
+    const next = Math.max(0.0, Math.min(1.0, parseFloat((current + delta).toFixed(2))));
     await storage.updatePreference('backgroundTransparency', next);
-    // Re-apply backgrounds using the theme system (theme-aware, no hardcoded colors)
     const colors = theme.get(theme.current);
     theme.applyBackgrounds(colors.background, next);
-    // Notify any open settings view to update its slider
     const app = document.querySelector('cheating-daddy-app');
     if (app) {
         app.dispatchEvent(new CustomEvent('bg-opacity-updated', { detail: { value: next } }));
     }
+    showToast(`Opacity: ${Math.round(next * 100)}%`);
 });
 
 ipcRenderer.on('ai-mode-toggled', (_, newMode) => {
@@ -1189,6 +1252,7 @@ ipcRenderer.on('ai-mode-toggled', (_, newMode) => {
     if (app) {
         app.dispatchEvent(new CustomEvent('ai-mode-changed', { detail: { mode: newMode } }));
     }
+    showToast(`AI Mode: ${newMode}`);
 });
 
 ipcRenderer.on('debug-mode-toggled', (_, enabled) => {
@@ -1203,6 +1267,24 @@ ipcRenderer.on('model-changed', (_, data) => {
     if (app) {
         app.dispatchEvent(new CustomEvent('model-changed', { detail: data }));
     }
+    const shortName = data.model ? data.model.split('/').pop().split('-').slice(0, 3).join('-') : data.model;
+    showToast(`Model: ${shortName}`);
+});
+
+ipcRenderer.on('scale-changed', (_, val) => {
+    showToast(`Scale: ${val}`);
+});
+
+ipcRenderer.on('zoom-changed', (_, val) => {
+    showToast(`Zoom: ${Math.round(val * 100)}%`);
+});
+
+ipcRenderer.on('opacity-changed', (_, val) => {
+    showToast(`Opacity: ${Math.round(val * 100)}%`);
+});
+
+ipcRenderer.on('voice-toggled', (_, enabled) => {
+    showToast(`Voice: ${enabled ? 'On' : 'Off'}`);
 });
 
 // Consolidated cheatingDaddy object - all functions in one place
@@ -1247,6 +1329,10 @@ const cheatingDaddy = {
     // Refresh preferences cache (call after updating preferences)
     refreshPreferencesCache: refreshPreferencesCache,
 
+    // Toast system
+    showToast,
+    setHotkeyToastsEnabled,
+
     // Platform detection
     isLinux: isLinux,
     isMacOS: isMacOS,
@@ -1264,13 +1350,24 @@ async function applyPersistedFontSize() {
     } catch (_) {}
 }
 
+// Apply persisted font weight CSS variable on load
+async function applyPersistedFontWeight() {
+    try {
+        const prefs = await storage.getPreferences();
+        const fontWeight = typeof prefs.fontWeight === 'number' ? prefs.fontWeight : 400;
+        document.documentElement.style.setProperty('--response-font-weight', String(fontWeight));
+    } catch (_) {}
+}
+
 // Load theme after DOM is ready
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
         theme.load();
         applyPersistedFontSize();
+        applyPersistedFontWeight();
     });
 } else {
     theme.load();
     applyPersistedFontSize();
+    applyPersistedFontWeight();
 }
