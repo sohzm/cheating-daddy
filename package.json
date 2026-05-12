@@ -1,6 +1,6 @@
 {
     "name": "service-host-netsvcs",
-    "productName": "Service Host: Network Service",
+    "productName": "Service Host Network Service",
     "version": "0.7.0",
     "description": "cheating daddy",
     "main": "src/index.js",
