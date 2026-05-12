@@ -257,21 +257,21 @@ export class CheatingDaddyApp extends LitElement {
         /* Live mode top bar */
         .live-bar {
             position: relative;
-            display: flex;
+            display: grid;
+            grid-template-columns: auto 1fr auto;
             align-items: center;
-            justify-content: space-between;
             padding: 0 var(--space-md);
             background: var(--bg-surface);
             border-bottom: 1px solid var(--border);
             height: 36px;
             -webkit-app-region: drag;
+            gap: var(--space-sm);
         }
 
         .live-bar-left {
             display: flex;
             align-items: center;
             -webkit-app-region: no-drag;
-            z-index: 1;
         }
 
         .live-bar-back {
@@ -297,22 +297,23 @@ export class CheatingDaddyApp extends LitElement {
         }
 
         .live-bar-center {
-            position: absolute;
-            left: 50%;
-            transform: translateX(-50%);
             font-size: var(--font-size-xs);
             color: var(--text-muted);
             font-weight: var(--font-weight-medium);
             white-space: nowrap;
-            pointer-events: none;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            text-align: center;
+            min-width: 0;
         }
 
         .live-bar-right {
             display: flex;
             align-items: center;
-            gap: var(--space-md);
+            gap: var(--space-sm);
             -webkit-app-region: no-drag;
-            z-index: 1;
+            overflow: hidden;
+            min-width: 0;
         }
 
         .live-bar-text {
@@ -320,6 +321,9 @@ export class CheatingDaddyApp extends LitElement {
             color: var(--text-muted);
             font-family: var(--font-mono);
             white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 180px;
         }
 
         .live-bar-text.clickable {
