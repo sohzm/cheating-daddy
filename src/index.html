@@ -145,10 +145,28 @@
                 border: 1px solid var(--border);
                 font-family: var(--font);
                 font-size: var(--font-size-base);
-                font-weight: var(--font-weight-normal);
+                font-weight: var(--response-font-weight, 400);
                 -webkit-font-smoothing: antialiased;
                 -moz-osx-font-smoothing: grayscale;
                 will-change: transform;
+            }
+
+            button,
+            input,
+            select,
+            textarea,
+            label,
+            h1,
+            h2,
+            h3,
+            h4,
+            h5,
+            h6,
+            span,
+            p,
+            div,
+            a {
+                font-weight: var(--response-font-weight, 400);
             }
 
             * {

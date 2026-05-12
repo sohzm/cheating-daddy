@@ -4,6 +4,7 @@ export class AppHeader extends LitElement {
     static styles = css`
         * {
             font-family: var(--font);
+            font-weight: var(--response-font-weight, 400);
             cursor: default;
             user-select: none;
         }

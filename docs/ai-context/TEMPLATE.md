@@ -2,7 +2,7 @@
 
 **Date:** YYYY-MM-DD  
 **Branch:** `branch-name`  
-**Status:** In Progress / Implemented / Fixed  
+**Status:** In Progress / Implemented / Fixed
 
 ---
 
@@ -15,6 +15,7 @@
 ## Architectural Decisions
 
 ### 1. [Decision Title]
+
 **Decision:** [What was decided]  
 **Reasoning:** [Why this approach was chosen over alternatives]
 
@@ -23,14 +24,17 @@
 ## Implementation Notes
 
 ### Files Modified
-| File | Changes |
-|------|---------|
+
+| File           | Changes                |
+| -------------- | ---------------------- |
 | `path/to/file` | Description of changes |
 
 ### IPC Channels Added
+
 - `channel-name` — description
 
 ### Events Added
+
 - `event-name` — `{ payload shape }` — when fired
 
 ---
@@ -51,4 +55,5 @@
 ## Key Prompts/Workflows
 
 ### [Workflow Title]
+
 Steps to reproduce or implement pattern...

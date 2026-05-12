@@ -4,6 +4,7 @@ export const unifiedPageStyles = css`
     * {
         box-sizing: border-box;
         font-family: var(--font);
+        font-weight: var(--response-font-weight, 400);
         cursor: default;
         user-select: none;
     }

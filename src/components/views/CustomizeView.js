@@ -300,38 +300,7 @@ export class CustomizeView extends LitElement {
     }
 
     getLanguages() {
-        return [
-            { value: 'en-US', name: 'English (US)' },
-            { value: 'en-GB', name: 'English (UK)' },
-            { value: 'en-AU', name: 'English (Australia)' },
-            { value: 'en-IN', name: 'English (India)' },
-            { value: 'de-DE', name: 'German (Germany)' },
-            { value: 'es-US', name: 'Spanish (US)' },
-            { value: 'es-ES', name: 'Spanish (Spain)' },
-            { value: 'fr-FR', name: 'French (France)' },
-            { value: 'fr-CA', name: 'French (Canada)' },
-            { value: 'hi-IN', name: 'Hindi (India)' },
-            { value: 'pt-BR', name: 'Portuguese (Brazil)' },
-            { value: 'ar-XA', name: 'Arabic (Generic)' },
-            { value: 'id-ID', name: 'Indonesian (Indonesia)' },
-            { value: 'it-IT', name: 'Italian (Italy)' },
-            { value: 'ja-JP', name: 'Japanese (Japan)' },
-            { value: 'tr-TR', name: 'Turkish (Turkey)' },
-            { value: 'vi-VN', name: 'Vietnamese (Vietnam)' },
-            { value: 'bn-IN', name: 'Bengali (India)' },
-            { value: 'gu-IN', name: 'Gujarati (India)' },
-            { value: 'kn-IN', name: 'Kannada (India)' },
-            { value: 'ml-IN', name: 'Malayalam (India)' },
-            { value: 'mr-IN', name: 'Marathi (India)' },
-            { value: 'ta-IN', name: 'Tamil (India)' },
-            { value: 'te-IN', name: 'Telugu (India)' },
-            { value: 'nl-NL', name: 'Dutch (Netherlands)' },
-            { value: 'ko-KR', name: 'Korean (South Korea)' },
-            { value: 'cmn-CN', name: 'Mandarin Chinese (China)' },
-            { value: 'pl-PL', name: 'Polish (Poland)' },
-            { value: 'ru-RU', name: 'Russian (Russia)' },
-            { value: 'th-TH', name: 'Thai (Thailand)' },
-        ];
+        return [{ value: 'en-US', name: 'English (US)' }];
     }
 
     getDefaultKeybinds() {

@@ -1227,6 +1227,8 @@ ipcRenderer.on('font-opacity-change', (_, delta) => {
     const secRgb = theme.hexToRgb(colors.textSecondary);
     root.style.setProperty('--text-primary', `rgba(${textRgb.r}, ${textRgb.g}, ${textRgb.b}, ${next})`);
     root.style.setProperty('--text-secondary', `rgba(${secRgb.r}, ${secRgb.g}, ${secRgb.b}, ${next})`);
+    const mutedRgb = theme.hexToRgb(colors.textMuted);
+    root.style.setProperty('--text-muted', `rgba(${mutedRgb.r}, ${mutedRgb.g}, ${mutedRgb.b}, ${Math.max(0.3, next * 0.6)})`);
     storage.updatePreference('fontOpacity', next);
     showToast(`Font Opacity: ${Math.round(next * 100)}%`);
 });

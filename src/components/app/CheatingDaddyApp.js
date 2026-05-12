@@ -14,6 +14,7 @@ export class CheatingDaddyApp extends LitElement {
         * {
             box-sizing: border-box;
             font-family: var(--font);
+            font-weight: var(--response-font-weight, 400);
             margin: 0;
             padding: 0;
             cursor: default;

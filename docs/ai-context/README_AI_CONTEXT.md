@@ -18,24 +18,28 @@
 ## Architecture Summary
 
 ### Process Model
-| Layer | Runtime | Module System | Key Files |
-|-------|---------|---------------|-----------|
-| Main process | Node.js | CommonJS | `src/index.js`, `src/storage.js`, `src/utils/apiKeys.js`, `src/utils/gemini.js` |
-| Preload | Node.js | CommonJS | `src/preload.js` (mostly empty) |
-| Renderer | Chromium | ES Modules | `src/utils/renderer.js`, `src/components/**/*.js` |
+
+| Layer        | Runtime  | Module System | Key Files                                                                       |
+| ------------ | -------- | ------------- | ------------------------------------------------------------------------------- |
+| Main process | Node.js  | CommonJS      | `src/index.js`, `src/storage.js`, `src/utils/apiKeys.js`, `src/utils/gemini.js` |
+| Preload      | Node.js  | CommonJS      | `src/preload.js` (mostly empty)                                                 |
+| Renderer     | Chromium | ES Modules    | `src/utils/renderer.js`, `src/components/**/*.js`                               |
 
 ### IPC Pattern
+
 - Main registers handlers via `ipcMain.handle('channel-name', async (event, ...args) => { ... })`
 - Renderer calls via `ipcRenderer.invoke('channel-name', ...args)` wrapped in `src/utils/renderer.js`
 - All IPC returns `{ success: boolean, data?, error? }`
 - Renderer exposes everything through `window.cheatingDaddy` global object
 
 ### Storage
+
 - Custom JSON-file storage (NOT electron-store)
 - Location: OS-specific config dir (`~/Library/Application Support/cheating-daddy-config/` on macOS)
 - Files: `config.json`, `credentials.json`, `preferences.json`, `keybinds.json`, `limits.json`, `history/*.json`
 
 ### UI Framework
+
 - Lit 2.7.4 loaded from local vendored file (`src/assets/lit-core-2.7.4.min.js`)
 - Shared styles in `src/components/views/sharedPageStyles.js`
 - Views registered via `customElements.define()` at bottom of each file
@@ -43,18 +47,20 @@
 - Navigation: `this.currentView` string property, rendered via `renderCurrentView()` switch
 
 ### Providers
-| Provider | Purpose | Key Functions |
-|----------|---------|---------------|
-| Gemini | Live audio session, screen analysis, Gemma text | `initializeGeminiSession()`, `sendImageToGeminiHttp()`, `sendToGemma()` |
-| Groq | Fast text completions | `sendToGroq()` |
-| Cloud | Managed cloud service | `connectCloud()` |
-| Local (Ollama) | Local LLM | `initializeLocalSession()` |
+
+| Provider       | Purpose                                         | Key Functions                                                           |
+| -------------- | ----------------------------------------------- | ----------------------------------------------------------------------- |
+| Gemini         | Live audio session, screen analysis, Gemma text | `initializeGeminiSession()`, `sendImageToGeminiHttp()`, `sendToGemma()` |
+| Groq           | Fast text completions                           | `sendToGroq()`                                                          |
+| Cloud          | Managed cloud service                           | `connectCloud()`                                                        |
+| Local (Ollama) | Local LLM                                       | `initializeLocalSession()`                                              |
 
 ---
 
 ## Key Systems
 
 ### API Key Management (v2 - Multi-key with rotation)
+
 - **Storage:** `credentials.json` → `geminiKeys[]` and `groqKeys[]` arrays
 - **States:** `ready` | `exhausted` | `invalid` | `unknown`
 - **Key fields:** `{ id, key, label, state, lastCheckedAt, exhaustedAt, exhaustedUntil, errorReason, createdAt }`
@@ -66,11 +72,13 @@
 - **UI:** `<api-keys-view>` — compact grid table, countdown timers, search/filter, rotation toasts
 
 ### Rate Limiting
+
 - Per-model daily limits in `limits.json`
 - `getAvailableModel()` for Gemini (flash/flash-lite rotation)
 - `getModelForToday()` for Groq (char-based limits per model)
 
 ### Audio Capture
+
 - macOS: SystemAudioDump binary + getDisplayMedia for screen
 - Linux: getDisplayMedia with audio + optional mic
 - Windows: Loopback audio + optional mic
@@ -135,11 +143,11 @@ src/
 
 ## Context Files Index
 
-| File | Date | Summary |
-|------|------|---------|
-| `sessions/001-api-key-management.md` | 2025-05-11 | Full API key pool system implementation |
+| File                                  | Date       | Summary                                            |
+| ------------------------------------- | ---------- | -------------------------------------------------- |
+| `sessions/001-api-key-management.md`  | 2025-05-11 | Full API key pool system implementation            |
 | `sessions/002-ui-features-hotkeys.md` | 2025-05-11 | Hotkeys, AI Hearing, settings UI, feedback removal |
 
 ---
 
-*Last updated: 2026-05-11*
+_Last updated: 2026-05-11_
