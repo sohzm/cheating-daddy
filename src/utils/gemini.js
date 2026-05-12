@@ -590,7 +590,6 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                     maxSpeakerCount: 2,
                 },
                 contextWindowCompression: { slidingWindow: {} },
-                speechConfig: { languageCode: language },
                 systemInstruction: {
                     parts: [{ text: systemPrompt }],
                 },

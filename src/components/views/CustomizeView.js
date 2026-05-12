@@ -636,19 +636,7 @@ export class CustomizeView extends LitElement {
     }
 
     renderLanguageSection() {
-        return html`
-            <section class="surface">
-                <div class="surface-title">Language</div>
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label class="form-label">Speech Language</label>
-                        <select class="control" .value=${this.selectedLanguage} @change=${this.handleLanguageSelect}>
-                            ${this.getLanguages().map(language => html`<option value=${language.value}>${language.name}</option>`)}
-                        </select>
-                    </div>
-                </div>
-            </section>
-        `;
+        return html``;
     }
 
     renderAppearanceSection() {
@@ -806,7 +794,7 @@ export class CustomizeView extends LitElement {
             <div class="unified-page">
                 <div class="unified-wrap">
                     <div class="page-title">Settings</div>
-                    ${this.renderAudioSection()} ${this.renderLanguageSection()} ${this.renderAppearanceSection()} ${this.renderPrivacySection()}
+                    ${this.renderAudioSection()} ${this.renderAppearanceSection()} ${this.renderPrivacySection()}
                 </div>
             </div>
         `;
