@@ -1,0 +1,29 @@
+{
+    "id": "FEAT-004",
+    "type": "fix",
+    "description": "Fix keybinding UI state desync (issue #8) and Analyse button animation desync (issue #9) - implement unified shared state architecture",
+    "status": "completed",
+    "steps": [
+        "1. ISSUE #8 - Debug Mode toggle desync: In src/utils/renderer.js, the 'debug-mode-toggled' IPC handler dispatches a CustomEvent on the app element. The CheatingDaddyApp listens for this and updates _debugMode. However, the HotkeysView and other views that show debug toggle state don't listen for this event. Fix: In the HotkeysView.js connectedCallback, add an IPC listener for 'debug-mode-toggled' that updates the local state.",
+        "2. In src/components/views/HotkeysView.js connectedCallback(), add IPC listeners for: 'debug-mode-toggled' (update debugModeEnabled pref display), 'ai-mode-toggled' (update AI mode display), 'model-changed' (update model display), 'voice-toggled' (already handled). These ensure the HotkeysView UI reflects changes made via hotkeys.",
+        "3. More broadly for issue #8: The problem is that hotkey changes update preferences via storage.updatePreference() in window.js but the renderer components don't re-read preferences. Fix this by having the renderer.js IPC listeners dispatch events that ALL open components can listen to. Add a global event bus pattern: create a small pub/sub on window.cheatingDaddy that components subscribe to.",
+        "4. In src/utils/renderer.js, add a simple event dispatcher: window.cheatingDaddy.events = new EventTarget(). Then in each IPC handler (debug-mode-toggled, ai-mode-toggled, model-changed, voice-toggled, font-size-changed, bg-opacity-change, font-opacity-change, theme-toggled), also dispatch a corresponding event on window.cheatingDaddy.events.",
+        "5. In src/components/views/HotkeysView.js, subscribe to cheatingDaddy.events in connectedCallback() for 'debug-mode-toggled' and any other relevant events. On receiving, reload state from storage to refresh the UI.",
+        "6. ISSUE #9 - Analyse button desync: In src/utils/renderer.js handleShortcut(), when the session is active and 'ctrl+enter'/'cmd+enter' is pressed, it calls captureManualScreenshot(). However, the AssistantView.isAnalyzing state is NOT set to true because the shortcut bypasses the component's handleScreenAnswer() method. Fix: After calling captureManualScreenshot() in handleShortcut(), also notify the AssistantView to enter analyzing state.",
+        "7. In src/utils/renderer.js handleShortcut(), after calling captureManualScreenshot() when session is active, dispatch an IPC-like event to notify the assistant view: send a custom event or call a method on the app element. Specifically: get the assistant-view element from the app's shadow DOM and set isAnalyzing = true and _responseCountWhenStarted = current response count.",
+        "8. Better approach for #9: In src/utils/renderer.js handleShortcut(), after calling captureManualScreenshot(), dispatch a custom event 'analyze-triggered' on the cheatingDaddyApp element. In AssistantView.js connectedCallback(), listen for this event on the parent app and set isAnalyzing=true.",
+        "9. In src/components/views/AssistantView.js connectedCallback(), add a listener for a custom event or IPC message that indicates an analysis was triggered externally. When received, set this.isAnalyzing = true and this._responseCountWhenStarted = this.responses.length."
+    ],
+    "acceptance_criteria": [
+        "When Alt+D toggles debug mode via hotkey, any open view (HotkeysView, live bar) immediately reflects the new state",
+        "When Ctrl+Enter triggers analysis during a session, the Analyse button in AssistantView enters its analyzing animation state",
+        "All hotkey-driven state changes are reflected in UI toggles/buttons/indicators without requiring view navigation",
+        "A global event bus (cheatingDaddy.events) exists for cross-component state synchronization"
+    ],
+    "verification": [
+        "Run 'node -e \"require('./src/storage.js')\"' from /projects/sandbox/cd to validate main process files parse correctly",
+        "Run 'npx prettier --check src/' to verify formatting compliance"
+    ],
+    "blocked_reason": null,
+    "findings": "Implementation complete. Global event bus added as _eventBus (EventTarget) exposed via cheatingDaddy.events. All IPC handlers dispatch corresponding events. HotkeysView subscribes to debug-mode-toggled and voice-toggled. AssistantView subscribes to analyze-triggered. Prettier formatted HotkeysView.js (arrow fn param parens). All verification passed."
+}
