@@ -931,6 +931,7 @@ function handleShortcut(shortcutKey) {
         if (appEl.sessionActive) {
             // Session running — trigger manual screenshot/analysis
             captureManualScreenshot();
+            _eventBus.dispatchEvent(new CustomEvent('analyze-triggered'));
         } else {
             // No session — start one via button click for full animation
             const mainView = appEl.shadowRoot.querySelector('main-view');
@@ -1213,6 +1214,7 @@ ipcRenderer.on('theme-toggled', () => {
 
 ipcRenderer.on('font-size-changed', (_, newSize) => {
     document.documentElement.style.setProperty('--response-font-size', `${newSize}px`);
+    _eventBus.dispatchEvent(new CustomEvent('font-size-changed', { detail: { size: newSize } }));
     showToast(`Font Size: ${newSize}px`);
 });
 
@@ -1230,6 +1232,7 @@ ipcRenderer.on('font-opacity-change', (_, delta) => {
     const mutedRgb = theme.hexToRgb(colors.textMuted);
     root.style.setProperty('--text-muted', `rgba(${mutedRgb.r}, ${mutedRgb.g}, ${mutedRgb.b}, ${Math.max(0.3, next * 0.6)})`);
     storage.updatePreference('fontOpacity', next);
+    _eventBus.dispatchEvent(new CustomEvent('font-opacity-changed', { detail: { value: next } }));
     showToast(`Font Opacity: ${Math.round(next * 100)}%`);
 });
 
@@ -1246,6 +1249,7 @@ ipcRenderer.on('bg-opacity-change', async (_, delta) => {
     if (app) {
         app.dispatchEvent(new CustomEvent('bg-opacity-updated', { detail: { value: next } }));
     }
+    _eventBus.dispatchEvent(new CustomEvent('bg-opacity-changed', { detail: { value: next } }));
     showToast(`Background: ${Math.round(next * 100)}%`);
 });
 
@@ -1254,6 +1258,7 @@ ipcRenderer.on('ai-mode-toggled', (_, newMode) => {
     if (app) {
         app.dispatchEvent(new CustomEvent('ai-mode-changed', { detail: { mode: newMode } }));
     }
+    _eventBus.dispatchEvent(new CustomEvent('ai-mode-toggled', { detail: { mode: newMode } }));
     showToast(`AI Mode: ${newMode}`);
 });
 
@@ -1262,6 +1267,7 @@ ipcRenderer.on('debug-mode-toggled', (_, enabled) => {
     if (app) {
         app.dispatchEvent(new CustomEvent('debug-mode-changed', { detail: { enabled } }));
     }
+    _eventBus.dispatchEvent(new CustomEvent('debug-mode-toggled', { detail: { enabled } }));
 });
 
 ipcRenderer.on('model-changed', (_, data) => {
@@ -1269,6 +1275,7 @@ ipcRenderer.on('model-changed', (_, data) => {
     if (app) {
         app.dispatchEvent(new CustomEvent('model-changed', { detail: data }));
     }
+    _eventBus.dispatchEvent(new CustomEvent('model-changed', { detail: data }));
     const shortName = data.model ? data.model.split('/').pop().split('-').slice(0, 3).join('-') : data.model;
     showToast(`Model: ${shortName}`);
 });
@@ -1286,8 +1293,13 @@ ipcRenderer.on('opacity-changed', (_, val) => {
 });
 
 ipcRenderer.on('voice-toggled', (_, enabled) => {
+    _eventBus.dispatchEvent(new CustomEvent('voice-toggled', { detail: { enabled } }));
     showToast(`Voice: ${enabled ? 'On' : 'Off'}`);
 });
+
+// ============ GLOBAL EVENT BUS ============
+// Allows components to subscribe to state changes triggered by hotkeys
+const _eventBus = new EventTarget();
 
 // Consolidated cheatingDaddy object - all functions in one place
 const cheatingDaddy = {
@@ -1334,6 +1346,9 @@ const cheatingDaddy = {
     // Toast system
     showToast,
     setHotkeyToastsEnabled,
+
+    // Event bus for cross-component state sync
+    events: _eventBus,
 
     // Platform detection
     isLinux: isLinux,

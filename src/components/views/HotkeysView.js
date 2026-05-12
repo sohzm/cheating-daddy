@@ -416,6 +416,25 @@ export class HotkeysView extends LitElement {
             () => ipcRenderer.removeListener('font-size-changed', onFontSize),
             () => ipcRenderer.removeListener('voice-toggled', onVoice),
         ];
+
+        // Subscribe to global event bus for hotkey-driven state changes
+        if (window.cheatingDaddy && window.cheatingDaddy.events) {
+            const onDebugToggle = e => {
+                this._load(); // Reload all state to reflect changes
+            };
+            const onVoiceToggle = e => {
+                if (this._state) {
+                    this._state = { ...this._state, voiceEnabled: e.detail.enabled };
+                    this.requestUpdate();
+                }
+            };
+            window.cheatingDaddy.events.addEventListener('debug-mode-toggled', onDebugToggle);
+            window.cheatingDaddy.events.addEventListener('voice-toggled', onVoiceToggle);
+            this._ipcCleanups.push(
+                () => window.cheatingDaddy.events.removeEventListener('debug-mode-toggled', onDebugToggle),
+                () => window.cheatingDaddy.events.removeEventListener('voice-toggled', onVoiceToggle)
+            );
+        }
     }
 
     disconnectedCallback() {

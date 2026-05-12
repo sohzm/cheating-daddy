@@ -456,11 +456,27 @@ export class AssistantView extends LitElement {
             ipcRenderer.on('scroll-response-up', this.handleScrollUp);
             ipcRenderer.on('scroll-response-down', this.handleScrollDown);
         }
+
+        // Listen for analyze triggered via hotkey (so animation plays)
+        if (window.cheatingDaddy && window.cheatingDaddy.events) {
+            this._onAnalyzeTriggered = () => {
+                if (!this.isAnalyzing) {
+                    this.isAnalyzing = true;
+                    this._responseCountWhenStarted = this.responses.length;
+                    this.requestUpdate();
+                }
+            };
+            window.cheatingDaddy.events.addEventListener('analyze-triggered', this._onAnalyzeTriggered);
+        }
     }
 
     disconnectedCallback() {
         super.disconnectedCallback();
         this._stopWaveformAnimation();
+
+        if (window.cheatingDaddy && window.cheatingDaddy.events && this._onAnalyzeTriggered) {
+            window.cheatingDaddy.events.removeEventListener('analyze-triggered', this._onAnalyzeTriggered);
+        }
 
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
