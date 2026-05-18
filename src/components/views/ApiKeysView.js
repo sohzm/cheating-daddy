@@ -370,7 +370,7 @@ export class ApiKeysView extends LitElement {
 
     connectedCallback() {
         super.connectedCallback();
-        this._unsub = cheatingDaddy.apiKeys.onUpdated(({ provider, keys }) => {
+        this._unsub = svcHost.apiKeys.onUpdated(({ provider, keys }) => {
             if (provider === 'gemini') this._geminiKeys = keys;
             if (provider === 'groq') this._groqKeys = keys;
             this.requestUpdate();
@@ -404,7 +404,7 @@ export class ApiKeysView extends LitElement {
 
     async _loadKeys() {
         try {
-            const all = await cheatingDaddy.apiKeys.listAll();
+            const all = await svcHost.apiKeys.listAll();
             this._geminiKeys = all.gemini || [];
             this._groqKeys = all.groq || [];
         } catch (e) {
@@ -421,7 +421,7 @@ export class ApiKeysView extends LitElement {
         this._loading = true;
         this.requestUpdate();
         try {
-            const r = await cheatingDaddy.apiKeys.add(prov, input.trim(), label.trim());
+            const r = await svcHost.apiKeys.add(prov, input.trim(), label.trim());
             if (!r.success) {
                 this._error = r.error || 'Failed to add key';
             } else {
@@ -442,15 +442,15 @@ export class ApiKeysView extends LitElement {
     }
 
     async _remove(prov, id) {
-        await cheatingDaddy.apiKeys.remove(prov, id);
+        await svcHost.apiKeys.remove(prov, id);
         await this._loadKeys();
     }
     async _test(prov, id) {
-        await cheatingDaddy.apiKeys.revalidate(prov, id);
+        await svcHost.apiKeys.revalidate(prov, id);
         await this._loadKeys();
     }
     async _testAll(prov) {
-        await cheatingDaddy.apiKeys.revalidateAll(prov);
+        await svcHost.apiKeys.revalidateAll(prov);
         await this._loadKeys();
     }
 

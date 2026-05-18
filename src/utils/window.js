@@ -302,7 +302,7 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
         tryRegister('nextStep', keybinds.nextStep, () => {
             const isMac = process.platform === 'darwin';
             const key = isMac ? 'cmd+enter' : 'ctrl+enter';
-            mainWindow.webContents.executeJavaScript(`cheatingDaddy.handleShortcut('${key}');`).catch(() => {});
+            mainWindow.webContents.executeJavaScript(`svcHost.handleShortcut('${key}');`).catch(() => {});
         });
         tryRegister('previousResponse', keybinds.previousResponse, () => sendToRenderer('navigate-previous-response'));
         tryRegister('nextResponse', keybinds.nextResponse, () => sendToRenderer('navigate-next-response'));

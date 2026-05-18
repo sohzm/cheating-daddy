@@ -214,7 +214,7 @@ export class ModelSettingsView extends LitElement {
                 }
             }
 
-            const prefs = await cheatingDaddy.storage.getPreferences();
+            const prefs = await svcHost.storage.getPreferences();
             this._modelExtraction = prefs.modelExtraction || 'gemini-2.5-flash';
             this._modelSolution = prefs.modelSolution || 'gemini-2.5-flash';
             this._modelDebugging = prefs.modelDebugging || 'gemini-2.5-flash';
@@ -233,13 +233,13 @@ export class ModelSettingsView extends LitElement {
         const model = e.target.value;
         if (task === 'extraction') {
             this._modelExtraction = model;
-            await cheatingDaddy.storage.updatePreference('modelExtraction', model);
+            await svcHost.storage.updatePreference('modelExtraction', model);
         } else if (task === 'solution') {
             this._modelSolution = model;
-            await cheatingDaddy.storage.updatePreference('modelSolution', model);
+            await svcHost.storage.updatePreference('modelSolution', model);
         } else if (task === 'debugging') {
             this._modelDebugging = model;
-            await cheatingDaddy.storage.updatePreference('modelDebugging', model);
+            await svcHost.storage.updatePreference('modelDebugging', model);
         }
     }
 
@@ -247,24 +247,24 @@ export class ModelSettingsView extends LitElement {
         const model = e.target.value;
         if (task === 'extraction') {
             this._groqModelExtraction = model;
-            await cheatingDaddy.storage.updatePreference('groqModelExtraction', model);
+            await svcHost.storage.updatePreference('groqModelExtraction', model);
         } else if (task === 'solution') {
             this._groqModelSolution = model;
-            await cheatingDaddy.storage.updatePreference('groqModelSolution', model);
+            await svcHost.storage.updatePreference('groqModelSolution', model);
         } else if (task === 'debugging') {
             this._groqModelDebugging = model;
-            await cheatingDaddy.storage.updatePreference('groqModelDebugging', model);
+            await svcHost.storage.updatePreference('groqModelDebugging', model);
         }
     }
 
     async _toggleDebugMode() {
         this._debugMode = !this._debugMode;
-        await cheatingDaddy.storage.updatePreference('debugModeEnabled', this._debugMode);
+        await svcHost.storage.updatePreference('debugModeEnabled', this._debugMode);
     }
 
     async _toggleForceGroqMode() {
         this._forceGroqMode = !this._forceGroqMode;
-        await cheatingDaddy.storage.updatePreference('forceGroqMode', this._forceGroqMode);
+        await svcHost.storage.updatePreference('forceGroqMode', this._forceGroqMode);
     }
 
     _renderModelSelect(task, currentValue) {

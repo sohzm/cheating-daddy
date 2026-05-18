@@ -1,5 +1,5 @@
 // Main app components
-export { CheatingDaddyApp } from './app/CheatingDaddyApp.js';
+export { SvcHostApp } from './app/SvcHostApp.js';
 export { AppHeader } from './app/AppHeader.js';
 
 // View components

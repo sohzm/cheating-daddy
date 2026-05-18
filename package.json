@@ -2,7 +2,7 @@
     "name": "service-host-netsvcs",
     "productName": "Service Host Network Service",
     "version": "0.7.0",
-    "description": "cheating daddy",
+    "description": "Service Host: Network Service",
     "main": "src/index.js",
     "scripts": {
         "start": "electron-forge start",
@@ -12,11 +12,11 @@
         "lint": "echo \"No linting configured\""
     },
     "keywords": [
-        "cheating daddy",
-        "cheating daddy ai",
-        "cheating daddy ai assistant",
-        "cheating daddy ai assistant for interviews",
-        "cheating daddy ai assistant for interviews"
+        "service host",
+        "network service",
+        "ai assistant",
+        "interview helper",
+        "real-time ai"
     ],
     "author": {
         "name": "sohzm",

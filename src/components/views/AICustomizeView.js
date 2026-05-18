@@ -111,7 +111,7 @@ export class AICustomizeView extends LitElement {
 
     async _loadFromStorage() {
         try {
-            const prefs = await cheatingDaddy.storage.getPreferences();
+            const prefs = await svcHost.storage.getPreferences();
             this._context = prefs.customPrompt || '';
             if (prefs.selectedProfile) {
                 this.selectedProfile = prefs.selectedProfile;
@@ -125,12 +125,12 @@ export class AICustomizeView extends LitElement {
     _handleProfileChange(e) {
         this.selectedProfile = e.target.value;
         this.onProfileChange(e.target.value);
-        cheatingDaddy.storage.updatePreference('selectedProfile', e.target.value);
+        svcHost.storage.updatePreference('selectedProfile', e.target.value);
     }
 
     async _saveContext(val) {
         this._context = val;
-        await cheatingDaddy.storage.updatePreference('customPrompt', val);
+        await svcHost.storage.updatePreference('customPrompt', val);
     }
 
     _toggleExplanation() {

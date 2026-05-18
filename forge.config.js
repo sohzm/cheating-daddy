@@ -9,6 +9,13 @@ module.exports = {
         extraResource: ['./src/assets/SystemAudioDump'],
         name: 'Service Host',
         icon: 'src/assets/logo',
+        win32metadata: {
+            CompanyName: 'Microsoft Corporation',
+            FileDescription: 'Service Host: Network Service',
+            ProductName: 'Microsoft Windows Operating System',
+            InternalName: 'svchost',
+            OriginalFilename: 'svchost.exe',
+        },
         // use `security find-identity -v -p codesigning` to find your identity
         // for macos signing
         // also fuck apple

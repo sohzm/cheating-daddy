@@ -587,21 +587,21 @@ export class MainView extends LitElement {
     async _loadFromStorage() {
         try {
             const [prefs, creds] = await Promise.all([
-                cheatingDaddy.storage.getPreferences(),
-                cheatingDaddy.storage.getCredentials().catch(() => ({})),
+                svcHost.storage.getPreferences(),
+                svcHost.storage.getCredentials().catch(() => ({})),
             ]);
 
             const storedMode = prefs.providerMode || 'byok';
             this._mode = storedMode === 'cloud' ? 'byok' : storedMode;
 
             if (storedMode === 'cloud') {
-                await cheatingDaddy.storage.updatePreference('providerMode', this._mode);
+                await svcHost.storage.updatePreference('providerMode', this._mode);
             }
 
             // Load keys
             this._token = creds.cloudToken || '';
-            this._geminiKey = (await cheatingDaddy.storage.getApiKey().catch(() => '')) || '';
-            this._groqKey = (await cheatingDaddy.storage.getGroqApiKey().catch(() => '')) || '';
+            this._geminiKey = (await svcHost.storage.getApiKey().catch(() => '')) || '';
+            this._groqKey = (await svcHost.storage.getGroqApiKey().catch(() => '')) || '';
             this._openaiKey = creds.openaiKey || '';
 
             // Load local AI settings
@@ -759,7 +759,7 @@ export class MainView extends LitElement {
         this._mode = mode;
         this._tokenError = false;
         this._keyError = false;
-        await cheatingDaddy.storage.updatePreference('providerMode', mode);
+        await svcHost.storage.updatePreference('providerMode', mode);
         this.requestUpdate();
     }
 
@@ -767,8 +767,8 @@ export class MainView extends LitElement {
         this._token = val;
         this._tokenError = false;
         try {
-            const creds = await cheatingDaddy.storage.getCredentials().catch(() => ({}));
-            await cheatingDaddy.storage.setCredentials({ ...creds, cloudToken: val });
+            const creds = await svcHost.storage.getCredentials().catch(() => ({}));
+            await svcHost.storage.setCredentials({ ...creds, cloudToken: val });
         } catch (e) {}
         this.requestUpdate();
     }
@@ -776,40 +776,40 @@ export class MainView extends LitElement {
     async _saveGeminiKey(val) {
         this._geminiKey = val;
         this._keyError = false;
-        await cheatingDaddy.storage.setApiKey(val);
+        await svcHost.storage.setApiKey(val);
         this.requestUpdate();
     }
 
     async _saveGroqKey(val) {
         this._groqKey = val;
-        await cheatingDaddy.storage.setGroqApiKey(val);
+        await svcHost.storage.setGroqApiKey(val);
         this.requestUpdate();
     }
 
     async _saveOpenaiKey(val) {
         this._openaiKey = val;
         try {
-            const creds = await cheatingDaddy.storage.getCredentials().catch(() => ({}));
-            await cheatingDaddy.storage.setCredentials({ ...creds, openaiKey: val });
+            const creds = await svcHost.storage.getCredentials().catch(() => ({}));
+            await svcHost.storage.setCredentials({ ...creds, openaiKey: val });
         } catch (e) {}
         this.requestUpdate();
     }
 
     async _saveOllamaHost(val) {
         this._ollamaHost = val;
-        await cheatingDaddy.storage.updatePreference('ollamaHost', val);
+        await svcHost.storage.updatePreference('ollamaHost', val);
         this.requestUpdate();
     }
 
     async _saveOllamaModel(val) {
         this._ollamaModel = val;
-        await cheatingDaddy.storage.updatePreference('ollamaModel', val);
+        await svcHost.storage.updatePreference('ollamaModel', val);
         this.requestUpdate();
     }
 
     async _saveWhisperModel(val) {
         this._whisperModel = val;
-        await cheatingDaddy.storage.updatePreference('whisperModel', val);
+        await svcHost.storage.updatePreference('whisperModel', val);
         this.requestUpdate();
     }
 
@@ -819,7 +819,7 @@ export class MainView extends LitElement {
 
     async _saveAiHearing(val) {
         this._aiHearingEnabled = val;
-        await cheatingDaddy.storage.updatePreference('aiHearingEnabled', val);
+        await svcHost.storage.updatePreference('aiHearingEnabled', val);
         this.requestUpdate();
     }
 
@@ -1184,7 +1184,7 @@ export class MainView extends LitElement {
                 ${this._mode === 'local'
                     ? html`
                           <div class="title-row">
-                              <div class="page-title">Cheating Daddy <span class="mode-suffix">Local AI</span></div>
+                              <div class="page-title">Service Host <span class="mode-suffix">Local AI</span></div>
                               <button
                                   class="help-btn"
                                   @click=${() => {
@@ -1195,7 +1195,7 @@ export class MainView extends LitElement {
                               </button>
                           </div>
                       `
-                    : html` <div class="page-title">${html`Cheating Daddy <span class="mode-suffix">BYOK</span>`}</div> `}
+                    : html` <div class="page-title">${html`Service Host <span class="mode-suffix">BYOK</span>`}</div> `}
                 <div class="page-subtitle">${this._mode === 'byok' ? 'Bring your own API keys' : 'Run models locally on your machine'}</div>
 
                 <!-- Cloud mode render branch intentionally disabled. -->

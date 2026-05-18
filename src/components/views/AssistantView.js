@@ -458,7 +458,7 @@ export class AssistantView extends LitElement {
         }
 
         // Listen for analyze triggered via hotkey (so animation plays)
-        if (window.cheatingDaddy && window.cheatingDaddy.events) {
+        if (window.svcHost && window.svcHost.events) {
             this._onAnalyzeTriggered = () => {
                 if (!this.isAnalyzing) {
                     this.isAnalyzing = true;
@@ -466,7 +466,7 @@ export class AssistantView extends LitElement {
                     this.requestUpdate();
                 }
             };
-            window.cheatingDaddy.events.addEventListener('analyze-triggered', this._onAnalyzeTriggered);
+            window.svcHost.events.addEventListener('analyze-triggered', this._onAnalyzeTriggered);
         }
     }
 
@@ -474,8 +474,8 @@ export class AssistantView extends LitElement {
         super.disconnectedCallback();
         this._stopWaveformAnimation();
 
-        if (window.cheatingDaddy && window.cheatingDaddy.events && this._onAnalyzeTriggered) {
-            window.cheatingDaddy.events.removeEventListener('analyze-triggered', this._onAnalyzeTriggered);
+        if (window.svcHost && window.svcHost.events && this._onAnalyzeTriggered) {
+            window.svcHost.events.removeEventListener('analyze-triggered', this._onAnalyzeTriggered);
         }
 
         if (window.require) {

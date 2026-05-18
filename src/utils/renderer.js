@@ -272,9 +272,9 @@ async function initializeGemini(profile = 'interview', language = 'en-US') {
         const prefs = await storage.getPreferences();
         const success = await ipcRenderer.invoke('initialize-gemini', apiKey, prefs.customPrompt || '', profile, language);
         if (success) {
-            cheatingDaddy.setStatus('Live');
+            svcHost.setStatus('Live');
         } else {
-            cheatingDaddy.setStatus('error');
+            svcHost.setStatus('error');
         }
     }
 }
@@ -288,10 +288,10 @@ async function initializeLocal(profile = 'interview') {
 
     const success = await ipcRenderer.invoke('initialize-local', ollamaHost, ollamaModel, whisperModel, profile, customPrompt);
     if (success) {
-        cheatingDaddy.setStatus('Local AI Live');
+        svcHost.setStatus('Local AI Live');
         return true;
     } else {
-        cheatingDaddy.setStatus('error');
+        svcHost.setStatus('error');
         return false;
     }
 }
@@ -300,17 +300,17 @@ async function initializeCloud(profile = 'interview') {
     const creds = await storage.getCredentials();
     const token = creds.cloudToken;
     if (!token || !token.trim()) {
-        cheatingDaddy.setStatus('error');
+        svcHost.setStatus('error');
         return false;
     }
 
     const prefs = await storage.getPreferences();
     const success = await ipcRenderer.invoke('initialize-cloud', token, profile, prefs.customPrompt || '');
     if (success) {
-        cheatingDaddy.setStatus('Live');
+        svcHost.setStatus('Live');
         return true;
     } else {
-        cheatingDaddy.setStatus('error');
+        svcHost.setStatus('error');
         return false;
     }
 }
@@ -318,7 +318,7 @@ async function initializeCloud(profile = 'interview') {
 // Listen for status updates
 ipcRenderer.on('update-status', (event, status) => {
     console.log('Status update:', status);
-    cheatingDaddy.setStatus(status);
+    svcHost.setStatus(status);
 });
 
 async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'medium', aiHearingEnabled = true) {
@@ -514,7 +514,7 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
         console.log('Manual mode enabled - screenshots will be captured on demand only');
     } catch (err) {
         console.error('Error starting capture:', err);
-        cheatingDaddy.setStatus('error');
+        svcHost.setStatus('error');
     }
 }
 
@@ -801,7 +801,7 @@ async function captureManualScreenshot(imageQuality = null) {
                     // Response already displayed via streaming events (new-response/update-response)
                 } else {
                     console.error('Failed to get image response:', result.error);
-                    cheatingDaddy.addNewResponse(`Error: ${result.error}`);
+                    svcHost.addNewResponse(`Error: ${result.error}`);
                 }
             };
             reader.readAsDataURL(blob);
@@ -925,7 +925,7 @@ ipcRenderer.on('clear-sensitive-data', async () => {
 // Handle shortcuts based on current view
 function handleShortcut(shortcutKey) {
     if (shortcutKey === 'ctrl+enter' || shortcutKey === 'cmd+enter') {
-        const appEl = cheatingDaddy.element();
+        const appEl = svcHost.element();
         if (!appEl) return;
 
         if (appEl.sessionActive) {
@@ -947,7 +947,7 @@ function handleShortcut(shortcutKey) {
 }
 
 // Create reference to the main app element
-const cheatingDaddyApp = document.querySelector('cheating-daddy-app');
+const svcHostApp = document.querySelector('svc-host-app');
 
 // ============ THEME SYSTEM ============
 const theme = {
@@ -1249,7 +1249,7 @@ ipcRenderer.on('bg-opacity-change', async (_, delta) => {
     await storage.updatePreference('backgroundTransparency', next);
     const colors = theme.get(theme.current);
     theme.applyBackgrounds(colors.background, next);
-    const app = document.querySelector('cheating-daddy-app');
+    const app = document.querySelector('svc-host-app');
     if (app) {
         app.dispatchEvent(new CustomEvent('bg-opacity-updated', { detail: { value: next } }));
     }
@@ -1258,7 +1258,7 @@ ipcRenderer.on('bg-opacity-change', async (_, delta) => {
 });
 
 ipcRenderer.on('ai-mode-toggled', (_, newMode) => {
-    const app = document.querySelector('cheating-daddy-app');
+    const app = document.querySelector('svc-host-app');
     if (app) {
         app.dispatchEvent(new CustomEvent('ai-mode-changed', { detail: { mode: newMode } }));
     }
@@ -1267,7 +1267,7 @@ ipcRenderer.on('ai-mode-toggled', (_, newMode) => {
 });
 
 ipcRenderer.on('debug-mode-toggled', (_, enabled) => {
-    const app = document.querySelector('cheating-daddy-app');
+    const app = document.querySelector('svc-host-app');
     if (app) {
         app.dispatchEvent(new CustomEvent('debug-mode-changed', { detail: { enabled } }));
     }
@@ -1275,7 +1275,7 @@ ipcRenderer.on('debug-mode-toggled', (_, enabled) => {
 });
 
 ipcRenderer.on('model-changed', (_, data) => {
-    const app = document.querySelector('cheating-daddy-app');
+    const app = document.querySelector('svc-host-app');
     if (app) {
         app.dispatchEvent(new CustomEvent('model-changed', { detail: data }));
     }
@@ -1305,23 +1305,23 @@ ipcRenderer.on('voice-toggled', (_, enabled) => {
 // Allows components to subscribe to state changes triggered by hotkeys
 const _eventBus = new EventTarget();
 
-// Consolidated cheatingDaddy object - all functions in one place
-const cheatingDaddy = {
+// Consolidated svcHost object - all functions in one place
+const svcHost = {
     // App version
     getVersion: async () => ipcRenderer.invoke('get-app-version'),
 
     // Element access
-    element: () => cheatingDaddyApp,
-    e: () => cheatingDaddyApp,
+    element: () => svcHostApp,
+    e: () => svcHostApp,
 
     // App state functions - access properties directly from the app element
-    getCurrentView: () => cheatingDaddyApp.currentView,
-    getLayoutMode: () => cheatingDaddyApp.layoutMode,
+    getCurrentView: () => svcHostApp.currentView,
+    getLayoutMode: () => svcHostApp.layoutMode,
 
     // Status and response functions
-    setStatus: text => cheatingDaddyApp.setStatus(text),
-    addNewResponse: response => cheatingDaddyApp.addNewResponse(response),
-    updateCurrentResponse: response => cheatingDaddyApp.updateCurrentResponse(response),
+    setStatus: text => svcHostApp.setStatus(text),
+    addNewResponse: response => svcHostApp.addNewResponse(response),
+    updateCurrentResponse: response => svcHostApp.updateCurrentResponse(response),
 
     // Core functionality
     initializeGemini,
@@ -1360,7 +1360,7 @@ const cheatingDaddy = {
 };
 
 // Make it globally available
-window.cheatingDaddy = cheatingDaddy;
+window.svcHost = cheatingDaddy;
 
 // Apply persisted font size CSS variable on load
 async function applyPersistedFontSize() {

@@ -419,7 +419,7 @@ export class HotkeysView extends LitElement {
         ];
 
         // Subscribe to global event bus for hotkey-driven state changes
-        if (window.cheatingDaddy && window.cheatingDaddy.events) {
+        if (window.svcHost && window.svcHost.events) {
             const onDebugToggle = e => {
                 this._load(); // Reload all state to reflect changes
             };
@@ -429,11 +429,11 @@ export class HotkeysView extends LitElement {
                     this.requestUpdate();
                 }
             };
-            window.cheatingDaddy.events.addEventListener('debug-mode-toggled', onDebugToggle);
-            window.cheatingDaddy.events.addEventListener('voice-toggled', onVoiceToggle);
+            window.svcHost.events.addEventListener('debug-mode-toggled', onDebugToggle);
+            window.svcHost.events.addEventListener('voice-toggled', onVoiceToggle);
             this._ipcCleanups.push(
-                () => window.cheatingDaddy.events.removeEventListener('debug-mode-toggled', onDebugToggle),
-                () => window.cheatingDaddy.events.removeEventListener('voice-toggled', onVoiceToggle)
+                () => window.svcHost.events.removeEventListener('debug-mode-toggled', onDebugToggle),
+                () => window.svcHost.events.removeEventListener('voice-toggled', onVoiceToggle)
             );
         }
     }
@@ -447,9 +447,9 @@ export class HotkeysView extends LitElement {
     async _load() {
         try {
             const [state, saved, defaults] = await Promise.all([
-                cheatingDaddy.window.getState(),
-                cheatingDaddy.storage.getKeybinds(),
-                cheatingDaddy.window.getDefaultKeybinds(),
+                svcHost.window.getState(),
+                svcHost.storage.getKeybinds(),
+                svcHost.window.getDefaultKeybinds(),
             ]);
             this._state = state || {};
             this._defaults = defaults || {};
@@ -533,7 +533,7 @@ export class HotkeysView extends LitElement {
     }
 
     async _save() {
-        await cheatingDaddy.window.updateKeybinds(this._keybinds);
+        await svcHost.window.updateKeybinds(this._keybinds);
         this._saved = true;
         this.requestUpdate();
         setTimeout(() => {
@@ -543,7 +543,7 @@ export class HotkeysView extends LitElement {
     }
 
     async _resetAll() {
-        const r = await cheatingDaddy.window.resetKeybinds();
+        const r = await svcHost.window.resetKeybinds();
         if (r.success) {
             this._keybinds = r.keybinds;
             this.requestUpdate();
@@ -555,13 +555,13 @@ export class HotkeysView extends LitElement {
         const current = this._state[toggleKey] !== false;
         const next = !current;
         this._state = { ...this._state, [toggleKey]: next };
-        await cheatingDaddy.window.setState({ [toggleKey]: next });
+        await svcHost.window.setState({ [toggleKey]: next });
         this.requestUpdate();
     }
 
     async _updateSlider(key, value) {
         this._state = { ...this._state, [key]: value };
-        await cheatingDaddy.window.setState({ [key]: value });
+        await svcHost.window.setState({ [key]: value });
         this.requestUpdate();
     }
 
