@@ -1,0 +1,27 @@
+{
+    "project_type": "Electron desktop app using LitElement web components with electron-forge",
+    "language": "JavaScript (ES Modules in renderer, CommonJS in main)",
+    "build_system": "electron-forge (npm start for dev)",
+    "test_framework": "No automated tests. Manual verification via npm start",
+    "build_command": "npm install",
+    "test_command": "node --check src/index.js; node --check src/utils/gemini.js; node --check src/storage.js; node --check src/utils/window.js",
+    "verification_instructions": "1. Run node --check on all modified files. 2. Run npm start to verify app launches. 3. Test Ctrl+Alt+G toggle, text input in session, profile persistence.",
+    "environment_constraints": "Windows. Electron binary requires network download from npmmirror.com (GitHub mirrors blocked by ISP).",
+    "contribution_requirements": "Run npx prettier --write . before committing. Prettier uses .prettierrc (4-space indent, 150 print width, semicolons, single quotes). src/assets ignored.",
+    "key_patterns": "LitElement components with static styles/properties. IPC between main (CommonJS) and renderer. Storage is JSON files on disk. Window management in window.js with global shortcuts. State sync via ipcRenderer events. API key pool system with rotation and fallback. Groq and Gemini as dual providers with cross-fallback.",
+    "relevant_files": [
+        "src/storage.js",
+        "src/utils/window.js",
+        "src/utils/renderer.js",
+        "src/utils/gemini.js",
+        "src/utils/apiKeys.js",
+        "src/utils/localai.js",
+        "src/index.js",
+        "src/components/app/CheatingDaddyApp.js",
+        "src/components/views/MainView.js",
+        "src/components/views/ModelSettingsView.js",
+        "src/components/views/AICustomizeView.js",
+        "src/components/views/HotkeysView.js",
+        "src/components/views/AssistantView.js"
+    ]
+}

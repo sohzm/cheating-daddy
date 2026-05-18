@@ -7,6 +7,7 @@ const { createWindow, updateGlobalShortcuts } = require('./utils/window');
 const { setupGeminiIpcHandlers, stopMacOSAudioCapture, sendToRenderer } = require('./utils/gemini');
 const apiKeys = require('./utils/apiKeys');
 const storage = require('./storage');
+const log = require('./utils/logger')('Main');
 
 const geminiSessionRef = { current: null };
 let mainWindow = null;
@@ -30,6 +31,7 @@ if (!gotTheLock) {
     app.whenReady().then(async () => {
         // Initialize storage (checks version, resets if needed)
         storage.initializeStorage();
+        log.info('Storage initialized');
 
         // Trigger screen recording permission prompt on macOS if not already granted
         if (process.platform === 'darwin') {
@@ -38,10 +40,13 @@ if (!gotTheLock) {
         }
 
         createMainWindow();
+        log.info('Main window created');
+
         setupGeminiIpcHandlers(geminiSessionRef);
         setupStorageIpcHandlers();
         setupApiKeysIpcHandlers();
         setupGeneralIpcHandlers();
+        log.info('IPC handlers registered');
 
         // Pre-warm screen capture subsystem to avoid first-session freeze on Windows
         setTimeout(() => {
@@ -49,7 +54,7 @@ if (!gotTheLock) {
             desktopCapturer
                 .getSources({ types: ['screen'] })
                 .then(sources => {
-                    console.log(`Screen capture pre-warmed: ${sources.length} source(s)`);
+                    log.info(`Screen capture pre-warmed: ${sources.length} source(s)`);
                 })
                 .catch(() => {});
         }, 1500);
@@ -57,6 +62,7 @@ if (!gotTheLock) {
         // Defer validation to avoid competing with initial render and GPU setup
         setTimeout(() => {
             apiKeys.startBackgroundValidation();
+            log.info('Background key validation started');
         }, 8000);
     });
 
@@ -401,6 +407,27 @@ function setupGeneralIpcHandlers() {
 
     ipcMain.handle('get-gemini-models', async () => {
         return { success: true, data: storage.GEMINI_MODELS };
+    });
+
+    ipcMain.handle('get-groq-models', async () => {
+        return { success: true, data: storage.GROQ_MODELS };
+    });
+
+    ipcMain.handle('list-ollama-models', async (event, host) => {
+        try {
+            const { Ollama } = require('ollama');
+            const client = new Ollama({ host: host || 'http://127.0.0.1:11434' });
+            const result = await client.list();
+            const models = (result.models || []).map(m => ({
+                name: m.name,
+                size: m.size,
+                modified: m.modified_at,
+                details: m.details || {},
+            }));
+            return { success: true, data: models };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
     });
 
     ipcMain.handle('quit-application', async event => {

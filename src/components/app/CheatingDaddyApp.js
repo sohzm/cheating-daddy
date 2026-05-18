@@ -531,6 +531,30 @@ export class CheatingDaddyApp extends LitElement {
             ipcRenderer.on('click-through-toggled', this._ipcClickThrough);
             ipcRenderer.on('reconnect-failed', this._ipcReconnectFailed);
             ipcRenderer.on('whisper-downloading', this._ipcWhisperDownloading);
+
+            // State sync from keybindings
+            this._ipcDebugModeToggled = (_, enabled) => {
+                this._debugMode = enabled;
+                this.requestUpdate();
+            };
+            this._ipcAiModeToggled = (_, mode) => {
+                this._aiMode = mode;
+                this.requestUpdate();
+            };
+            this._ipcModelChanged = (_, data) => {
+                if (data.task === 'extraction') this._modelExtraction = data.model;
+                else if (data.task === 'solution') this._modelSolution = data.model;
+                else if (data.task === 'debugging') this._modelDebugging = data.model;
+                this.requestUpdate();
+            };
+            this._ipcForceGroqToggled = (_, enabled) => {
+                this._forceGroqMode = enabled;
+                this.requestUpdate();
+            };
+            ipcRenderer.on('debug-mode-toggled', this._ipcDebugModeToggled);
+            ipcRenderer.on('ai-mode-toggled', this._ipcAiModeToggled);
+            ipcRenderer.on('model-changed', this._ipcModelChanged);
+            ipcRenderer.on('force-groq-toggled', this._ipcForceGroqToggled);
         }
     }
 
@@ -548,6 +572,10 @@ export class CheatingDaddyApp extends LitElement {
             ipcRenderer.removeListener('click-through-toggled', this._ipcClickThrough);
             ipcRenderer.removeListener('reconnect-failed', this._ipcReconnectFailed);
             ipcRenderer.removeListener('whisper-downloading', this._ipcWhisperDownloading);
+            ipcRenderer.removeListener('debug-mode-toggled', this._ipcDebugModeToggled);
+            ipcRenderer.removeListener('ai-mode-toggled', this._ipcAiModeToggled);
+            ipcRenderer.removeListener('model-changed', this._ipcModelChanged);
+            ipcRenderer.removeListener('force-groq-toggled', this._ipcForceGroqToggled);
         }
     }
 
@@ -668,7 +696,8 @@ export class CheatingDaddyApp extends LitElement {
             }
         } else if (providerMode === 'byok') {
             const apiKey = await cheatingDaddy.storage.getApiKey();
-            if (!apiKey || apiKey === '') {
+            const groqKey = await cheatingDaddy.storage.getGroqApiKey();
+            if ((!apiKey || apiKey === '') && (!groqKey || groqKey === '')) {
                 const mainView = this.shadowRoot.querySelector('main-view');
                 if (mainView && mainView.triggerApiKeyError) mainView.triggerApiKeyError();
                 return;

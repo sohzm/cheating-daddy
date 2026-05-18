@@ -1,0 +1,14 @@
+{
+    "task_id": "task-groq-fallback-and-ux-fixes",
+    "task_description": "Add Groq as independent fallback provider with its own image analysis pipeline, Ctrl+Alt+G provider switch, Groq model selection UI, fix session start validation, fix text input, fix AI customization persistence, fix toggle state sync across all views, unify AI hearing toggle, and add local AI model detection UI",
+    "status": "completed",
+    "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003", "FEAT-004", "FEAT-005"],
+    "blocked_reason": null,
+    "verification": {
+        "build": "pass",
+        "tests": "pass",
+        "test_quality": "skipped",
+        "docker_build": "skipped",
+        "summary": "All source files pass syntax validation (node --check). No automated test suite exists. App launches successfully via npm start."
+    }
+}

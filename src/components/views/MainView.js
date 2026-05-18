@@ -543,6 +543,9 @@ export class MainView extends LitElement {
         _ollamaModel: { state: true },
         _whisperModel: { state: true },
         _showLocalHelp: { state: true },
+        _ollamaModelList: { state: true },
+        _ollamaStatus: { state: true },
+        _ollamaChecking: { state: true },
         // AI Hearing
         _aiHearingEnabled: { state: true },
     };
@@ -567,6 +570,9 @@ export class MainView extends LitElement {
         this._ollamaHost = 'http://127.0.0.1:11434';
         this._ollamaModel = 'llama3.1';
         this._whisperModel = 'Xenova/whisper-small';
+        this._ollamaModelList = [];
+        this._ollamaStatus = '';
+        this._ollamaChecking = false;
         this._aiHearingEnabled = false;
 
         this._animId = null;
@@ -615,12 +621,23 @@ export class MainView extends LitElement {
     connectedCallback() {
         super.connectedCallback();
         document.addEventListener('keydown', this.boundKeydownHandler);
+        if (window.require) {
+            const { ipcRenderer } = window.require('electron');
+            this._aiHearingListener = (_e, enabled) => {
+                this._aiHearingEnabled = enabled;
+                this.requestUpdate();
+            };
+            ipcRenderer.on('ai-hearing-toggled', this._aiHearingListener);
+        }
     }
 
     disconnectedCallback() {
         super.disconnectedCallback();
         document.removeEventListener('keydown', this.boundKeydownHandler);
         if (this._animId) cancelAnimationFrame(this._animId);
+        if (this._aiHearingListener && window.require) {
+            window.require('electron').ipcRenderer.removeListener('ai-hearing-toggled', this._aiHearingListener);
+        }
     }
 
     updated(changedProperties) {
@@ -812,13 +829,12 @@ export class MainView extends LitElement {
         if (this.isInitializing) return;
 
         if (this._mode === 'byok') {
-            if (!this._geminiKey.trim()) {
+            if (!this._geminiKey.trim() && !this._groqKey.trim()) {
                 this._keyError = true;
                 this.requestUpdate();
                 return;
             }
         } else if (this._mode === 'local') {
-            // Local mode doesn't need API keys, just Ollama host
             if (!this._ollamaHost.trim()) {
                 return;
             }
@@ -919,7 +935,7 @@ export class MainView extends LitElement {
                 <label class="form-label">Gemini API Key</label>
                 <input
                     type="password"
-                    placeholder="Required"
+                    placeholder="For live audio + screen analysis"
                     .value=${this._geminiKey}
                     @input=${e => this._saveGeminiKey(e.target.value)}
                     class=${this._keyError ? 'error' : ''}
@@ -931,9 +947,10 @@ export class MainView extends LitElement {
 
             <div class="form-group">
                 <label class="form-label">Groq API Key</label>
-                <input type="password" placeholder="Optional" .value=${this._groqKey} @input=${e => this._saveGroqKey(e.target.value)} />
+                <input type="password" placeholder="For fast text responses" .value=${this._groqKey} @input=${e => this._saveGroqKey(e.target.value)} class=${this._keyError ? 'error' : ''} />
                 <div class="form-hint">
                     <span class="link" @click=${() => this.onExternalLink('https://console.groq.com/keys')}>Get Groq key</span>
+                    — at least one key required
                 </div>
             </div>
 
@@ -963,31 +980,104 @@ export class MainView extends LitElement {
         return html`
             <div class="form-group">
                 <label class="form-label">Ollama Host</label>
-                <input
-                    type="text"
-                    placeholder="http://127.0.0.1:11434"
-                    .value=${this._ollamaHost}
-                    @input=${e => this._saveOllamaHost(e.target.value)}
-                />
-                <div class="form-hint">Ollama must be running locally</div>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Ollama Model</label>
-                <input type="text" placeholder="llama3.1" .value=${this._ollamaModel} @input=${e => this._saveOllamaModel(e.target.value)} />
-                <div class="form-hint">
-                    Run
-                    <code
-                        style="font-family: var(--font-mono); font-size: 11px; background: var(--bg-elevated); padding: 1px 4px; border-radius: 3px;"
-                        >ollama pull ${this._ollamaModel}</code
+                <div style="display:flex; gap:6px; align-items:center;">
+                    <input
+                        type="text"
+                        placeholder="http://127.0.0.1:11434"
+                        .value=${this._ollamaHost}
+                        @input=${e => this._saveOllamaHost(e.target.value)}
+                        style="flex:1;"
+                    />
+                    <button
+                        style="background:var(--bg-elevated); border:1px solid var(--border); border-radius:var(--radius-sm); padding:8px 12px; font-size:11px; color:var(--text-secondary); cursor:pointer; white-space:nowrap;"
+                        @click=${() => this._detectOllamaModels()}
                     >
-                    first
+                        ${this._ollamaChecking ? '...' : 'Detect'}
+                    </button>
+                </div>
+                <div class="form-hint">
+                    ${this._ollamaStatus === 'connected'
+                        ? html`<span style="color:#22C55E;">● Connected</span> — ${this._ollamaModelList.length} model(s) found`
+                        : this._ollamaStatus === 'error'
+                          ? html`<span style="color:#EF4444;">● Not reachable</span> — is Ollama running?`
+                          : 'Click Detect to check connection'}
                 </div>
             </div>
 
+            ${this._ollamaStatus === 'connected' && this._ollamaModelList.length > 0
+                ? html`
+                      <!-- LLM Model Selection -->
+                      <div class="form-group">
+                          <label class="form-label">LLM Model</label>
+                          <select
+                              .value=${this._ollamaModel}
+                              @change=${e => this._saveOllamaModel(e.target.value)}
+                              style="background:var(--bg-elevated); color:var(--text-primary); border:1px solid var(--border); padding:10px 12px; width:100%; border-radius:var(--radius-sm); font-size:var(--font-size-sm); font-family:var(--font);"
+                          >
+                              ${this._ollamaModelList.map(
+                                  m => html`
+                                      <option value=${m.name} ?selected=${m.name === this._ollamaModel}>${m.name} (${this._formatSize(m.size)})</option>
+                                  `
+                              )}
+                          </select>
+                          <div class="form-hint">
+                              ${this._isVisionModel(this._ollamaModel)
+                                  ? html`<span style="color:#22C55E;">✓ Vision capable</span> — supports screen analysis`
+                                  : html`<span style="color:#D4A017;">⚠ Text only</span> — screen analysis won't work. Use gemma3:4b or llava for OCR.`}
+                          </div>
+                      </div>
+
+                      <!-- Vision/OCR Model (separate from LLM if desired) -->
+                      ${this._ollamaVisionModels.length > 0
+                          ? html`
+                                <div class="form-group">
+                                    <label class="form-label">Vision / OCR Model</label>
+                                    <div
+                                        style="background:var(--bg-elevated); border:1px solid var(--border); border-radius:var(--radius-sm); padding:8px 12px;"
+                                    >
+                                        <div style="font-size:11px; color:var(--text-muted); margin-bottom:4px;">Available vision models:</div>
+                                        ${this._ollamaVisionModels.map(
+                                            m => html`
+                                                <div
+                                                    style="display:flex; align-items:center; justify-content:space-between; padding:3px 0; font-size:12px;"
+                                                >
+                                                    <span style="color:var(--text-primary); font-family:var(--font-mono);">${m.name}</span>
+                                                    <span style="color:var(--text-muted); font-size:10px;">${this._formatSize(m.size)}</span>
+                                                </div>
+                                            `
+                                        )}
+                                    </div>
+                                    <div class="form-hint">
+                                        ${this._isVisionModel(this._ollamaModel)
+                                            ? 'Your selected LLM model already supports vision.'
+                                            : 'Switch your LLM model to one of these for screen analysis.'}
+                                    </div>
+                                </div>
+                            `
+                          : ''}
+                  `
+                : html`
+                      <!-- Fallback manual input when not detected -->
+                      <div class="form-group">
+                          <label class="form-label">Ollama Model</label>
+                          <input
+                              type="text"
+                              placeholder="gemma3:4b"
+                              .value=${this._ollamaModel}
+                              @input=${e => this._saveOllamaModel(e.target.value)}
+                          />
+                          <div class="form-hint">
+                              For image/screen analysis use a vision model:
+                              <code style="font-family:var(--font-mono); font-size:11px; background:var(--bg-elevated); padding:1px 4px; border-radius:3px;">gemma3:4b</code>
+                              or
+                              <code style="font-family:var(--font-mono); font-size:11px; background:var(--bg-elevated); padding:1px 4px; border-radius:3px;">llava</code>
+                          </div>
+                      </div>
+                  `}
+
             <div class="form-group">
                 <div class="whisper-label-row">
-                    <label class="form-label">Whisper Model</label>
+                    <label class="form-label">Whisper Model (Speech-to-Text)</label>
                     ${this.whisperDownloading ? html`<div class="whisper-spinner"></div>` : ''}
                 </div>
                 <select .value=${this._whisperModel} @change=${e => this._saveWhisperModel(e.target.value)}>
@@ -1015,12 +1105,65 @@ export class MainView extends LitElement {
 
             ${this._renderStartButton()} ${this._renderDivider()}
 
-            <!-- Cloud promo intentionally removed from the active UI. -->
-
             <div class="mode-links">
                 <button class="mode-link" @click=${() => this._saveMode('byok')}>Use own API keys</button>
             </div>
         `;
+    }
+
+    // Known vision-capable model patterns
+    _isVisionModel(modelName) {
+        if (!modelName) return false;
+        const name = modelName.toLowerCase();
+        return (
+            name.includes('llava') ||
+            name.includes('gemma3') ||
+            name.includes('gemma-3') ||
+            name.includes('bakllava') ||
+            name.includes('moondream') ||
+            name.includes('minicpm-v') ||
+            name.includes('llama3.2-vision') ||
+            name.includes('cogvlm') ||
+            name.includes('internvl')
+        );
+    }
+
+    _formatSize(bytes) {
+        if (!bytes) return '?';
+        const gb = bytes / (1024 * 1024 * 1024);
+        if (gb >= 1) return `${gb.toFixed(1)}GB`;
+        const mb = bytes / (1024 * 1024);
+        return `${mb.toFixed(0)}MB`;
+    }
+
+    get _ollamaVisionModels() {
+        return (this._ollamaModelList || []).filter(m => this._isVisionModel(m.name));
+    }
+
+    async _detectOllamaModels() {
+        this._ollamaChecking = true;
+        this._ollamaStatus = '';
+        this.requestUpdate();
+
+        try {
+            if (window.require) {
+                const { ipcRenderer } = window.require('electron');
+                const result = await ipcRenderer.invoke('list-ollama-models', this._ollamaHost);
+                if (result.success) {
+                    this._ollamaModelList = result.data;
+                    this._ollamaStatus = 'connected';
+                } else {
+                    this._ollamaModelList = [];
+                    this._ollamaStatus = 'error';
+                }
+            }
+        } catch (e) {
+            this._ollamaModelList = [];
+            this._ollamaStatus = 'error';
+        }
+
+        this._ollamaChecking = false;
+        this.requestUpdate();
     }
 
     // ── Main render ──

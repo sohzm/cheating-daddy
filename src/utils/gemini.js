@@ -7,6 +7,7 @@ const { getAvailableModel, incrementLimitCount, getApiKey, getGroqApiKey, increm
 const storage = require('../storage');
 const apiKeys = require('./apiKeys');
 const { connectCloud, sendCloudAudio, sendCloudText, sendCloudImage, closeCloud, isCloudActive, setOnTurnComplete } = require('./cloud');
+const log = require('./logger')('Gemini');
 
 // Lazy-loaded to avoid circular dependency (localai.js imports from gemini.js)
 let _localai = null;
@@ -84,7 +85,7 @@ function initializeNewSession(profile = null, customPrompt = null) {
     groqConversationHistory = [];
     currentProfile = profile;
     currentCustomPrompt = customPrompt;
-    console.log('New conversation session started:', currentSessionId, 'profile:', profile);
+    log.info('New session started:', currentSessionId, 'profile:', profile);
 
     // Save initial session with profile context
     if (profile) {
@@ -264,6 +265,13 @@ async function sendToGroq(transcription) {
     if (!modelToUse) {
         console.log('All Groq daily limits exhausted');
         sendToRenderer('update-status', 'Groq limits reached for today');
+        // Fallback to Gemini when Groq limits are exhausted
+        try {
+            await sendToGemma(transcription);
+        } catch (gemmaError) {
+            console.error('Gemini fallback also failed:', gemmaError);
+            sendToRenderer('update-status', 'Both Groq and Gemini failed');
+        }
         return;
     }
 
@@ -369,10 +377,24 @@ async function sendToGroq(transcription) {
     } catch (error) {
         if (error.code === 'NO_READY_KEY' || error.code === 'ALL_KEYS_UNAVAILABLE') {
             console.error('Groq: no usable keys left in pool');
-            sendToRenderer('update-status', 'All Groq API keys exhausted or invalid');
+            sendToRenderer('update-status', 'Groq keys exhausted, falling back to Gemini...');
+            // Fallback to Gemini when Groq fails
+            try {
+                await sendToGemma(transcription);
+            } catch (gemmaError) {
+                console.error('Gemini fallback also failed:', gemmaError);
+                sendToRenderer('update-status', 'Both Groq and Gemini failed');
+            }
         } else {
             console.error('Error calling Groq API:', error);
-            sendToRenderer('update-status', 'Groq error: ' + error.message);
+            sendToRenderer('update-status', 'Groq error, trying Gemini...');
+            // Fallback to Gemini on any Groq error
+            try {
+                await sendToGemma(transcription);
+            } catch (gemmaError) {
+                console.error('Gemini fallback also failed:', gemmaError);
+                sendToRenderer('update-status', 'Both Groq and Gemini failed');
+            }
         }
     }
 }
@@ -464,10 +486,31 @@ async function sendToGemma(transcription) {
     } catch (error) {
         if (error.code === 'NO_READY_KEY' || error.code === 'ALL_KEYS_UNAVAILABLE') {
             console.error('Gemma: no usable Gemini keys left in pool');
-            sendToRenderer('update-status', 'All Gemini API keys exhausted or invalid');
+            sendToRenderer('update-status', 'Gemini keys exhausted, falling back to Groq...');
+            // Fallback to Groq when Gemini fails
+            if (hasGroqKey()) {
+                try {
+                    await sendToGroq(transcription);
+                } catch (groqError) {
+                    console.error('Groq fallback also failed:', groqError);
+                    sendToRenderer('update-status', 'Both Gemini and Groq failed');
+                }
+            } else {
+                sendToRenderer('update-status', 'All Gemini API keys exhausted or invalid');
+            }
         } else {
             console.error('Error calling Gemma API:', error);
-            sendToRenderer('update-status', 'Gemma error: ' + error.message);
+            sendToRenderer('update-status', 'Gemini error, trying Groq...');
+            if (hasGroqKey()) {
+                try {
+                    await sendToGroq(transcription);
+                } catch (groqError) {
+                    console.error('Groq fallback also failed:', groqError);
+                    sendToRenderer('update-status', 'Both Gemini and Groq failed');
+                }
+            } else {
+                sendToRenderer('update-status', 'Gemma error: ' + error.message);
+            }
         }
     }
 }
@@ -542,7 +585,10 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
 
                     if (message.serverContent?.generationComplete) {
                         if (currentTranscription.trim() !== '') {
-                            if (hasGroqKey()) {
+                            const prefs = storage.getPreferences();
+                            if (prefs.forceGroqMode && hasGroqKey()) {
+                                sendToGroq(currentTranscription);
+                            } else if (hasGroqKey()) {
                                 sendToGroq(currentTranscription);
                             } else {
                                 sendToGemma(currentTranscription);
@@ -836,10 +882,21 @@ async function sendImageToGeminiHttp(base64Data, prompt) {
     const debugMode = prefs.debugModeEnabled || false;
     const model = debugMode ? prefs.modelDebugging || 'gemini-2.5-flash' : prefs.modelSolution || getAvailableModel();
 
+    // If force Groq mode is active, skip Gemini entirely and use Groq
+    if (prefs.forceGroqMode && hasGroqKey()) {
+        console.log('[ForceGroq] Skipping Gemini, using Groq for image analysis');
+        return await sendImageToGroqHttp(base64Data, prompt);
+    }
+
     // Pick a ready key; fall back to legacy single-key for users that haven't migrated yet.
     const readyKeys = storage.listReadyProviderKeys('gemini');
     const legacyKey = getApiKey();
     if (readyKeys.length === 0 && !legacyKey) {
+        // No Gemini keys available — try Groq fallback
+        if (hasGroqKey()) {
+            console.log('[Fallback] No Gemini keys, falling back to Groq for image analysis');
+            return await sendImageToGroqHttp(base64Data, prompt);
+        }
         return { success: false, error: 'No API key configured' };
     }
 
@@ -892,8 +949,149 @@ async function sendImageToGeminiHttp(base64Data, prompt) {
         });
     } catch (error) {
         console.error('Error sending image to Gemini HTTP:', error);
+
+        // Fallback to Groq if Gemini fails
+        if (hasGroqKey()) {
+            console.log('[Fallback] Gemini image analysis failed, falling back to Groq');
+            sendToRenderer('update-status', 'Gemini failed, using Groq fallback...');
+            try {
+                return await sendImageToGroqHttp(base64Data, prompt);
+            } catch (groqError) {
+                console.error('[Fallback] Groq image analysis also failed:', groqError);
+                return { success: false, error: 'Both Gemini and Groq failed: ' + error.message };
+            }
+        }
+
         if (error.code === 'ALL_KEYS_UNAVAILABLE' || error.code === 'NO_READY_KEY') {
             return { success: false, error: 'All Gemini API keys exhausted or invalid' };
+        }
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Independent Groq image/screen analysis pipeline.
+ * Uses Groq's vision-capable models to analyse screenshots without any Gemini dependency.
+ * Falls back through available Groq models if one fails.
+ */
+async function sendImageToGroqHttp(base64Data, prompt) {
+    const prefs = storage.getPreferences();
+    const debugMode = prefs.debugModeEnabled || false;
+    const model = debugMode ? prefs.groqModelDebugging || 'qwen/qwen3-32b' : prefs.groqModelSolution || 'qwen/qwen3-32b';
+
+    const readyKeys = storage.listReadyProviderKeys('groq');
+    const legacyKey = getGroqApiKey();
+    if (readyKeys.length === 0 && !legacyKey) {
+        return { success: false, error: 'No Groq API key configured' };
+    }
+
+    console.log(`[Groq Vision] Sending image to ${model}...`);
+
+    try {
+        return await apiKeys.withKeyRotation('groq', async (groqApiKey, entry) => {
+            const messages = [
+                {
+                    role: 'system',
+                    content: currentSystemPrompt || 'You are a helpful assistant that analyses images and provides detailed answers.',
+                },
+                {
+                    role: 'user',
+                    content: [
+                        {
+                            type: 'image_url',
+                            image_url: {
+                                url: `data:image/jpeg;base64,${base64Data}`,
+                            },
+                        },
+                        {
+                            type: 'text',
+                            text: prompt,
+                        },
+                    ],
+                },
+            ];
+
+            const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${groqApiKey}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    model: model,
+                    messages: messages,
+                    stream: true,
+                    temperature: 0.7,
+                    max_tokens: 2048,
+                }),
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text().catch(() => '');
+                apiKeys.handleKeyFailure('groq', entry.id, response.status, errorText);
+                const err = new Error(`Groq Vision API error ${response.status}: ${errorText.slice(0, 200)}`);
+                err.status = response.status;
+                throw err;
+            }
+
+            // On success: mark key ready
+            storage.markProviderKeyState('groq', entry.id, 'ready', { errorReason: null });
+            apiKeys.broadcastUpdate('groq');
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let fullText = '';
+            let isFirst = true;
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value, { stream: true });
+                const lines = chunk.split('\n').filter(line => line.trim() !== '');
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        const data = line.slice(6);
+                        if (data === '[DONE]') continue;
+
+                        try {
+                            const json = JSON.parse(data);
+                            const token = json.choices?.[0]?.delta?.content || '';
+                            if (token) {
+                                fullText += token;
+                                const displayText = stripThinkingTags(fullText);
+                                if (displayText) {
+                                    sendToRenderer(isFirst ? 'new-response' : 'update-response', displayText);
+                                    isFirst = false;
+                                }
+                            }
+                        } catch (parseError) {
+                            // Skip invalid JSON chunks
+                        }
+                    }
+                }
+            }
+
+            const cleanedResponse = stripThinkingTags(fullText);
+
+            // Track usage
+            const inputChars = prompt.length + 1000; // approximate for image
+            const outputChars = cleanedResponse.length;
+            const modelKey = model.split('/').pop();
+            incrementCharUsage('groq', modelKey, inputChars + outputChars);
+
+            console.log(`[Groq Vision] Image response completed from ${model}`);
+
+            // Save screen analysis to history
+            saveScreenAnalysis(prompt, cleanedResponse, `groq:${model}`);
+
+            return { success: true, text: cleanedResponse, model: `groq:${model}` };
+        });
+    } catch (error) {
+        console.error('[Groq Vision] Error:', error);
+        if (error.code === 'ALL_KEYS_UNAVAILABLE' || error.code === 'NO_READY_KEY') {
+            return { success: false, error: 'All Groq API keys exhausted or invalid' };
         }
         return { success: false, error: error.message };
     }
@@ -925,13 +1123,28 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
     ipcMain.handle('initialize-gemini', async (event, apiKey, customPrompt, profile = 'interview', language = 'en-US') => {
         currentProviderMode = 'byok';
 
+        // Set up system prompt and session regardless of whether Gemini live connects
+        const enabledTools = await getEnabledTools();
+        const googleSearchEnabled = enabledTools.some(tool => tool.googleSearch);
+        const systemPrompt = getSystemPrompt(profile, customPrompt, googleSearchEnabled);
+        currentSystemPrompt = systemPrompt;
+
+        // Append cross-session context for AI memory
+        const sessionContext = storage.getRecentSessionContext();
+        if (sessionContext) {
+            currentSystemPrompt += sessionContext;
+        }
+
         // Prefer the pool; fall back to any apiKey the renderer passed (for back-compat).
         const readyKeys = storage.listReadyProviderKeys('gemini');
         const candidates = readyKeys.length > 0 ? readyKeys : apiKey ? [{ id: null, key: apiKey }] : [];
 
         if (candidates.length === 0) {
-            console.error('initialize-gemini: no ready Gemini API keys');
-            return false;
+            // No Gemini keys — still initialize session for Groq-only mode
+            console.log('initialize-gemini: no Gemini keys, running in Groq-only mode');
+            initializeNewSession(profile, customPrompt);
+            sendToRenderer('update-status', 'Groq-only mode (no Gemini key)');
+            return true;
         }
 
         let lastError = null;
@@ -961,6 +1174,13 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
 
         if (lastError) {
             console.error('initialize-gemini failed:', lastError);
+            // Even if Gemini live session fails, allow Groq-only operation
+            if (hasGroqKey()) {
+                console.log('Gemini session failed but Groq keys available, continuing in Groq-only mode');
+                initializeNewSession(profile, customPrompt);
+                sendToRenderer('update-status', 'Gemini failed, using Groq');
+                return true;
+            }
         }
         return false;
     });
@@ -1107,12 +1327,32 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
             }
         }
 
-        if (!geminiSessionRef.current) return { success: false, error: 'No active Gemini session' };
+        if (!geminiSessionRef.current) {
+            // No live Gemini session — still route text to Groq/Gemma for response
+            try {
+                console.log('Sending text message (no live session):', text);
+                const prefs = storage.getPreferences();
+                if (prefs.forceGroqMode && hasGroqKey()) {
+                    sendToGroq(text.trim());
+                } else if (hasGroqKey()) {
+                    sendToGroq(text.trim());
+                } else {
+                    sendToGemma(text.trim());
+                }
+                return { success: true };
+            } catch (error) {
+                console.error('Error sending text:', error);
+                return { success: false, error: error.message };
+            }
+        }
 
         try {
             console.log('Sending text message:', text);
 
-            if (hasGroqKey()) {
+            const prefs = storage.getPreferences();
+            if (prefs.forceGroqMode && hasGroqKey()) {
+                sendToGroq(text.trim());
+            } else if (hasGroqKey()) {
                 sendToGroq(text.trim());
             } else {
                 sendToGemma(text.trim());
@@ -1235,6 +1475,7 @@ module.exports = {
     stopMacOSAudioCapture,
     sendAudioToGemini,
     sendImageToGeminiHttp,
+    sendImageToGroqHttp,
     setupGeminiIpcHandlers,
     formatSpeakerResults,
 };

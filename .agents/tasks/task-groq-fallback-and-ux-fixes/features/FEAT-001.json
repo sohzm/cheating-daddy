@@ -1,0 +1,29 @@
+{
+    "id": "FEAT-001",
+    "type": "feat",
+    "description": "Add Groq as independent fallback provider with its own image/screen analysis pipeline (sendImageToGroqHttp), cross-provider fallback in both directions, and Ctrl+Alt+G keybinding to switch between Gemini and Groq mid-session",
+    "status": "completed",
+    "steps": [
+        "1. Added GROQ_MODELS array to storage.js with models: qwen/qwen3-32b, openai/gpt-oss-120b, openai/gpt-oss-20b, moonshotai/kimi-k2-instruct, meta-llama/llama-4-scout-17b-16e-instruct, meta-llama/llama-4-maverick-17b-128e-instruct",
+        "2. Added Groq model preferences to DEFAULT_PREFERENCES: groqModelExtraction, groqModelSolution, groqModelDebugging, forceGroqMode",
+        "3. Created sendImageToGroqHttp() in gemini.js — fully independent Groq vision pipeline using Groq's OpenAI-compatible chat completions API with image_url content type. Streams response, tracks usage, saves screen analysis.",
+        "4. Modified sendImageToGeminiHttp() to check forceGroqMode first (skip Gemini entirely), and fall back to sendImageToGroqHttp() when Gemini fails or has no keys.",
+        "5. Added cross-fallback in sendToGroq(): on failure, falls back to sendToGemma(). Added cross-fallback in sendToGemma(): on failure, falls back to sendToGroq().",
+        "6. Added fallback when Groq daily limits exhausted: calls sendToGemma() instead of just showing error.",
+        "7. Added forceGroqToggle keybinding (Ctrl+Alt+G on Windows, Cmd+Alt+G on Mac) in window.js getDefaultKeybinds().",
+        "8. Registered forceGroqToggle handler in updateGlobalShortcuts() — toggles forceGroqMode preference and sends 'force-groq-toggled' + status update to renderer.",
+        "9. Bumped KEYBINDS_VERSION to 6 to force keybind reset for new binding.",
+        "10. Added 'get-groq-models' IPC handler in index.js.",
+        "11. Updated generationComplete handler and send-text-message handler to respect forceGroqMode preference.",
+        "12. Exported sendImageToGroqHttp from gemini.js module."
+    ],
+    "acceptance_criteria": [
+        "Ctrl+Alt+G switches between Gemini and Groq mid-session, status bar shows which is active",
+        "When Gemini image analysis fails, automatically falls back to Groq",
+        "When Groq text response fails, automatically falls back to Gemini (and vice versa)",
+        "sendImageToGroqHttp works independently without any Gemini dependency",
+        "Groq daily limit exhaustion triggers Gemini fallback automatically"
+    ],
+    "blocked_reason": null,
+    "findings": "Groq's vision API uses the same OpenAI chat completions format with image_url in content array. Models like qwen3-32b support multimodal input via this endpoint."
+}

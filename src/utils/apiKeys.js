@@ -17,6 +17,7 @@
 
 const { BrowserWindow } = require('electron');
 const storage = require('../storage');
+const log = require('./logger')('ApiKeys');
 
 let _revalidationInterval = null;
 const REVALIDATION_INTERVAL_MS = 5 * 60 * 1000; // 5 min sweep
@@ -135,7 +136,7 @@ function broadcastUpdate(provider) {
             w.webContents.send('api-keys:updated', { provider, keys });
         }
     } catch (err) {
-        console.error('Failed to broadcast api-keys:updated:', err.message);
+        log.error('Failed to broadcast api-keys:updated:', err.message);
     }
 }
 
@@ -147,11 +148,12 @@ function broadcastRotation(provider, newKey, oldKey) {
             from: { id: oldKey.id, label: oldKey.label || 'Unnamed' },
             to: { id: newKey.id, label: newKey.label || 'Unnamed' },
         };
+        log.info(`Key rotation: ${provider} "${oldKey.label || 'Unnamed'}" → "${newKey.label || 'Unnamed'}"`);
         for (const w of windows) {
             w.webContents.send('api-keys:rotated', payload);
         }
     } catch (err) {
-        console.error('Failed to broadcast rotation:', err.message);
+        log.error('Failed to broadcast rotation:', err.message);
     }
 }
 

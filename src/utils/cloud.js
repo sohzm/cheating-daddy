@@ -1,5 +1,6 @@
 const WebSocket = require('ws');
 const { BrowserWindow } = require('electron');
+const log = require('./logger')('Cloud');
 
 let cloudWs = null;
 let isCloudConnected = false;
@@ -34,7 +35,7 @@ function connectCloud(token, profile, userContext) {
 
     return new Promise((resolve, reject) => {
         const url = `wss://api.cheatingdaddy.com/ws?token=${encodeURIComponent(token)}`;
-        console.log('[Cloud] Connecting to', url);
+        log.info(' Connecting to', url);
 
         cloudWs = new WebSocket(url);
 
@@ -46,7 +47,7 @@ function connectCloud(token, profile, userContext) {
         }, 10000);
 
         cloudWs.on('open', () => {
-            console.log('[Cloud] WebSocket open');
+            log.info(' WebSocket open');
             isCloudConnected = true;
             clearTimeout(timeout);
 
@@ -57,7 +58,7 @@ function connectCloud(token, profile, userContext) {
                 user_context: userContext || '',
             });
             cloudWs.send(config);
-            console.log('[Cloud] Config sent:', profile);
+            log.info(' Config sent:', profile);
 
             sendToRenderer('update-status', 'Cloud connected');
             resolve(true);
@@ -68,19 +69,19 @@ function connectCloud(token, profile, userContext) {
                 const msg = JSON.parse(data.toString());
                 handleMessage(msg);
             } catch (e) {
-                console.error('[Cloud] Parse error:', e);
+                log.error(' Parse error:', e);
             }
         });
 
         cloudWs.on('close', (code, reason) => {
-            console.log('[Cloud] WebSocket closed:', code, reason.toString());
-            console.log('[Cloud] Audio chunks sent before close:', audioChunkCount);
+            log.info(' WebSocket closed:', code, reason.toString());
+            log.info(' Audio chunks sent before close:', audioChunkCount);
             isCloudConnected = false;
             clearTimeout(timeout);
         });
 
         cloudWs.on('error', err => {
-            console.error('[Cloud] WebSocket error:', err.message);
+            log.error(' WebSocket error:', err.message);
             isCloudConnected = false;
             clearTimeout(timeout);
             reject(err);
@@ -91,11 +92,11 @@ function connectCloud(token, profile, userContext) {
 function handleMessage(msg) {
     switch (msg.type) {
         case 'connected':
-            console.log('[Cloud] Server confirmed connected');
+            log.info(' Server confirmed connected');
             break;
 
         case 'transcription':
-            console.log('[Cloud] Transcription:', msg.text);
+            log.info(' Transcription:', msg.text);
             currentTranscription = msg.text || '';
             sendToRenderer('update-status', 'Generating response...');
             break;
@@ -120,17 +121,17 @@ function handleMessage(msg) {
             break;
 
         case 'session_end':
-            console.log('[Cloud] Session ended by server');
+            log.info(' Session ended by server');
             isCloudConnected = false;
             break;
 
         case 'error':
-            console.error('[Cloud] Server error:', msg.message);
+            log.error(' Server error:', msg.message);
             sendToRenderer('update-status', 'Cloud error: ' + msg.message);
             break;
 
         default:
-            console.log('[Cloud] Event:', msg.type);
+            log.info(' Event:', msg.type);
     }
 }
 
@@ -141,7 +142,7 @@ function sendCloudAudio(pcmBuffer) {
 
     cloudWs.send(pcmBuffer, { binary: true }, err => {
         if (err) {
-            console.error('[Cloud] Audio send error:', err.message);
+            log.error(' Audio send error:', err.message);
         }
     });
 
@@ -174,7 +175,7 @@ function sendCloudImage(base64Data) {
 }
 
 function closeCloud() {
-    console.log('[Cloud] Closing. Audio chunks sent:', audioChunkCount);
+    log.info(' Closing. Audio chunks sent:', audioChunkCount);
     if (cloudWs) {
         try {
             if (cloudWs.readyState === WebSocket.OPEN) {
@@ -182,7 +183,7 @@ function closeCloud() {
             }
             cloudWs.close();
         } catch (e) {
-            console.error('[Cloud] Close error:', e);
+            log.error(' Close error:', e);
         }
         cloudWs = null;
     }

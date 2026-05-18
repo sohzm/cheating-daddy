@@ -1,11 +1,12 @@
 const { BrowserWindow, globalShortcut, ipcMain, screen, app } = require('electron');
 const path = require('node:path');
 const storage = require('../storage');
+const log = require('./logger')('Window');
 
 let mouseEventsIgnored = false;
 let _programmaticMove = false;
 
-const KEYBINDS_VERSION = 5; // Bumped: remap opacity keys to font/bg split
+const KEYBINDS_VERSION = 6; // Bumped: added forceGroqToggle keybind
 
 const DEFAULT_MAIN_WINDOW_SIZE = { width: 1100, height: 800 };
 const MIN_WINDOW_SIZE = { width: 400, height: 260 };
@@ -76,6 +77,8 @@ function getDefaultKeybinds() {
         debugToggle: 'Alt+D',
         cycleSolutionModel: isMac ? 'Cmd+Y' : 'Ctrl+Y',
         cycleExtractionModel: isMac ? "Cmd+'" : "Ctrl+'",
+        // ── Groq Force Switch ──
+        forceGroqToggle: isMac ? 'Cmd+Alt+G' : 'Ctrl+Alt+G',
     };
 }
 
@@ -206,10 +209,10 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
         try {
             const success = globalShortcut.register(kb, handler);
             if (!success) {
-                console.warn(`Shortcut ${action} (${kb}) failed to register`);
+                log.warn(`Shortcut ${action} (${kb}) failed to register`);
             }
         } catch (e) {
-            console.error(`Failed to register ${action} (${kb}):`, e.message);
+            log.error(`Failed to register ${action} (${kb}):`, e.message);
         }
     }
 
@@ -310,9 +313,10 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
     // ── Voice ──
     if (winState().voiceToggleEnabled !== false) {
         tryRegister('toggleVoice', keybinds.toggleVoice, () => {
-            const enabled = !(winState().voiceEnabled ?? true);
-            storage.updateWindowState('voiceEnabled', enabled);
-            sendToRenderer('voice-toggled', enabled);
+            const prefs = storage.getPreferences();
+            const enabled = !prefs.aiHearingEnabled;
+            storage.updatePreference('aiHearingEnabled', enabled);
+            sendToRenderer('ai-hearing-toggled', enabled);
         });
     }
 
@@ -389,6 +393,15 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
         const next = models[(idx + 1) % models.length].id;
         storage.updatePreference('modelExtraction', next);
         sendToRenderer('model-changed', { task: 'extraction', model: next });
+    });
+
+    // ── Force Groq Toggle ──
+    tryRegister('forceGroqToggle', keybinds.forceGroqToggle, () => {
+        const prefs = storage.getPreferences();
+        const enabled = !prefs.forceGroqMode;
+        storage.updatePreference('forceGroqMode', enabled);
+        sendToRenderer('force-groq-toggled', enabled);
+        sendToRenderer('update-status', enabled ? 'Switched to Groq' : 'Switched to Gemini');
     });
 }
 

@@ -58,7 +58,7 @@ const HOTKEY_GROUPS = [
         id: 'audio',
         label: 'Audio Controls',
         icon: '🎙',
-        actions: [{ id: 'toggleVoice', label: 'Toggle Voice Listening', desc: 'Enable / disable microphone pipeline', toggle: 'voiceToggleEnabled' }],
+        actions: [{ id: 'toggleVoice', label: 'Toggle AI Hearing', desc: 'Enable / disable AI hearing', toggle: 'voiceToggleEnabled' }],
     },
     {
         id: 'dev',
@@ -79,6 +79,7 @@ const HOTKEY_GROUPS = [
             { id: 'fontSizeDown', label: 'Font Size -', desc: 'Decrease app font size', toggle: null },
             { id: 'aiModeToggle', label: 'Toggle AI Mode', desc: 'Switch between Local/Online AI', toggle: null },
             { id: 'debugToggle', label: 'Debug Mode', desc: 'Toggle debugging-focused workflow', toggle: null },
+            { id: 'forceGroqToggle', label: 'Switch Gemini/Groq', desc: 'Switch between Gemini and Groq mid-session (Ctrl+Alt+G)', toggle: null },
             { id: 'cycleSolutionModel', label: 'Cycle Solution Model', desc: 'Cycle Solution Generation model', toggle: null },
             { id: 'cycleExtractionModel', label: 'Cycle Extraction Model', desc: 'Cycle Problem Extraction model', toggle: null },
             { id: 'emergencyQuit', label: 'Quit App', desc: 'Quit the application immediately', toggle: null },

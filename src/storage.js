@@ -2,6 +2,8 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
+const log = require('./utils/logger')('Storage');
+
 const CONFIG_VERSION = 1;
 
 // Default values
@@ -35,6 +37,16 @@ const GEMINI_MODELS = [
     { id: 'gemma-3-27b-it', name: 'Gemma 3 27B', shortName: 'Gemma 27B' },
 ];
 
+// Available Groq models for pipeline task assignment
+const GROQ_MODELS = [
+    { id: 'qwen/qwen3-32b', name: 'Qwen 3 32B', shortName: 'Qwen3 32B' },
+    { id: 'openai/gpt-oss-120b', name: 'GPT OSS 120B', shortName: 'GPT 120B' },
+    { id: 'openai/gpt-oss-20b', name: 'GPT OSS 20B', shortName: 'GPT 20B' },
+    { id: 'moonshotai/kimi-k2-instruct', name: 'Kimi K2 Instruct', shortName: 'Kimi K2' },
+    { id: 'meta-llama/llama-4-scout-17b-16e-instruct', name: 'Llama 4 Scout 17B', shortName: 'Llama4 17B' },
+    { id: 'meta-llama/llama-4-maverick-17b-128e-instruct', name: 'Llama 4 Maverick 17B', shortName: 'Llama4 Mav' },
+];
+
 const DEFAULT_PREFERENCES = {
     customPrompt: '',
     providerMode: 'byok',
@@ -55,6 +67,12 @@ const DEFAULT_PREFERENCES = {
     modelExtraction: 'gemini-2.5-flash',
     modelSolution: 'gemini-2.5-flash',
     modelDebugging: 'gemini-2.5-flash',
+    // Groq model assignments per pipeline task
+    groqModelExtraction: 'qwen/qwen3-32b',
+    groqModelSolution: 'qwen/qwen3-32b',
+    groqModelDebugging: 'qwen/qwen3-32b',
+    // Force Groq mode (Ctrl+Alt+G toggle)
+    forceGroqMode: false,
     debugModeEnabled: false,
     hotkeyToastsEnabled: true,
     fontWeight: 400,
@@ -192,7 +210,7 @@ function needsReset() {
 function resetConfigDir() {
     const configDir = getConfigDir();
 
-    console.log('Resetting config directory...');
+    log.info('Resetting config directory...');
 
     // Remove existing directory if it exists
     if (fs.existsSync(configDir)) {
@@ -208,7 +226,7 @@ function resetConfigDir() {
     writeJsonFile(getCredentialsPath(), DEFAULT_CREDENTIALS);
     writeJsonFile(getPreferencesPath(), DEFAULT_PREFERENCES);
 
-    console.log('Config directory initialized with defaults');
+    log.info('Config directory initialized with defaults');
 }
 
 // Initialize storage - call this on app startup
@@ -863,6 +881,7 @@ module.exports = {
     API_KEY_PROVIDERS,
     EXHAUSTION_COOLDOWN_MS,
     GEMINI_MODELS,
+    GROQ_MODELS,
     listProviderKeys,
     listAllProviderKeysRaw,
     listReadyProviderKeys,
