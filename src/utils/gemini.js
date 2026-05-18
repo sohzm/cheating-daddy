@@ -382,7 +382,7 @@ async function sendToGemma(transcription) {
         ];
 
         const response = await ai.models.generateContentStream({
-            model: 'gemma-3-27b-it',
+            model: 'gemma-4-31b-it',
             contents: messagesWithSystem,
         });
 
