@@ -59,11 +59,11 @@ if (!gotTheLock) {
                 .catch(() => {});
         }, 1500);
 
-        // Defer validation to avoid competing with initial render and GPU setup
+        // Defer validation slightly to avoid competing with initial render
         setTimeout(() => {
             apiKeys.startBackgroundValidation();
             log.info('Background key validation started');
-        }, 8000);
+        }, 2000);
     });
 
     app.on('window-all-closed', () => {

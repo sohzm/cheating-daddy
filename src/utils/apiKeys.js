@@ -312,8 +312,12 @@ async function revalidateStale() {
  * On 401/403 → mark invalid, try next. On 429 → mark exhausted, try next. Transient → rethrow.
  */
 async function withKeyRotation(provider, fn) {
-    // ONLY use explicitly 'ready' keys — never 'unknown' or 'checking'
-    const candidates = storage.listReadyProviderKeys(provider);
+    // Use 'ready' keys first, then fall back to 'unknown' keys (not yet validated but likely good)
+    const readyKeys = storage.listReadyProviderKeys(provider);
+    const allKeys = storage.listAllProviderKeysRaw(provider);
+    const unknownKeys = allKeys.filter(k => k.state === 'unknown' || k.state === 'checking');
+    const candidates = readyKeys.length > 0 ? readyKeys : unknownKeys;
+
     if (candidates.length === 0) {
         const err = new Error(`No ready ${provider} API key available`);
         err.code = 'NO_READY_KEY';

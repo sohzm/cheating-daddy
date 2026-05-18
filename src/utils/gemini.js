@@ -257,8 +257,12 @@ async function sendToGroq(transcription) {
     const readyKeys = storage.listReadyProviderKeys('groq');
     const legacyKey = getGroqApiKey();
     if (readyKeys.length === 0 && !legacyKey) {
-        console.log('No Groq API key configured, skipping Groq response');
-        return;
+        // Also check for unknown keys that haven't been validated yet
+        const allKeys = storage.listAllProviderKeysRaw('groq');
+        if (allKeys.length === 0) {
+            console.log('No Groq API key configured, skipping Groq response');
+            return;
+        }
     }
 
     const modelToUse = getModelForToday();
@@ -408,8 +412,12 @@ async function sendToGemma(transcription) {
     const readyKeys = storage.listReadyProviderKeys('gemini');
     const legacyKey = getApiKey();
     if (readyKeys.length === 0 && !legacyKey) {
-        console.log('No Gemini API key configured');
-        return;
+        // Also check for unknown keys that haven't been validated yet
+        const allKeys = storage.listAllProviderKeysRaw('gemini');
+        if (allKeys.length === 0) {
+            console.log('No Gemini API key configured');
+            return;
+        }
     }
 
     console.log('Sending to Gemma:', transcription.substring(0, 100) + '...');
@@ -892,12 +900,16 @@ async function sendImageToGeminiHttp(base64Data, prompt) {
     const readyKeys = storage.listReadyProviderKeys('gemini');
     const legacyKey = getApiKey();
     if (readyKeys.length === 0 && !legacyKey) {
-        // No Gemini keys available — try Groq fallback
-        if (hasGroqKey()) {
-            console.log('[Fallback] No Gemini keys, falling back to Groq for image analysis');
-            return await sendImageToGroqHttp(base64Data, prompt);
+        // Also check for unknown keys that haven't been validated yet
+        const allGeminiKeys = storage.listAllProviderKeysRaw('gemini');
+        if (allGeminiKeys.length === 0) {
+            // No Gemini keys available — try Groq fallback
+            if (hasGroqKey()) {
+                console.log('[Fallback] No Gemini keys, falling back to Groq for image analysis');
+                return await sendImageToGroqHttp(base64Data, prompt);
+            }
+            return { success: false, error: 'No API key configured' };
         }
-        return { success: false, error: 'No API key configured' };
     }
 
     try {
@@ -982,7 +994,10 @@ async function sendImageToGroqHttp(base64Data, prompt) {
     const readyKeys = storage.listReadyProviderKeys('groq');
     const legacyKey = getGroqApiKey();
     if (readyKeys.length === 0 && !legacyKey) {
-        return { success: false, error: 'No Groq API key configured' };
+        const allKeys = storage.listAllProviderKeysRaw('groq');
+        if (allKeys.length === 0) {
+            return { success: false, error: 'No Groq API key configured' };
+        }
     }
 
     console.log(`[Groq Vision] Sending image to ${model}...`);
