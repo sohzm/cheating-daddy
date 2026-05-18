@@ -268,7 +268,7 @@ function getTodayLimits() {
         }
         if(!todayEntry.gemini) {
             todayEntry.gemini = {
-                'gemma-3-27b-it': { chars: 0 }
+                'gemma-4-31b-it': { chars: 0 }
             };
         }
         setLimits(limits);
@@ -288,7 +288,7 @@ function getTodayLimits() {
             'kimi-k2-instruct': { chars: 0, limit: 600000 }
         },
         gemini: {
-            'gemma-3-27b-it': { chars: 0 }
+            'gemma-4-31b-it': { chars: 0 }
         }
     };
     limits.data.push(newEntry);
