@@ -79,6 +79,8 @@ function getDefaultKeybinds() {
         cycleExtractionModel: isMac ? "Cmd+'" : "Ctrl+'",
         // ── Groq Force Switch ──
         forceGroqToggle: isMac ? 'Cmd+Alt+G' : 'Ctrl+Alt+G',
+        // ── Auto-Typer ──
+        autoType: 'Alt+Enter',
     };
 }
 
@@ -402,6 +404,38 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
         storage.updatePreference('forceGroqMode', enabled);
         sendToRenderer('force-groq-toggled', enabled);
         sendToRenderer('update-status', enabled ? 'Switched to Groq' : 'Switched to Gemini');
+    });
+
+    // ── Auto-Typer ──
+    tryRegister('autoType', keybinds.autoType, () => {
+        const typer = require('./typer');
+        if (typer.isTyping()) {
+            typer.stopTyping();
+            sendToRenderer('update-status', 'Typing stopped');
+        } else {
+            // Get the latest response from the renderer
+            mainWindow.webContents
+                .executeJavaScript(`svcHost.getLatestResponse ? svcHost.getLatestResponse() : ''`)
+                .then(text => {
+                    if (text && text.trim()) {
+                        const prefs = storage.getPreferences();
+                        sendToRenderer('update-status', `Typing (${prefs.typerMethod})...`);
+                        typer.startTyping(text, {
+                            method: prefs.typerMethod || 'powershell',
+                            delayMs: prefs.typerDelayMs || 40,
+                        }).then(() => {
+                            sendToRenderer('update-status', 'Typing done');
+                        }).catch(err => {
+                            sendToRenderer('update-status', 'Typing error: ' + err.message);
+                        });
+                    } else {
+                        sendToRenderer('update-status', 'Nothing to type');
+                    }
+                })
+                .catch(() => {
+                    sendToRenderer('update-status', 'Cannot get response');
+                });
+        }
     });
 }
 

@@ -80,6 +80,7 @@ const HOTKEY_GROUPS = [
             { id: 'aiModeToggle', label: 'Toggle AI Mode', desc: 'Switch between Local/Online AI', toggle: null },
             { id: 'debugToggle', label: 'Debug Mode', desc: 'Toggle debugging-focused workflow', toggle: null },
             { id: 'forceGroqToggle', label: 'Switch Gemini/Groq', desc: 'Switch between Gemini and Groq mid-session (Ctrl+Alt+G)', toggle: null },
+            { id: 'autoType', label: 'Auto-Type Response', desc: 'Type the current AI response as keystrokes (Alt+Enter)', toggle: null },
             { id: 'cycleSolutionModel', label: 'Cycle Solution Model', desc: 'Cycle Solution Generation model', toggle: null },
             { id: 'cycleExtractionModel', label: 'Cycle Extraction Model', desc: 'Cycle Problem Extraction model', toggle: null },
             { id: 'emergencyQuit', label: 'Quit App', desc: 'Quit the application immediately', toggle: null },

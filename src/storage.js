@@ -73,6 +73,9 @@ const DEFAULT_PREFERENCES = {
     groqModelDebugging: 'qwen/qwen3-32b',
     // Force Groq mode (Ctrl+Alt+G toggle)
     forceGroqMode: false,
+    // Auto-typer settings
+    typerMethod: 'powershell', // 'powershell' | 'vbscript' | 'robotjs'
+    typerDelayMs: 40,
     debugModeEnabled: false,
     hotkeyToastsEnabled: true,
     fontWeight: 400,

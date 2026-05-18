@@ -1323,6 +1323,17 @@ const svcHost = {
     addNewResponse: response => svcHostApp.addNewResponse(response),
     updateCurrentResponse: response => svcHostApp.updateCurrentResponse(response),
 
+    // Get latest response for auto-typer
+    getLatestResponse: () => {
+        if (!svcHostApp) return '';
+        const responses = svcHostApp.responses || [];
+        const idx = svcHostApp.currentResponseIndex;
+        if (responses.length > 0 && idx >= 0 && idx < responses.length) {
+            return responses[idx];
+        }
+        return '';
+    },
+
     // Core functionality
     initializeGemini,
     initializeCloud,

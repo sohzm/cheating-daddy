@@ -205,6 +205,8 @@ export class CustomizeView extends LitElement {
         clearStatusMessage: { type: String },
         clearStatusType: { type: String },
         hotkeyToastsEnabled: { type: Boolean },
+        _typerMethod: { state: true },
+        _typerDelayMs: { state: true },
     };
 
     constructor() {
@@ -277,6 +279,8 @@ export class CustomizeView extends LitElement {
             this.customPrompt = prefs.customPrompt ?? '';
             this.theme = prefs.theme ?? 'dark';
             this.hotkeyToastsEnabled = prefs.hotkeyToastsEnabled !== false;
+            this._typerMethod = prefs.typerMethod || 'powershell';
+            this._typerDelayMs = prefs.typerDelayMs || 40;
             if (keybinds) {
                 this.keybinds = { ...this.getDefaultKeybinds(), ...keybinds };
             }
@@ -794,9 +798,58 @@ export class CustomizeView extends LitElement {
             <div class="unified-page">
                 <div class="unified-wrap">
                     <div class="page-title">Settings</div>
-                    ${this.renderAudioSection()} ${this.renderAppearanceSection()} ${this.renderPrivacySection()}
+                    ${this.renderAudioSection()} ${this.renderAppearanceSection()} ${this.renderTyperSection()} ${this.renderPrivacySection()}
                 </div>
             </div>
+        `;
+    }
+
+    renderTyperSection() {
+        return html`
+            <section class="surface">
+                <h2 class="surface-title">Auto-Typer</h2>
+                <p class="surface-subtitle">Simulates keyboard input to type AI responses (Alt+Enter)</p>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Typing Method</label>
+                        <select
+                            class="control"
+                            .value=${this._typerMethod || 'powershell'}
+                            @change=${async e => {
+                                this._typerMethod = e.target.value;
+                                await svcHost.storage.updatePreference('typerMethod', e.target.value);
+                            }}
+                        >
+                            <option value="powershell" ?selected=${this._typerMethod === 'powershell'}>
+                                PowerShell SendKeys (zero deps, reliable)
+                            </option>
+                            <option value="vbscript" ?selected=${this._typerMethod === 'vbscript'}>
+                                VBScript SendKeys (zero deps, lightweight)
+                            </option>
+                            <option value="robotjs" ?selected=${this._typerMethod === 'robotjs'}>
+                                RobotJS (native addon, most accurate)
+                            </option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Typing Speed (ms per char)</label>
+                        <input
+                            type="number"
+                            class="control"
+                            min="10"
+                            max="200"
+                            step="5"
+                            .value=${String(this._typerDelayMs || 40)}
+                            @change=${async e => {
+                                const val = Math.max(10, Math.min(200, parseInt(e.target.value) || 40));
+                                this._typerDelayMs = val;
+                                await svcHost.storage.updatePreference('typerDelayMs', val);
+                            }}
+                        />
+                        <div class="form-help">Lower = faster typing. 30-50ms looks natural.</div>
+                    </div>
+                </div>
+            </section>
         `;
     }
 }
