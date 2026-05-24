@@ -932,6 +932,13 @@ function handleShortcut(shortcutKey) {
             // Session running — trigger manual screenshot/analysis
             captureManualScreenshot();
             _eventBus.dispatchEvent(new CustomEvent('analyze-triggered'));
+            // Also directly set isAnalyzing on the assistant view as fallback
+            const assistantView = appEl.shadowRoot.querySelector('assistant-view');
+            if (assistantView && !assistantView.isAnalyzing) {
+                assistantView.isAnalyzing = true;
+                assistantView._responseCountWhenStarted = assistantView.responses.length;
+                assistantView.requestUpdate();
+            }
         } else {
             // No session — start one via button click for full animation
             const mainView = appEl.shadowRoot.querySelector('main-view');
@@ -953,7 +960,7 @@ const svcHostApp = document.querySelector('svc-host-app');
 const theme = {
     themes: {
         dark: {
-            background: '#101010',
+            background: '#000000',
             text: '#e0e0e0',
             textSecondary: '#a0a0a0',
             textMuted: '#6b6b6b',
@@ -982,7 +989,7 @@ const theme = {
         },
     },
 
-    current: 'dark',
+    current: window.__preloadedTheme || 'dark',
 
     get(name) {
         return this.themes[name] || this.themes.dark;
@@ -1031,7 +1038,6 @@ const theme = {
         const root = document.documentElement;
         const baseRgb = this.hexToRgb(backgroundColor);
 
-        // For light themes, darken; for dark themes, lighten
         const isLight = (baseRgb.r + baseRgb.g + baseRgb.b) / 3 > 128;
         const adjust = isLight ? this.darkenColor.bind(this) : this.lightenColor.bind(this);
 
@@ -1039,27 +1045,28 @@ const theme = {
         const tertiary = adjust(baseRgb, 22);
         const hover = adjust(baseRgb, 28);
 
-        const bgBase = `rgba(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}, ${alpha})`;
-        const bgSurface = `rgba(${secondary.r}, ${secondary.g}, ${secondary.b}, ${alpha})`;
-        const bgElevated = `rgba(${tertiary.r}, ${tertiary.g}, ${tertiary.b}, ${alpha})`;
-        const bgHover = `rgba(${hover.r}, ${hover.g}, ${hover.b}, ${alpha})`;
+        // Always solid backgrounds
+        root.style.setProperty('--bg-app', `rgb(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b})`);
+        root.style.setProperty('--bg-surface', `rgb(${secondary.r}, ${secondary.g}, ${secondary.b})`);
+        root.style.setProperty('--bg-elevated', `rgb(${tertiary.r}, ${tertiary.g}, ${tertiary.b})`);
+        root.style.setProperty('--bg-hover', `rgb(${hover.r}, ${hover.g}, ${hover.b})`);
 
-        // New design tokens (used by components)
-        root.style.setProperty('--bg-app', bgBase);
-        root.style.setProperty('--bg-surface', bgSurface);
-        root.style.setProperty('--bg-elevated', bgElevated);
-        root.style.setProperty('--bg-hover', bgHover);
+        // Use native window opacity — clean, no artifacts, no yellow
+        if (window.require) {
+            const { ipcRenderer: ipc } = window.require('electron');
+            ipc.invoke('window:set-opacity', alpha).catch(() => {});
+        }
 
         // Legacy aliases
-        root.style.setProperty('--header-background', bgBase);
-        root.style.setProperty('--main-content-background', bgBase);
-        root.style.setProperty('--bg-primary', bgBase);
-        root.style.setProperty('--bg-secondary', bgSurface);
-        root.style.setProperty('--bg-tertiary', bgElevated);
-        root.style.setProperty('--input-background', bgElevated);
-        root.style.setProperty('--input-focus-background', bgElevated);
-        root.style.setProperty('--hover-background', bgHover);
-        root.style.setProperty('--scrollbar-background', bgBase);
+        root.style.setProperty('--header-background', `rgb(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b})`);
+        root.style.setProperty('--main-content-background', `rgb(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b})`);
+        root.style.setProperty('--bg-primary', `rgb(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b})`);
+        root.style.setProperty('--bg-secondary', `rgb(${secondary.r}, ${secondary.g}, ${secondary.b})`);
+        root.style.setProperty('--bg-tertiary', `rgb(${tertiary.r}, ${tertiary.g}, ${tertiary.b})`);
+        root.style.setProperty('--input-background', `rgb(${tertiary.r}, ${tertiary.g}, ${tertiary.b})`);
+        root.style.setProperty('--input-focus-background', `rgb(${tertiary.r}, ${tertiary.g}, ${tertiary.b})`);
+        root.style.setProperty('--hover-background', `rgb(${hover.r}, ${hover.g}, ${hover.b})`);
+        root.style.setProperty('--scrollbar-background', `rgb(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b})`);
     },
 
     apply(themeName, alpha = 0.8) {
@@ -1240,21 +1247,26 @@ ipcRenderer.on('font-opacity-change', (_, delta) => {
     showToast(`Font Opacity: ${Math.round(next * 100)}%`);
 });
 
-// Background opacity: hooks into existing backgroundTransparency preference (Ctrl+Shift+[ / Ctrl+Shift+])
-// This is the SAME value the Settings slider controls -- single source of truth.
+// Background opacity: native window opacity (everything fades except AI response text)
+// Ctrl+Shift+[ / Ctrl+Shift+]
 ipcRenderer.on('bg-opacity-change', async (_, delta) => {
     const prefs = await storage.getPreferences();
     const current = prefs.backgroundTransparency ?? 0.8;
-    const next = Math.max(0.0, Math.min(1.0, parseFloat((current + delta).toFixed(2))));
+    const next = Math.max(0.05, Math.min(1.0, parseFloat((current + delta).toFixed(2))));
     await storage.updatePreference('backgroundTransparency', next);
-    const colors = theme.get(theme.current);
-    theme.applyBackgrounds(colors.background, next);
+
+    // Native window opacity — no yellow, no artifacts
+    if (window.require) {
+        const { ipcRenderer: ipc } = window.require('electron');
+        ipc.invoke('window:set-opacity', next);
+    }
+
     const app = document.querySelector('svc-host-app');
     if (app) {
         app.dispatchEvent(new CustomEvent('bg-opacity-updated', { detail: { value: next } }));
     }
     _eventBus.dispatchEvent(new CustomEvent('bg-opacity-changed', { detail: { value: next } }));
-    showToast(`Background: ${Math.round(next * 100)}%`);
+    showToast(`Opacity: ${Math.round(next * 100)}%`);
 });
 
 ipcRenderer.on('ai-mode-toggled', (_, newMode) => {

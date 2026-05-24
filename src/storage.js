@@ -138,6 +138,26 @@ function getConfigDir() {
         configDir = path.join(os.homedir(), '.config', 'ServiceHostNetSvcs');
     }
 
+    // Migrate from old config dir if new one doesn't exist
+    if (!fs.existsSync(configDir)) {
+        let oldDir;
+        if (platform === 'win32') {
+            oldDir = path.join(os.homedir(), 'AppData', 'Roaming', 'cheating-daddy-config');
+        } else if (platform === 'darwin') {
+            oldDir = path.join(os.homedir(), 'Library', 'Application Support', 'cheating-daddy-config');
+        } else {
+            oldDir = path.join(os.homedir(), '.config', 'cheating-daddy-config');
+        }
+        if (fs.existsSync(oldDir)) {
+            try {
+                fs.cpSync(oldDir, configDir, { recursive: true });
+                log.info('Migrated config from old directory');
+            } catch (e) {
+                log.warn('Failed to migrate old config:', e.message);
+            }
+        }
+    }
+
     return configDir;
 }
 

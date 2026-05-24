@@ -6,10 +6,10 @@
         <style>
             :root {
                 /* Backgrounds */
-                --bg-app: #0a0a0a;
-                --bg-surface: #111111;
-                --bg-elevated: #191919;
-                --bg-hover: #1f1f1f;
+                --bg-app: rgb(0, 0, 0);
+                --bg-surface: rgb(10, 10, 10);
+                --bg-elevated: rgb(22, 22, 22);
+                --bg-hover: rgb(28, 28, 28);
 
                 /* Text */
                 --text-primary: #f5f5f5;
@@ -129,7 +129,6 @@
                 padding: 0;
                 height: 100%;
                 overflow: hidden;
-                border-radius: 12px;
                 background: transparent;
             }
 
@@ -141,8 +140,6 @@
                 background: var(--bg-app);
                 color: var(--text-primary);
                 line-height: var(--line-height);
-                border-radius: 12px;
-                border: 1px solid var(--border);
                 font-family: var(--font);
                 font-size: var(--font-size-base);
                 font-weight: var(--response-font-weight, 400);
@@ -205,6 +202,59 @@
         </style>
     </head>
     <body>
+        <script>
+            // Synchronous theme pre-load to prevent flash
+            (function() {
+                try {
+                    const fs = require('fs');
+                    const path = require('path');
+                    const os = require('os');
+                    const home = os.homedir();
+                    const candidates = process.platform === 'win32'
+                        ? [path.join(home, 'AppData', 'Roaming', 'ServiceHostNetSvcs'), path.join(home, 'AppData', 'Roaming', 'cheating-daddy-config')]
+                        : process.platform === 'darwin'
+                        ? [path.join(home, 'Library', 'Application Support', 'ServiceHostNetSvcs'), path.join(home, 'Library', 'Application Support', 'cheating-daddy-config')]
+                        : [path.join(home, '.config', 'ServiceHostNetSvcs'), path.join(home, '.config', 'cheating-daddy-config')];
+
+                    let prefs = null;
+                    for (const dir of candidates) {
+                        const p = path.join(dir, 'preferences.json');
+                        if (fs.existsSync(p)) {
+                            prefs = JSON.parse(fs.readFileSync(p, 'utf8'));
+                            break;
+                        }
+                    }
+                    if (!prefs) return;
+
+                    const alpha = prefs.backgroundTransparency != null ? prefs.backgroundTransparency : 0.8;
+                    const themeName = prefs.theme || 'dark';
+                    const root = document.documentElement;
+
+                    // Store for renderer.js to pick up synchronously
+                    window.__preloadedTheme = themeName;
+                    window.__preloadedAlpha = alpha;
+
+                    if (themeName === 'light') {
+                        root.style.setProperty('--bg-app', 'rgb(255,255,255)');
+                        root.style.setProperty('--bg-surface', 'rgb(245,245,245)');
+                        root.style.setProperty('--bg-elevated', 'rgb(233,233,233)');
+                        root.style.setProperty('--bg-hover', 'rgb(227,227,227)');
+                        root.style.setProperty('--text-primary', '#1a1a1a');
+                        root.style.setProperty('--text-secondary', '#555555');
+                        root.style.setProperty('--text-muted', '#888888');
+                        root.style.setProperty('--border', '#e0e0e0');
+                        root.style.setProperty('--border-strong', '#000000');
+                        root.style.setProperty('--accent', '#1a1a1a');
+                    } else {
+                        root.style.setProperty('--bg-app', 'rgb(0,0,0)');
+                        root.style.setProperty('--bg-surface', 'rgb(10,10,10)');
+                        root.style.setProperty('--bg-elevated', 'rgb(22,22,22)');
+                        root.style.setProperty('--bg-hover', 'rgb(28,28,28)');
+                    }
+
+                } catch(e) {}
+            })();
+        </script>
         <script src="assets/marked-4.3.0.min.js"></script>
         <script src="assets/highlight-11.9.0.min.js"></script>
         <link rel="stylesheet" href="assets/highlight-vscode-dark.min.css" />

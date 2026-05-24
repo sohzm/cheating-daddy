@@ -215,6 +215,14 @@ function buildSystemPrompt(promptParts, customPrompt = '', googleSearchEnabled =
 }
 
 function getSystemPrompt(profile, customPrompt = '', googleSearchEnabled = true) {
+    // Custom profile: use the customPrompt as the entire system prompt
+    if (profile === 'custom') {
+        if (customPrompt && customPrompt.trim()) {
+            return customPrompt.trim();
+        }
+        return 'You are a helpful assistant. Follow the user instructions precisely.';
+    }
+
     const promptParts = profilePrompts[profile] || profilePrompts.interview;
     return buildSystemPrompt(promptParts, customPrompt, googleSearchEnabled);
 }

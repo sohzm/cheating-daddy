@@ -12,6 +12,7 @@ const PROFILE_DESCRIPTIONS = {
     negotiation:
         'Strategic responses for business negotiations and deal-making. Focuses on win-win solutions, addresses underlying concerns, and leverages market intelligence for leverage.',
     exam: 'Direct, efficient exam answers with minimal explanation. Provides the correct answer choice, brief justification, and moves on. Optimized for speed and accuracy.',
+    custom: 'Your custom prompt becomes the entire system instruction. Write exactly how you want the AI to behave — no predefined template is applied.',
 };
 
 export class AICustomizeView extends LitElement {
@@ -146,6 +147,7 @@ export class AICustomizeView extends LitElement {
             { value: 'presentation', label: 'Presentation' },
             { value: 'negotiation', label: 'Negotiation' },
             { value: 'exam', label: 'Exam Assistant' },
+            { value: 'custom', label: 'Custom Prompt' },
         ];
 
         return html`
@@ -176,14 +178,14 @@ export class AICustomizeView extends LitElement {
                             </div>
 
                             <div class="form-group vertical">
-                                <label class="form-label">Custom Instructions</label>
+                                <label class="form-label">${this.selectedProfile === 'custom' ? 'System Prompt' : 'Custom Instructions'}</label>
                                 <textarea
                                     class="control"
-                                    placeholder="Resume details, role requirements, constraints, company info..."
+                                    placeholder="${this.selectedProfile === 'custom' ? 'Write your full system prompt here. This becomes the entire AI instruction...' : 'Resume details, role requirements, constraints, company info...'}"
                                     .value=${this._context}
                                     @input=${e => this._saveContext(e.target.value)}
                                 ></textarea>
-                                <div class="form-help">Sent as context at session start. Include your resume, job description, or any relevant details.</div>
+                                <div class="form-help">${this.selectedProfile === 'custom' ? 'This is the entire system prompt — no template is applied.' : 'Sent as context at session start. Include your resume, job description, or any relevant details.'}</div>
                             </div>
                         </div>
                     </section>

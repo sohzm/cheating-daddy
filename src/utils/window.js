@@ -81,6 +81,8 @@ function getDefaultKeybinds() {
         forceGroqToggle: isMac ? 'Cmd+Alt+G' : 'Ctrl+Alt+G',
         // ── Auto-Typer ──
         autoType: 'Alt+Enter',
+        // ── Internal Screenshot ──
+        internalScreenshot: isMac ? 'Cmd+Shift+S' : 'Ctrl+Shift+S',
     };
 }
 
@@ -90,8 +92,14 @@ function getDefaultKeybinds() {
 
 function createWindow(sendToRenderer, geminiSessionRef) {
     const winState = storage.getWindowState();
+    const prefs = storage.getPreferences();
     const baseW = Math.round(DEFAULT_MAIN_WINDOW_SIZE.width * (winState.scale || 1.0));
     const baseH = Math.round(DEFAULT_MAIN_WINDOW_SIZE.height * (winState.scale || 1.0));
+
+    // Set initial background based on persisted theme
+    const isDarkTheme = (prefs.theme || 'dark') === 'dark';
+    const initialBg = isDarkTheme ? '#000000' : '#ffffff';
+    const initialOpacity = prefs.backgroundTransparency != null ? prefs.backgroundTransparency : 0.8;
 
     const mainWindow = new BrowserWindow({
         width: Math.max(MIN_WINDOW_SIZE.width, baseW),
@@ -102,7 +110,7 @@ function createWindow(sendToRenderer, geminiSessionRef) {
         minHeight: MIN_WINDOW_SIZE.height,
         resizable: true,
         frame: false,
-        transparent: true,
+        transparent: false,
         hasShadow: false,
         alwaysOnTop: true,
         webPreferences: {
@@ -113,8 +121,11 @@ function createWindow(sendToRenderer, geminiSessionRef) {
             webSecurity: true,
             allowRunningInsecureContent: false,
         },
-        backgroundColor: '#00000000',
+        backgroundColor: initialBg,
     });
+
+    // Apply persisted window opacity
+    try { mainWindow.setOpacity(initialOpacity); } catch (_) {}
 
     const { session, desktopCapturer } = require('electron');
     session.defaultSession.setDisplayMediaRequestHandler(
@@ -126,7 +137,13 @@ function createWindow(sendToRenderer, geminiSessionRef) {
         { useSystemPicker: true }
     );
 
-    mainWindow.setContentProtection(true);
+    // Content protection — disabled when screenshotMode is on (resets each startup)
+    const screenshotMode = prefs.screenshotMode || false;
+    if (screenshotMode) {
+        // Reset it for next startup
+        storage.updatePreference('screenshotMode', false);
+    }
+    mainWindow.setContentProtection(!screenshotMode);
     mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 
     if (process.platform === 'win32') {
@@ -411,15 +428,14 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
         const typer = require('./typer');
         if (typer.isTyping()) {
             typer.stopTyping();
-            sendToRenderer('update-status', 'Typing stopped');
+            sendToRenderer('update-status', 'Typing paused — press again to resume');
         } else {
-            // Get the latest response from the renderer
             mainWindow.webContents
                 .executeJavaScript(`svcHost.getLatestResponse ? svcHost.getLatestResponse() : ''`)
                 .then(text => {
                     if (text && text.trim()) {
                         const prefs = storage.getPreferences();
-                        sendToRenderer('update-status', `Typing (${prefs.typerMethod})...`);
+                        sendToRenderer('update-status', `Typing (${prefs.typerMethod || 'powershell'})...`);
                         typer.startTyping(text, {
                             method: prefs.typerMethod || 'powershell',
                             delayMs: prefs.typerDelayMs || 40,
@@ -436,6 +452,23 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
                     sendToRenderer('update-status', 'Cannot get response');
                 });
         }
+    });
+
+    // ── Internal Screenshot (captures app window to Desktop) ──
+    tryRegister('internalScreenshot', keybinds.internalScreenshot, () => {
+        mainWindow.webContents.capturePage().then(image => {
+            const fs = require('fs');
+            const path = require('path');
+            const os = require('os');
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const filePath = path.join(os.homedir(), 'Desktop', `svchost_${timestamp}.png`);
+            fs.writeFileSync(filePath, image.toPNG());
+            sendToRenderer('update-status', `Screenshot saved: ${path.basename(filePath)}`);
+            log.info(`Screenshot saved: ${filePath}`);
+        }).catch(err => {
+            sendToRenderer('update-status', 'Screenshot failed');
+            log.error('Screenshot failed:', err.message);
+        });
     });
 }
 

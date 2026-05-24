@@ -776,6 +776,27 @@ export class CustomizeView extends LitElement {
 
     renderPrivacySection() {
         return html`
+            <section class="surface">
+                <div class="surface-title">Debug</div>
+                <div class="form-grid">
+                    <div class="form-group" style="flex-direction:row; align-items:center; gap:var(--space-sm);">
+                        <input
+                            type="checkbox"
+                            id="screenshot-mode"
+                            .checked=${this._screenshotMode || false}
+                            @change=${async e => {
+                                this._screenshotMode = e.target.checked;
+                                await svcHost.storage.updatePreference('screenshotMode', e.target.checked);
+                                this.requestUpdate();
+                            }}
+                        />
+                        <label for="screenshot-mode" style="font-size:var(--font-size-sm); color:var(--text-secondary);">
+                            Allow screenshots on next restart (resets each launch)
+                        </label>
+                    </div>
+                </div>
+            </section>
+
             <section class="surface danger-surface">
                 <div class="surface-title danger">Privacy and Data</div>
                 <div style="display:flex;gap:var(--space-sm);flex-wrap:wrap;">
