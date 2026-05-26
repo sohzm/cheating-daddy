@@ -464,7 +464,7 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
 
     try {
         const session = await client.live.connect({
-            model: 'gemini-live-2.5-flash-native-audio',
+            model: 'gemini-3.1-flash-live-preview',
             callbacks: {
                 onopen: function () {
                     sendToRenderer('update-status', 'Live session connected');
