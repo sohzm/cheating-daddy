@@ -36,7 +36,7 @@ const DEFAULT_PREFERENCES = {
 const DEFAULT_KEYBINDS = null; // null means use system defaults
 
 const DEFAULT_LIMITS = {
-    data: [] // Array of { date: 'YYYY-MM-DD', flash: { count }, flashLite: { count }, groq: { 'qwen3-32b': { chars, limit }, 'gpt-oss-120b': { chars, limit }, 'gpt-oss-20b': { chars, limit } }, gemini: { 'gemma-3-27b-it': { chars } } }
+    data: [] // Array of { date: 'YYYY-MM-DD', flash: { count }, flashLite: { count }, groq: { 'qwen3-32b': { chars, limit }, 'gpt-oss-120b': { chars, limit }, 'gpt-oss-20b': { chars, limit } }, gemini: { 'gemma-4-31b-it': { chars } } }
 };
 
 // Get the config directory path based on OS
@@ -267,9 +267,10 @@ function getTodayLimits() {
             };
         }
         if(!todayEntry.gemini) {
-            todayEntry.gemini = {
-                'gemma-3-27b-it': { chars: 0 }
-            };
+            todayEntry.gemini = {};
+        }
+        if(!todayEntry.gemini['gemma-4-31b-it']) {
+            todayEntry.gemini['gemma-4-31b-it'] = { chars: 0 };
         }
         setLimits(limits);
         return todayEntry;
@@ -288,7 +289,7 @@ function getTodayLimits() {
             'kimi-k2-instruct': { chars: 0, limit: 600000 }
         },
         gemini: {
-            'gemma-3-27b-it': { chars: 0 }
+            'gemma-4-31b-it': { chars: 0 }
         }
     };
     limits.data.push(newEntry);
@@ -319,9 +320,9 @@ function incrementLimitCount(model) {
     }
 
     // Increment the appropriate model count
-    if (model === 'gemini-2.5-flash') {
+    if (model === 'gemini-3.1-flash') {
         todayEntry.flash.count++;
-    } else if (model === 'gemini-2.5-flash-lite') {
+    } else if (model === 'gemini-3.1-flash-lite') {
         todayEntry.flashLite.count++;
     }
 
@@ -350,12 +351,12 @@ function getAvailableModel() {
     // RPD limits: flash = 20, flash-lite = 20
     // After both exhausted, fall back to flash (for paid API users)
     if (todayLimits.flash.count < 20) {
-        return 'gemini-2.5-flash';
+        return 'gemini-3.1-flash';
     } else if (todayLimits.flashLite.count < 20) {
-        return 'gemini-2.5-flash-lite';
+        return 'gemini-3.1-flash-lite';
     }
 
-    return 'gemini-2.5-flash'; // Default to flash for paid API users
+    return 'gemini-3.1-flash'; // Default to flash for paid API users
 }
 
 function getModelForToday() {

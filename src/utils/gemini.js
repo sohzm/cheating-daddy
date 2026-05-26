@@ -382,7 +382,7 @@ async function sendToGemma(transcription) {
         ];
 
         const response = await ai.models.generateContentStream({
-            model: 'gemma-3-27b-it',
+            model: 'gemma-4-31b-it',
             contents: messagesWithSystem,
         });
 
@@ -403,7 +403,7 @@ async function sendToGemma(transcription) {
         const inputChars = systemPromptChars + historyChars;
         const outputChars = fullText.length;
 
-        incrementCharUsage('gemini', 'gemma-3-27b-it', inputChars + outputChars);
+        incrementCharUsage('gemini', 'gemma-4-31b-it', inputChars + outputChars);
 
         if (fullText.trim()) {
             groqConversationHistory.push({
@@ -454,7 +454,7 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
     const enabledTools = await getEnabledTools();
     const googleSearchEnabled = enabledTools.some(tool => tool.googleSearch);
 
-    const systemPrompt = getSystemPrompt(profile, customPrompt, googleSearchEnabled);
+    const systemPrompt = getSystemPrompt(profile, customPrompt, googleSearchEnabled, language);
     currentSystemPrompt = systemPrompt; // Store for Groq
 
     // Initialize new conversation session only on first connect
@@ -464,7 +464,7 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
 
     try {
         const session = await client.live.connect({
-            model: 'gemini-2.5-flash-native-audio-preview-09-2025',
+            model: 'gemini-3.1-flash-live-preview',
             callbacks: {
                 onopen: function () {
                     sendToRenderer('update-status', 'Live session connected');

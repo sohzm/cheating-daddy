@@ -201,7 +201,7 @@ Provide direct exam answers in **markdown format**. Include the question text, t
     },
 };
 
-function buildSystemPrompt(promptParts, customPrompt = '', googleSearchEnabled = true) {
+function buildSystemPrompt(promptParts, customPrompt = '', googleSearchEnabled = true, language = 'en-US') {
     const sections = [promptParts.intro, '\n\n', promptParts.formatRequirements];
 
     // Only add search usage section if Google Search is enabled
@@ -209,14 +209,60 @@ function buildSystemPrompt(promptParts, customPrompt = '', googleSearchEnabled =
         sections.push('\n\n', promptParts.searchUsage);
     }
 
+    // Add language instruction
+    const languageName = getLanguageName(language);
+    sections.push(
+        '\n\n**LANGUAGE REQUIREMENT**: You MUST respond entirely in ',
+        languageName,
+        '. All your answers, explanations, and suggestions must be in ',
+        languageName,
+        '. Do not switch to other languages under any circumstances.',
+    );
+
     sections.push('\n\n', promptParts.content, '\n\nUser-provided context\n-----\n', customPrompt, '\n-----\n\n', promptParts.outputInstructions);
 
     return sections.join('');
 }
 
-function getSystemPrompt(profile, customPrompt = '', googleSearchEnabled = true) {
+function getLanguageName(languageCode) {
+    const languageMap = {
+        'en-US': 'English (US)',
+        'en-GB': 'English (UK)',
+        'en-AU': 'English (Australian)',
+        'en-IN': 'English (Indian)',
+        'de-DE': 'German',
+        'es-US': 'Spanish (US)',
+        'es-ES': 'Spanish (Spain)',
+        'fr-FR': 'French',
+        'fr-CA': 'French (Canadian)',
+        'hi-IN': 'Hindi',
+        'pt-BR': 'Portuguese (Brazilian)',
+        'ar-XA': 'Arabic',
+        'id-ID': 'Indonesian',
+        'it-IT': 'Italian',
+        'ja-JP': 'Japanese',
+        'tr-TR': 'Turkish',
+        'vi-VN': 'Vietnamese',
+        'bn-IN': 'Bengali',
+        'gu-IN': 'Gujarati',
+        'kn-IN': 'Kannada',
+        'ml-IN': 'Malayalam',
+        'mr-IN': 'Marathi',
+        'ta-IN': 'Tamil',
+        'te-IN': 'Telugu',
+        'nl-NL': 'Dutch',
+        'ko-KR': 'Korean',
+        'cmn-CN': 'Mandarin Chinese',
+        'pl-PL': 'Polish',
+        'ru-RU': 'Russian',
+        'th-TH': 'Thai',
+    };
+    return languageMap[languageCode] || 'English (US)';
+}
+
+function getSystemPrompt(profile, customPrompt = '', googleSearchEnabled = true, language = 'en-US') {
     const promptParts = profilePrompts[profile] || profilePrompts.interview;
-    return buildSystemPrompt(promptParts, customPrompt, googleSearchEnabled);
+    return buildSystemPrompt(promptParts, customPrompt, googleSearchEnabled, language);
 }
 
 module.exports = {
