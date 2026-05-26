@@ -266,9 +266,10 @@ function getTodayLimits() {
             };
         }
         if(!todayEntry.gemini) {
-            todayEntry.gemini = {
-                'gemma-4-31b-it': { chars: 0 }
-            };
+            todayEntry.gemini = {};
+        }
+        if(!todayEntry.gemini['gemma-4-31b-it']) {
+            todayEntry.gemini['gemma-4-31b-it'] = { chars: 0 };
         }
         setLimits(limits);
         return todayEntry;
