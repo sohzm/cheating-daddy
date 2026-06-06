@@ -10,6 +10,17 @@ const storage = require('./storage');
 const geminiSessionRef = { current: null };
 let mainWindow = null;
 
+// Keep unhandled errors (e.g. inside the live-session message handler or a
+// rejected API promise) from hard-crashing the app mid-session. Log them so
+// the real cause is visible in the terminal, and let the session recover.
+process.on('uncaughtException', error => {
+    console.error('Uncaught exception:', error);
+    sendToRenderer('update-status', 'Recovered from error: ' + error.message);
+});
+process.on('unhandledRejection', reason => {
+    console.error('Unhandled promise rejection:', reason);
+});
+
 function createMainWindow() {
     mainWindow = createWindow(sendToRenderer, geminiSessionRef);
     return mainWindow;

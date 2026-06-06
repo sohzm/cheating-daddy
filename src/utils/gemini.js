@@ -13,6 +13,13 @@ function getLocalAi() {
     return _localai;
 }
 
+// Lazy-loaded for the same reason (groqstt.js imports from gemini.js)
+let _groqstt = null;
+function getGroqStt() {
+    if (!_groqstt) _groqstt = require('./groqstt');
+    return _groqstt;
+}
+
 // Provider mode: 'byok', 'cloud', or 'local'
 let currentProviderMode = 'byok';
 
@@ -206,6 +213,54 @@ function hasGroqKey() {
     return key && key.trim() != ''
 }
 
+// --- Response serialization ---------------------------------------------
+// Replies stream token-by-token to the UI. If a new transcription arrives
+// while a reply is still streaming, two concurrent calls would mutate the
+// shared conversation history and interleave their output into the renderer,
+// garbling both responses. Serialize so only one reply is generated at a time.
+let responseQueue = [];
+let isProcessingResponse = false;
+const MAX_QUEUED_RESPONSES = 3;
+
+function enqueueResponse(transcription) {
+    if (!transcription || transcription.trim() === '') return;
+    responseQueue.push(transcription);
+    // If we fall behind, keep only the freshest questions — stale interview
+    // questions aren't worth answering and just burn quota.
+    if (responseQueue.length > MAX_QUEUED_RESPONSES) {
+        responseQueue = responseQueue.slice(-MAX_QUEUED_RESPONSES);
+    }
+    processResponseQueue();
+}
+
+async function processResponseQueue() {
+    if (isProcessingResponse) return;
+    isProcessingResponse = true;
+    try {
+        while (responseQueue.length > 0) {
+            const transcription = responseQueue.shift();
+            try {
+                if (hasGroqKey()) {
+                    await sendToGroq(transcription);
+                } else {
+                    await sendToGemma(transcription);
+                }
+            } catch (err) {
+                console.error('Error generating response:', err);
+                sendToRenderer('update-status', 'Response error: ' + err.message);
+            }
+        }
+    } finally {
+        isProcessingResponse = false;
+    }
+}
+
+// Lets other transcription modes (e.g. Groq) set the system prompt used by the
+// shared reply path (sendToGroq / sendToGemma read currentSystemPrompt).
+function setCurrentSystemPrompt(prompt) {
+    currentSystemPrompt = prompt;
+}
+
 function trimConversationHistoryForGemma(history, maxChars=42000) {
     if(!history || history.length === 0) return [];
     let totalChars = 0;
@@ -271,7 +326,7 @@ async function sendToGroq(transcription) {
                 ],
                 stream: true,
                 temperature: 0.7,
-                max_tokens: 1024
+                max_tokens: 8192
             })
         });
 
@@ -487,11 +542,7 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
 
                     if (message.serverContent?.generationComplete) {
                         if (currentTranscription.trim() !== '') {
-                            if (hasGroqKey()) {
-                                sendToGroq(currentTranscription);
-                            } else {
-                                sendToGemma(currentTranscription);
-                            }
+                            enqueueResponse(currentTranscription);
                             currentTranscription = '';
                         }
                         messageBuffer = '';
@@ -874,6 +925,15 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
         return success;
     });
 
+    ipcMain.handle('initialize-groq', async (event, profile = 'interview', customPrompt = '', whisperModel = 'Xenova/whisper-small') => {
+        currentProviderMode = 'groq';
+        const success = await getGroqStt().initializeGroqSession(profile, customPrompt, whisperModel);
+        if (!success) {
+            currentProviderMode = 'byok';
+        }
+        return success;
+    });
+
     ipcMain.handle('send-audio-content', async (event, { data, mimeType }) => {
         if (currentProviderMode === 'cloud') {
             try {
@@ -892,6 +952,16 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
                 return { success: true };
             } catch (error) {
                 console.error('Error sending local audio:', error);
+                return { success: false, error: error.message };
+            }
+        }
+        if (currentProviderMode === 'groq') {
+            try {
+                const pcmBuffer = Buffer.from(data, 'base64');
+                getGroqStt().processGroqAudio(pcmBuffer);
+                return { success: true };
+            } catch (error) {
+                console.error('Error sending groq audio:', error);
                 return { success: false, error: error.message };
             }
         }
@@ -927,6 +997,16 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
                 return { success: true };
             } catch (error) {
                 console.error('Error sending local mic audio:', error);
+                return { success: false, error: error.message };
+            }
+        }
+        if (currentProviderMode === 'groq') {
+            try {
+                const pcmBuffer = Buffer.from(data, 'base64');
+                getGroqStt().processGroqAudio(pcmBuffer);
+                return { success: true };
+            } catch (error) {
+                console.error('Error sending groq mic audio:', error);
                 return { success: false, error: error.message };
             }
         }
@@ -972,6 +1052,11 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
                 return result;
             }
 
+            if (currentProviderMode === 'groq') {
+                // Groq's text models don't take images here; skip gracefully.
+                return { success: false, error: 'Image analysis is not supported in Groq mode' };
+            }
+
             // Use HTTP API instead of realtime session
             const result = await sendImageToGeminiHttp(data, prompt);
             return result;
@@ -1003,6 +1088,17 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
                 return await getLocalAi().sendLocalText(text.trim());
             } catch (error) {
                 console.error('Error sending local text:', error);
+                return { success: false, error: error.message };
+            }
+        }
+
+        if (currentProviderMode === 'groq') {
+            try {
+                console.log('Sending text to Groq:', text);
+                enqueueResponse(text.trim());
+                return { success: true };
+            } catch (error) {
+                console.error('Error sending groq text:', error);
                 return { success: false, error: error.message };
             }
         }
@@ -1069,6 +1165,12 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
                 return { success: true };
             }
 
+            if (currentProviderMode === 'groq') {
+                getGroqStt().closeGroqSession();
+                currentProviderMode = 'byok';
+                return { success: true };
+            }
+
             // Set flag to prevent reconnection attempts
             isUserClosing = true;
             sessionParams = null;
@@ -1124,6 +1226,8 @@ module.exports = {
     getEnabledTools,
     getStoredSetting,
     sendToRenderer,
+    enqueueResponse,
+    setCurrentSystemPrompt,
     initializeNewSession,
     saveConversationTurn,
     getCurrentSessionData,

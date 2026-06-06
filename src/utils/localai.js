@@ -179,6 +179,14 @@ async function transcribeAudio(pcm16kBuffer) {
     }
 }
 
+// Load (if needed) and run local Whisper on a 16kHz mono PCM buffer. Exposed so
+// other transcription modes (e.g. Groq) can fall back to local Whisper offline.
+async function transcribeWithLocalWhisper(pcm16kBuffer, modelName) {
+    const pipeline = await loadWhisperPipeline(modelName);
+    if (!pipeline) throw new Error('Local Whisper pipeline unavailable');
+    return transcribeAudio(pcm16kBuffer);
+}
+
 // ── Speech End Handler ──
 
 async function handleSpeechEnd(audioData) {
@@ -434,4 +442,5 @@ module.exports = {
     isLocalSessionActive,
     sendLocalText,
     sendLocalImage,
+    transcribeWithLocalWhisper,
 };

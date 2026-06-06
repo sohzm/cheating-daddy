@@ -595,6 +595,24 @@ export class CheatingDaddyApp extends LitElement {
                 }
                 return;
             }
+        } else if (providerMode === 'groq') {
+            const groqKey = await cheatingDaddy.storage.getGroqApiKey().catch(() => '');
+            if (!groqKey || groqKey.trim() === '') {
+                const mainView = this.shadowRoot.querySelector('main-view');
+                if (mainView && mainView.triggerApiKeyError) {
+                    mainView.triggerApiKeyError();
+                }
+                return;
+            }
+
+            const success = await cheatingDaddy.initializeGroq(this.selectedProfile);
+            if (!success) {
+                const mainView = this.shadowRoot.querySelector('main-view');
+                if (mainView && mainView.triggerApiKeyError) {
+                    mainView.triggerApiKeyError();
+                }
+                return;
+            }
         } else {
             const apiKey = await cheatingDaddy.storage.getApiKey();
             if (!apiKey || apiKey === '') {

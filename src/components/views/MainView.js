@@ -53,7 +53,7 @@ export class MainView extends LitElement {
             gap: 10px;
             padding: 14px 16px;
             border-radius: var(--radius-md);
-            border: 1px solid rgba(59, 130, 246, 0.45);
+            border: 1px solid rgba(59, 130, 246, 0.45);\
             background: linear-gradient(135deg, rgba(59, 130, 246, 0.12) 0%, rgba(139, 92, 246, 0.09) 100%);
             cursor: pointer;
             transition: border-color 0.2s, background 0.2s;
@@ -763,6 +763,12 @@ export class MainView extends LitElement {
             if (!this._ollamaHost.trim()) {
                 return;
             }
+        } else if (this._mode === 'groq') {
+            if (!this._groqKey.trim()) {
+                this._keyError = true;
+                this.requestUpdate();
+                return;
+            }
         }
 
         this.onStart();
@@ -853,6 +859,7 @@ export class MainView extends LitElement {
             <!-- Cloud promo intentionally removed from the active UI. -->
 
             <div class="mode-links">
+                <button class="mode-link" @click=${() => this._saveMode('groq')}>Use Groq (cloud)</button>
                 <button class="mode-link" @click=${() => this._saveMode('local')}>Use local AI</button>
             </div>
         `;
@@ -907,7 +914,44 @@ export class MainView extends LitElement {
             <!-- Cloud promo intentionally removed from the active UI. -->
 
             <div class="mode-links">
+                <button class="mode-link" @click=${() => this._saveMode('groq')}>Use Groq (cloud)</button>
                 <button class="mode-link" @click=${() => this._saveMode('byok')}>Use own API keys</button>
+            </div>
+        `;
+    }
+
+    // ── Groq (cloud) mode ──
+
+    _renderGroqMode() {
+        return html`
+            <div class="form-group">
+                <label class="form-label">Groq API Key</label>
+                <input
+                    type="password"
+                    placeholder="Required"
+                    .value=${this._groqKey}
+                    @input=${e => this._saveGroqKey(e.target.value)}
+                    class=${this._keyError ? 'error' : ''}
+                />
+                <div class="form-hint">
+                    <span class="link" @click=${() => this.onExternalLink('https://console.groq.com/keys')}>Get Groq key</span>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <div class="form-hint">
+                    Speech is transcribed with Groq's hosted Whisper (whisper-large-v3) and
+                    replies come from Groq's LLMs — fast, free tier, no local compute. If Groq
+                    is unavailable or you're offline, it automatically falls back to local Whisper.
+                </div>
+            </div>
+
+            ${this._renderStartButton()}
+            ${this._renderDivider()}
+
+            <div class="mode-links">
+                <button class="mode-link" @click=${() => this._saveMode('byok')}>Use own API keys</button>
+                <button class="mode-link" @click=${() => this._saveMode('local')}>Use local AI</button>
             </div>
         `;
     }
@@ -927,15 +971,22 @@ export class MainView extends LitElement {
                     </div>
                 ` : html`
                     <div class="page-title">
-                        ${html`Cheating Daddy <span class="mode-suffix">BYOK</span>`}
+                        ${this._mode === 'groq'
+                            ? html`Cheating Daddy <span class="mode-suffix">Groq Cloud</span>`
+                            : html`Cheating Daddy <span class="mode-suffix">BYOK</span>`}
                     </div>
                 `}
                 <div class="page-subtitle">
-                    ${this._mode === 'byok' ? 'Bring your own API keys' : 'Run models locally on your machine'}
+                    ${this._mode === 'byok'
+                        ? 'Bring your own API keys'
+                        : this._mode === 'groq'
+                          ? 'Cloud speech-to-text and replies via Groq'
+                          : 'Run models locally on your machine'}
                 </div>
 
                 <!-- Cloud mode render branch intentionally disabled. -->
                 ${this._mode === 'byok' ? this._renderByokMode() : ''}
+                ${this._mode === 'groq' ? this._renderGroqMode() : ''}
                 ${this._mode === 'local' ? (this._showLocalHelp ? this._renderLocalHelp() : this._renderLocalMode()) : ''}
             </div>
         `;
