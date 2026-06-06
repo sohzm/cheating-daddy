@@ -19,6 +19,9 @@ const GROQ_STT_URL = 'https://api.groq.com/openai/v1/audio/transcriptions';
 const GROQ_STT_MODEL = 'whisper-large-v3-turbo';
 // Ignore utterances shorter than ~0.5s at 16kHz/16-bit (likely noise).
 const MIN_AUDIO_BYTES = 16000;
+// Abort a Groq STT request that hangs so we fall back to local Whisper instead
+// of getting stuck on "Transcribing..." forever.
+const GROQ_STT_TIMEOUT_MS = 15000;
 
 // Groq mode is used for in-depth answers (not the quick teleprompter style),
 // so we override the profile's brevity instructions with a request for a
@@ -85,11 +88,20 @@ async function transcribeWithGroq(pcm16kBuffer) {
     form.append('response_format', 'json');
     form.append('language', 'en');
 
-    const response = await fetch(GROQ_STT_URL, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${apiKey}` },
-        body: form,
-    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), GROQ_STT_TIMEOUT_MS);
+
+    let response;
+    try {
+        response = await fetch(GROQ_STT_URL, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${apiKey}` },
+            body: form,
+            signal: controller.signal,
+        });
+    } finally {
+        clearTimeout(timer);
+    }
 
     if (!response.ok) {
         const errorText = await response.text();
@@ -149,6 +161,9 @@ async function drainAudioQueue() {
         while (audioQueue.length > 0) {
             const buffer = audioQueue.shift();
             const text = await transcribeOne(buffer);
+            // Session may have been closed while we awaited transcription — if
+            // so, drop the result rather than replying after the user stopped.
+            if (!isActive) return;
             if (text) {
                 pendingQuestion += (pendingQuestion ? ' ' : '') + text;
                 console.log('[GroqSTT] Partial transcription:', text);
@@ -166,6 +181,11 @@ function scheduleReply() {
     if (replyTimer) clearTimeout(replyTimer);
     replyTimer = setTimeout(() => {
         replyTimer = null;
+        // Session closed while we waited — don't reply after the user stopped.
+        if (!isActive) {
+            pendingQuestion = '';
+            return;
+        }
         // More audio arrived while we waited — let the drain finish first.
         if (isTranscribing || audioQueue.length > 0) {
             scheduleReply();

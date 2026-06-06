@@ -11,14 +11,20 @@ const geminiSessionRef = { current: null };
 let mainWindow = null;
 
 // Keep unhandled errors (e.g. inside the live-session message handler or a
-// rejected API promise) from hard-crashing the app mid-session. Log them so
-// the real cause is visible in the terminal, and let the session recover.
+// rejected API promise) from hard-crashing the app mid-session. Full detail is
+// logged to the terminal only; the renderer gets a generic, non-sensitive
+// message — raw error text can contain API keys, file paths, or stack details.
+// We deliberately keep the app alive (crashing on every transient error is
+// worse for a live session) but advise the user to restart if state looks off.
+function reportUnexpectedError(label, err) {
+    console.error(label, err);
+    sendToRenderer('update-status', 'An unexpected error occurred. If the session misbehaves, please restart it.');
+}
 process.on('uncaughtException', error => {
-    console.error('Uncaught exception:', error);
-    sendToRenderer('update-status', 'Recovered from error: ' + error.message);
+    reportUnexpectedError('Uncaught exception:', error);
 });
 process.on('unhandledRejection', reason => {
-    console.error('Unhandled promise rejection:', reason);
+    reportUnexpectedError('Unhandled promise rejection:', reason);
 });
 
 function createMainWindow() {

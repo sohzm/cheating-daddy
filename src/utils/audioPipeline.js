@@ -34,6 +34,11 @@ function createSpeechSegmenter({ onSpeechEnd, vadMode = 'VERY_AGGRESSIVE' } = {}
     let speechBuffers = [];
     let silenceFrameCount = 0;
     let speechFrameCount = 0;
+    // Rolling window of the most recent idle frames. When speech is detected we
+    // seed the utterance with these so the leading ~200-400ms (the frames that
+    // triggered detection, plus a little lead-in) isn't clipped off the start.
+    let preRoll = [];
+    const PRE_ROLL_FRAMES = vad.speechFramesRequired + 2;
 
     // 24kHz → 16kHz linear-interpolation resample. Ratio is 2/3, so every 3
     // input samples produce 2 output samples; leftover samples carry over.
@@ -64,6 +69,7 @@ function createSpeechSegmenter({ onSpeechEnd, vadMode = 'VERY_AGGRESSIVE' } = {}
     function process(monoChunk24k) {
         const pcm16k = resample24kTo16k(monoChunk24k);
         if (pcm16k.length === 0) return;
+        const frame = Buffer.from(pcm16k);
 
         const rms = calculateRMS(pcm16k);
         const isVoice = rms > vad.energyThreshold;
@@ -74,7 +80,9 @@ function createSpeechSegmenter({ onSpeechEnd, vadMode = 'VERY_AGGRESSIVE' } = {}
 
             if (!isSpeaking && speechFrameCount >= vad.speechFramesRequired) {
                 isSpeaking = true;
-                speechBuffers = [];
+                // Seed with the recent pre-roll frames (which include the ones
+                // that triggered detection) so no leading audio is lost.
+                speechBuffers = preRoll.slice();
             }
         } else {
             silenceFrameCount++;
@@ -84,13 +92,18 @@ function createSpeechSegmenter({ onSpeechEnd, vadMode = 'VERY_AGGRESSIVE' } = {}
                 isSpeaking = false;
                 const audioData = Buffer.concat(speechBuffers);
                 speechBuffers = [];
+                preRoll = [];
                 if (typeof onSpeechEnd === 'function') onSpeechEnd(audioData);
                 return;
             }
         }
 
         if (isSpeaking) {
-            speechBuffers.push(Buffer.from(pcm16k));
+            speechBuffers.push(frame);
+        } else {
+            // Maintain the rolling pre-roll window while idle.
+            preRoll.push(frame);
+            if (preRoll.length > PRE_ROLL_FRAMES) preRoll.shift();
         }
     }
 
@@ -100,6 +113,7 @@ function createSpeechSegmenter({ onSpeechEnd, vadMode = 'VERY_AGGRESSIVE' } = {}
         speechBuffers = [];
         silenceFrameCount = 0;
         speechFrameCount = 0;
+        preRoll = [];
     }
 
     return { process, reset };
