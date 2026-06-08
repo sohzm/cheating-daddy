@@ -128,9 +128,10 @@ async function loadWhisperPipeline(modelName) {
         const { app } = require('electron');
         const path = require('path');
         env.cacheDir = path.join(app.getPath('userData'), 'whisper-models');
+        const isWindows = process.platform === 'win32';
         whisperPipeline = await pipeline('automatic-speech-recognition', modelName, {
             dtype: 'q8',
-            device: 'auto',
+            device: isWindows ? 'cpu' : 'auto',
         });
         console.log('[LocalAI] Whisper model loaded successfully');
         sendToRenderer('whisper-downloading', false);
@@ -138,6 +139,18 @@ async function loadWhisperPipeline(modelName) {
         return whisperPipeline;
     } catch (error) {
         console.error('[LocalAI] Failed to load Whisper model:', error);
+        if (error && error.stack) {
+            console.error('[LocalAI] Whisper load stack:', error.stack);
+        }
+
+        // Fallback to tiny model if a larger model fails to load
+        if (modelName !== 'Xenova/whisper-tiny') {
+            console.warn('[LocalAI] Falling back to Xenova/whisper-tiny');
+            sendToRenderer('update-status', 'Whisper model failed. Falling back to tiny...');
+            isWhisperLoading = false;
+            return loadWhisperPipeline('Xenova/whisper-tiny');
+        }
+
         sendToRenderer('whisper-downloading', false);
         sendToRenderer('update-status', 'Failed to load Whisper model: ' + error.message);
         isWhisperLoading = false;
