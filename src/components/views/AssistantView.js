@@ -434,11 +434,16 @@ export class AssistantView extends LitElement {
             this.handleNextResponse = () => this.navigateToNextResponse();
             this.handleScrollUp = () => this.scrollResponseUp();
             this.handleScrollDown = () => this.scrollResponseDown();
+            this.handleFocusInput = () => {
+                const textInput = this.shadowRoot.querySelector('#textInput');
+                if (textInput) textInput.focus();
+            };
 
             ipcRenderer.on('navigate-previous-response', this.handlePreviousResponse);
             ipcRenderer.on('navigate-next-response', this.handleNextResponse);
             ipcRenderer.on('scroll-response-up', this.handleScrollUp);
             ipcRenderer.on('scroll-response-down', this.handleScrollDown);
+            ipcRenderer.on('focus-input', this.handleFocusInput);
         }
     }
 
@@ -452,6 +457,7 @@ export class AssistantView extends LitElement {
             if (this.handleNextResponse) ipcRenderer.removeListener('navigate-next-response', this.handleNextResponse);
             if (this.handleScrollUp) ipcRenderer.removeListener('scroll-response-up', this.handleScrollUp);
             if (this.handleScrollDown) ipcRenderer.removeListener('scroll-response-down', this.handleScrollDown);
+            if (this.handleFocusInput) ipcRenderer.removeListener('focus-input', this.handleFocusInput);
         }
     }
 
