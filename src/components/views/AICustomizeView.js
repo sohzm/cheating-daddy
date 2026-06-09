@@ -184,10 +184,10 @@ export class AICustomizeView extends LitElement {
                                 <label class="form-label">Profile</label>
                                 <select class="control" .value=${this.selectedProfile} @change=${this._handleProfileChange}>
                                     ${profiles.map(
-                                        profile =>
-                                            html`<option value=${profile.value} ?selected=${profile.value === this.selectedProfile}>
-                                                ${profile.label}
-                                            </option>`
+                                            profile =>
+                                                    html`<option value=${profile.value} ?selected=${profile.value === this.selectedProfile}>
+                                                        ${profile.label}
+                                                    </option>`
                                     )}
                                 </select>
                             </div>
@@ -197,7 +197,7 @@ export class AICustomizeView extends LitElement {
                                 <div class="preset-row">
                                     <select class="control grow" .value=${this._selectedPresetId} @change=${this._selectPreset}>
                                         ${this._presets.map(
-                                            p => html`<option value=${p.id} ?selected=${p.id === this._selectedPresetId}>${p.name}</option>`
+                                                p => html`<option value=${p.id} ?selected=${p.id === this._selectedPresetId}>${p.name}</option>`
                                         )}
                                     </select>
                                     <button class="control" @click=${this._newPreset}>+ New</button>
@@ -208,20 +208,20 @@ export class AICustomizeView extends LitElement {
                             <div class="form-group">
                                 <label class="form-label">Preset name</label>
                                 <input
-                                    class="control"
-                                    type="text"
-                                    .value=${active ? active.name : ''}
-                                    @input=${e => this._renameActive(e.target.value)}
+                                        class="control"
+                                        type="text"
+                                        .value=${active ? active.name : ''}
+                                        @input=${e => this._renameActive(e.target.value)}
                                 />
                             </div>
 
                             <div class="form-group vertical">
                                 <label class="form-label">Prompt</label>
                                 <textarea
-                                    class="control"
-                                    placeholder="Опиши роль и поведение ассистента: кто он, как отвечает, на каком языке, что важно. Напр.: «Ты — я на собесе…», «Я провожу собес, оцени ответ кандидата…», «Просто помощник в разговоре…»"
-                                    .value=${this._context}
-                                    @input=${e => this._saveContext(e.target.value)}
+                                        class="control"
+                                        placeholder="Опиши роль и поведение ассистента: кто он, как отвечает, на каком языке, что важно. Напр.: «Ты — я на собесе…», «Я провожу собес, оцени ответ кандидата…», «Просто помощник в разговоре…»"
+                                        .value=${this._context}
+                                        @input=${e => this._saveContext(e.target.value)}
                                 ></textarea>
                                 <div class="form-help">Active preset is sent as context at session start. Edits save automatically.</div>
                             </div>
