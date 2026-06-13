@@ -34,6 +34,125 @@ export class CustomizeView extends LitElement {
                 transform: rotate(45deg);
             }
 
+            .form-hint {
+                color: var(--text-muted);
+                font-size: var(--font-size-xs);
+                margin: 2px 0 8px 0;
+                line-height: 1.4;
+            }
+
+            .audio-device-row {
+                display: flex;
+                align-items: center;
+                gap: var(--space-sm);
+                flex-wrap: wrap;
+            }
+
+            .audio-device-row select.control {
+                flex: 1;
+                min-width: 180px;
+            }
+
+            .btn-secondary {
+                flex-shrink: 0;
+                padding: 8px 14px;
+                background: var(--bg-elevated);
+                color: var(--text-primary);
+                border: 1px solid var(--border);
+                border-radius: var(--radius-sm);
+                font-size: var(--font-size-sm);
+                cursor: pointer;
+                white-space: nowrap;
+            }
+
+            .btn-secondary:hover:not(:disabled) {
+                border-color: var(--accent);
+                background: var(--bg-hover);
+            }
+
+            .btn-secondary:disabled {
+                opacity: 0.6;
+                cursor: not-allowed;
+            }
+
+            .custom-select-wrap {
+                position: relative;
+                flex: 1;
+                min-width: 180px;
+            }
+
+            .custom-select-trigger {
+                width: 100%;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 8px;
+                padding: 8px 12px;
+                background: var(--bg-elevated);
+                color: var(--text-primary);
+                border: 1px solid var(--border);
+                border-radius: var(--radius-sm);
+                font-size: var(--font-size-sm);
+                cursor: pointer;
+                text-align: left;
+                transition: border-color var(--transition), box-shadow var(--transition);
+            }
+
+            .custom-select-trigger:hover {
+                border-color: var(--border-strong);
+            }
+
+            .custom-select-trigger:focus {
+                outline: none;
+                border-color: var(--accent);
+                box-shadow: 0 0 0 1px var(--accent);
+            }
+
+            .custom-select-trigger .chevron {
+                flex-shrink: 0;
+                opacity: 0.7;
+            }
+
+            .custom-select-dropdown {
+                position: absolute;
+                top: 100%;
+                left: 0;
+                right: 0;
+                margin-top: 2px;
+                max-height: 220px;
+                overflow-y: auto;
+                background: var(--bg-elevated);
+                border: 1px solid var(--border);
+                border-radius: var(--radius-sm);
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+                z-index: 100;
+            }
+
+            .custom-select-option {
+                display: block;
+                width: 100%;
+                padding: 8px 12px;
+                background: var(--bg-elevated);
+                color: var(--text-primary);
+                border: none;
+                font-size: var(--font-size-sm);
+                font-family: var(--font);
+                text-align: left;
+                cursor: pointer;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .custom-select-option:hover {
+                background: var(--bg-hover);
+            }
+
+            .custom-select-option.selected {
+                background: var(--bg-hover);
+                color: var(--accent);
+            }
+
             .toggle-row {
                 display: flex;
                 align-items: center;
@@ -214,6 +333,11 @@ export class CustomizeView extends LitElement {
         this.backgroundTransparency = 0.8;
         this.fontSize = 20;
         this.audioMode = 'speaker_only';
+        this.audioInputDeviceId = '';
+        this.audioInputDevices = [];
+        this.audioInputDevicesLoading = false;
+        this.audioInputDevicesError = '';
+        this.audioDeviceDropdownOpen = false;
         this.customPrompt = '';
         this.theme = 'dark';
         this._loadFromStorage();
@@ -230,6 +354,7 @@ export class CustomizeView extends LitElement {
             this.backgroundTransparency = prefs.backgroundTransparency ?? 0.8;
             this.fontSize = prefs.fontSize ?? 20;
             this.audioMode = prefs.audioMode ?? 'speaker_only';
+            this.audioInputDeviceId = prefs.audioInputDeviceId ?? '';
             this.customPrompt = prefs.customPrompt ?? '';
             this.theme = prefs.theme ?? 'dark';
             if (keybinds) {
@@ -361,6 +486,59 @@ export class CustomizeView extends LitElement {
         this.requestUpdate();
     }
 
+    updated(changedProperties) {
+        if (changedProperties.has('audioDeviceDropdownOpen') && this.audioDeviceDropdownOpen && !this._audioDropdownListenerAdded) {
+            this._audioDropdownListenerAdded = true;
+            setTimeout(() => document.addEventListener('click', this._closeAudioDropdown), 0);
+        }
+    }
+
+    async loadAudioInputDevices() {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            this.audioInputDevicesError = 'Microphone API not available';
+            this.requestUpdate();
+            return;
+        }
+        this.audioInputDevicesLoading = true;
+        this.audioInputDevicesError = '';
+        this.requestUpdate();
+        try {
+            this.audioInputDevices = await cheatingDaddy.getAudioInputDevices();
+            if (this.audioInputDevices.length === 0) {
+                this.audioInputDevicesError = 'No microphone devices found';
+            }
+        } catch (err) {
+            this.audioInputDevicesError = err.message || 'Permission denied or error';
+            this.audioInputDevices = [];
+        }
+        this.audioInputDevicesLoading = false;
+        this.requestUpdate();
+    }
+
+    async handleAudioInputDeviceSelect(deviceId) {
+        this.audioInputDeviceId = deviceId;
+        this.audioDeviceDropdownOpen = false;
+        await cheatingDaddy.storage.updatePreference('audioInputDeviceId', this.audioInputDeviceId);
+        await cheatingDaddy.refreshPreferencesCache();
+        this.requestUpdate();
+    }
+
+    _getAudioDeviceLabel() {
+        if (!this.audioInputDeviceId) {
+            if (this.audioInputDevices.length === 0 && !this.audioInputDevicesLoading) return 'Click "Allow access" to list devices';
+            return 'Default device';
+        }
+        const d = this.audioInputDevices.find(dev => dev.deviceId === this.audioInputDeviceId);
+        return d ? d.label : 'Default device';
+    }
+
+    _closeAudioDropdown = () => {
+        this.audioDeviceDropdownOpen = false;
+        document.removeEventListener('click', this._closeAudioDropdown);
+        this._audioDropdownListenerAdded = false;
+        this.requestUpdate();
+    };
+
     async handleThemeChange(e) {
         this.theme = e.target.value;
         await cheatingDaddy.theme.save(this.theme);
@@ -486,6 +664,7 @@ export class CustomizeView extends LitElement {
                 selectedScreenshotInterval: '5',
                 selectedImageQuality: 'medium',
                 audioMode: 'speaker_only',
+                audioInputDeviceId: '',
                 fontSize: 20,
                 backgroundTransparency: 0.8,
                 googleSearchEnabled: false,
@@ -508,6 +687,9 @@ export class CustomizeView extends LitElement {
             this.selectedLanguage = defaults.selectedLanguage;
             this.selectedImageQuality = defaults.selectedImageQuality;
             this.audioMode = defaults.audioMode;
+            this.audioInputDeviceId = defaults.audioInputDeviceId;
+            this.audioInputDevices = [];
+            this.audioInputDevicesError = '';
             this.fontSize = defaults.fontSize;
             this.backgroundTransparency = defaults.backgroundTransparency;
             this.googleSearchEnabled = defaults.googleSearchEnabled;
@@ -581,6 +763,43 @@ export class CustomizeView extends LitElement {
                         </select>
                     </div>
                     ${this.audioMode !== 'speaker_only' ? html`
+                        <div class="form-group vertical">
+                            <label class="form-label">Microphone device</label>
+                            <p class="form-hint">Allow access once to see and choose your microphone (e.g. Logitech G733).</p>
+                            <div class="audio-device-row">
+                                <div class="custom-select-wrap">
+                                    <button
+                                        type="button"
+                                        class="custom-select-trigger"
+                                        ?disabled=${this.audioInputDevicesLoading || this.audioInputDevices.length === 0}
+                                        @click=${(e) => {
+                                            e.stopPropagation();
+                                            if (this.audioInputDevicesLoading || this.audioInputDevices.length === 0) return;
+                                            this.audioDeviceDropdownOpen = !this.audioDeviceDropdownOpen;
+                                            this.requestUpdate();
+                                        }}
+                                    >
+                                        <span>${this._getAudioDeviceLabel()}</span>
+                                        <span class="chevron">${this.audioDeviceDropdownOpen ? '▲' : '▼'}</span>
+                                    </button>
+                                    ${this.audioDeviceDropdownOpen && this.audioInputDevices.length > 0 ? html`
+                                        <div class="custom-select-dropdown" @click=${(e) => e.stopPropagation()}>
+                                            <button type="button" class="custom-select-option ${!this.audioInputDeviceId ? 'selected' : ''}" @click=${() => this.handleAudioInputDeviceSelect('')}>Default device</button>
+                                            ${this.audioInputDevices.map(d => html`
+                                                <button type="button" class="custom-select-option ${this.audioInputDeviceId === d.deviceId ? 'selected' : ''}" @click=${() => this.handleAudioInputDeviceSelect(d.deviceId)}>${d.label}</button>
+                                            `)}
+                                        </div>
+                                    ` : ''}
+                                </div>
+                                <button
+                                    type="button"
+                                    class="control btn-secondary"
+                                    ?disabled=${this.audioInputDevicesLoading}
+                                    @click=${() => this.loadAudioInputDevices()}
+                                >${this.audioInputDevicesLoading ? 'Loading…' : 'Allow access & list devices'}</button>
+                            </div>
+                            ${this.audioInputDevicesError ? html`<div class="warning-callout">${this.audioInputDevicesError}</div>` : ''}
+                        </div>
                         <div class="warning-callout">May cause unexpected behavior. Only change this if you know what you're doing.</div>
                     ` : ''}
                     <div class="form-group">
