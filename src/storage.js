@@ -293,6 +293,9 @@ function getTodayLimits() {
             if (todayEntry.gemini['gemma-4-31b-it']) {
                 delete todayEntry.gemini['gemma-4-31b-it'];
             }
+            if (todayEntry.gemini['gemma-4-26b-a4b-it']) {
+                delete todayEntry.gemini['gemma-4-26b-a4b-it'];
+            }
         }
         setLimits(limits);
         return todayEntry;
@@ -312,7 +315,7 @@ function getTodayLimits() {
         },
         gemini: {
             'gemini-2.5-flash-lite': { chars: 0 },
-        },
+        }
     };
     limits.data.push(newEntry);
     setLimits(limits);
