@@ -36,7 +36,7 @@ const DEFAULT_PREFERENCES = {
 const DEFAULT_KEYBINDS = null; // null means use system defaults
 
 const DEFAULT_LIMITS = {
-    data: [] // Array of { date: 'YYYY-MM-DD', flash: { count }, flashLite: { count }, groq: { 'qwen3-32b': { chars, limit }, 'gpt-oss-120b': { chars, limit }, 'gpt-oss-20b': { chars, limit } }, gemini: { 'gemma-4-26b-a4b-it': { chars } } }
+    data: [] // Array of { date: 'YYYY-MM-DD', flash: { count }, flashLite: { count }, groq: { 'gpt-oss-120b': { chars, limit }, 'gpt-oss-20b': { chars, limit }, 'qwen3.6-27b': { chars, limit } }, gemini: { 'gemma-4-26b-a4b-it': { chars } } }
 };
 
 // Get the config directory path based on OS
@@ -258,13 +258,19 @@ function getTodayLimits() {
 
     if (todayEntry) {
         // ensure new fields exist
-        if(!todayEntry.groq) {
-            todayEntry.groq = {
-                'qwen3-32b': { chars: 0, limit: 1500000 },
-                'gpt-oss-120b': { chars: 0, limit: 600000 },
-                'gpt-oss-20b': { chars: 0, limit: 600000 },
-                'kimi-k2-instruct': { chars: 0, limit: 600000 }
-            };
+           if(!todayEntry.groq) {
+            todayEntry.groq = {};
+        }
+        // backfill any missing/renamed buckets (handles upgrades from a version
+        // that tracked now-deprecated Groq model ids)
+        if(!todayEntry.groq['gpt-oss-120b']) {
+            todayEntry.groq['gpt-oss-120b'] = { chars: 0, limit: 1500000 };
+        }
+        if(!todayEntry.groq['gpt-oss-20b']) {
+            todayEntry.groq['gpt-oss-20b'] = { chars: 0, limit: 600000 };
+        }
+        if(!todayEntry.groq['qwen3.6-27b']) {
+            todayEntry.groq['qwen3.6-27b'] = { chars: 0, limit: 600000 };
         }
         if(!todayEntry.gemini) {
             todayEntry.gemini = {
@@ -282,10 +288,9 @@ function getTodayLimits() {
         flash: { count: 0 },
         flashLite: { count: 0 },
         groq: {
-            'qwen3-32b': { chars: 0, limit: 1500000 },
-            'gpt-oss-120b': { chars: 0, limit: 600000 },
+            'gpt-oss-120b': { chars: 0, limit: 1500000 },
             'gpt-oss-20b': { chars: 0, limit: 600000 },
-            'kimi-k2-instruct': { chars: 0, limit: 600000 }
+            'qwen3.6-27b': { chars: 0, limit: 600000 }
         },
         gemini: {
             'gemma-4-26b-a4b-it': { chars: 0 }
@@ -362,17 +367,14 @@ function getModelForToday() {
     const todayEntry = getTodayLimits();
     const groq = todayEntry.groq;
 
-    if (groq['qwen3-32b'].chars < groq['qwen3-32b'].limit) {
-        return 'qwen/qwen3-32b';
-    }
     if (groq['gpt-oss-120b'].chars < groq['gpt-oss-120b'].limit) {
         return 'openai/gpt-oss-120b';
     }
     if (groq['gpt-oss-20b'].chars < groq['gpt-oss-20b'].limit) {
         return 'openai/gpt-oss-20b';
     }
-    if (groq['kimi-k2-instruct'].chars < groq['kimi-k2-instruct'].limit) {
-        return 'moonshotai/kimi-k2-instruct';
+    if (groq['qwen3.6-27b'].chars < groq['qwen3.6-27b'].limit) {
+        return 'qwen/qwen3.6-27b';
     }
 
     // All limits exhausted
