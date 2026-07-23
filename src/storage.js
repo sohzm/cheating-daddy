@@ -8,12 +8,16 @@ const CONFIG_VERSION = 1;
 const DEFAULT_CONFIG = {
     configVersion: CONFIG_VERSION,
     onboarded: false,
-    layout: 'normal'
+    layout: 'normal',
+    geminiLiveModel: 'gemini-3.1-flash-live-preview',
+    groqModel: 'qwen/qwen3.6-27b',
+    groqImageModel: 'qwen/qwen3.6-27b',
+    disableGroqThinking: true,
 };
 
 const DEFAULT_CREDENTIALS = {
     apiKey: '',
-    groqApiKey: ''
+    groqApiKey: '',
 };
 
 const DEFAULT_PREFERENCES = {
@@ -28,15 +32,14 @@ const DEFAULT_PREFERENCES = {
     fontSize: 'medium',
     backgroundTransparency: 0.8,
     googleSearchEnabled: false,
-    ollamaHost: 'http://127.0.0.1:11434',
-    ollamaModel: 'llama3.1',
-    whisperModel: 'Xenova/whisper-small',
+    localLlmModel: 'unsloth/Qwen3.5-4B-GGUF:Q4_K_M',
+    whisperModel: 'tiny.en',
 };
 
 const DEFAULT_KEYBINDS = null; // null means use system defaults
 
 const DEFAULT_LIMITS = {
-    data: [] // Array of { date: 'YYYY-MM-DD', flash: { count }, flashLite: { count }, groq: { 'qwen3-32b': { chars, limit }, 'gpt-oss-120b': { chars, limit }, 'gpt-oss-20b': { chars, limit } }, gemini: { 'gemma-4-26b-a4b-it': { chars } } }
+    data: [], // Array of { date: 'YYYY-MM-DD', flash: { count }, flashLite: { count }, groq: { 'qwen3-32b': { chars, limit }, 'gpt-oss-120b': { chars, limit }, 'gpt-oss-20b': { chars, limit } }, gemini: { 'gemma-4-26b-a4b-it': { chars } } }
 };
 
 // Get the config directory path based on OS
@@ -162,7 +165,8 @@ function initializeStorage() {
 // ============ CONFIG ============
 
 function getConfig() {
-    return readJsonFile(getConfigPath(), DEFAULT_CONFIG);
+    const saved = readJsonFile(getConfigPath(), {});
+    return { ...DEFAULT_CONFIG, ...saved };
 }
 
 function setConfig(config) {
@@ -209,7 +213,15 @@ function setGroqApiKey(groqApiKey) {
 
 function getPreferences() {
     const saved = readJsonFile(getPreferencesPath(), {});
-    return { ...DEFAULT_PREFERENCES, ...saved };
+    const preferences = { ...DEFAULT_PREFERENCES, ...saved };
+    const legacyWhisperModels = {
+        'Xenova/whisper-tiny': 'tiny.en',
+        'Xenova/whisper-base': 'base.en',
+        'Xenova/whisper-small': 'small.en',
+    };
+
+    preferences.whisperModel = legacyWhisperModels[preferences.whisperModel] || preferences.whisperModel;
+    return preferences;
 }
 
 function setPreferences(preferences) {
@@ -258,17 +270,17 @@ function getTodayLimits() {
 
     if (todayEntry) {
         // ensure new fields exist
-        if(!todayEntry.groq) {
+        if (!todayEntry.groq) {
             todayEntry.groq = {
                 'qwen3-32b': { chars: 0, limit: 1500000 },
                 'gpt-oss-120b': { chars: 0, limit: 600000 },
                 'gpt-oss-20b': { chars: 0, limit: 600000 },
-                'kimi-k2-instruct': { chars: 0, limit: 600000 }
+                'kimi-k2-instruct': { chars: 0, limit: 600000 },
             };
         }
-        if(!todayEntry.gemini) {
+        if (!todayEntry.gemini) {
             todayEntry.gemini = {
-                'gemma-4-26b-a4b-it': { chars: 0 }
+                'gemma-4-26b-a4b-it': { chars: 0 },
             };
         }
         setLimits(limits);
@@ -285,11 +297,11 @@ function getTodayLimits() {
             'qwen3-32b': { chars: 0, limit: 1500000 },
             'gpt-oss-120b': { chars: 0, limit: 600000 },
             'gpt-oss-20b': { chars: 0, limit: 600000 },
-            'kimi-k2-instruct': { chars: 0, limit: 600000 }
+            'kimi-k2-instruct': { chars: 0, limit: 600000 },
         },
         gemini: {
-            'gemma-4-26b-a4b-it': { chars: 0 }
-        }
+            'gemma-4-26b-a4b-it': { chars: 0 },
+        },
     };
     limits.data.push(newEntry);
     setLimits(limits);
@@ -310,7 +322,7 @@ function incrementLimitCount(model) {
         todayEntry = {
             date: today,
             flash: { count: 0 },
-            flashLite: { count: 0 }
+            flashLite: { count: 0 },
         };
         limits.data.push(todayEntry);
     } else {
@@ -336,7 +348,7 @@ function incrementCharUsage(provider, model, charCount) {
     const today = getTodayDateString();
     const todayEntry = limits.data.find(entry => entry.date === today);
 
-    if(todayEntry[provider] && todayEntry[provider][model]) {
+    if (todayEntry[provider] && todayEntry[provider][model]) {
         todayEntry[provider][model].chars += charCount;
         setLimits(limits);
     }
@@ -362,9 +374,6 @@ function getModelForToday() {
     const todayEntry = getTodayLimits();
     const groq = todayEntry.groq;
 
-    if (groq['qwen3-32b'].chars < groq['qwen3-32b'].limit) {
-        return 'qwen/qwen3-32b';
-    }
     if (groq['gpt-oss-120b'].chars < groq['gpt-oss-120b'].limit) {
         return 'openai/gpt-oss-120b';
     }
@@ -400,7 +409,7 @@ function saveSession(sessionId, data) {
         customPrompt: data.customPrompt || existingSession?.customPrompt || null,
         // Conversation data
         conversationHistory: data.conversationHistory || existingSession?.conversationHistory || [],
-        screenAnalysisHistory: data.screenAnalysisHistory || existingSession?.screenAnalysisHistory || []
+        screenAnalysisHistory: data.screenAnalysisHistory || existingSession?.screenAnalysisHistory || [],
     };
     return writeJsonFile(sessionPath, sessionData);
 }
@@ -417,7 +426,8 @@ function getAllSessions() {
             return [];
         }
 
-        const files = fs.readdirSync(historyDir)
+        const files = fs
+            .readdirSync(historyDir)
             .filter(f => f.endsWith('.json'))
             .sort((a, b) => {
                 // Sort by timestamp descending (newest first)
@@ -426,22 +436,24 @@ function getAllSessions() {
                 return tsB - tsA;
             });
 
-        return files.map(file => {
-            const sessionId = file.replace('.json', '');
-            const data = readJsonFile(path.join(historyDir, file), null);
-            if (data) {
-                return {
-                    sessionId,
-                    createdAt: data.createdAt,
-                    lastUpdated: data.lastUpdated,
-                    messageCount: data.conversationHistory?.length || 0,
-                    screenAnalysisCount: data.screenAnalysisHistory?.length || 0,
-                    profile: data.profile || null,
-                    customPrompt: data.customPrompt || null
-                };
-            }
-            return null;
-        }).filter(Boolean);
+        return files
+            .map(file => {
+                const sessionId = file.replace('.json', '');
+                const data = readJsonFile(path.join(historyDir, file), null);
+                if (data) {
+                    return {
+                        sessionId,
+                        createdAt: data.createdAt,
+                        lastUpdated: data.lastUpdated,
+                        messageCount: data.conversationHistory?.length || 0,
+                        screenAnalysisCount: data.screenAnalysisHistory?.length || 0,
+                        profile: data.profile || null,
+                        customPrompt: data.customPrompt || null,
+                    };
+                }
+                return null;
+            })
+            .filter(Boolean);
     } catch (error) {
         console.error('Error reading sessions:', error.message);
         return [];
@@ -528,5 +540,5 @@ module.exports = {
     deleteAllSessions,
 
     // Clear all
-    clearAllData
+    clearAllData,
 };

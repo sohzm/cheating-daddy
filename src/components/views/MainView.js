@@ -1,5 +1,18 @@
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
 
+const LOCAL_LLM_PRESETS = [
+    { value: 'unsloth/Qwen3.5-0.8B-GGUF:Q4_K_M', label: 'Qwen 3.5 0.8B Q4 — 0.74 GB · Fastest' },
+    { value: 'unsloth/Qwen3.5-0.8B-GGUF:Q8_0', label: 'Qwen 3.5 0.8B Q8 — 1.02 GB' },
+    { value: 'unsloth/Qwen3.5-2B-GGUF:Q4_K_M', label: 'Qwen 3.5 2B Q4 — 1.95 GB' },
+    { value: 'unsloth/Qwen3.5-2B-GGUF:Q8_0', label: 'Qwen 3.5 2B Q8 — 2.68 GB' },
+    { value: 'unsloth/Qwen3.5-4B-GGUF:Q4_K_M', label: 'Qwen 3.5 4B Q4 — 3.42 GB · Recommended' },
+    { value: 'unsloth/Qwen3.5-4B-GGUF:Q8_0', label: 'Qwen 3.5 4B Q8 — 5.16 GB' },
+    { value: 'unsloth/Qwen3.5-9B-GGUF:Q4_K_M', label: 'Qwen 3.5 9B Q4 — 6.60 GB' },
+    { value: 'unsloth/Qwen3.5-9B-GGUF:Q8_0', label: 'Qwen 3.5 9B Q8 — 10.45 GB' },
+    { value: 'unsloth/Qwen3.5-27B-GGUF:Q4_K_M', label: 'Qwen 3.5 27B Q4 — 17.67 GB' },
+    { value: 'unsloth/Qwen3.5-35B-A3B-GGUF:Q4_K_M', label: 'Qwen 3.5 35B-A3B Q4 — 22.92 GB · Largest' },
+];
+
 export class MainView extends LitElement {
     static styles = css`
         * {
@@ -56,13 +69,17 @@ export class MainView extends LitElement {
             border: 1px solid rgba(59, 130, 246, 0.45);
             background: linear-gradient(135deg, rgba(59, 130, 246, 0.12) 0%, rgba(139, 92, 246, 0.09) 100%);
             cursor: pointer;
-            transition: border-color 0.2s, background 0.2s;
+            transition:
+                border-color 0.2s,
+                background 0.2s;
         }
 
         .cloud-promo:hover {
             border-color: rgba(59, 130, 246, 0.65);
             background: linear-gradient(135deg, rgba(59, 130, 246, 0.16) 0%, rgba(139, 92, 246, 0.12) 100%);
-            box-shadow: 0 0 20px rgba(59, 130, 246, 0.15), 0 0 40px rgba(139, 92, 246, 0.08);
+            box-shadow:
+                0 0 20px rgba(59, 130, 246, 0.15),
+                0 0 40px rgba(139, 92, 246, 0.08);
         }
 
         .cloud-promo-glow {
@@ -111,6 +128,95 @@ export class MainView extends LitElement {
             gap: var(--space-xs);
         }
 
+        .config-section {
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            background: var(--bg-surface);
+            overflow: hidden;
+        }
+
+        .config-summary {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: var(--space-md);
+            padding: 12px 14px;
+            cursor: pointer;
+            list-style: none;
+        }
+
+        .config-summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .config-summary-text {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .config-summary-title {
+            font-size: var(--font-size-sm);
+            font-weight: var(--font-weight-medium);
+            color: var(--text-primary);
+        }
+
+        .config-summary-description {
+            font-size: var(--font-size-xs);
+            color: var(--text-muted);
+        }
+
+        .config-chevron {
+            width: 16px;
+            height: 16px;
+            color: var(--text-muted);
+            transition: transform var(--transition);
+        }
+
+        .config-section[open] .config-chevron {
+            transform: rotate(180deg);
+        }
+
+        .config-content {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-md);
+            padding: 14px;
+            border-top: 1px solid var(--border);
+        }
+
+        .config-note {
+            padding: 10px 12px;
+            border: 1px solid rgba(212, 160, 23, 0.28);
+            border-radius: var(--radius-sm);
+            background: rgba(212, 160, 23, 0.08);
+            color: var(--text-secondary);
+            font-size: var(--font-size-xs);
+            line-height: var(--line-height);
+        }
+
+        .config-checkbox {
+            display: flex;
+            align-items: flex-start;
+            gap: var(--space-sm);
+            cursor: pointer;
+        }
+
+        .config-checkbox input {
+            width: 16px;
+            height: 16px;
+            margin-top: 2px;
+            padding: 0;
+            accent-color: var(--accent);
+            cursor: pointer;
+        }
+
+        .config-checkbox-text {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
         .form-label {
             font-size: var(--font-size-xs);
             font-weight: var(--font-weight-medium);
@@ -119,7 +225,9 @@ export class MainView extends LitElement {
             letter-spacing: 0.5px;
         }
 
-        input, select, textarea {
+        input,
+        select,
+        textarea {
             background: var(--bg-elevated);
             color: var(--text-primary);
             border: 1px solid var(--border);
@@ -128,25 +236,32 @@ export class MainView extends LitElement {
             border-radius: var(--radius-sm);
             font-size: var(--font-size-sm);
             font-family: var(--font);
-            transition: border-color var(--transition), box-shadow var(--transition);
+            transition:
+                border-color var(--transition),
+                box-shadow var(--transition);
         }
 
-        input:hover:not(:focus), select:hover:not(:focus), textarea:hover:not(:focus) {
+        input:hover:not(:focus),
+        select:hover:not(:focus),
+        textarea:hover:not(:focus) {
             border-color: var(--text-muted);
         }
 
-        input:focus, select:focus, textarea:focus {
+        input:focus,
+        select:focus,
+        textarea:focus {
             outline: none;
             border-color: var(--accent);
             box-shadow: 0 0 0 1px var(--accent);
         }
 
-        input::placeholder, textarea::placeholder {
+        input::placeholder,
+        textarea::placeholder {
             color: var(--text-muted);
         }
 
         input.error {
-            border-color: var(--danger, #EF4444);
+            border-color: var(--danger, #ef4444);
         }
 
         select {
@@ -170,7 +285,8 @@ export class MainView extends LitElement {
             color: var(--text-muted);
         }
 
-        .form-hint a, .form-hint span.link {
+        .form-hint a,
+        .form-hint span.link {
             color: var(--accent);
             text-decoration: none;
             cursor: pointer;
@@ -196,7 +312,9 @@ export class MainView extends LitElement {
         }
 
         @keyframes whisper-spin {
-            to { transform: rotate(360deg); }
+            to {
+                transform: rotate(360deg);
+            }
         }
 
         /* ── Start button ── */
@@ -258,6 +376,54 @@ export class MainView extends LitElement {
 
         .start-button.disabled:hover {
             opacity: 0.5;
+        }
+
+        .download-progress-fill {
+            position: absolute;
+            inset: 0 auto 0 0;
+            z-index: 2;
+            width: 0;
+            background: rgba(17, 17, 17, 0.16);
+            transition: width 0.2s ease;
+            pointer-events: none;
+        }
+
+        .download-progress-fill.indeterminate {
+            width: 38%;
+            animation: download-progress-slide 1.2s ease-in-out infinite;
+        }
+
+        .download-controls {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: var(--space-md);
+            margin-top: var(--space-xs);
+            font-size: var(--font-size-xs);
+            color: var(--text-muted);
+        }
+
+        .download-cancel {
+            flex: none;
+            padding: 0;
+            border: none;
+            background: none;
+            color: var(--danger, #ef4444);
+            font: inherit;
+            cursor: pointer;
+        }
+
+        .download-cancel:hover {
+            text-decoration: underline;
+        }
+
+        @keyframes download-progress-slide {
+            from {
+                transform: translateX(-105%);
+            }
+            to {
+                transform: translateX(270%);
+            }
         }
 
         .shortcut-hint {
@@ -328,7 +494,9 @@ export class MainView extends LitElement {
             border: 1px solid var(--border);
             background: var(--bg-elevated);
             cursor: pointer;
-            transition: border-color 0.2s, background 0.2s;
+            transition:
+                border-color 0.2s,
+                background 0.2s;
         }
 
         .mode-card:hover {
@@ -381,13 +549,49 @@ export class MainView extends LitElement {
             pointer-events: none;
         }
 
+        .help-dialog-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: var(--space-lg);
+            background: rgba(0, 0, 0, 0.62);
+        }
+
+        .help-dialog {
+            width: min(680px, 100%);
+            max-height: calc(100vh - 48px);
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-md);
+            padding: var(--space-lg);
+            overflow: hidden;
+            background: var(--bg-surface);
+            border: 1px solid var(--border-strong);
+            border-radius: var(--radius-lg);
+            color: var(--text-primary);
+        }
+
+        .help-dialog-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: var(--space-md);
+        }
+
+        .help-dialog-title {
+            font-size: var(--font-size-lg);
+            font-weight: var(--font-weight-semibold);
+        }
+
         /* ── Help content ── */
 
         .help-content {
             display: flex;
             flex-direction: column;
             gap: var(--space-md);
-            max-height: 500px;
             overflow-y: auto;
         }
 
@@ -486,17 +690,23 @@ export class MainView extends LitElement {
         onProfileChange: { type: Function },
         isInitializing: { type: Boolean },
         whisperDownloading: { type: Boolean },
+        downloadProgress: { type: Object },
+        onCancelDownload: { type: Function },
         // Internal state
         _mode: { state: true },
         _token: { state: true },
         _geminiKey: { state: true },
         _groqKey: { state: true },
         _openaiKey: { state: true },
+        _geminiLiveModel: { state: true },
+        _groqModel: { state: true },
+        _groqImageModel: { state: true },
+        _disableGroqThinking: { state: true },
         _tokenError: { state: true },
         _keyError: { state: true },
         // Local AI state
-        _ollamaHost: { state: true },
-        _ollamaModel: { state: true },
+        _localLlmModel: { state: true },
+        _useCustomLocalLlmModel: { state: true },
         _whisperModel: { state: true },
         _showLocalHelp: { state: true },
     };
@@ -509,18 +719,24 @@ export class MainView extends LitElement {
         this.onProfileChange = () => {};
         this.isInitializing = false;
         this.whisperDownloading = false;
+        this.downloadProgress = { active: false, label: '', percentage: null };
+        this.onCancelDownload = () => {};
 
         this._mode = 'byok';
         this._token = '';
         this._geminiKey = '';
         this._groqKey = '';
         this._openaiKey = '';
+        this._geminiLiveModel = 'gemini-3.1-flash-live-preview';
+        this._groqModel = 'qwen/qwen3.6-27b';
+        this._groqImageModel = 'qwen/qwen3.6-27b';
+        this._disableGroqThinking = true;
         this._tokenError = false;
         this._keyError = false;
         this._showLocalHelp = false;
-        this._ollamaHost = 'http://127.0.0.1:11434';
-        this._ollamaModel = 'llama3.1';
-        this._whisperModel = 'Xenova/whisper-small';
+        this._localLlmModel = 'unsloth/Qwen3.5-4B-GGUF:Q4_K_M';
+        this._useCustomLocalLlmModel = false;
+        this._whisperModel = 'tiny.en';
 
         this._animId = null;
         this._time = 0;
@@ -533,7 +749,8 @@ export class MainView extends LitElement {
 
     async _loadFromStorage() {
         try {
-            const [prefs, creds] = await Promise.all([
+            const [config, prefs, creds] = await Promise.all([
+                cheatingDaddy.storage.getConfig(),
                 cheatingDaddy.storage.getPreferences(),
                 cheatingDaddy.storage.getCredentials().catch(() => ({})),
             ]);
@@ -547,14 +764,18 @@ export class MainView extends LitElement {
 
             // Load keys
             this._token = creds.cloudToken || '';
-            this._geminiKey = await cheatingDaddy.storage.getApiKey().catch(() => '') || '';
-            this._groqKey = await cheatingDaddy.storage.getGroqApiKey().catch(() => '') || '';
+            this._geminiKey = (await cheatingDaddy.storage.getApiKey().catch(() => '')) || '';
+            this._groqKey = (await cheatingDaddy.storage.getGroqApiKey().catch(() => '')) || '';
             this._openaiKey = creds.openaiKey || '';
+            this._geminiLiveModel = config.geminiLiveModel || 'gemini-3.1-flash-live-preview';
+            this._groqModel = config.groqModel || 'qwen/qwen3.6-27b';
+            this._groqImageModel = config.groqImageModel || 'qwen/qwen3.6-27b';
+            this._disableGroqThinking = config.disableGroqThinking === true;
 
             // Load local AI settings
-            this._ollamaHost = prefs.ollamaHost || 'http://127.0.0.1:11434';
-            this._ollamaModel = prefs.ollamaModel || 'llama3.1';
-            this._whisperModel = prefs.whisperModel || 'Xenova/whisper-small';
+            this._localLlmModel = prefs.localLlmModel || 'unsloth/Qwen3.5-4B-GGUF:Q4_K_M';
+            this._useCustomLocalLlmModel = !LOCAL_LLM_PRESETS.some(preset => preset.value === this._localLlmModel);
+            this._whisperModel = prefs.whisperModel || 'tiny.en';
 
             this.requestUpdate();
         } catch (e) {
@@ -593,7 +814,7 @@ export class MainView extends LitElement {
         // Mouse tracking
         this._mouseX = -1;
         this._mouseY = -1;
-        btn.addEventListener('mousemove', (e) => {
+        btn.addEventListener('mousemove', e => {
             const rect = btn.getBoundingClientRect();
             this._mouseX = (e.clientX - rect.left) / rect.width;
             this._mouseY = (e.clientY - rect.top) / rect.height;
@@ -613,7 +834,10 @@ export class MainView extends LitElement {
         const img = dCtx.createImageData(cols, rows);
         for (let i = 0; i < img.data.length; i += 4) {
             const v = Math.random() > 0.5 ? 255 : 0;
-            img.data[i] = v; img.data[i+1] = v; img.data[i+2] = v; img.data[i+3] = 255;
+            img.data[i] = v;
+            img.data[i + 1] = v;
+            img.data[i + 2] = v;
+            img.data[i + 3] = 255;
         }
         dCtx.putImageData(img, 0, 0);
 
@@ -676,6 +900,11 @@ export class MainView extends LitElement {
     }
 
     _handleKeydown(e) {
+        if (e.key === 'Escape' && this._showLocalHelp) {
+            this._closeLocalHelp();
+            return;
+        }
+
         const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
         if ((isMac ? e.metaKey : e.ctrlKey) && e.key === 'Enter') {
             e.preventDefault();
@@ -716,6 +945,30 @@ export class MainView extends LitElement {
         this.requestUpdate();
     }
 
+    async _saveGeminiLiveModel(val) {
+        this._geminiLiveModel = val;
+        await cheatingDaddy.storage.updateConfig('geminiLiveModel', val);
+        this.requestUpdate();
+    }
+
+    async _saveGroqModel(val) {
+        this._groqModel = val;
+        await cheatingDaddy.storage.updateConfig('groqModel', val);
+        this.requestUpdate();
+    }
+
+    async _saveGroqImageModel(val) {
+        this._groqImageModel = val;
+        await cheatingDaddy.storage.updateConfig('groqImageModel', val);
+        this.requestUpdate();
+    }
+
+    async _saveDisableGroqThinking(disabled) {
+        this._disableGroqThinking = disabled;
+        await cheatingDaddy.storage.updateConfig('disableGroqThinking', disabled);
+        this.requestUpdate();
+    }
+
     async _saveOpenaiKey(val) {
         this._openaiKey = val;
         try {
@@ -725,16 +978,21 @@ export class MainView extends LitElement {
         this.requestUpdate();
     }
 
-    async _saveOllamaHost(val) {
-        this._ollamaHost = val;
-        await cheatingDaddy.storage.updatePreference('ollamaHost', val);
+    async _saveLocalLlmModel(val) {
+        this._localLlmModel = val;
+        await cheatingDaddy.storage.updatePreference('localLlmModel', val);
         this.requestUpdate();
     }
 
-    async _saveOllamaModel(val) {
-        this._ollamaModel = val;
-        await cheatingDaddy.storage.updatePreference('ollamaModel', val);
-        this.requestUpdate();
+    async _selectLocalLlmModel(value) {
+        if (value === 'custom') {
+            this._useCustomLocalLlmModel = true;
+            this.requestUpdate();
+            return;
+        }
+
+        this._useCustomLocalLlmModel = false;
+        await this._saveLocalLlmModel(value);
     }
 
     async _saveWhisperModel(val) {
@@ -747,10 +1005,22 @@ export class MainView extends LitElement {
         this.onProfileChange(e.target.value);
     }
 
+    _openLocalHelp() {
+        this._showLocalHelp = true;
+    }
+
+    _closeLocalHelp() {
+        this._showLocalHelp = false;
+    }
+
+    _handleHelpDialogClick(e) {
+        e.stopPropagation();
+    }
+
     // ── Start ──
 
     _handleStart() {
-        if (this.isInitializing) return;
+        if (this.isInitializing || this.downloadProgress.active) return;
 
         if (this._mode === 'byok') {
             if (!this._geminiKey.trim()) {
@@ -759,8 +1029,7 @@ export class MainView extends LitElement {
                 return;
             }
         } else if (this._mode === 'local') {
-            // Local mode doesn't need API keys, just Ollama host
-            if (!this._ollamaHost.trim()) {
+            if (!this._localLlmModel.trim()) {
                 return;
             }
         }
@@ -782,23 +1051,84 @@ export class MainView extends LitElement {
 
     _renderStartButton() {
         const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+        const isDownloading = this._mode === 'local' && this.downloadProgress.active;
+        const percentage = this.downloadProgress.percentage;
+        const hasPercentage = Number.isFinite(percentage);
 
-        const cmdIcon = html`<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3H6a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3h12a3 3 0 0 0 3-3 3 3 0 0 0-3-3z"/></svg>`;
-        const ctrlIcon = html`<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>`;
-        const enterIcon = html`<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 10l-5 5 5 5"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/></svg>`;
+        const cmdIcon = html`<svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="3"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+        >
+            <path
+                d="M18 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3H6a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3h12a3 3 0 0 0 3-3 3 3 0 0 0-3-3z"
+            />
+        </svg>`;
+        const ctrlIcon = html`<svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="3"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+        >
+            <path d="M6 15l6-6 6 6" />
+        </svg>`;
+        const enterIcon = html`<svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="3"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+        >
+            <path d="M9 10l-5 5 5 5" />
+            <path d="M20 4v7a4 4 0 0 1-4 4H4" />
+        </svg>`;
 
         return html`
             <button
-                class="start-button ${this.isInitializing ? 'disabled' : ''}"
+                class="start-button ${this.isInitializing || isDownloading ? 'disabled' : ''}"
+                ?disabled=${this.isInitializing || isDownloading}
                 @click=${() => this._handleStart()}
             >
                 <canvas class="btn-aurora"></canvas>
                 <canvas class="btn-dither"></canvas>
+                ${
+                    isDownloading
+                        ? html`<span
+                              class="download-progress-fill ${hasPercentage ? '' : 'indeterminate'}"
+                              style=${hasPercentage ? `width: ${percentage}%` : ''}
+                          ></span>`
+                        : ''
+                }
                 <span class="btn-label">
-                    Start Session
-                    <span class="shortcut-hint">${isMac ? cmdIcon : ctrlIcon}${enterIcon}</span>
+                    ${isDownloading ? (hasPercentage ? `${percentage}%` : 'Preparing...') : 'Start Session'}
+                    ${isDownloading ? '' : html`<span class="shortcut-hint">${isMac ? cmdIcon : ctrlIcon}${enterIcon}</span>`}
                 </span>
             </button>
+            ${
+                isDownloading
+                    ? html`
+                          <div class="download-controls">
+                              <span>Downloading: ${this.downloadProgress.label || 'Local AI files'}</span>
+                              <button class="download-cancel" @click=${() => this.onCancelDownload()}>Cancel</button>
+                          </div>
+                      `
+                    : ''
+            }
         `;
     }
 
@@ -818,37 +1148,92 @@ export class MainView extends LitElement {
 
     // ── BYOK mode ──
 
+    _renderConfigChevron() {
+        return html`
+            <svg class="config-chevron" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                <path d="m5 7.5 5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+        `;
+    }
+
     _renderByokMode() {
         return html`
-            <div class="form-group">
-                <label class="form-label">Gemini API Key</label>
-                <input
-                    type="password"
-                    placeholder="Required"
-                    .value=${this._geminiKey}
-                    @input=${e => this._saveGeminiKey(e.target.value)}
-                    class=${this._keyError ? 'error' : ''}
-                />
-                <div class="form-hint">
-                    <span class="link" @click=${() => this.onExternalLink('https://aistudio.google.com/apikey')}>Get Gemini key</span>
-                </div>
-            </div>
+            <details class="config-section">
+                <summary class="config-summary">
+                    <span class="config-summary-text">
+                        <span class="config-summary-title">Transcription</span>
+                        <span class="config-summary-description">Gemini Live connection</span>
+                    </span>
+                    ${this._renderConfigChevron()}
+                </summary>
+                <div class="config-content">
+                    <div class="form-group">
+                        <label class="form-label">Gemini API Key</label>
+                        <input
+                            type="password"
+                            placeholder="Required"
+                            .value=${this._geminiKey}
+                            @input=${e => this._saveGeminiKey(e.target.value)}
+                            class=${this._keyError ? 'error' : ''}
+                        />
+                        <div class="form-hint">
+                            <span class="link" @click=${() => this.onExternalLink('https://aistudio.google.com/apikey')}>Get Gemini key</span>
+                        </div>
+                    </div>
 
-            <div class="form-group">
-                <label class="form-label">Groq API Key</label>
-                <input
-                    type="password"
-                    placeholder="Optional"
-                    .value=${this._groqKey}
-                    @input=${e => this._saveGroqKey(e.target.value)}
-                />
-                <div class="form-hint">
-                    <span class="link" @click=${() => this.onExternalLink('https://console.groq.com/keys')}>Get Groq key</span>
+                    <div class="form-group">
+                        <label class="form-label">Gemini Live Model</label>
+                        <input type="text" .value=${this._geminiLiveModel} @input=${e => this._saveGeminiLiveModel(e.target.value)} />
+                    </div>
                 </div>
-            </div>
+            </details>
 
-            ${this._renderStartButton()}
-            ${this._renderDivider()}
+            <details class="config-section">
+                <summary class="config-summary">
+                    <span class="config-summary-text">
+                        <span class="config-summary-title">AI responses</span>
+                        <span class="config-summary-description">Groq key and response model</span>
+                    </span>
+                    ${this._renderConfigChevron()}
+                </summary>
+                <div class="config-content">
+                    <div class="form-group">
+                        <label class="form-label">Groq API Key</label>
+                        <input type="password" placeholder="Optional" .value=${this._groqKey} @input=${e => this._saveGroqKey(e.target.value)} />
+                        <div class="form-hint">
+                            <span class="link" @click=${() => this.onExternalLink('https://console.groq.com/keys')}>Get Groq key</span>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Groq Model</label>
+                        <input type="text" .value=${this._groqModel} @input=${e => this._saveGroqModel(e.target.value)} />
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Groq Image Model</label>
+                        <input type="text" .value=${this._groqImageModel} @input=${e => this._saveGroqImageModel(e.target.value)} />
+                    </div>
+
+                    <label class="config-checkbox">
+                        <input
+                            type="checkbox"
+                            .checked=${this._disableGroqThinking}
+                            @change=${e => this._saveDisableGroqThinking(e.target.checked)}
+                        />
+                        <span class="config-checkbox-text">
+                            <span class="config-summary-title">Disable thinking</span>
+                            <span class="config-summary-description">Faster responses with less internal reasoning</span>
+                        </span>
+                    </label>
+
+                    <div class="config-note">
+                        If the Groq API key is empty, Gemini Live is used for answers instead. Its answer quality may be lower.
+                    </div>
+                </div>
+            </details>
+
+            ${this._renderStartButton()} ${this._renderDivider()}
 
             <!-- Cloud promo intentionally removed from the active UI. -->
 
@@ -862,47 +1247,66 @@ export class MainView extends LitElement {
 
     _renderLocalMode() {
         return html`
-            <div class="form-group">
-                <label class="form-label">Ollama Host</label>
-                <input
-                    type="text"
-                    placeholder="http://127.0.0.1:11434"
-                    .value=${this._ollamaHost}
-                    @input=${e => this._saveOllamaHost(e.target.value)}
-                />
-                <div class="form-hint">Ollama must be running locally</div>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Ollama Model</label>
-                <input
-                    type="text"
-                    placeholder="llama3.1"
-                    .value=${this._ollamaModel}
-                    @input=${e => this._saveOllamaModel(e.target.value)}
-                />
-                <div class="form-hint">Run <code style="font-family: var(--font-mono); font-size: 11px; background: var(--bg-elevated); padding: 1px 4px; border-radius: 3px;">ollama pull ${this._ollamaModel}</code> first</div>
-            </div>
-
-            <div class="form-group">
-                <div class="whisper-label-row">
-                    <label class="form-label">Whisper Model</label>
-                    ${this.whisperDownloading ? html`<div class="whisper-spinner"></div>` : ''}
+            <details class="config-section">
+                <summary class="config-summary">
+                    <span class="config-summary-text">
+                        <span class="config-summary-title">Language model</span>
+                        <span class="config-summary-description">Local GGUF model</span>
+                    </span>
+                    ${this._renderConfigChevron()}
+                </summary>
+                <div class="config-content">
+                    <div class="form-group">
+                        <label class="form-label">Model</label>
+                        <select
+                            .value=${this._useCustomLocalLlmModel ? 'custom' : this._localLlmModel}
+                            @change=${event => this._selectLocalLlmModel(event.target.value)}
+                        >
+                            ${LOCAL_LLM_PRESETS.map(preset => html`<option value=${preset.value}>${preset.label}</option>`)}
+                            <option value="custom">Custom Hugging Face model or local GGUF…</option>
+                        </select>
+                        ${
+                            this._useCustomLocalLlmModel
+                                ? html`
+                                      <input
+                                          type="text"
+                                          placeholder="owner/repository:quant or /absolute/model.gguf"
+                                          .value=${this._localLlmModel}
+                                          @input=${event => this._saveLocalLlmModel(event.target.value)}
+                                      />
+                                  `
+                                : ''
+                        }
+                        <div class="form-hint">Sizes include the vision model. Q4 uses less memory; Q8 preserves more quality.</div>
+                    </div>
                 </div>
-                <select
-                    .value=${this._whisperModel}
-                    @change=${e => this._saveWhisperModel(e.target.value)}
-                >
-                    <option value="Xenova/whisper-tiny" ?selected=${this._whisperModel === 'Xenova/whisper-tiny'}>Tiny (fastest, least accurate)</option>
-                    <option value="Xenova/whisper-base" ?selected=${this._whisperModel === 'Xenova/whisper-base'}>Base</option>
-                    <option value="Xenova/whisper-small" ?selected=${this._whisperModel === 'Xenova/whisper-small'}>Small (recommended)</option>
-                    <option value="Xenova/whisper-medium" ?selected=${this._whisperModel === 'Xenova/whisper-medium'}>Medium (most accurate, slowest)</option>
-                </select>
-                <div class="form-hint">${this.whisperDownloading ? 'Downloading model...' : 'Downloaded automatically on first use'}</div>
-            </div>
+            </details>
 
-            ${this._renderStartButton()}
-            ${this._renderDivider()}
+            <details class="config-section">
+                <summary class="config-summary">
+                    <span class="config-summary-text">
+                        <span class="config-summary-title">Transcription</span>
+                        <span class="config-summary-description">Whisper speech-to-text model</span>
+                    </span>
+                    ${this._renderConfigChevron()}
+                </summary>
+                <div class="config-content">
+                    <div class="form-group">
+                        <div class="whisper-label-row">
+                            <label class="form-label">Whisper Model</label>
+                            ${this.whisperDownloading ? html`<div class="whisper-spinner"></div>` : ''}
+                        </div>
+                        <select .value=${this._whisperModel} @change=${e => this._saveWhisperModel(e.target.value)}>
+                            <option value="tiny.en" ?selected=${this._whisperModel === 'tiny.en'}>Tiny English (75 MB, fastest)</option>
+                            <option value="base.en" ?selected=${this._whisperModel === 'base.en'}>Base English (142 MB)</option>
+                            <option value="small.en" ?selected=${this._whisperModel === 'small.en'}>Small English (466 MB, most accurate)</option>
+                        </select>
+                        <div class="form-hint">${this.whisperDownloading ? 'Downloading model...' : 'Downloaded automatically on first use'}</div>
+                    </div>
+                </div>
+            </details>
+
+            ${this._renderStartButton()} ${this._renderDivider()}
 
             <!-- Cloud promo intentionally removed from the active UI. -->
 
@@ -915,83 +1319,100 @@ export class MainView extends LitElement {
     // ── Main render ──
 
     render() {
-        const helpIcon = html`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0-18 0m9 5v.01" /><path d="M12 13.5a1.5 1.5 0 0 1 1-1.5a2.6 2.6 0 1 0-3-4" /></g></svg>`;
-        const closeIcon = html`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 6L6 18M6 6l12 12" /></svg>`;
+        const helpIcon = html`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+            <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
+                <path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0-18 0m9 5v.01" />
+                <path d="M12 13.5a1.5 1.5 0 0 1 1-1.5a2.6 2.6 0 1 0-3-4" />
+            </g>
+        </svg>`;
+        const closeIcon = html`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+            <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 6L6 18M6 6l12 12" />
+        </svg>`;
 
         return html`
             <div class="form-wrapper">
-                ${this._mode === 'local' ? html`
-                    <div class="title-row">
-                        <div class="page-title">Cheating Daddy <span class="mode-suffix">Local AI</span></div>
-                        <button class="help-btn" @click=${() => { this._showLocalHelp = !this._showLocalHelp; }}>${this._showLocalHelp ? closeIcon : helpIcon}</button>
-                    </div>
-                ` : html`
-                    <div class="page-title">
-                        ${html`Cheating Daddy <span class="mode-suffix">BYOK</span>`}
-                    </div>
-                `}
-                <div class="page-subtitle">
-                    ${this._mode === 'byok' ? 'Bring your own API keys' : 'Run models locally on your machine'}
-                </div>
+                ${
+                    this._mode === 'local'
+                        ? html`
+                              <div class="title-row">
+                                  <div class="page-title">Cheating Daddy <span class="mode-suffix">Local AI</span></div>
+                                  <button class="help-btn" @click=${this._openLocalHelp} aria-label="Open Local AI help">${helpIcon}</button>
+                              </div>
+                          `
+                        : html` <div class="page-title">${html`Cheating Daddy <span class="mode-suffix">BYOK</span>`}</div> `
+                }
+                <div class="page-subtitle">${this._mode === 'byok' ? 'Bring your own API keys' : 'Run models locally on your machine'}</div>
 
                 <!-- Cloud mode render branch intentionally disabled. -->
-                ${this._mode === 'byok' ? this._renderByokMode() : ''}
-                ${this._mode === 'local' ? (this._showLocalHelp ? this._renderLocalHelp() : this._renderLocalMode()) : ''}
+                ${this._mode === 'byok' ? this._renderByokMode() : ''} ${this._mode === 'local' ? this._renderLocalMode() : ''}
             </div>
+            ${this._mode === 'local' && this._showLocalHelp ? this._renderLocalHelp(closeIcon) : ''}
         `;
     }
 
-    _renderLocalHelp() {
+    _renderLocalHelp(closeIcon) {
         return html`
-            <div class="help-content">
-                <div class="help-section">
-                    <div class="help-section-title">What is Ollama?</div>
-                    <div class="help-section-text">Ollama lets you run large language models locally on your machine. Everything stays on your computer — no data leaves your device.</div>
-                </div>
-
-                <div class="help-section">
-                    <div class="help-section-title">Install Ollama</div>
-                    <div class="help-section-text">Download from <span class="help-link" @click=${() => this.onExternalLink('https://ollama.com/download')}>ollama.com/download</span> and install it.</div>
-                </div>
-
-                <div class="help-section">
-                    <div class="help-section-title">Ollama must be running</div>
-                    <div class="help-section-text">Ollama needs to be running before you start a session. If it's not running, open your terminal and type:</div>
-                    <code class="help-code">ollama serve</code>
-                </div>
-
-                <div class="help-section">
-                    <div class="help-section-title">Pull a model</div>
-                    <div class="help-section-text">Download a model before first use:</div>
-                    <code class="help-code">ollama pull gemma3:4b</code>
-                </div>
-
-                <div class="help-section">
-                    <div class="help-section-title">Recommended models</div>
-                    <div class="help-models">
-                        <div class="help-model"><span class="help-model-name">gemma3:4b</span><span>4B — fast, multimodal (images + text)</span></div>
-                        <div class="help-model"><span class="help-model-name">mistral-small</span><span>8B — solid all-rounder, text only</span></div>
+            <div class="help-dialog-backdrop" @click=${this._closeLocalHelp}>
+                <section class="help-dialog" role="dialog" aria-modal="true" aria-labelledby="local-help-title" @click=${this._handleHelpDialogClick}>
+                    <div class="help-dialog-header">
+                        <div id="local-help-title" class="help-dialog-title">Local AI setup</div>
+                        <button class="help-btn" @click=${this._closeLocalHelp} aria-label="Close Local AI help">${closeIcon}</button>
                     </div>
-                    <div class="help-section-text">gemma3:4b and above supports images — screenshots will work with these models.</div>
-                </div>
 
-                <div class="help-section">
-                    <div class="help-warn">Avoid "thinking" models (e.g. deepseek-r1, qwq). Local inference is already slower — a thinking model adds extra delay before responding.</div>
-                </div>
+                    <div class="help-content">
+                        <div class="help-section">
+                            <div class="help-section-title">Native local AI</div>
+                            <div class="help-section-text">
+                                Cheating Daddy runs llama.cpp and whisper.cpp directly. Everything stays on your computer — no external AI service or
+                                Ollama installation is required.
+                            </div>
+                        </div>
 
-                <div class="help-section">
-                    <div class="help-section-title">Whisper</div>
-                    <div class="help-section-text">The Whisper speech-to-text model is downloaded automatically the first time you start a session. This is a one-time download.</div>
-                </div>
+                        <div class="help-section">
+                            <div class="help-section-title">Automatic setup</div>
+                            <div class="help-section-text">
+                                The correct native runners, selected Whisper model, and language model are downloaded and checksum-verified on first
+                                use. They are stored in the Cheating Daddy config directory.
+                            </div>
+                        </div>
 
-                <hr class="help-divider" />
+                        <div class="help-section">
+                            <div class="help-section-title">Default model</div>
+                            <div class="help-models">
+                                <div class="help-model">
+                                    <span class="help-model-name">Qwen3.5 4B Q4_K_M</span><span>About 2.7 GB — balanced local quality and speed</span>
+                                </div>
+                            </div>
+                        </div>
 
-                <div class="help-section">
-                    <div class="help-section-title">Computer hanging or slow?</div>
-                    <div class="help-section-text">Running models locally uses a lot of RAM and CPU. If your computer slows down or freezes, it's likely the LLM. Switch back to BYOK mode if you want to use a hosted provider instead.</div>
-                </div>
+                        <div class="help-section">
+                            <div class="help-section-title">Whisper</div>
+                            <div class="help-section-text">
+                                The selected whisper.cpp model is downloaded automatically once and kept in the config directory.
+                            </div>
+                        </div>
 
-                <button class="help-cloud-btn" @click=${() => { this._showLocalHelp = false; this._saveMode('byok'); }}>Switch to BYOK</button>
+                        <hr class="help-divider" />
+
+                        <div class="help-section">
+                            <div class="help-section-title">Computer hanging or slow?</div>
+                            <div class="help-section-text">
+                                Running models locally uses a lot of RAM and CPU. If your computer slows down or freezes, it's likely the LLM. Switch
+                                back to BYOK mode if you want to use a hosted provider instead.
+                            </div>
+                        </div>
+
+                        <button
+                            class="help-cloud-btn"
+                            @click=${() => {
+                                this._closeLocalHelp();
+                                this._saveMode('byok');
+                            }}
+                        >
+                            Switch to BYOK
+                        </button>
+                    </div>
+                </section>
             </div>
         `;
     }

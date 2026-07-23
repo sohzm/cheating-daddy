@@ -20,7 +20,7 @@ function createWindow(sendToRenderer, geminiSessionRef) {
         frame: false,
         transparent: true,
         hasShadow: false,
-        alwaysOnTop: true,
+        alwaysOnTop: process.platform === 'win32',
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false, // TODO: change to true
@@ -43,7 +43,10 @@ function createWindow(sendToRenderer, geminiSessionRef) {
     );
 
     mainWindow.setContentProtection(true);
-    mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    if (process.platform === 'win32') {
+        mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+        mainWindow.setAlwaysOnTop(true, 'screen-saver', 1);
+    }
 
     // Hide from Windows taskbar
     if (process.platform === 'win32') {
@@ -61,10 +64,6 @@ function createWindow(sendToRenderer, geminiSessionRef) {
         } catch (error) {
             console.warn('Could not hide from Mission Control:', error.message);
         }
-    }
-
-    if (process.platform === 'win32') {
-        mainWindow.setAlwaysOnTop(true, 'screen-saver', 1);
     }
 
     mainWindow.loadFile(path.join(__dirname, '../index.html'));
@@ -296,7 +295,14 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
 function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
     ipcMain.on('view-changed', (event, view) => {
         if (!mainWindow.isDestroyed()) {
-            if (view !== 'assistant') {
+            const isLiveMode = view === 'assistant';
+
+            if (process.platform !== 'win32') {
+                mainWindow.setAlwaysOnTop(isLiveMode);
+                mainWindow.setVisibleOnAllWorkspaces(isLiveMode, { visibleOnFullScreen: isLiveMode });
+            }
+
+            if (!isLiveMode) {
                 mainWindow.setIgnoreMouseEvents(false);
             }
         }
@@ -331,7 +337,6 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
             return { success: false, error: error.message };
         }
     });
-
 }
 
 module.exports = {
