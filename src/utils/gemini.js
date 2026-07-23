@@ -515,10 +515,21 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                         return;
                     }
 
-                    // Don't retry quota/billing errors — retrying just wastes more quota
+                    // Don't retry quota/billing errors — retrying just wastes more quota.
+                    // Google Live API signals quota exhaustion via:
+                    //   - e.reason containing human-readable quota/billing text
+                    //   - e.reason containing "resource_exhausted" (canonical gRPC status)
+                    //   - WebSocket close code 1011 (Internal Error), which Google uses
+                    //     specifically for rate-limit / concurrency-limit closures
                     const reason = (e.reason || '').toLowerCase();
-                    if (reason.includes('quota') || reason.includes('exceeded') || reason.includes('billing')) {
-                        console.log('Session closed due to quota/billing issue — not retrying.');
+                    const isQuotaError =
+                        reason.includes('quota') ||
+                        reason.includes('exceeded') ||
+                        reason.includes('billing') ||
+                        reason.includes('resource_exhausted') ||
+                        e.code === 1011;
+                    if (isQuotaError) {
+                        console.log('Session closed due to quota/rate-limit (code:', e.code, 'reason:', e.reason, ') — not retrying.');
                         sendToRenderer('update-status', 'Error: Quota exceeded. Check your Gemini API quota at aistudio.google.com');
                         sessionParams = null;
                         return;
