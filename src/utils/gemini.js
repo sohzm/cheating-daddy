@@ -252,8 +252,16 @@ async function sendToGroq(transcription) {
         content: transcription.trim()
     });
 
-    if (groqConversationHistory.length > 20) {
-        groqConversationHistory = groqConversationHistory.slice(-20);
+    // Trim history by character budget rather than message count.
+    // Groq's context window is ~6000 tokens (~24000 chars). Reserve space
+    // for the system prompt and keep as many recent messages as fit.
+    const GROQ_CHAR_BUDGET = 20000;
+    const systemChars = (currentSystemPrompt || '').length;
+    const availableChars = Math.max(GROQ_CHAR_BUDGET - systemChars, 4000);
+    let historyChars = groqConversationHistory.reduce((sum, msg) => sum + (msg.content || '').length, 0);
+    while (groqConversationHistory.length > 2 && historyChars > availableChars) {
+        const removed = groqConversationHistory.shift();
+        historyChars -= (removed.content || '').length;
     }
 
     try {
@@ -278,7 +286,14 @@ async function sendToGroq(transcription) {
         if (!response.ok) {
             const errorText = await response.text();
             console.error('Groq API error:', response.status, errorText);
-            sendToRenderer('update-status', `Groq error: ${response.status}`);
+            if (response.status === 413) {
+                // Request too large — clear history so next message starts fresh
+                console.warn('Groq 413: clearing conversation history to recover.');
+                groqConversationHistory = [];
+                sendToRenderer('update-status', 'Groq: context too large, cleared history. Try again.');
+            } else {
+                sendToRenderer('update-status', `Groq error: ${response.status}`);
+            }
             return;
         }
 
@@ -796,7 +811,8 @@ async function sendAudioToGemini(base64Data, geminiSessionRef) {
     }
 }
 
-async function sendImageToGeminiHttp(base64Data, prompt) {
+async function sendImageToGeminiHttp(base64Data, prompt, _retryCount = 0) {
+    const MAX_RETRIES = 3;
     // Get available model based on rate limits
     const model = getAvailableModel();
 
@@ -847,10 +863,20 @@ async function sendImageToGeminiHttp(base64Data, prompt) {
 
         return { success: true, text: fullText, model: model };
     } catch (error) {
+        // Retry on 503 (transient server overload) with exponential backoff
+        const is503 = error.message && (error.message.includes('503') || error.message.includes('UNAVAILABLE'));
+        if (is503 && _retryCount < MAX_RETRIES) {
+            const delayMs = Math.pow(2, _retryCount + 1) * 1000; // 2s, 4s, 8s
+            console.warn(`Gemini 503 — retrying in ${delayMs / 1000}s (attempt ${_retryCount + 1}/${MAX_RETRIES})...`);
+            sendToRenderer('update-status', `Model busy, retrying in ${delayMs / 1000}s...`);
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+            return sendImageToGeminiHttp(base64Data, prompt, _retryCount + 1);
+        }
         console.error('Error sending image to Gemini HTTP:', error);
         return { success: false, error: error.message };
     }
 }
+
 
 function setupGeminiIpcHandlers(geminiSessionRef) {
     // Store the geminiSessionRef globally for reconnection access
