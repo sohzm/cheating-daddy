@@ -515,7 +515,16 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                         return;
                     }
 
-                    // Attempt reconnection
+                    // Don't retry quota/billing errors — retrying just wastes more quota
+                    const reason = (e.reason || '').toLowerCase();
+                    if (reason.includes('quota') || reason.includes('exceeded') || reason.includes('billing')) {
+                        console.log('Session closed due to quota/billing issue — not retrying.');
+                        sendToRenderer('update-status', 'Error: Quota exceeded. Check your Gemini API quota at aistudio.google.com');
+                        sessionParams = null;
+                        return;
+                    }
+
+                    // Attempt reconnection for other transient errors
                     if (sessionParams && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
                         attemptReconnect();
                     } else {
