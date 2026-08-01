@@ -264,6 +264,21 @@ export class MainView extends LitElement {
             border-color: var(--danger, #ef4444);
         }
 
+        .start-error {
+            margin-bottom: 10px;
+            padding: 10px 12px;
+            border: 1px solid var(--danger, #ef4444);
+            border-radius: 6px;
+            background: rgba(239, 68, 68, 0.08);
+            color: var(--text-primary, #e0e0e0);
+            font-size: var(--font-size-xs);
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-height: 180px;
+            overflow-y: auto;
+        }
+
         select {
             cursor: pointer;
             appearance: none;
@@ -701,9 +716,11 @@ export class MainView extends LitElement {
         _geminiLiveModel: { state: true },
         _groqModel: { state: true },
         _groqImageModel: { state: true },
+        _groqTranscriptionModel: { state: true },
         _disableGroqThinking: { state: true },
         _tokenError: { state: true },
         _keyError: { state: true },
+        _startError: { state: true },
         // Local AI state
         _localLlmModel: { state: true },
         _useCustomLocalLlmModel: { state: true },
@@ -730,9 +747,11 @@ export class MainView extends LitElement {
         this._geminiLiveModel = 'gemini-3.1-flash-live-preview';
         this._groqModel = 'qwen/qwen3.6-27b';
         this._groqImageModel = 'qwen/qwen3.6-27b';
+        this._groqTranscriptionModel = 'whisper-large-v3-turbo';
         this._disableGroqThinking = true;
         this._tokenError = false;
         this._keyError = false;
+        this._startError = '';
         this._showLocalHelp = false;
         this._localLlmModel = 'unsloth/Qwen3.5-4B-GGUF:Q4_K_M';
         this._useCustomLocalLlmModel = false;
@@ -770,6 +789,7 @@ export class MainView extends LitElement {
             this._geminiLiveModel = config.geminiLiveModel || 'gemini-3.1-flash-live-preview';
             this._groqModel = config.groqModel || 'qwen/qwen3.6-27b';
             this._groqImageModel = config.groqImageModel || 'qwen/qwen3.6-27b';
+            this._groqTranscriptionModel = config.groqTranscriptionModel || 'whisper-large-v3-turbo';
             this._disableGroqThinking = config.disableGroqThinking === true;
 
             // Load local AI settings
@@ -933,33 +953,47 @@ export class MainView extends LitElement {
     }
 
     async _saveGeminiKey(val) {
-        this._geminiKey = val;
+        // Pasted keys often carry a trailing newline, which makes the provider
+        // reject the Authorization header outright.
+        this._geminiKey = val.trim();
         this._keyError = false;
-        await cheatingDaddy.storage.setApiKey(val);
+        this._startError = '';
+        await cheatingDaddy.storage.setApiKey(this._geminiKey);
         this.requestUpdate();
     }
 
     async _saveGroqKey(val) {
-        this._groqKey = val;
-        await cheatingDaddy.storage.setGroqApiKey(val);
+        this._groqKey = val.trim();
+        this._startError = '';
+        await cheatingDaddy.storage.setGroqApiKey(this._groqKey);
         this.requestUpdate();
     }
 
     async _saveGeminiLiveModel(val) {
-        this._geminiLiveModel = val;
-        await cheatingDaddy.storage.updateConfig('geminiLiveModel', val);
+        this._geminiLiveModel = val.trim();
+        this._startError = '';
+        await cheatingDaddy.storage.updateConfig('geminiLiveModel', this._geminiLiveModel);
         this.requestUpdate();
     }
 
     async _saveGroqModel(val) {
-        this._groqModel = val;
-        await cheatingDaddy.storage.updateConfig('groqModel', val);
+        this._groqModel = val.trim();
+        this._startError = '';
+        await cheatingDaddy.storage.updateConfig('groqModel', this._groqModel);
         this.requestUpdate();
     }
 
     async _saveGroqImageModel(val) {
-        this._groqImageModel = val;
-        await cheatingDaddy.storage.updateConfig('groqImageModel', val);
+        this._groqImageModel = val.trim();
+        this._startError = '';
+        await cheatingDaddy.storage.updateConfig('groqImageModel', this._groqImageModel);
+        this.requestUpdate();
+    }
+
+    async _saveGroqTranscriptionModel(val) {
+        this._groqTranscriptionModel = val.trim();
+        this._startError = '';
+        await cheatingDaddy.storage.updateConfig('groqTranscriptionModel', this._groqTranscriptionModel);
         this.requestUpdate();
     }
 
@@ -1022,8 +1056,11 @@ export class MainView extends LitElement {
     _handleStart() {
         if (this.isInitializing || this.downloadProgress.active) return;
 
+        this._startError = '';
+
         if (this._mode === 'byok') {
-            if (!this._geminiKey.trim()) {
+            // Either key on its own is a usable session.
+            if (!this._geminiKey.trim() && !this._groqKey.trim()) {
                 this._keyError = true;
                 this.requestUpdate();
                 return;
@@ -1035,6 +1072,14 @@ export class MainView extends LitElement {
         }
 
         this.onStart();
+    }
+
+    // Shown when a provider rejects the session - the exact reason from the API,
+    // not just a red outline on the key field.
+    showStartError(message) {
+        this._startError = message;
+        this._keyError = /key/i.test(message) && this._mode !== 'local';
+        this.requestUpdate();
     }
 
     triggerApiKeyError() {
@@ -1099,6 +1144,7 @@ export class MainView extends LitElement {
         </svg>`;
 
         return html`
+            ${this._startError ? html`<div class="start-error" role="alert">${this._startError}</div>` : ''}
             <button
                 class="start-button ${this.isInitializing || isDownloading ? 'disabled' : ''}"
                 ?disabled=${this.isInitializing || isDownloading}
@@ -1171,7 +1217,7 @@ export class MainView extends LitElement {
                         <label class="form-label">Gemini API Key</label>
                         <input
                             type="password"
-                            placeholder="Required"
+                            placeholder="Required unless a Groq key is set"
                             .value=${this._geminiKey}
                             @input=${e => this._saveGeminiKey(e.target.value)}
                             class=${this._keyError ? 'error' : ''}
@@ -1199,7 +1245,13 @@ export class MainView extends LitElement {
                 <div class="config-content">
                     <div class="form-group">
                         <label class="form-label">Groq API Key</label>
-                        <input type="password" placeholder="Optional" .value=${this._groqKey} @input=${e => this._saveGroqKey(e.target.value)} />
+                        <input
+                            type="password"
+                            placeholder="Optional, or use on its own"
+                            .value=${this._groqKey}
+                            @input=${e => this._saveGroqKey(e.target.value)}
+                            class=${this._keyError && !this._geminiKey.trim() ? 'error' : ''}
+                        />
                         <div class="form-hint">
                             <span class="link" @click=${() => this.onExternalLink('https://console.groq.com/keys')}>Get Groq key</span>
                         </div>
@@ -1215,6 +1267,12 @@ export class MainView extends LitElement {
                         <input type="text" .value=${this._groqImageModel} @input=${e => this._saveGroqImageModel(e.target.value)} />
                     </div>
 
+                    <div class="form-group">
+                        <label class="form-label">Groq Transcription Model</label>
+                        <input type="text" .value=${this._groqTranscriptionModel} @input=${e => this._saveGroqTranscriptionModel(e.target.value)} />
+                        <div class="form-hint">Only used when running without a Gemini key</div>
+                    </div>
+
                     <label class="config-checkbox">
                         <input
                             type="checkbox"
@@ -1228,7 +1286,8 @@ export class MainView extends LitElement {
                     </label>
 
                     <div class="config-note">
-                        If the Groq API key is empty, Gemini Live is used for answers instead. Its answer quality may be lower.
+                        Both keys: Gemini Live transcribes, Groq answers. Gemini key only: Gemini does both, and answer quality may be lower. Groq key
+                        only: Groq Whisper transcribes and Groq answers.
                     </div>
                 </div>
             </details>
