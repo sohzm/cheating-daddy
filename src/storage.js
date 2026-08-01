@@ -12,7 +12,14 @@ const DEFAULT_CONFIG = {
     geminiLiveModel: 'gemini-3.1-flash-live-preview',
     groqModel: 'qwen/qwen3.6-27b',
     groqImageModel: 'qwen/qwen3.6-27b',
+    // Used when running on a Groq key alone - Groq does its own speech-to-text
+    // instead of borrowing Gemini Live's.
+    groqTranscriptionModel: 'whisper-large-v3-turbo',
     disableGroqThinking: true,
+    // Groq counts prompt tokens + max_completion_tokens against the per-minute
+    // token budget, so a large ceiling makes every request fail with a 413 on
+    // the free tier (TPM 8000) even when the answer would have been short.
+    groqMaxCompletionTokens: 4096,
 };
 
 const DEFAULT_CREDENTIALS = {
@@ -187,14 +194,24 @@ function getCredentials() {
     return readJsonFile(getCredentialsPath(), DEFAULT_CREDENTIALS);
 }
 
+// Keys are almost always pasted, and a stray newline or space makes the
+// provider reject the whole Authorization header with a 401.
+function trimCredentialValues(credentials) {
+    const cleaned = {};
+    for (const [key, value] of Object.entries(credentials)) {
+        cleaned[key] = typeof value === 'string' ? value.trim() : value;
+    }
+    return cleaned;
+}
+
 function setCredentials(credentials) {
     const current = getCredentials();
-    const updated = { ...current, ...credentials };
+    const updated = { ...current, ...trimCredentialValues(credentials) };
     return writeJsonFile(getCredentialsPath(), updated);
 }
 
 function getApiKey() {
-    return getCredentials().apiKey || '';
+    return (getCredentials().apiKey || '').trim();
 }
 
 function setApiKey(apiKey) {
@@ -202,7 +219,7 @@ function setApiKey(apiKey) {
 }
 
 function getGroqApiKey() {
-    return getCredentials().groqApiKey || '';
+    return (getCredentials().groqApiKey || '').trim();
 }
 
 function setGroqApiKey(groqApiKey) {
@@ -348,10 +365,17 @@ function incrementCharUsage(provider, model, charCount) {
     const today = getTodayDateString();
     const todayEntry = limits.data.find(entry => entry.date === today);
 
-    if (todayEntry[provider] && todayEntry[provider][model]) {
-        todayEntry[provider][model].chars += charCount;
-        setLimits(limits);
+    // Track any model the user configures, not only the ones seeded above -
+    // otherwise usage for a custom model silently goes nowhere.
+    if (!todayEntry[provider]) {
+        todayEntry[provider] = {};
     }
+    if (!todayEntry[provider][model]) {
+        todayEntry[provider][model] = { chars: 0 };
+    }
+
+    todayEntry[provider][model].chars += charCount;
+    setLimits(limits);
 
     return todayEntry;
 }

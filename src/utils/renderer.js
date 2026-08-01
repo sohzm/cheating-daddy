@@ -142,15 +142,45 @@ function arrayBufferToBase64(buffer) {
 
 async function initializeGemini(profile = 'interview', language = 'en-US') {
     const apiKey = await storage.getApiKey();
-    if (apiKey) {
-        const prefs = await storage.getPreferences();
-        const success = await ipcRenderer.invoke('initialize-gemini', apiKey, prefs.customPrompt || '', profile, language);
-        if (success) {
-            cheatingDaddy.setStatus('Live');
-        } else {
-            cheatingDaddy.setStatus('error');
-        }
+    if (!apiKey) {
+        cheatingDaddy.setStatus('No Gemini API key set');
+        return { success: false, error: 'No Gemini API key set. Add one in Home → Gemini API key.' };
     }
+
+    const prefs = await storage.getPreferences();
+    const result = await ipcRenderer.invoke('initialize-gemini', apiKey, prefs.customPrompt || '', profile, language);
+
+    // The handler used to return a bare boolean; keep tolerating that shape.
+    const success = result === true || result?.success === true;
+    if (success) {
+        cheatingDaddy.setStatus(result?.warning ? 'Live (Groq unavailable)' : 'Live');
+        return { success: true, warning: result?.warning };
+    }
+
+    const error = result?.error || 'Could not start the Gemini session';
+    cheatingDaddy.setStatus(error);
+    return { success: false, error };
+}
+
+// Groq key but no Gemini key: Groq Whisper listens and the Groq chat model answers.
+async function initializeGroqOnly(profile = 'interview') {
+    const groqKey = await storage.getGroqApiKey();
+    if (!groqKey) {
+        cheatingDaddy.setStatus('No Groq API key set');
+        return { success: false, error: 'No Groq API key set. Add one in Home → Groq API key.' };
+    }
+
+    const prefs = await storage.getPreferences();
+    const result = await ipcRenderer.invoke('initialize-groq', profile, prefs.customPrompt || '');
+
+    if (result?.success) {
+        cheatingDaddy.setStatus('Live (Groq)');
+        return { success: true };
+    }
+
+    const error = result?.error || 'Could not start the Groq session';
+    cheatingDaddy.setStatus(error);
+    return { success: false, error };
 }
 
 async function initializeLocal(profile = 'interview') {
@@ -1086,6 +1116,7 @@ const cheatingDaddy = {
 
     // Core functionality
     initializeGemini,
+    initializeGroqOnly,
     initializeCloud,
     initializeLocal,
     cancelLocalInitialization,

@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { getSystemPrompt } = require('./prompts');
 const { sendToRenderer, initializeNewSession, saveConversationTurn } = require('./gemini');
+const { createSpeechDetector, createWavBuffer } = require('./audioPipeline');
 const {
     ensureNativeBinary,
     ensureLlamaModel,
@@ -24,110 +25,24 @@ let isLocalActive = false;
 let initializationController = null;
 let llamaCacheSnapshot = new Set();
 
-let isSpeaking = false;
-let speechBuffers = [];
-let silenceFrameCount = 0;
-let speechFrameCount = 0;
+let speechDetector = null;
 
-const VAD_MODES = {
-    NORMAL: { energyThreshold: 0.01, speechFramesRequired: 3, silenceFramesRequired: 30 },
-    LOW_BITRATE: { energyThreshold: 0.008, speechFramesRequired: 4, silenceFramesRequired: 35 },
-    AGGRESSIVE: { energyThreshold: 0.015, speechFramesRequired: 2, silenceFramesRequired: 20 },
-    VERY_AGGRESSIVE: { energyThreshold: 0.02, speechFramesRequired: 2, silenceFramesRequired: 15 },
-};
+function ensureSpeechDetector() {
+    if (speechDetector) return speechDetector;
 
-let vadConfig = VAD_MODES.VERY_AGGRESSIVE;
-let resampleRemainder = Buffer.alloc(0);
-
-function resample24kTo16k(inputBuffer) {
-    const combined = Buffer.concat([resampleRemainder, inputBuffer]);
-    const inputSamples = Math.floor(combined.length / 2);
-    const outputSamples = Math.floor((inputSamples * 2) / 3);
-    const outputBuffer = Buffer.alloc(outputSamples * 2);
-
-    for (let i = 0; i < outputSamples; i++) {
-        const sourcePosition = (i * 3) / 2;
-        const sourceIndex = Math.floor(sourcePosition);
-        const fraction = sourcePosition - sourceIndex;
-        const firstSample = combined.readInt16LE(sourceIndex * 2);
-        const secondSample = sourceIndex + 1 < inputSamples ? combined.readInt16LE((sourceIndex + 1) * 2) : firstSample;
-        const interpolated = Math.round(firstSample + fraction * (secondSample - firstSample));
-        outputBuffer.writeInt16LE(Math.max(-32768, Math.min(32767, interpolated)), i * 2);
-    }
-
-    const consumedInputSamples = Math.ceil((outputSamples * 3) / 2);
-    const remainderStart = consumedInputSamples * 2;
-    resampleRemainder = remainderStart < combined.length ? combined.slice(remainderStart) : Buffer.alloc(0);
-
-    return outputBuffer;
-}
-
-function calculateRms(pcm16Buffer) {
-    const samples = pcm16Buffer.length / 2;
-    if (samples === 0) return 0;
-
-    let sumSquares = 0;
-    for (let i = 0; i < samples; i++) {
-        const sample = pcm16Buffer.readInt16LE(i * 2) / 32768;
-        sumSquares += sample * sample;
-    }
-
-    return Math.sqrt(sumSquares / samples);
-}
-
-function processVad(pcm16kBuffer) {
-    const rms = calculateRms(pcm16kBuffer);
-    const isVoice = rms > vadConfig.energyThreshold;
-
-    if (isVoice) {
-        speechFrameCount += 1;
-        silenceFrameCount = 0;
-
-        if (!isSpeaking && speechFrameCount >= vadConfig.speechFramesRequired) {
-            isSpeaking = true;
-            speechBuffers = [];
+    speechDetector = createSpeechDetector({
+        onSpeechStart: rms => {
             console.log('[LocalAI] Speech started (RMS:', rms.toFixed(4), ')');
             sendToRenderer('update-status', 'Listening... (speech detected)');
-        }
-    } else {
-        silenceFrameCount += 1;
-        speechFrameCount = 0;
-
-        if (isSpeaking && silenceFrameCount >= vadConfig.silenceFramesRequired) {
-            isSpeaking = false;
-            const audioData = Buffer.concat(speechBuffers);
-            speechBuffers = [];
+        },
+        onSpeechEnd: audioData => {
             console.log('[LocalAI] Speech ended, accumulated', audioData.length, 'bytes');
             sendToRenderer('update-status', 'Transcribing...');
             handleSpeechEnd(audioData);
-            return;
-        }
-    }
+        },
+    });
 
-    if (isSpeaking) {
-        speechBuffers.push(Buffer.from(pcm16kBuffer));
-    }
-}
-
-function createWavBuffer(pcm16Buffer) {
-    const header = Buffer.alloc(44);
-    const byteRate = 16000 * 2;
-
-    header.write('RIFF', 0);
-    header.writeUInt32LE(36 + pcm16Buffer.length, 4);
-    header.write('WAVE', 8);
-    header.write('fmt ', 12);
-    header.writeUInt32LE(16, 16);
-    header.writeUInt16LE(1, 20);
-    header.writeUInt16LE(1, 22);
-    header.writeUInt32LE(16000, 24);
-    header.writeUInt32LE(byteRate, 28);
-    header.writeUInt16LE(2, 32);
-    header.writeUInt16LE(16, 34);
-    header.write('data', 36);
-    header.writeUInt32LE(pcm16Buffer.length, 40);
-
-    return Buffer.concat([header, pcm16Buffer]);
+    return speechDetector;
 }
 
 async function transcribeAudio(pcm16kBuffer) {
@@ -444,11 +359,7 @@ async function initializeLocalSession(model, whisperModel, profile, customPrompt
         sendDownloadProgress('Loading language model');
         await startLlamaServer(nativeFiles.llamaBinaryPath, nativeFiles.llamaModelPath, nativeFiles.projectorPath);
 
-        isSpeaking = false;
-        speechBuffers = [];
-        silenceFrameCount = 0;
-        speechFrameCount = 0;
-        resampleRemainder = Buffer.alloc(0);
+        speechDetector = null;
         localConversationHistory = [];
 
         initializeNewSession(profile, customPrompt);
@@ -480,10 +391,7 @@ async function initializeLocalSession(model, whisperModel, profile, customPrompt
 function processLocalAudio(monoChunk24k) {
     if (!isLocalActive) return;
 
-    const pcm16k = resample24kTo16k(monoChunk24k);
-    if (pcm16k.length > 0) {
-        processVad(pcm16k);
-    }
+    ensureSpeechDetector().process(monoChunk24k);
 }
 
 function closeLocalSession() {
@@ -497,11 +405,7 @@ function closeLocalSession() {
     llamaBaseUrl = null;
     whisperBaseUrl = null;
     llamaModel = null;
-    isSpeaking = false;
-    speechBuffers = [];
-    silenceFrameCount = 0;
-    speechFrameCount = 0;
-    resampleRemainder = Buffer.alloc(0);
+    speechDetector = null;
     localConversationHistory = [];
     currentSystemPrompt = null;
 }

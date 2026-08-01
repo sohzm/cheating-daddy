@@ -627,8 +627,10 @@ export class CheatingDaddyApp extends LitElement {
                 return;
             }
         } else {
-            const apiKey = await cheatingDaddy.storage.getApiKey();
-            if (!apiKey || apiKey === '') {
+            const apiKey = (await cheatingDaddy.storage.getApiKey()) || '';
+            const groqKey = (await cheatingDaddy.storage.getGroqApiKey()) || '';
+
+            if (apiKey.trim() === '' && groqKey.trim() === '') {
                 const mainView = this.shadowRoot.querySelector('main-view');
                 if (mainView && mainView.triggerApiKeyError) {
                     mainView.triggerApiKeyError();
@@ -636,7 +638,32 @@ export class CheatingDaddyApp extends LitElement {
                 return;
             }
 
-            await cheatingDaddy.initializeGemini(this.selectedProfile, this.selectedLanguage);
+            // Either key alone is enough: Gemini transcribes and can answer on
+            // its own, and Groq can transcribe via Whisper and answer on its own.
+            // With both, Gemini listens and Groq answers.
+            // Stay on this screen when the provider rejects us, instead of
+            // dropping into an assistant view that can never answer.
+            const result =
+                apiKey.trim() === ''
+                    ? await cheatingDaddy.initializeGroqOnly(this.selectedProfile)
+                    : await cheatingDaddy.initializeGemini(this.selectedProfile, this.selectedLanguage);
+            if (!result?.success) {
+                let message = result?.error || 'Could not start the session';
+
+                // A leftover placeholder in the Gemini field blocks the Groq-only
+                // path, since a non-empty key means "use Gemini".
+                if (apiKey.trim() !== '' && groqKey.trim() !== '') {
+                    message += '\n\nClear the Gemini API key to run on Groq alone.';
+                }
+
+                const mainView = this.shadowRoot.querySelector('main-view');
+                if (mainView && mainView.showStartError) {
+                    mainView.showStartError(message);
+                } else if (mainView && mainView.triggerApiKeyError) {
+                    mainView.triggerApiKeyError();
+                }
+                return;
+            }
         }
 
         cheatingDaddy.startCapture(this.selectedScreenshotInterval, this.selectedImageQuality);
