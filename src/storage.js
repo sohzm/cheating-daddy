@@ -9,7 +9,7 @@ const DEFAULT_CONFIG = {
     configVersion: CONFIG_VERSION,
     onboarded: false,
     layout: 'normal',
-    geminiLiveModel: 'gemini-3.1-flash-live-preview',
+    geminiLiveModel: 'gemini-3.1-flash-live',
     groqModel: 'qwen/qwen3.6-27b',
     groqImageModel: 'qwen/qwen3.6-27b',
     disableGroqThinking: true,
@@ -164,9 +164,40 @@ function initializeStorage() {
 
 // ============ CONFIG ============
 
+function normalizeGeminiModel(model, kind = 'image') {
+    if (!model || typeof model !== 'string') {
+        return kind === 'live' ? 'gemini-3.1-flash-live' : 'gemini-3.6-flash';
+    }
+
+    const value = model.trim();
+    if (kind === 'live') {
+        if (value === 'gemini-3.1-flash-live-preview' || value === 'gemini-3.1-flash-live' || value === 'gemini-3.1-flash') {
+            return 'gemini-3.1-flash-live';
+        }
+        if (value.includes('2.5')) {
+            return 'gemini-3.1-flash-live';
+        }
+        return value;
+    }
+
+    const imageMap = {
+        'gemini-3-1-flash': 'gemini-3.6-flash',
+        'gemini-3.1-flash': 'gemini-3.6-flash',
+        'gemini-3.1-flash-preview': 'gemini-3.6-flash',
+        'gemini-2.5-flash': 'gemini-3.6-flash',
+        'gemini-2.5-pro': 'gemini-3.1-pro',
+        'gemini-3-1-flash-lite': 'gemini-3.5-flash-lite',
+        'gemini-3.1-flash-lite': 'gemini-3.5-flash-lite',
+    };
+
+    return imageMap[value] || value || 'gemini-3.6-flash';
+}
+
 function getConfig() {
     const saved = readJsonFile(getConfigPath(), {});
-    return { ...DEFAULT_CONFIG, ...saved };
+    const config = { ...DEFAULT_CONFIG, ...saved };
+    config.geminiLiveModel = normalizeGeminiModel(config.geminiLiveModel, 'live');
+    return config;
 }
 
 function setConfig(config) {
@@ -331,9 +362,9 @@ function incrementLimitCount(model) {
     }
 
     // Increment the appropriate model count
-    if (model === 'gemini-2.5-flash') {
+    if (model === 'gemini-3.6-flash' || model === 'gemini-3.1-pro' || model === 'gemini-3.1-flash' || model === 'gemini-3.1-flash-live') {
         todayEntry.flash.count++;
-    } else if (model === 'gemini-2.5-flash-lite') {
+    } else if (model === 'gemini-3.5-flash-lite' || model === 'gemini-3.1-flash-lite') {
         todayEntry.flashLite.count++;
     }
 
@@ -362,12 +393,12 @@ function getAvailableModel() {
     // RPD limits: flash = 20, flash-lite = 20
     // After both exhausted, fall back to flash (for paid API users)
     if (todayLimits.flash.count < 20) {
-        return 'gemini-2.5-flash';
+        return 'gemini-3.6-flash';
     } else if (todayLimits.flashLite.count < 20) {
-        return 'gemini-2.5-flash-lite';
+        return 'gemini-3.5-flash-lite';
     }
 
-    return 'gemini-2.5-flash'; // Default to flash for paid API users
+    return 'gemini-3.6-flash'; // Default to flash for paid API users
 }
 
 function getModelForToday() {

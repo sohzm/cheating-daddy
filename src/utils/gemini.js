@@ -41,6 +41,21 @@ function formatSpeakerResults(results) {
     return text;
 }
 
+function extractLiveTextResponse(message) {
+    const parts = message?.serverContent?.modelTurn?.parts || [];
+    const combinedText = parts
+        .filter(part => typeof part?.text === 'string' && part.text.trim())
+        .map(part => part.text)
+        .join('')
+        .trim();
+
+    if (combinedText) {
+        return combinedText;
+    }
+
+    return message?.serverContent?.outputTranscription?.text?.trim() || '';
+}
+
 module.exports.formatSpeakerResults = formatSpeakerResults;
 
 // Audio capture variables
@@ -687,10 +702,13 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                         sendFinalTranscriptionToGroq();
                     }
 
-                    if (!hasGroqKey() && message.serverContent?.outputTranscription?.text) {
-                        const isFirstChunk = messageBuffer === '';
-                        messageBuffer += message.serverContent.outputTranscription.text;
-                        sendToRenderer(isFirstChunk ? 'new-response' : 'update-response', messageBuffer);
+                    if (!hasGroqKey()) {
+                        const liveText = extractLiveTextResponse(message);
+                        if (liveText) {
+                            const isFirstChunk = messageBuffer === '';
+                            messageBuffer += liveText;
+                            sendToRenderer(isFirstChunk ? 'new-response' : 'update-response', messageBuffer);
+                        }
                     }
 
                     if (message.serverContent?.generationComplete) {
@@ -741,7 +759,7 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                 },
             },
             config: {
-                responseModalities: [Modality.AUDIO],
+                responseModalities: [Modality.TEXT, Modality.AUDIO],
                 proactivity: { proactiveAudio: true },
                 outputAudioTranscription: {},
                 tools: enabledTools,
