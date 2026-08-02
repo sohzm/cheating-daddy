@@ -706,6 +706,9 @@ export class CheatingDaddyApp extends LitElement {
         if (!result.success) {
             this.setStatus('Error sending message: ' + result.error);
         } else {
+            if (result.text && typeof result.text === 'string' && result.text.trim()) {
+                this.addNewResponse(result.text.trim());
+            }
             this.setStatus('Message sent...');
             this._awaitingNewResponse = true;
         }

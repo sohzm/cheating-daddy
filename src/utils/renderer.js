@@ -719,6 +719,9 @@ async function sendTextMessage(text) {
         const result = await ipcRenderer.invoke('send-text-message', text);
         if (result.success) {
             console.log('Text message sent successfully');
+            if (result.text && typeof result.text === 'string' && result.text.trim()) {
+                cheatingDaddy.addNewResponse(result.text.trim());
+            }
         } else {
             console.error('Failed to send text message:', result.error);
         }

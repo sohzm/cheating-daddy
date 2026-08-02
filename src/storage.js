@@ -9,7 +9,7 @@ const DEFAULT_CONFIG = {
     configVersion: CONFIG_VERSION,
     onboarded: false,
     layout: 'normal',
-    geminiLiveModel: 'gemini-3.1-flash-live',
+    geminiLiveModel: 'gemini-3.6-flash',
     groqModel: 'qwen/qwen3.6-27b',
     groqImageModel: 'qwen/qwen3.6-27b',
     disableGroqThinking: true,
@@ -166,17 +166,26 @@ function initializeStorage() {
 
 function normalizeGeminiModel(model, kind = 'image') {
     if (!model || typeof model !== 'string') {
-        return kind === 'live' ? 'gemini-3.1-flash-live' : 'gemini-3.6-flash';
+        return kind === 'live' ? 'gemini-3.6-flash' : 'gemini-3.6-flash';
     }
 
     const value = model.trim();
     if (kind === 'live') {
-        if (value === 'gemini-3.1-flash-live-preview' || value === 'gemini-3.1-flash-live' || value === 'gemini-3.1-flash') {
-            return 'gemini-3.1-flash-live';
+        const liveAliases = [
+            'gemini-3.1-flash-live-preview',
+            'gemini-3.1-flash-live',
+            'gemini-3.1-flash',
+            'gemini-2.5-flash-live-preview',
+            'gemini-2.5-flash-live',
+            'gemini-2.5-flash',
+            'gemini-2.0-flash-exp',
+            'gemini-2.0-flash',
+        ];
+
+        if (liveAliases.includes(value) || value.includes('preview') || value.includes('2.5') || value.includes('2.0')) {
+            return 'gemini-3.6-flash';
         }
-        if (value.includes('2.5')) {
-            return 'gemini-3.1-flash-live';
-        }
+
         return value;
     }
 

@@ -62,6 +62,7 @@ module.exports.formatSpeakerResults = formatSpeakerResults;
 let systemAudioProc = null;
 let messageBuffer = '';
 let groqRequestStartedForTurn = false;
+let liveTextFallbackTriggered = false;
 
 const GROQ_MAX_COMPLETION_TOKENS = 16384;
 const GROQ_EMPTY_RESPONSE_MESSAGE =
@@ -99,6 +100,7 @@ function initializeNewSession(profile = null, customPrompt = null) {
     startTransportLog(currentSessionId);
     currentTranscription = '';
     groqRequestStartedForTurn = false;
+    liveTextFallbackTriggered = false;
     conversationHistory = [];
     screenAnalysisHistory = [];
     groqConversationHistory = [];
@@ -661,8 +663,12 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
     const client = new GoogleGenAI({
         vertexai: false,
         apiKey: apiKey,
-        httpOptions: { apiVersion: 'v1alpha' },
+        httpOptions: { apiVersion: 'v1beta' },
     });
+
+    const config = getConfig();
+    const liveModel = config.geminiLiveModel || 'gemini-3.1-flash-live';
+    console.log('Initializing Gemini live session with model:', liveModel);
 
     // Get enabled tools first to determine Google Search status
     const enabledTools = await getEnabledTools();
@@ -678,7 +684,7 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
 
     try {
         const session = await client.live.connect({
-            model: getConfig().geminiLiveModel,
+            model: liveModel,
             callbacks: {
                 onopen: function () {
                     logTransportEvent('gemini.live.opened', {});
@@ -699,6 +705,7 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                     }
 
                     if (message.serverContent?.inputTranscription) {
+                        liveTextFallbackTriggered = false;
                         sendFinalTranscriptionToGroq();
                     }
 
@@ -722,6 +729,13 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                     }
 
                     if (message.serverContent?.turnComplete) {
+                        if (currentTranscription.trim() !== '' && messageBuffer.trim() === '' && !liveTextFallbackTriggered) {
+                            liveTextFallbackTriggered = true;
+                            sendTextToGeminiHttp(currentTranscription.trim()).catch(error => {
+                                console.error('Fallback text response failed:', error);
+                            });
+                        }
+
                         currentTranscription = '';
                         messageBuffer = '';
                         groqRequestStartedForTurn = false;
@@ -760,7 +774,6 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
             },
             config: {
                 responseModalities: [Modality.TEXT, Modality.AUDIO],
-                proactivity: { proactiveAudio: true },
                 outputAudioTranscription: {},
                 tools: enabledTools,
                 // Enable speaker diarization
@@ -1011,9 +1024,71 @@ async function sendAudioToGemini(base64Data, geminiSessionRef) {
     }
 }
 
+async function sendTextToGeminiHttp(text) {
+    const apiKey = getApiKey();
+    if (!apiKey) {
+        return { success: false, error: 'No API key configured' };
+    }
+
+    const prompt = currentSystemPrompt ? `${currentSystemPrompt}\n\nUser: ${text}` : text;
+    const candidateModels = [getAvailableModel(), 'gemini-3.6-flash'];
+
+    try {
+        const ai = new GoogleGenAI({ apiKey: apiKey });
+        sendToRenderer('update-status', 'Thinking...');
+
+        sendToRenderer('new-response', '');
+
+        let response;
+        let model = candidateModels[0];
+        let lastError = null;
+
+        for (const candidate of candidateModels) {
+            try {
+                model = candidate;
+                console.log(`Sending text to Gemini (${model})...`);
+                response = await ai.models.generateContentStream({
+                    model,
+                    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                });
+                break;
+            } catch (error) {
+                lastError = error;
+                console.warn(`Gemini text model ${candidate} failed:`, error.message);
+            }
+        }
+
+        if (!response) {
+            throw lastError || new Error('No Gemini response received');
+        }
+
+        let fullText = '';
+        let isFirst = true;
+        for await (const chunk of response) {
+            const chunkText = chunk.text;
+            if (chunkText) {
+                fullText += chunkText;
+                sendToRenderer(isFirst ? 'new-response' : 'update-response', fullText);
+                isFirst = false;
+            }
+        }
+
+        const cleanedText = fullText.trim();
+        if (cleanedText) {
+            saveConversationTurn(text, cleanedText);
+        }
+
+        sendToRenderer('update-status', 'Listening...');
+        return { success: true, text: cleanedText, model };
+    } catch (error) {
+        console.error('Error sending text to Gemini HTTP:', error);
+        return { success: false, error: error.message };
+    }
+}
+
 async function sendImageToGeminiHttp(base64Data, prompt) {
     // Get available model based on rate limits
-    const model = getAvailableModel();
+    const candidateModels = [getAvailableModel(), 'gemini-3.6-flash'];
 
     const apiKey = getApiKey();
     if (!apiKey) {
@@ -1033,11 +1108,28 @@ async function sendImageToGeminiHttp(base64Data, prompt) {
             { text: prompt },
         ];
 
-        console.log(`Sending image to ${model} (streaming)...`);
-        const response = await ai.models.generateContentStream({
-            model: model,
-            contents: contents,
-        });
+        let response;
+        let model = candidateModels[0];
+        let lastError = null;
+
+        for (const candidate of candidateModels) {
+            try {
+                model = candidate;
+                console.log(`Sending image to ${model} (streaming)...`);
+                response = await ai.models.generateContentStream({
+                    model,
+                    contents,
+                });
+                break;
+            } catch (error) {
+                lastError = error;
+                console.warn(`Gemini image model ${candidate} failed:`, error.message);
+            }
+        }
+
+        if (!response) {
+            throw lastError || new Error('No Gemini image response received');
+        }
 
         // Increment count after successful call
         incrementLimitCount(model);
@@ -1249,16 +1341,26 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
             }
         }
 
-        if (!geminiSessionRef.current) return { success: false, error: 'No active Gemini session' };
-
         try {
             console.log('Sending text message:', text);
 
             if (hasGroqKey()) {
                 groqRequestStartedForTurn = true;
                 sendToGroq(text.trim());
+                return { success: true };
             }
 
+            const geminiResult = await sendTextToGeminiHttp(text.trim());
+            if (geminiResult.success) {
+                return geminiResult;
+            }
+
+            if (!geminiSessionRef.current) {
+                return { success: false, error: geminiResult.error || 'No active Gemini session' };
+            }
+
+            // Fall back to the live session only if the HTTP path fails
+            sendToRenderer('new-response', '');
             await geminiSessionRef.current.sendRealtimeInput({ text: text.trim() });
             return { success: true };
         } catch (error) {
