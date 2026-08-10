@@ -39,6 +39,10 @@
         "@electron-forge/plugin-fuses": "^7.8.1",
         "@electron/fuses": "^1.8.0",
         "@reforged/maker-appimage": "^5.0.0",
-        "electron": "^30.0.5"
+        "electron": "^30.5.1"
+    },
+    "allowScripts": {
+        "electron@30.5.1": true,
+        "electron-winstaller@5.4.0": true
     }
 }

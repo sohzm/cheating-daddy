@@ -701,6 +701,7 @@ export class MainView extends LitElement {
         _geminiLiveModel: { state: true },
         _groqModel: { state: true },
         _groqImageModel: { state: true },
+        _groqBaseUrl: { state: true },
         _disableGroqThinking: { state: true },
         _tokenError: { state: true },
         _keyError: { state: true },
@@ -730,6 +731,7 @@ export class MainView extends LitElement {
         this._geminiLiveModel = 'gemini-3.1-flash-live-preview';
         this._groqModel = 'qwen/qwen3.6-27b';
         this._groqImageModel = 'qwen/qwen3.6-27b';
+        this._groqBaseUrl = 'https://api.groq.com/openai/v1';
         this._disableGroqThinking = true;
         this._tokenError = false;
         this._keyError = false;
@@ -770,6 +772,7 @@ export class MainView extends LitElement {
             this._geminiLiveModel = config.geminiLiveModel || 'gemini-3.1-flash-live-preview';
             this._groqModel = config.groqModel || 'qwen/qwen3.6-27b';
             this._groqImageModel = config.groqImageModel || 'qwen/qwen3.6-27b';
+            this._groqBaseUrl = config.groqBaseUrl || 'https://api.groq.com/openai/v1';
             this._disableGroqThinking = config.disableGroqThinking === true;
 
             // Load local AI settings
@@ -963,6 +966,12 @@ export class MainView extends LitElement {
         this.requestUpdate();
     }
 
+    async _saveGroqBaseUrl(val) {
+        this._groqBaseUrl = val;
+        await cheatingDaddy.storage.updateConfig('groqBaseUrl', val);
+        this.requestUpdate();
+    }
+
     async _saveDisableGroqThinking(disabled) {
         this._disableGroqThinking = disabled;
         await cheatingDaddy.storage.updateConfig('disableGroqThinking', disabled);
@@ -1032,6 +1041,12 @@ export class MainView extends LitElement {
             if (!this._localLlmModel.trim()) {
                 return;
             }
+        } else if (this._mode === 'remote') {
+            if (!this._groqKey.trim()) {
+                this._keyError = true;
+                this.requestUpdate();
+                return;
+            }
         }
 
         this.onStart();
@@ -1051,7 +1066,7 @@ export class MainView extends LitElement {
 
     _renderStartButton() {
         const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-        const isDownloading = this._mode === 'local' && this.downloadProgress.active;
+        const isDownloading = (this._mode === 'local' || this._mode === 'remote') && this.downloadProgress.active;
         const percentage = this.downloadProgress.percentage;
         const hasPercentage = Number.isFinite(percentage);
 
@@ -1215,6 +1230,12 @@ export class MainView extends LitElement {
                         <input type="text" .value=${this._groqImageModel} @input=${e => this._saveGroqImageModel(e.target.value)} />
                     </div>
 
+                    <div class="form-group">
+                        <label class="form-label">API Base URL</label>
+                        <input type="text" .value=${this._groqBaseUrl} @input=${e => this._saveGroqBaseUrl(e.target.value)} />
+                        <div class="form-hint">OpenAI-compatible endpoint. Leave as-is to use Groq; set a custom URL to use another provider.</div>
+                    </div>
+
                     <label class="config-checkbox">
                         <input
                             type="checkbox"
@@ -1239,6 +1260,7 @@ export class MainView extends LitElement {
 
             <div class="mode-links">
                 <button class="mode-link" @click=${() => this._saveMode('local')}>Use local AI</button>
+                <button class="mode-link" @click=${() => this._saveMode('remote')}>Use remote/custom AI</button>
             </div>
         `;
     }
@@ -1316,6 +1338,89 @@ export class MainView extends LitElement {
         `;
     }
 
+    // ── Remote AI mode ──
+
+    _renderRemoteMode() {
+        return html`
+            <details class="config-section">
+                <summary class="config-summary">
+                    <span class="config-summary-text">
+                        <span class="config-summary-title">Transcription</span>
+                        <span class="config-summary-description">Local Whisper speech-to-text</span>
+                    </span>
+                    ${this._renderConfigChevron()}
+                </summary>
+                <div class="config-content">
+                    <div class="form-group">
+                        <label class="form-label">Whisper model</label>
+                        <select .value=${this._whisperModel} @change=${e => this._saveWhisperModel(e.target.value)}>
+                            <option value="tiny.en" ?selected=${this._whisperModel === 'tiny.en'}>Tiny English (75 MB, fastest)</option>
+                            <option value="base.en" ?selected=${this._whisperModel === 'base.en'}>Base English (142 MB)</option>
+                            <option value="small.en" ?selected=${this._whisperModel === 'small.en'}>Small English (466 MB, most accurate)</option>
+                        </select>
+                        <div class="form-hint">${this.whisperDownloading ? 'Downloading model...' : 'Downloaded automatically on first use'}</div>
+                    </div>
+                </div>
+            </details>
+
+            <details class="config-section">
+                <summary class="config-summary">
+                    <span class="config-summary-text">
+                        <span class="config-summary-title">AI response API</span>
+                        <span class="config-summary-description">OpenAI-compatible endpoint</span>
+                    </span>
+                    ${this._renderConfigChevron()}
+                </summary>
+                <div class="config-content">
+                    <div class="form-group">
+                        <label class="form-label">API Key</label>
+                        <input
+                            type="password"
+                            placeholder="Required"
+                            .value=${this._groqKey}
+                            @input=${e => this._saveGroqKey(e.target.value)}
+                            class=${this._keyError ? 'error' : ''}
+                        />
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">API Base URL</label>
+                        <input type="text" .value=${this._groqBaseUrl} @input=${e => this._saveGroqBaseUrl(e.target.value)} />
+                        <div class="form-hint">OpenAI-compatible endpoint, e.g. http://localhost:8080/v1</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Model</label>
+                        <input type="text" .value=${this._groqModel} @input=${e => this._saveGroqModel(e.target.value)} />
+                    </div>
+
+                    <label class="config-checkbox">
+                        <input
+                            type="checkbox"
+                            .checked=${this._disableGroqThinking}
+                            @change=${e => this._saveDisableGroqThinking(e.target.checked)}
+                        />
+                        <span class="config-checkbox-text">
+                            <span class="config-summary-title">Disable thinking</span>
+                            <span class="config-summary-description">Faster responses with less internal reasoning</span>
+                        </span>
+                    </label>
+
+                    <div class="config-note">
+                        Audio is transcribed locally with Whisper, then answers come from your custom OpenAI-compatible API.
+                    </div>
+                </div>
+            </details>
+
+            ${this._renderStartButton()} ${this._renderDivider()}
+
+            <div class="mode-links">
+                <button class="mode-link" @click=${() => this._saveMode('byok')}>Use own API keys</button>
+                <button class="mode-link" @click=${() => this._saveMode('local')}>Use local AI</button>
+            </div>
+        `;
+    }
+
     // ── Main render ──
 
     render() {
@@ -1339,12 +1444,17 @@ export class MainView extends LitElement {
                                   <button class="help-btn" @click=${this._openLocalHelp} aria-label="Open Local AI help">${helpIcon}</button>
                               </div>
                           `
-                        : html` <div class="page-title">${html`Cheating Daddy <span class="mode-suffix">BYOK</span>`}</div> `
+                        : this._mode === 'remote'
+                          ? html` <div class="page-title">${html`Cheating Daddy <span class="mode-suffix">Remote AI</span>`}</div> `
+                          : html` <div class="page-title">${html`Cheating Daddy <span class="mode-suffix">BYOK</span>`}</div> `
                 }
-                <div class="page-subtitle">${this._mode === 'byok' ? 'Bring your own API keys' : 'Run models locally on your machine'}</div>
+                <div class="page-subtitle">
+                    ${this._mode === 'byok' ? 'Bring your own API keys' : this._mode === 'remote' ? 'Local transcription + custom AI API' : 'Run models locally on your machine'}
+                </div>
 
                 <!-- Cloud mode render branch intentionally disabled. -->
                 ${this._mode === 'byok' ? this._renderByokMode() : ''} ${this._mode === 'local' ? this._renderLocalMode() : ''}
+                ${this._mode === 'remote' ? this._renderRemoteMode() : ''}
             </div>
             ${this._mode === 'local' && this._showLocalHelp ? this._renderLocalHelp(closeIcon) : ''}
         `;

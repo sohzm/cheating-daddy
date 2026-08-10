@@ -44,6 +44,22 @@ const BINARY_RELEASES = {
             },
         },
     },
+    linux: {
+        x64: {
+            llama: {
+                archiveUrl: 'https://github.com/ggml-org/llama.cpp/releases/download/b10333/llama-b10333-bin-ubuntu-x64.tar.gz',
+                archiveSha256: '936ce04d98abe2a977e9dd2ff92659bb96947e136acee8f2bc3e21d8eaebbf23',
+                archiveSubdirectory: 'llama-b10333',
+                binaryName: 'llama-server',
+            },
+            whisper: {
+                archiveUrl: 'https://github.com/ggml-org/whisper.cpp/releases/download/v1.9.2/whisper-bin-ubuntu-x64.tar.gz',
+                archiveSha256: '46811a3ecf584307480a220b9ef5ff81b7b22dc41577cbc274ce3afc61f753b1',
+                archiveSubdirectory: 'whisper-bin-ubuntu-x64',
+                binaryName: 'whisper-server',
+            },
+        },
+    },
 };
 
 const WHISPER_MODELS = {
@@ -99,33 +115,57 @@ async function fileMatchesChecksum(filePath, expectedSha256) {
     return actualSha256 === expectedSha256;
 }
 
+const MAX_DOWNLOAD_ATTEMPTS = 4;
+
+function isRetryableDownloadError(error, signal) {
+    if (error.name === 'AbortError' || (signal && signal.aborted)) {
+        return false;
+    }
+    const codes = ['ENOTFOUND', 'EAI_AGAIN', 'ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT', 'EPIPE', 'ENETUNREACH', 'EADDRNOTAVAIL'];
+    return codes.includes(error.code) || codes.includes(error.cause?.code);
+}
+
 async function downloadFile(url, destinationPath, onProgress, signal) {
-    const temporaryPath = `${destinationPath}.download-${process.pid}-${Date.now()}`;
-    const response = await fetch(url, { redirect: 'follow', signal });
+    let lastError;
 
-    if (!response.ok || !response.body) {
-        throw new Error(`Download failed with HTTP ${response.status}: ${url}`);
+    for (let attempt = 1; attempt <= MAX_DOWNLOAD_ATTEMPTS; attempt++) {
+        const temporaryPath = `${destinationPath}.download-${process.pid}-${Date.now()}-${attempt}`;
+
+        try {
+            const response = await fetch(url, { redirect: 'follow', signal });
+
+            if (!response.ok || !response.body) {
+                throw new Error(`Download failed with HTTP ${response.status}: ${url}`);
+            }
+
+            const expectedBytes = Number(response.headers.get('content-length')) || 0;
+            let downloadedBytes = 0;
+
+            const input = Readable.fromWeb(response.body);
+            const progressStream = new Transform({
+                transform(chunk, encoding, callback) {
+                    downloadedBytes += chunk.length;
+                    onProgress?.({ downloadedBytes, expectedBytes });
+                    callback(null, chunk);
+                },
+            });
+            await pipeline(input, progressStream, fs.createWriteStream(temporaryPath, { flags: 'wx' }));
+
+            return temporaryPath;
+        } catch (error) {
+            fs.rmSync(temporaryPath, { force: true });
+
+            if (!isRetryableDownloadError(error, signal) || attempt === MAX_DOWNLOAD_ATTEMPTS) {
+                throw error;
+            }
+
+            lastError = error;
+            console.log(`Download attempt ${attempt} failed (${error.cause?.code || error.code || error.message}), retrying...`);
+            await new Promise(resolve => setTimeout(resolve, 500 * attempt));
+        }
     }
 
-    const expectedBytes = Number(response.headers.get('content-length')) || 0;
-    let downloadedBytes = 0;
-
-    try {
-        const input = Readable.fromWeb(response.body);
-        const progressStream = new Transform({
-            transform(chunk, encoding, callback) {
-                downloadedBytes += chunk.length;
-                onProgress?.({ downloadedBytes, expectedBytes });
-                callback(null, chunk);
-            },
-        });
-        await pipeline(input, progressStream, fs.createWriteStream(temporaryPath, { flags: 'wx' }));
-
-        return temporaryPath;
-    } catch (error) {
-        fs.rmSync(temporaryPath, { force: true });
-        throw error;
-    }
+    throw lastError;
 }
 
 async function installVerifiedFile({ url, destinationPath, sha256, executable, onProgress, signal }) {
@@ -158,6 +198,11 @@ async function installVerifiedFile({ url, destinationPath, sha256, executable, o
 
 async function ensureNativeBinary(type, onProgress, signal) {
     const release = getPlatformReleases()[type];
+
+    if (release.archiveUrl) {
+        return ensureArchiveBinary(type, release, onProgress, signal);
+    }
+
     const destinationPath = path.join(getBinariesDirectory(), release.filename);
 
     return installVerifiedFile({
@@ -168,6 +213,53 @@ async function ensureNativeBinary(type, onProgress, signal) {
         onProgress,
         signal,
     });
+}
+
+async function extractTarGz(archivePath, destinationDirectory) {
+    await new Promise((resolve, reject) => {
+        const childProcess = spawn('tar', ['-xzf', archivePath, '-C', destinationDirectory], { stdio: ['ignore', 'ignore', 'pipe'] });
+        let stderr = '';
+        childProcess.stderr.on('data', data => {
+            stderr += data;
+        });
+        childProcess.on('error', reject);
+        childProcess.on('close', code => {
+            if (code === 0) {
+                resolve();
+            } else {
+                reject(new Error(`Failed to extract ${archivePath}: ${stderr || `exit code ${code}`}`));
+            }
+        });
+    });
+}
+
+async function ensureArchiveBinary(type, release, onProgress, signal) {
+    const extractionDirectory = path.join(getBinariesDirectory(), 'linux', type);
+    const archivePath = path.join(extractionDirectory, 'runner.tar.gz');
+    const binaryPath = path.join(extractionDirectory, release.archiveSubdirectory, release.binaryName);
+
+    if (!(await fileMatchesChecksum(archivePath, release.archiveSha256)) || !fs.existsSync(binaryPath)) {
+        fs.mkdirSync(extractionDirectory, { recursive: true });
+
+        const temporaryPath = await downloadFile(release.archiveUrl, archivePath, onProgress, signal);
+        const downloadedSha256 = await calculateSha256(temporaryPath);
+
+        if (downloadedSha256 !== release.archiveSha256) {
+            fs.rmSync(temporaryPath, { force: true });
+            throw new Error(`Checksum verification failed for ${release.binaryName}`);
+        }
+
+        fs.rmSync(archivePath, { force: true });
+        fs.renameSync(temporaryPath, archivePath);
+        await extractTarGz(archivePath, extractionDirectory);
+    }
+
+    if (!fs.existsSync(binaryPath)) {
+        throw new Error(`Binary not found after extraction: ${binaryPath}`);
+    }
+
+    fs.chmodSync(binaryPath, 0o755);
+    return binaryPath;
 }
 
 function normalizeWhisperModel(modelName) {
@@ -224,16 +316,42 @@ function parseHuggingFaceModelReference(modelReference) {
     };
 }
 
+async function fetchWithRetry(url, signal, maxAttempts = MAX_DOWNLOAD_ATTEMPTS) {
+    let lastError;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            const response = await fetch(url, { redirect: 'follow', signal });
+            if (response.ok || response.status < 500 || attempt === maxAttempts) {
+                return response;
+            }
+        } catch (error) {
+            lastError = error;
+            if (!isRetryableDownloadError(error, signal) || attempt === maxAttempts) {
+                throw error;
+            }
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 500 * attempt));
+    }
+
+    throw lastError;
+}
+
 async function resolveHuggingFaceGguf(modelReference, signal) {
     const { repository, quant } = parseHuggingFaceModelReference(modelReference);
     const repositoryUrl = encodePathParts(repository);
-    const response = await fetch(`https://huggingface.co/api/models/${repositoryUrl}/tree/main?recursive=true&expand=true`, { signal });
+    const response = await fetchWithRetry(`https://huggingface.co/api/models/${repositoryUrl}/tree/main?recursive=true&expand=true`, signal);
 
     if (!response.ok) {
         throw new Error(`Could not inspect Hugging Face model: HTTP ${response.status}`);
     }
 
     const files = await response.json();
+    if (!Array.isArray(files)) {
+        throw new Error(`Hugging Face returned an unexpected response for ${modelReference}`);
+    }
+
     const normalizedQuant = quant.toUpperCase();
     const matches = files.filter(file => {
         return file.type === 'file' && file.path?.toLowerCase().endsWith('.gguf') && file.path.toUpperCase().includes(normalizedQuant);
