@@ -25,7 +25,11 @@ module.exports = {
         //    teamId: 'your team id',
         // },
     },
-    rebuildConfig: {},
+    // uiohook-napi ships N-API prebuilds for every packaged platform. Rebuilding
+    // it is unnecessary and breaks on machines without a supported MSVC toolset.
+    rebuildConfig: {
+        onlyModules: [],
+    },
     makers: [
         {
             name: '@electron-forge/maker-squirrel',

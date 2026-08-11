@@ -3,7 +3,7 @@ if (require('electron-squirrel-startup')) {
 }
 
 const { app, BrowserWindow, shell, ipcMain } = require('electron');
-const { createWindow, updateGlobalShortcuts } = require('./utils/window');
+const { createWindow, updateGlobalShortcuts, stopGlobalInputHook } = require('./utils/window');
 const { setupGeminiIpcHandlers, stopMacOSAudioCapture, sendToRenderer } = require('./utils/gemini');
 const storage = require('./storage');
 
@@ -40,6 +40,7 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
     stopMacOSAudioCapture();
+    stopGlobalInputHook();
     require('./utils/localai').closeLocalSession();
 });
 
