@@ -1,5 +1,7 @@
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
 
+const katexStylesheetUrl = new URL('../../../node_modules/katex/dist/katex.min.css', import.meta.url).href;
+
 export class AssistantView extends LitElement {
     static styles = css`
         :host {
@@ -41,6 +43,26 @@ export class AssistantView extends LitElement {
             display: inline-block;
         }
 
+        .response-container .math-inline {
+            display: inline;
+        }
+
+        .response-container .math-block {
+            display: block;
+            max-width: 100%;
+            margin: 0.8em 0;
+            padding: 0.35em 0;
+            overflow-x: auto;
+            overflow-y: hidden;
+            text-align: center;
+        }
+
+        .response-container .math-error {
+            color: var(--danger);
+            font-family: var(--font-mono);
+            white-space: pre-wrap;
+        }
+
         /* ── Markdown ── */
 
         .response-container h1,
@@ -54,12 +76,22 @@ export class AssistantView extends LitElement {
             font-weight: var(--font-weight-semibold);
         }
 
-        .response-container h1 { font-size: 1.5em; }
-        .response-container h2 { font-size: 1.3em; }
-        .response-container h3 { font-size: 1.15em; }
-        .response-container h4 { font-size: 1.05em; }
+        .response-container h1 {
+            font-size: 1.5em;
+        }
+        .response-container h2 {
+            font-size: 1.3em;
+        }
+        .response-container h3 {
+            font-size: 1.15em;
+        }
+        .response-container h4 {
+            font-size: 1.05em;
+        }
         .response-container h5,
-        .response-container h6 { font-size: 1em; }
+        .response-container h6 {
+            font-size: 1em;
+        }
 
         .response-container p {
             margin: 0.6em 0;
@@ -263,7 +295,9 @@ export class AssistantView extends LitElement {
             display: flex;
             align-items: center;
             gap: 4px;
-            transition: border-color 0.4s ease, background var(--transition);
+            transition:
+                border-color 0.4s ease,
+                background var(--transition);
             flex-shrink: 0;
             overflow: hidden;
         }
@@ -345,8 +379,10 @@ export class AssistantView extends LitElement {
                     gfm: true,
                     sanitize: false,
                 });
-                let rendered = window.marked.parse(content);
+                const math = this.extractMath(content);
+                let rendered = window.marked.parse(math.markdown);
                 rendered = this.wrapWordsInSpans(rendered);
+                rendered = this.renderMathPlaceholders(rendered, math.expressions);
                 return rendered;
             } catch (error) {
                 console.warn('Error parsing markdown:', error);
@@ -354,6 +390,62 @@ export class AssistantView extends LitElement {
             }
         }
         return content;
+    }
+
+    extractMath(content) {
+        if (typeof window === 'undefined' || !window.katex) {
+            return { markdown: content, expressions: [] };
+        }
+
+        const expressions = [];
+        const addPlaceholder = (source, displayMode) => {
+            const index = expressions.push({ source: source.trim(), displayMode }) - 1;
+            const tag = displayMode ? 'div' : 'span';
+            return `<${tag} data-math-placeholder="${index}"></${tag}>`;
+        };
+
+        let markdown = content
+            .replace(/\$\$([\s\S]+?)\$\$/g, (_, source) => addPlaceholder(source, true))
+            .replace(/\\\[([\s\S]+?)\\\]/g, (_, source) => addPlaceholder(source, true))
+            .replace(/\\\(([\s\S]+?)\\\)/g, (_, source) => addPlaceholder(source, false));
+
+        markdown = markdown.replace(/(^|[^\\])\$(?![\s$])([^\n$]*?[^\\\s])\$(?![$\d])/g, (_, prefix, source) => {
+            return `${prefix}${addPlaceholder(source, false)}`;
+        });
+
+        return { markdown, expressions };
+    }
+
+    renderMathPlaceholders(htmlContent, expressions) {
+        if (!expressions.length || typeof window === 'undefined' || !window.katex) return htmlContent;
+
+        const template = document.createElement('template');
+        template.innerHTML = htmlContent;
+
+        template.content.querySelectorAll('[data-math-placeholder]').forEach(placeholder => {
+            const expression = expressions[Number(placeholder.dataset.mathPlaceholder)];
+            if (!expression) return;
+
+            const wrapper = document.createElement(expression.displayMode ? 'div' : 'span');
+            wrapper.className = expression.displayMode ? 'math-block' : 'math-inline';
+
+            try {
+                wrapper.innerHTML = window.katex.renderToString(expression.source, {
+                    displayMode: expression.displayMode,
+                    throwOnError: false,
+                    strict: 'ignore',
+                    trust: false,
+                    output: 'htmlAndMathml',
+                });
+            } catch (error) {
+                wrapper.classList.add('math-error');
+                wrapper.textContent = expression.source;
+            }
+
+            placeholder.replaceWith(wrapper);
+        });
+
+        return template.innerHTML;
     }
 
     wrapWordsInSpans(html) {
@@ -506,7 +598,7 @@ export class AssistantView extends LitElement {
         const perimeter = 2 * straightLen + 2 * arcLen;
 
         // Given a distance along the perimeter, return {x, y, nx, ny} (position + inward normal)
-        const pointOnPerimeter = (d) => {
+        const pointOnPerimeter = d => {
             d = ((d % perimeter) + perimeter) % perimeter;
             // Top straight: left to right
             if (d < straightLen) {
@@ -545,7 +637,7 @@ export class AssistantView extends LitElement {
             seeds.push({ pos: Math.random(), drift: Math.random(), depthSeed: Math.random() });
         }
 
-        const draw = (now) => {
+        const draw = now => {
             const elapsed = (now - startTime) / 1000;
             const fade = Math.min(1, elapsed / FADE_IN);
 
@@ -668,38 +760,63 @@ export class AssistantView extends LitElement {
         const hasMultipleResponses = this.responses.length > 1;
 
         return html`
+            <link rel="stylesheet" href=${katexStylesheetUrl} />
             <div class="response-container" id="responseContainer"></div>
 
-            ${hasMultipleResponses ? html`
-                <div class="response-nav">
-                    <button class="nav-btn" @click=${this.navigateToPreviousResponse} ?disabled=${this.currentResponseIndex <= 0} title="Previous response">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd" />
-                        </svg>
-                    </button>
-                    <span class="response-counter">${this.currentResponseIndex + 1} of ${this.responses.length}</span>
-                    <button class="nav-btn" @click=${this.navigateToNextResponse} ?disabled=${this.currentResponseIndex >= this.responses.length - 1} title="Next response">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
-                        </svg>
-                    </button>
-                </div>
-            ` : ''}
+            ${
+                hasMultipleResponses
+                    ? html`
+                          <div class="response-nav">
+                              <button
+                                  class="nav-btn"
+                                  @click=${this.navigateToPreviousResponse}
+                                  ?disabled=${this.currentResponseIndex <= 0}
+                                  title="Previous response"
+                              >
+                                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                      <path
+                                          fill-rule="evenodd"
+                                          d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z"
+                                          clip-rule="evenodd"
+                                      />
+                                  </svg>
+                              </button>
+                              <span class="response-counter">${this.currentResponseIndex + 1} of ${this.responses.length}</span>
+                              <button
+                                  class="nav-btn"
+                                  @click=${this.navigateToNextResponse}
+                                  ?disabled=${this.currentResponseIndex >= this.responses.length - 1}
+                                  title="Next response"
+                              >
+                                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                      <path
+                                          fill-rule="evenodd"
+                                          d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z"
+                                          clip-rule="evenodd"
+                                      />
+                                  </svg>
+                              </button>
+                          </div>
+                      `
+                    : ''
+            }
 
             <div class="input-bar">
                 <div class="input-bar-inner">
-                    <input
-                        type="text"
-                        id="textInput"
-                        placeholder="Type a message..."
-                        @keydown=${this.handleTextKeydown}
-                    />
+                    <input type="text" id="textInput" placeholder="Type a message..." @keydown=${this.handleTextKeydown} />
                 </div>
                 <button class="analyze-btn ${this.isAnalyzing ? 'analyzing' : ''}" @click=${this.handleScreenAnswer}>
                     <canvas class="analyze-canvas"></canvas>
                     <span class="analyze-btn-content">
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24">
-                            <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 3v7h6l-8 11v-7H5z" />
+                            <path
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M13 3v7h6l-8 11v-7H5z"
+                            />
                         </svg>
                         Analyze Screen
                     </span>

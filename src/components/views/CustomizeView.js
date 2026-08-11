@@ -119,6 +119,13 @@ export class CustomizeView extends LitElement {
                 border-bottom: 1px solid var(--border);
             }
 
+            .keybind-help {
+                margin: 0 0 var(--space-sm);
+                color: var(--text-secondary);
+                font-size: var(--font-size-xs);
+                line-height: 1.4;
+            }
+
             .keybind-row:last-of-type {
                 border-bottom: none;
             }
@@ -330,14 +337,18 @@ export class CustomizeView extends LitElement {
         }
     }
 
-    handleProfileSelect(e) {
+    async handleProfileSelect(e) {
         this.selectedProfile = e.target.value;
-        this.onProfileChange(this.selectedProfile);
+        await cheatingDaddy.storage.updatePreference('selectedProfile', this.selectedProfile);
+        await this.onProfileChange(this.selectedProfile);
+        this.requestUpdate();
     }
 
-    handleLanguageSelect(e) {
+    async handleLanguageSelect(e) {
         this.selectedLanguage = e.target.value;
-        this.onLanguageChange(this.selectedLanguage);
+        await cheatingDaddy.storage.updatePreference('selectedLanguage', this.selectedLanguage);
+        await this.onLanguageChange(this.selectedLanguage);
+        this.requestUpdate();
     }
 
     handleImageQualitySelect(e) {
@@ -412,8 +423,20 @@ export class CustomizeView extends LitElement {
     }
 
     handleKeybindFocus(e) {
-        e.target.placeholder = 'Press key combination...';
+        e.target.placeholder = 'Press keys or Mouse4/Mouse5...';
         e.target.select();
+        if (window.require) {
+            const { ipcRenderer } = window.require('electron');
+            ipcRenderer.send('set-keybind-recording', true);
+        }
+    }
+
+    handleKeybindBlur(e) {
+        e.target.placeholder = '';
+        if (window.require) {
+            const { ipcRenderer } = window.require('electron');
+            ipcRenderer.send('set-keybind-recording', false);
+        }
     }
 
     handleKeybindInput(e) {
@@ -459,6 +482,32 @@ export class CustomizeView extends LitElement {
         this.handleKeybindChange(action, keybind);
         e.target.value = keybind;
         e.target.blur();
+    }
+
+    handleMouseBindInput(e) {
+        const mouseButton = e.button === 3 ? 'Mouse4' : e.button === 4 ? 'Mouse5' : null;
+        if (!mouseButton) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        const modifiers = [];
+        if (e.ctrlKey) modifiers.push('Ctrl');
+        if (e.metaKey) modifiers.push('Cmd');
+        if (e.altKey) modifiers.push('Alt');
+        if (e.shiftKey) modifiers.push('Shift');
+
+        const action = e.currentTarget.dataset.action;
+        const keybind = [...modifiers, mouseButton].join('+');
+        this.handleKeybindChange(action, keybind);
+        e.currentTarget.value = keybind;
+        e.currentTarget.blur();
+    }
+
+    preventMouseNavigation(e) {
+        if (e.button === 3 || e.button === 4) {
+            e.preventDefault();
+        }
     }
 
     async resetKeybinds() {
@@ -580,9 +629,13 @@ export class CustomizeView extends LitElement {
                             <option value="both">Both Speaker and Microphone</option>
                         </select>
                     </div>
-                    ${this.audioMode !== 'speaker_only' ? html`
-                        <div class="warning-callout">May cause unexpected behavior. Only change this if you know what you're doing.</div>
-                    ` : ''}
+                    ${
+                        this.audioMode !== 'speaker_only'
+                            ? html`
+                                  <div class="warning-callout">May cause unexpected behavior. Only change this if you know what you're doing.</div>
+                              `
+                            : ''
+                    }
                     <div class="form-group">
                         <label class="form-label">Image Quality</label>
                         <select class="control" .value=${this.selectedImageQuality} @change=${this.handleImageQualitySelect}>
@@ -602,7 +655,7 @@ export class CustomizeView extends LitElement {
                 <div class="surface-title">Language</div>
                 <div class="form-grid">
                     <div class="form-group">
-                        <label class="form-label">Speech Language</label>
+                        <label class="form-label">Speech & Response Language</label>
                         <select class="control" .value=${this.selectedLanguage} @change=${this.handleLanguageSelect}>
                             ${this.getLanguages().map(language => html`<option value=${language.value}>${language.name}</option>`)}
                         </select>
@@ -661,21 +714,27 @@ export class CustomizeView extends LitElement {
     renderKeyboardSection() {
         return html`
             <section class="surface">
-                <div class="surface-title">Keyboard Shortcuts</div>
-                ${this.getKeybindActions().map(action => html`
-                    <div class="keybind-row">
-                        <span class="keybind-name">${action.name}</span>
-                        <input
-                            type="text"
-                            class="control keybind-input"
-                            .value=${this.keybinds[action.key]}
-                            data-action=${action.key}
-                            @keydown=${this.handleKeybindInput}
-                            @focus=${this.handleKeybindFocus}
-                            readonly
-                        />
-                    </div>
-                `)}
+                <div class="surface-title">Keyboard & Mouse Shortcuts</div>
+                <p class="keybind-help">Click a field, then press a keyboard combination or a side mouse button (Mouse4/Mouse5).</p>
+                ${this.getKeybindActions().map(
+                    action => html`
+                        <div class="keybind-row">
+                            <span class="keybind-name">${action.name}</span>
+                            <input
+                                type="text"
+                                class="control keybind-input"
+                                .value=${this.keybinds[action.key]}
+                                data-action=${action.key}
+                                @keydown=${this.handleKeybindInput}
+                                @mousedown=${this.handleMouseBindInput}
+                                @auxclick=${this.preventMouseNavigation}
+                                @focus=${this.handleKeybindFocus}
+                                @blur=${this.handleKeybindBlur}
+                                readonly
+                            />
+                        </div>
+                    `
+                )}
                 <div style="margin-top: var(--space-sm);">
                     <button class="control" style="width:auto;padding:8px 10px;" @click=${this.resetKeybinds}>Reset to defaults</button>
                 </div>
@@ -695,9 +754,11 @@ export class CustomizeView extends LitElement {
                         ${this.isClearing ? 'Clearing...' : 'Delete all data'}
                     </button>
                 </div>
-                ${this.clearStatusMessage ? html`
-                    <div class="status ${this.clearStatusType === 'success' ? 'success' : 'error'}">${this.clearStatusMessage}</div>
-                ` : ''}
+                ${
+                    this.clearStatusMessage
+                        ? html` <div class="status ${this.clearStatusType === 'success' ? 'success' : 'error'}">${this.clearStatusMessage}</div> `
+                        : ''
+                }
             </section>
         `;
     }
@@ -707,10 +768,7 @@ export class CustomizeView extends LitElement {
             <div class="unified-page">
                 <div class="unified-wrap">
                     <div class="page-title">Settings</div>
-                    ${this.renderAudioSection()}
-                    ${this.renderLanguageSection()}
-                    ${this.renderAppearanceSection()}
-                    ${this.renderKeyboardSection()}
+                    ${this.renderAudioSection()} ${this.renderLanguageSection()} ${this.renderAppearanceSection()} ${this.renderKeyboardSection()}
                     ${this.renderPrivacySection()}
                 </div>
             </div>

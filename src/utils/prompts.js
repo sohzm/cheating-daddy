@@ -201,7 +201,16 @@ Provide direct exam answers in **markdown format**. Include the question text, t
     },
 };
 
-function buildSystemPrompt(promptParts, customPrompt = '', googleSearchEnabled = true) {
+function getLanguageName(language) {
+    if (!language) return '';
+    try {
+        return new Intl.DisplayNames(['en'], { type: 'language' }).of(language) || language;
+    } catch {
+        return language;
+    }
+}
+
+function buildSystemPrompt(promptParts, customPrompt = '', googleSearchEnabled = true, language = '') {
     const sections = [promptParts.intro, '\n\n', promptParts.formatRequirements];
 
     // Only add search usage section if Google Search is enabled
@@ -209,14 +218,30 @@ function buildSystemPrompt(promptParts, customPrompt = '', googleSearchEnabled =
         sections.push('\n\n', promptParts.searchUsage);
     }
 
-    sections.push('\n\n', promptParts.content, '\n\nUser-provided context\n-----\n', customPrompt, '\n-----\n\n', promptParts.outputInstructions);
+    sections.push('\n\n', promptParts.content, '\n\n', promptParts.outputInstructions);
+
+    if (language) {
+        sections.push(
+            '\n\nRESPONSE LANGUAGE\n-----\n',
+            `Respond in ${getLanguageName(language)} (${language}) unless the user-provided custom instructions explicitly request another language.`,
+            '\n-----'
+        );
+    }
+
+    if (customPrompt.trim()) {
+        sections.push(
+            '\n\nUSER-PROVIDED CUSTOM INSTRUCTIONS — HIGHEST PRIORITY\n-----\n',
+            customPrompt.trim(),
+            '\n-----\nFollow these custom instructions exactly. When they conflict with profile defaults, the custom instructions win, including requested language, opening phrase, response length, level of detail, and formatting.'
+        );
+    }
 
     return sections.join('');
 }
 
-function getSystemPrompt(profile, customPrompt = '', googleSearchEnabled = true) {
+function getSystemPrompt(profile, customPrompt = '', googleSearchEnabled = true, language = '') {
     const promptParts = profilePrompts[profile] || profilePrompts.interview;
-    return buildSystemPrompt(promptParts, customPrompt, googleSearchEnabled);
+    return buildSystemPrompt(promptParts, customPrompt, googleSearchEnabled, language);
 }
 
 module.exports = {

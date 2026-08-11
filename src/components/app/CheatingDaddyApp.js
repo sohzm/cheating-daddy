@@ -598,6 +598,8 @@ export class CheatingDaddyApp extends LitElement {
     async handleStart() {
         const prefs = await cheatingDaddy.storage.getPreferences();
         const providerMode = prefs.providerMode === 'cloud' ? 'byok' : prefs.providerMode || 'byok';
+        this.selectedProfile = prefs.selectedProfile || this.selectedProfile || 'interview';
+        this.selectedLanguage = prefs.selectedLanguage || this.selectedLanguage || 'en-US';
 
         if (providerMode === 'cloud') {
             const creds = await cheatingDaddy.storage.getCredentials();
@@ -671,11 +673,13 @@ export class CheatingDaddyApp extends LitElement {
     async handleProfileChange(profile) {
         this.selectedProfile = profile;
         await cheatingDaddy.storage.updatePreference('selectedProfile', profile);
+        this.requestUpdate();
     }
 
     async handleLanguageChange(language) {
         this.selectedLanguage = language;
         await cheatingDaddy.storage.updatePreference('selectedLanguage', language);
+        this.requestUpdate();
     }
 
     async handleScreenshotIntervalChange(interval) {

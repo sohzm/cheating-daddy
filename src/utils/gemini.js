@@ -3,7 +3,7 @@ const { BrowserWindow, ipcMain } = require('electron');
 const { spawn } = require('child_process');
 const { saveDebugAudio } = require('../audioUtils');
 const { getSystemPrompt } = require('./prompts');
-const { getAvailableModel, incrementLimitCount, getApiKey, getGroqApiKey, incrementCharUsage, getConfig } = require('../storage');
+const { getAvailableModel, incrementLimitCount, getApiKey, getGroqApiKey, incrementCharUsage, getConfig, getPreferences } = require('../storage');
 const { connectCloud, sendCloudAudio, sendCloudText, sendCloudImage, closeCloud, isCloudActive, setOnTurnComplete } = require('./cloud');
 const { startTransportLog, logTransportEvent, closeTransportLog } = require('./transportLogger');
 
@@ -27,6 +27,7 @@ let conversationHistory = [];
 let screenAnalysisHistory = [];
 let currentProfile = null;
 let currentCustomPrompt = null;
+let currentLanguage = 'en-US';
 let isInitializingSession = false;
 let currentSystemPrompt = null;
 
@@ -653,7 +654,8 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
     const enabledTools = await getEnabledTools();
     const googleSearchEnabled = enabledTools.some(tool => tool.googleSearch);
 
-    const systemPrompt = getSystemPrompt(profile, customPrompt, googleSearchEnabled);
+    currentLanguage = language;
+    const systemPrompt = getSystemPrompt(profile, customPrompt, googleSearchEnabled, language);
     currentSystemPrompt = systemPrompt; // Store for Groq
 
     // Initialize new conversation session only on first connect
@@ -994,59 +996,93 @@ async function sendAudioToGemini(base64Data, geminiSessionRef) {
 }
 
 async function sendImageToGeminiHttp(base64Data, prompt) {
-    // Get available model based on rate limits
-    const model = getAvailableModel();
+    // Prefer the current multimodal Flash model and retain a lower-cost fallback.
+    // Gemini 2.5 Flash is no longer available to new API users.
+    const preferredModel = getAvailableModel();
+    const modelCandidates = [...new Set([preferredModel, 'gemini-3.6-flash', 'gemini-3.5-flash-lite'])];
 
     const apiKey = getApiKey();
     if (!apiKey) {
         return { success: false, error: 'No API key configured' };
     }
 
-    try {
-        const ai = new GoogleGenAI({ apiKey: apiKey });
+    const ai = new GoogleGenAI({ apiKey: apiKey });
 
-        const contents = [
-            {
-                inlineData: {
-                    mimeType: 'image/jpeg',
-                    data: base64Data,
-                },
+    const contents = [
+        {
+            inlineData: {
+                mimeType: 'image/jpeg',
+                data: base64Data,
             },
-            { text: prompt },
-        ];
+        },
+        { text: prompt },
+    ];
 
-        console.log(`Sending image to ${model} (streaming)...`);
-        const response = await ai.models.generateContentStream({
-            model: model,
-            contents: contents,
-        });
+    let lastError = null;
+    for (const model of modelCandidates) {
+        try {
+            console.log(`Sending image to ${model} (streaming)...`);
+            const response = await ai.models.generateContentStream({
+                model,
+                contents,
+                config: {
+                    // Screen analysis is a separate HTTP request, so explicitly carry
+                    // the profile and AI Customization instructions into it.
+                    systemInstruction: currentSystemPrompt || 'You are a helpful assistant.',
+                },
+            });
 
-        // Increment count after successful call
-        incrementLimitCount(model);
+            // Increment count after successful call
+            incrementLimitCount(model);
 
-        // Stream the response
-        let fullText = '';
-        let isFirst = true;
-        for await (const chunk of response) {
-            const chunkText = chunk.text;
-            if (chunkText) {
-                fullText += chunkText;
-                // Send to renderer - new response for first chunk, update for subsequent
-                sendToRenderer(isFirst ? 'new-response' : 'update-response', fullText);
-                isFirst = false;
+            // Stream the response
+            let fullText = '';
+            let isFirst = true;
+            for await (const chunk of response) {
+                const chunkText = chunk.text;
+                if (chunkText) {
+                    fullText += chunkText;
+                    // Send to renderer - new response for first chunk, update for subsequent
+                    sendToRenderer(isFirst ? 'new-response' : 'update-response', fullText);
+                    isFirst = false;
+                }
             }
+
+            if (!fullText.trim()) {
+                throw new Error(`${model} returned an empty response`);
+            }
+
+            console.log(`Image response completed from ${model}`);
+
+            // Save screen analysis to history
+            saveScreenAnalysis(prompt, fullText, model);
+
+            return { success: true, text: fullText, model };
+        } catch (error) {
+            lastError = error;
+            console.error(`Error sending image to ${model}:`, error);
+
+            const errorText = `${error?.message || error}`;
+            const canTryAnotherModel = /\b(404|429)\b|not found|no longer available|resource exhausted/i.test(errorText);
+            if (!canTryAnotherModel) break;
         }
-
-        console.log(`Image response completed from ${model}`);
-
-        // Save screen analysis to history
-        saveScreenAnalysis(prompt, fullText, model);
-
-        return { success: true, text: fullText, model: model };
-    } catch (error) {
-        console.error('Error sending image to Gemini HTTP:', error);
-        return { success: false, error: error.message };
     }
+
+    return { success: false, error: lastError?.message || 'Gemini screen analysis failed' };
+}
+
+function refreshScreenAnalysisSystemPrompt() {
+    try {
+        const preferences = getPreferences();
+        currentProfile = preferences.selectedProfile || currentProfile || 'interview';
+        currentCustomPrompt = typeof preferences.customPrompt === 'string' ? preferences.customPrompt : currentCustomPrompt || '';
+        currentLanguage = preferences.selectedLanguage || currentLanguage || 'en-US';
+        currentSystemPrompt = getSystemPrompt(currentProfile, currentCustomPrompt, preferences.googleSearchEnabled === true, currentLanguage);
+    } catch (error) {
+        console.warn('Could not refresh screen analysis preferences:', error.message);
+    }
+
+    return currentSystemPrompt;
 }
 
 function setupGeminiIpcHandlers(geminiSessionRef) {
@@ -1197,6 +1233,10 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
                 return result;
             }
 
+            // Screenshot analysis is independent from the Live connection. Refresh
+            // settings here so changes to profile, language, and AI Customization
+            // take effect without requiring the app or session to restart.
+            refreshScreenAnalysisSystemPrompt();
             const result = hasGroqKey() ? await sendImageToGroq(data, prompt) : await sendImageToGeminiHttp(data, prompt);
             return result;
         } catch (error) {
