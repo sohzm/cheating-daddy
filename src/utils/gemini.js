@@ -3,7 +3,7 @@ const { BrowserWindow, ipcMain } = require('electron');
 const { spawn } = require('child_process');
 const { saveDebugAudio } = require('../audioUtils');
 const { getSystemPrompt } = require('./prompts');
-const { getAvailableModel, incrementLimitCount, getApiKey, getGroqApiKey, incrementCharUsage, getConfig } = require('../storage');
+const { getAvailableModel, incrementLimitCount, getApiKey, getGroqApiKey, incrementCharUsage, getConfig, getPreferences } = require('../storage');
 const { connectCloud, sendCloudAudio, sendCloudText, sendCloudImage, closeCloud, isCloudActive, setOnTurnComplete } = require('./cloud');
 const { startTransportLog, logTransportEvent, closeTransportLog } = require('./transportLogger');
 
@@ -27,6 +27,7 @@ let conversationHistory = [];
 let screenAnalysisHistory = [];
 let currentProfile = null;
 let currentCustomPrompt = null;
+let currentLanguage = 'en-US';
 let isInitializingSession = false;
 let currentSystemPrompt = null;
 
@@ -653,7 +654,8 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
     const enabledTools = await getEnabledTools();
     const googleSearchEnabled = enabledTools.some(tool => tool.googleSearch);
 
-    const systemPrompt = getSystemPrompt(profile, customPrompt, googleSearchEnabled);
+    currentLanguage = language;
+    const systemPrompt = getSystemPrompt(profile, customPrompt, googleSearchEnabled, language);
     currentSystemPrompt = systemPrompt; // Store for Groq
 
     // Initialize new conversation session only on first connect
@@ -1069,6 +1071,20 @@ async function sendImageToGeminiHttp(base64Data, prompt) {
     return { success: false, error: lastError?.message || 'Gemini screen analysis failed' };
 }
 
+function refreshScreenAnalysisSystemPrompt() {
+    try {
+        const preferences = getPreferences();
+        currentProfile = preferences.selectedProfile || currentProfile || 'interview';
+        currentCustomPrompt = typeof preferences.customPrompt === 'string' ? preferences.customPrompt : currentCustomPrompt || '';
+        currentLanguage = preferences.selectedLanguage || currentLanguage || 'en-US';
+        currentSystemPrompt = getSystemPrompt(currentProfile, currentCustomPrompt, preferences.googleSearchEnabled === true, currentLanguage);
+    } catch (error) {
+        console.warn('Could not refresh screen analysis preferences:', error.message);
+    }
+
+    return currentSystemPrompt;
+}
+
 function setupGeminiIpcHandlers(geminiSessionRef) {
     // Store the geminiSessionRef globally for reconnection access
     global.geminiSessionRef = geminiSessionRef;
@@ -1217,6 +1233,10 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
                 return result;
             }
 
+            // Screenshot analysis is independent from the Live connection. Refresh
+            // settings here so changes to profile, language, and AI Customization
+            // take effect without requiring the app or session to restart.
+            refreshScreenAnalysisSystemPrompt();
             const result = hasGroqKey() ? await sendImageToGroq(data, prompt) : await sendImageToGeminiHttp(data, prompt);
             return result;
         } catch (error) {

@@ -337,14 +337,18 @@ export class CustomizeView extends LitElement {
         }
     }
 
-    handleProfileSelect(e) {
+    async handleProfileSelect(e) {
         this.selectedProfile = e.target.value;
-        this.onProfileChange(this.selectedProfile);
+        await cheatingDaddy.storage.updatePreference('selectedProfile', this.selectedProfile);
+        await this.onProfileChange(this.selectedProfile);
+        this.requestUpdate();
     }
 
-    handleLanguageSelect(e) {
+    async handleLanguageSelect(e) {
         this.selectedLanguage = e.target.value;
-        this.onLanguageChange(this.selectedLanguage);
+        await cheatingDaddy.storage.updatePreference('selectedLanguage', this.selectedLanguage);
+        await this.onLanguageChange(this.selectedLanguage);
+        this.requestUpdate();
     }
 
     handleImageQualitySelect(e) {
@@ -651,7 +655,7 @@ export class CustomizeView extends LitElement {
                 <div class="surface-title">Language</div>
                 <div class="form-grid">
                     <div class="form-group">
-                        <label class="form-label">Speech Language</label>
+                        <label class="form-label">Speech & Response Language</label>
                         <select class="control" .value=${this.selectedLanguage} @change=${this.handleLanguageSelect}>
                             ${this.getLanguages().map(language => html`<option value=${language.value}>${language.name}</option>`)}
                         </select>

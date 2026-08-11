@@ -59,8 +59,12 @@ export class AICustomizeView extends LitElement {
         }
     }
 
-    _handleProfileChange(e) {
-        this.onProfileChange(e.target.value);
+    async _handleProfileChange(e) {
+        const profile = e.target.value;
+        this.selectedProfile = profile;
+        await cheatingDaddy.storage.updatePreference('selectedProfile', profile);
+        await this.onProfileChange(profile);
+        this.requestUpdate();
     }
 
     async _saveContext(val) {
@@ -113,11 +117,12 @@ export class AICustomizeView extends LitElement {
                                     .value=${this._context}
                                     @input=${e => this._saveContext(e.target.value)}
                                 ></textarea>
-                                <div class="form-help">Sent as context at session start. Keep it short.</div>
+                                <div class="form-help">
+                                    Applied to new sessions and the next screen analysis. Explicit instructions override profile defaults.
+                                </div>
                             </div>
                         </div>
                     </section>
-
                 </div>
             </div>
         `;
