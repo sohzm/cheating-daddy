@@ -29,6 +29,11 @@ let speechBuffers = [];
 let silenceFrameCount = 0;
 let speechFrameCount = 0;
 let resampleRemainder = Buffer.alloc(0);
+let preRollBuffers = [];
+let processingSegment = false;
+let transcriptionLanguage = '';
+
+const PRE_ROLL_FRAMES = 5;
 
 const VAD_MODES = {
     NORMAL: { energyThreshold: 0.01, speechFramesRequired: 3, silenceFramesRequired: 30 },
@@ -79,13 +84,20 @@ function processVad(pcm16kBuffer) {
     const rms = calculateRms(pcm16kBuffer);
     const isVoice = rms > vadConfig.energyThreshold;
 
+    if (!isSpeaking) {
+        preRollBuffers.push(Buffer.from(pcm16kBuffer));
+        if (preRollBuffers.length > PRE_ROLL_FRAMES) {
+            preRollBuffers.shift();
+        }
+    }
+
     if (isVoice) {
         speechFrameCount += 1;
         silenceFrameCount = 0;
 
         if (!isSpeaking && speechFrameCount >= vadConfig.speechFramesRequired) {
             isSpeaking = true;
-            speechBuffers = [];
+            speechBuffers = preRollBuffers.slice();
             console.log('[Remote] Speech started (RMS:', rms.toFixed(4), ')');
             sendToRenderer('update-status', 'Listening... (speech detected)');
         }
@@ -95,6 +107,7 @@ function processVad(pcm16kBuffer) {
 
         if (isSpeaking && silenceFrameCount >= vadConfig.silenceFramesRequired) {
             isSpeaking = false;
+            preRollBuffers = [];
             const audioData = Buffer.concat(speechBuffers);
             speechBuffers = [];
             console.log('[Remote] Speech ended, accumulated', audioData.length, 'bytes');
@@ -140,11 +153,14 @@ async function transcribeAudio(pcm16kBuffer) {
     formData.append('file', new Blob([wavBuffer], { type: 'audio/wav' }), 'speech.wav');
     formData.append('response_format', 'json');
     formData.append('temperature', '0.0');
-    formData.append('language', 'ru');
+    if (transcriptionLanguage) {
+        formData.append('language', transcriptionLanguage);
+    }
 
     const response = await fetch(`${whisperBaseUrl}/inference`, {
         method: 'POST',
         body: formData,
+        signal: AbortSignal.timeout(120000),
     });
 
     if (!response.ok) {
@@ -171,7 +187,14 @@ async function readStreamingResponse(response, onText) {
             const data = line.slice(6).trim();
             if (!data || data === '[DONE]') continue;
 
-            const event = JSON.parse(data);
+            let event;
+            try {
+                event = JSON.parse(data);
+            } catch (parseError) {
+                console.warn('[Remote] Skipping unparsable stream line:', parseError.message);
+                continue;
+            }
+
             const token = event.choices?.[0]?.delta?.content || '';
             if (!token) continue;
 
@@ -198,6 +221,7 @@ async function requestRemote(messages, onText) {
             Authorization: `Bearer ${groqApiKey}`,
             'Content-Type': 'application/json',
         },
+        signal: AbortSignal.timeout(180000),
         body: JSON.stringify({
             model,
             messages,
@@ -235,23 +259,25 @@ async function sendToRemote(transcription) {
             isFirst = false;
         });
 
-        if (fullText.trim()) {
-            remoteConversationHistory.push({
-                role: 'assistant',
-                content: fullText.trim(),
-            });
-            saveConversationTurn(transcription, fullText);
-        } else {
+        if (!fullText.trim()) {
             sendToRenderer('new-response', 'Model returned an empty response. Try again.');
             sendToRenderer('update-status', 'Empty response');
-            return;
+            return false;
         }
+
+        remoteConversationHistory.push({
+            role: 'assistant',
+            content: fullText.trim(),
+        });
+        saveConversationTurn(transcription, fullText);
 
         console.log('[Remote] Response completed');
         sendToRenderer('update-status', 'Listening...');
+        return true;
     } catch (error) {
         console.error('[Remote] API error:', error);
         sendToRenderer('update-status', 'API error: ' + error.message);
+        return false;
     }
 }
 
@@ -264,6 +290,12 @@ async function handleSpeechEnd(audioData) {
         return;
     }
 
+    if (processingSegment) {
+        console.log('[Remote] Segment already processing, skipping');
+        return;
+    }
+
+    processingSegment = true;
     try {
         const transcription = await transcribeAudio(audioData);
 
@@ -278,6 +310,8 @@ async function handleSpeechEnd(audioData) {
     } catch (error) {
         console.error('[Remote] Transcription error:', error);
         sendToRenderer('update-status', 'Transcription error: ' + error.message);
+    } finally {
+        processingSegment = false;
     }
 }
 
@@ -345,6 +379,9 @@ async function initializeRemoteSession(whisperModel, profile, customPrompt, lang
         silenceFrameCount = 0;
         speechFrameCount = 0;
         resampleRemainder = Buffer.alloc(0);
+        preRollBuffers = [];
+        processingSegment = false;
+        transcriptionLanguage = (language || '').split('-')[0].toLowerCase();
         remoteConversationHistory = [];
 
         initializeNewSession(profile, customPrompt);
@@ -383,6 +420,9 @@ function closeRemoteSession() {
     silenceFrameCount = 0;
     speechFrameCount = 0;
     resampleRemainder = Buffer.alloc(0);
+    preRollBuffers = [];
+    processingSegment = false;
+    transcriptionLanguage = '';
     remoteConversationHistory = [];
     currentSystemPrompt = null;
 }
@@ -397,8 +437,8 @@ async function sendRemoteText(text) {
     }
 
     try {
-        await sendToRemote(text);
-        return { success: true };
+        const ok = await sendToRemote(text);
+        return ok ? { success: true } : { success: false, error: 'Remote request failed or returned an empty response' };
     } catch (error) {
         return { success: false, error: error.message };
     }
