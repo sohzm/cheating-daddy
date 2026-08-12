@@ -1,4 +1,5 @@
 const { getSystemPrompt } = require('./prompts');
+const os = require('os');
 const {
     sendToRenderer,
     initializeNewSession,
@@ -139,7 +140,7 @@ async function transcribeAudio(pcm16kBuffer) {
     formData.append('file', new Blob([wavBuffer], { type: 'audio/wav' }), 'speech.wav');
     formData.append('response_format', 'json');
     formData.append('temperature', '0.0');
-    formData.append('language', 'en');
+    formData.append('language', 'ru');
 
     const response = await fetch(`${whisperBaseUrl}/inference`, {
         method: 'POST',
@@ -191,7 +192,7 @@ async function requestRemote(messages, onText) {
     const config = getConfig();
     const model = config.groqModel;
 
-    const response = await fetch(getChatCompletionsUrl(config), {
+    const response = await fetch(getChatCompletionsUrl(config, 'remoteBaseUrl'), {
         method: 'POST',
         headers: {
             Authorization: `Bearer ${groqApiKey}`,
@@ -303,15 +304,15 @@ async function startWhisperServer(executablePath, modelPath) {
     whisperBaseUrl = `http://127.0.0.1:${port}`;
     whisperProcess = startNativeServer({
         executablePath,
-        arguments: ['-m', modelPath, '--host', '127.0.0.1', '--port', String(port)],
+        arguments: ['-m', modelPath, '--host', '127.0.0.1', '--port', String(port), '-t', String(os.cpus().length)],
         name: 'Whisper',
     });
 
     await waitForServer(`${whisperBaseUrl}/`, whisperProcess, 120000);
 }
 
-async function initializeRemoteSession(whisperModel, profile, customPrompt) {
-    console.log('[Remote] Initializing remote session:', { whisperModel, profile });
+async function initializeRemoteSession(whisperModel, profile, customPrompt, language) {
+    console.log('[Remote] Initializing remote session:', { whisperModel, profile, language });
     sendToRenderer('session-initializing', true);
 
     try {

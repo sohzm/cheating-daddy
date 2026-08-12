@@ -196,8 +196,9 @@ async function initializeRemote(profile = 'interview') {
     const prefs = await storage.getPreferences();
     const whisperModel = prefs.whisperModel || 'tiny.en';
     const customPrompt = prefs.customPrompt || '';
+    const language = prefs.selectedLanguage || 'en-US'; // Получаем выбранный язык
 
-    const success = await ipcRenderer.invoke('initialize-remote', whisperModel, profile, customPrompt);
+    const success = await ipcRenderer.invoke('initialize-remote', whisperModel, profile, customPrompt, language);
     if (success) {
         cheatingDaddy.setStatus('Remote AI Live');
         return true;

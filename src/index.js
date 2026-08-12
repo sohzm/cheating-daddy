@@ -10,6 +10,11 @@ const storage = require('./storage');
 const geminiSessionRef = { current: null };
 let mainWindow = null;
 
+if (process.env.CD_PROXY) {
+    app.commandLine.appendSwitch('proxy-server', process.env.CD_PROXY);
+    app.commandLine.appendSwitch('proxy-bypass-list', '<local>;127.0.0.1;localhost');
+}
+
 function createMainWindow() {
     mainWindow = createWindow(sendToRenderer, geminiSessionRef);
     return mainWindow;

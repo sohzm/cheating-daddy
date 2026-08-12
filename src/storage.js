@@ -13,6 +13,7 @@ const DEFAULT_CONFIG = {
     groqModel: 'qwen/qwen3.6-27b',
     groqImageModel: 'qwen/qwen3.6-27b',
     groqBaseUrl: 'https://api.groq.com/openai/v1',
+    remoteBaseUrl: 'http://localhost:8080/v1',
     disableGroqThinking: true,
 };
 

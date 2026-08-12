@@ -702,6 +702,7 @@ export class MainView extends LitElement {
         _groqModel: { state: true },
         _groqImageModel: { state: true },
         _groqBaseUrl: { state: true },
+        _remoteBaseUrl: { state: true },
         _disableGroqThinking: { state: true },
         _tokenError: { state: true },
         _keyError: { state: true },
@@ -732,6 +733,7 @@ export class MainView extends LitElement {
         this._groqModel = 'qwen/qwen3.6-27b';
         this._groqImageModel = 'qwen/qwen3.6-27b';
         this._groqBaseUrl = 'https://api.groq.com/openai/v1';
+        this._remoteBaseUrl = 'http://localhost:8080/v1';
         this._disableGroqThinking = true;
         this._tokenError = false;
         this._keyError = false;
@@ -773,6 +775,7 @@ export class MainView extends LitElement {
             this._groqModel = config.groqModel || 'qwen/qwen3.6-27b';
             this._groqImageModel = config.groqImageModel || 'qwen/qwen3.6-27b';
             this._groqBaseUrl = config.groqBaseUrl || 'https://api.groq.com/openai/v1';
+            this._remoteBaseUrl = config.remoteBaseUrl || 'http://localhost:8080/v1';
             this._disableGroqThinking = config.disableGroqThinking === true;
 
             // Load local AI settings
@@ -969,6 +972,12 @@ export class MainView extends LitElement {
     async _saveGroqBaseUrl(val) {
         this._groqBaseUrl = val;
         await cheatingDaddy.storage.updateConfig('groqBaseUrl', val);
+        this.requestUpdate();
+    }
+
+    async _saveRemoteBaseUrl(val) {
+        this._remoteBaseUrl = val;
+        await cheatingDaddy.storage.updateConfig('remoteBaseUrl', val);
         this.requestUpdate();
     }
 
@@ -1320,8 +1329,11 @@ export class MainView extends LitElement {
                         </div>
                         <select .value=${this._whisperModel} @change=${e => this._saveWhisperModel(e.target.value)}>
                             <option value="tiny.en" ?selected=${this._whisperModel === 'tiny.en'}>Tiny English (75 MB, fastest)</option>
+                            <option value="tiny" ?selected=${this._whisperModel === 'tiny'}>Tiny Multilingual (77 MB, fastest)</option>
                             <option value="base.en" ?selected=${this._whisperModel === 'base.en'}>Base English (142 MB)</option>
                             <option value="small.en" ?selected=${this._whisperModel === 'small.en'}>Small English (466 MB, most accurate)</option>
+                            <option value="base" ?selected=${this._whisperModel === 'base'}>Base Multilingual (142 MB)</option>
+                            <option value="small" ?selected=${this._whisperModel === 'small'}>Small Multilingual (466 MB)</option>
                         </select>
                         <div class="form-hint">${this.whisperDownloading ? 'Downloading model...' : 'Downloaded automatically on first use'}</div>
                     </div>
@@ -1355,8 +1367,11 @@ export class MainView extends LitElement {
                         <label class="form-label">Whisper model</label>
                         <select .value=${this._whisperModel} @change=${e => this._saveWhisperModel(e.target.value)}>
                             <option value="tiny.en" ?selected=${this._whisperModel === 'tiny.en'}>Tiny English (75 MB, fastest)</option>
+                            <option value="tiny" ?selected=${this._whisperModel === 'tiny'}>Tiny Multilingual (77 MB, fastest)</option>
                             <option value="base.en" ?selected=${this._whisperModel === 'base.en'}>Base English (142 MB)</option>
                             <option value="small.en" ?selected=${this._whisperModel === 'small.en'}>Small English (466 MB, most accurate)</option>
+                            <option value="base" ?selected=${this._whisperModel === 'base'}>Base Multilingual (142 MB)</option>
+                            <option value="small" ?selected=${this._whisperModel === 'small'}>Small Multilingual (466 MB)</option>
                         </select>
                         <div class="form-hint">${this.whisperDownloading ? 'Downloading model...' : 'Downloaded automatically on first use'}</div>
                     </div>
@@ -1385,7 +1400,7 @@ export class MainView extends LitElement {
 
                     <div class="form-group">
                         <label class="form-label">API Base URL</label>
-                        <input type="text" .value=${this._groqBaseUrl} @input=${e => this._saveGroqBaseUrl(e.target.value)} />
+                        <input type="text" .value=${this._remoteBaseUrl} @input=${e => this._saveRemoteBaseUrl(e.target.value)} />
                         <div class="form-hint">OpenAI-compatible endpoint, e.g. http://localhost:8080/v1</div>
                     </div>
 

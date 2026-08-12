@@ -256,8 +256,8 @@ function stripThinkingTags(text) {
     return text.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '').trim();
 }
 
-function getChatCompletionsUrl(config) {
-    const baseUrl = String(config.groqBaseUrl || 'https://api.groq.com/openai/v1').replace(/\/+$/, '');
+function getChatCompletionsUrl(config, baseUrlKey = 'groqBaseUrl') {
+    const baseUrl = String(config[baseUrlKey] || 'https://api.groq.com/openai/v1').replace(/\/+$/, '');
     return `${baseUrl}/chat/completions`;
 }
 
@@ -1102,13 +1102,13 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
         return success;
     });
 
-    ipcMain.handle('initialize-remote', async (event, whisperModel, profile, customPrompt) => {
-        if (typeof whisperModel !== 'string' || typeof profile !== 'string') {
+    ipcMain.handle('initialize-remote', async (event, whisperModel, profile, customPrompt, language) => {
+        if (typeof whisperModel !== 'string' || typeof profile !== 'string' || typeof language !== 'string') {
             return false;
         }
 
         currentProviderMode = 'remote';
-        const success = await getRemoteAi().initializeRemoteSession(whisperModel, profile, customPrompt);
+        const success = await getRemoteAi().initializeRemoteSession(whisperModel, profile, customPrompt, language);
         if (!success) {
             currentProviderMode = 'byok';
         }
