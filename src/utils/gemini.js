@@ -14,6 +14,12 @@ function getLocalAi() {
     return _localai;
 }
 
+let _remoteAi = null;
+function getRemoteAi() {
+    if (!_remoteAi) _remoteAi = require('./remote-transcription');
+    return _remoteAi;
+}
+
 // Provider mode: 'byok', 'cloud', or 'local'
 let currentProviderMode = 'byok';
 
@@ -250,6 +256,11 @@ function stripThinkingTags(text) {
     return text.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '').trim();
 }
 
+function getChatCompletionsUrl(config, baseUrlKey = 'groqBaseUrl') {
+    const baseUrl = String(config[baseUrlKey] || 'https://api.groq.com/openai/v1').replace(/\/+$/, '');
+    return `${baseUrl}/chat/completions`;
+}
+
 function getGroqReasoningOptions(model, disableThinking) {
     if (model.includes('qwen3')) {
         const options = {
@@ -303,7 +314,7 @@ async function sendToGroq(transcription) {
     }
 
     try {
-        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        const response = await fetch(getChatCompletionsUrl(config), {
             method: 'POST',
             headers: {
                 Authorization: `Bearer ${groqApiKey}`,
@@ -433,7 +444,7 @@ async function sendImageToGroq(base64Data, prompt) {
     });
 
     try {
-        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        const response = await fetch(getChatCompletionsUrl(config), {
             method: 'POST',
             headers: {
                 Authorization: `Bearer ${groqApiKey}`,
@@ -1091,6 +1102,19 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
         return success;
     });
 
+    ipcMain.handle('initialize-remote', async (event, whisperModel, profile, customPrompt, language) => {
+        if (typeof whisperModel !== 'string' || typeof profile !== 'string' || typeof language !== 'string') {
+            return false;
+        }
+
+        currentProviderMode = 'remote';
+        const success = await getRemoteAi().initializeRemoteSession(whisperModel, profile, customPrompt, language);
+        if (!success) {
+            currentProviderMode = 'byok';
+        }
+        return success;
+    });
+
     ipcMain.handle('cancel-local-initialization', async () => {
         const cancelled = await getLocalAi().cancelLocalInitialization();
         if (cancelled) {
@@ -1117,6 +1141,16 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
                 return { success: true };
             } catch (error) {
                 console.error('Error sending local audio:', error);
+                return { success: false, error: error.message };
+            }
+        }
+        if (currentProviderMode === 'remote') {
+            try {
+                const pcmBuffer = Buffer.from(data, 'base64');
+                getRemoteAi().processRemoteAudio(pcmBuffer);
+                return { success: true };
+            } catch (error) {
+                console.error('Error sending remote audio:', error);
                 return { success: false, error: error.message };
             }
         }
@@ -1152,6 +1186,16 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
                 return { success: true };
             } catch (error) {
                 console.error('Error sending local mic audio:', error);
+                return { success: false, error: error.message };
+            }
+        }
+        if (currentProviderMode === 'remote') {
+            try {
+                const pcmBuffer = Buffer.from(data, 'base64');
+                getRemoteAi().processRemoteAudio(pcmBuffer);
+                return { success: true };
+            } catch (error) {
+                console.error('Error sending remote mic audio:', error);
                 return { success: false, error: error.message };
             }
         }
@@ -1231,6 +1275,16 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
             }
         }
 
+        if (currentProviderMode === 'remote') {
+            try {
+                console.log('Sending text to remote API:', text);
+                return await getRemoteAi().sendRemoteText(text.trim());
+            } catch (error) {
+                console.error('Error sending remote text:', error);
+                return { success: false, error: error.message };
+            }
+        }
+
         if (!geminiSessionRef.current) return { success: false, error: 'No active Gemini session' };
 
         try {
@@ -1289,6 +1343,13 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
 
             if (currentProviderMode === 'local') {
                 getLocalAi().closeLocalSession();
+                currentProviderMode = 'byok';
+                closeTransportLog();
+                return { success: true };
+            }
+
+            if (currentProviderMode === 'remote') {
+                getRemoteAi().closeRemoteSession();
                 currentProviderMode = 'byok';
                 closeTransportLog();
                 return { success: true };
@@ -1362,4 +1423,7 @@ module.exports = {
     sendImageToGeminiHttp,
     setupGeminiIpcHandlers,
     formatSpeakerResults,
+    stripThinkingTags,
+    getChatCompletionsUrl,
+    getGroqReasoningOptions,
 };
