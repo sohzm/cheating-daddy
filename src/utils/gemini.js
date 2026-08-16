@@ -163,8 +163,8 @@ async function getEnabledTools() {
     console.log('Google Search enabled:', googleSearchEnabled);
 
     if (googleSearchEnabled === 'true') {
-        tools.push({ googleSearch: {} });
-        console.log('Added Google Search tool');
+        // googleSearch on the Live API returns a bogus "quota exceeded" on free-tier keys — keep it out of the live config
+        console.log('Google Search tool skipped (breaks live session on this tier)');
     } else {
         console.log('Google Search tool disabled');
     }
@@ -742,7 +742,7 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
             },
             config: {
                 responseModalities: [Modality.AUDIO],
-                proactivity: { proactiveAudio: true },
+                // proactivity was removed from the v1beta Live setup — sending it closes the session with "Unknown name"
                 outputAudioTranscription: {},
                 tools: enabledTools,
                 // Enable speaker diarization
