@@ -3,7 +3,16 @@ const { BrowserWindow, ipcMain } = require('electron');
 const { spawn } = require('child_process');
 const { saveDebugAudio } = require('../audioUtils');
 const { getSystemPrompt } = require('./prompts');
-const { getAvailableModel, incrementLimitCount, getApiKey, getGroqApiKey, incrementCharUsage, getConfig } = require('../storage');
+const {
+    getAvailableModel,
+    incrementLimitCount,
+    getApiKey,
+    getGroqApiKey,
+    incrementCharUsage,
+    getConfig,
+    getGeminiKeys,
+    cycleActiveKey,
+} = require('../storage');
 const { connectCloud, sendCloudAudio, sendCloudText, sendCloudImage, closeCloud, isCloudActive, setOnTurnComplete } = require('./cloud');
 const { startTransportLog, logTransportEvent, closeTransportLog } = require('./transportLogger');
 
@@ -993,60 +1002,111 @@ async function sendAudioToGemini(base64Data, geminiSessionRef) {
     }
 }
 
-async function sendImageToGeminiHttp(base64Data, prompt) {
-    // Get available model based on rate limits
-    const model = getAvailableModel();
+// Tried in order when the preferred model can't serve the request. The newest
+// model is the one that gets overloaded (503) on free tiers, while the older
+// ones keep answering, so falling back beats failing the request.
+const IMAGE_MODEL_FALLBACKS = ['gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.5-flash-lite'];
 
-    const apiKey = getApiKey();
-    if (!apiKey) {
+function getErrorStatus(error) {
+    return error?.status ?? error?.code ?? error?.response?.status;
+}
+
+function isQuotaError(error) {
+    return getErrorStatus(error) === 429 || /exceeded your current quota|resource_exhausted/i.test(String(error?.message || ''));
+}
+
+// 503 (overloaded), 500 (transient) and quota all mean "ask someone else"
+function isRetryableModelError(error) {
+    const status = getErrorStatus(error);
+    if (status === 503 || status === 500 || status === 429) return true;
+
+    return /unavailable|overloaded|high demand|internal error|not found for API version/i.test(String(error?.message || ''));
+}
+
+async function sendImageToGeminiHttp(base64Data, prompt) {
+    if (!getApiKey()) {
         return { success: false, error: 'No API key configured' };
     }
 
-    try {
-        const ai = new GoogleGenAI({ apiKey: apiKey });
-
-        const contents = [
-            {
-                inlineData: {
-                    mimeType: 'image/jpeg',
-                    data: base64Data,
-                },
+    const contents = [
+        {
+            inlineData: {
+                mimeType: 'image/jpeg',
+                data: base64Data,
             },
-            { text: prompt },
-        ];
+        },
+        { text: prompt },
+    ];
 
-        console.log(`Sending image to ${model} (streaming)...`);
-        const response = await ai.models.generateContentStream({
-            model: model,
-            contents: contents,
-        });
+    // Start from the rate-limit-aware pick, then walk the rest of the chain
+    const preferred = getAvailableModel();
+    const models = [preferred, ...IMAGE_MODEL_FALLBACKS.filter(model => model !== preferred)];
+    // Key rotation only applies when multiple keys are stored
+    const keyCount = Math.max((typeof getGeminiKeys === 'function' ? getGeminiKeys() : []).length, 1);
 
-        // Increment count after successful call
-        incrementLimitCount(model);
+    let lastError = 'Unknown error';
+    let hasStreamedText = false;
 
-        // Stream the response
-        let fullText = '';
-        let isFirst = true;
-        for await (const chunk of response) {
-            const chunkText = chunk.text;
-            if (chunkText) {
-                fullText += chunkText;
-                // Send to renderer - new response for first chunk, update for subsequent
-                sendToRenderer(isFirst ? 'new-response' : 'update-response', fullText);
-                isFirst = false;
+    for (let keyAttempt = 0; keyAttempt < keyCount; keyAttempt++) {
+        const ai = new GoogleGenAI({ apiKey: getApiKey() });
+        let sawQuotaError = false;
+
+        for (const model of models) {
+            try {
+                console.log(`Sending image to ${model} (streaming)...`);
+                const response = await ai.models.generateContentStream({ model, contents });
+
+                let fullText = '';
+                let isFirst = true;
+                for await (const chunk of response) {
+                    const chunkText = chunk.text;
+                    if (chunkText) {
+                        fullText += chunkText;
+                        hasStreamedText = true;
+                        // Send to renderer - new response for first chunk, update for subsequent
+                        sendToRenderer(isFirst ? 'new-response' : 'update-response', fullText);
+                        isFirst = false;
+                    }
+                }
+
+                incrementLimitCount(model);
+                console.log(`Image response completed from ${model}`);
+
+                if (model !== preferred) {
+                    sendToRenderer('update-status', `Answered by ${model}`);
+                }
+
+                saveScreenAnalysis(prompt, fullText, model);
+
+                return { success: true, text: fullText, model: model };
+            } catch (error) {
+                lastError = error.message || String(error);
+                console.error(`Image request failed on ${model}:`, lastError);
+
+                // Text already on screen came from this attempt; retrying would duplicate it
+                if (hasStreamedText) {
+                    return { success: false, error: lastError };
+                }
+
+                if (isQuotaError(error)) {
+                    sawQuotaError = true;
+                } else if (!isRetryableModelError(error)) {
+                    return { success: false, error: lastError };
+                }
+
+                sendToRenderer('update-status', `${model} unavailable, trying another model...`);
             }
         }
 
-        console.log(`Image response completed from ${model}`);
+        // Every model refused. If that was quota, another stored key may still have some.
+        if (!sawQuotaError || keyCount < 2 || typeof cycleActiveKey !== 'function') break;
 
-        // Save screen analysis to history
-        saveScreenAnalysis(prompt, fullText, model);
-
-        return { success: true, text: fullText, model: model };
-    } catch (error) {
-        console.error('Error sending image to Gemini HTTP:', error);
-        return { success: false, error: error.message };
+        const nextIndex = cycleActiveKey();
+        console.log(`Quota exhausted on this key, switching to slot ${nextIndex + 1}`);
+        sendToRenderer('update-status', `Quota reached, switched to key ${nextIndex + 1}`);
     }
+
+    return { success: false, error: lastError };
 }
 
 function setupGeminiIpcHandlers(geminiSessionRef) {
