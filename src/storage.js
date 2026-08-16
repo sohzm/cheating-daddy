@@ -331,9 +331,9 @@ function incrementLimitCount(model) {
     }
 
     // Increment the appropriate model count
-    if (model === 'gemini-2.5-flash') {
+    if (model === 'gemini-3.7-flash') {
         todayEntry.flash.count++;
-    } else if (model === 'gemini-2.5-flash-lite') {
+    } else if (model === 'gemini-3.5-flash-lite') {
         todayEntry.flashLite.count++;
     }
 
@@ -362,12 +362,12 @@ function getAvailableModel() {
     // RPD limits: flash = 20, flash-lite = 20
     // After both exhausted, fall back to flash (for paid API users)
     if (todayLimits.flash.count < 20) {
-        return 'gemini-2.5-flash';
+        return 'gemini-3.7-flash';
     } else if (todayLimits.flashLite.count < 20) {
-        return 'gemini-2.5-flash-lite';
+        return 'gemini-3.5-flash-lite';
     }
 
-    return 'gemini-2.5-flash'; // Default to flash for paid API users
+    return 'gemini-3.7-flash'; // Default to flash for paid API users
 }
 
 function getModelForToday() {
