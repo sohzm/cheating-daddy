@@ -23,8 +23,6 @@ export class CheatingDaddyApp extends LitElement {
             display: block;
             width: 100%;
             height: 100vh;
-            overflow: hidden;
-            border-radius: 12px;
             background: var(--bg-app);
             color: var(--text-primary);
         }
@@ -33,11 +31,8 @@ export class CheatingDaddyApp extends LitElement {
 
         .app-shell {
             display: flex;
-            height: calc(100vh - 2px);
-            margin: 1px;
+            height: 100vh;
             overflow: hidden;
-            border: 2px solid rgba(255, 255, 255, 0.18);
-            border-radius: 11px;
         }
 
         .top-drag-bar {
@@ -365,6 +360,24 @@ export class CheatingDaddyApp extends LitElement {
         ::-webkit-scrollbar-thumb:hover {
             background: #444444;
         }
+
+        .resize-handle {
+            position: fixed;
+            bottom: 0;
+            right: 0;
+            width: 14px;
+            height: 14px;
+            cursor: nwse-resize;
+            background: linear-gradient(135deg, transparent 50%, var(--text-muted) 50%);
+            opacity: 0.3;
+            -webkit-app-region: no-drag;
+            z-index: 10000;
+            transition: opacity var(--transition);
+        }
+
+        .resize-handle:hover {
+            opacity: 1;
+        }
     `;
 
     static properties = {
@@ -387,7 +400,6 @@ export class CheatingDaddyApp extends LitElement {
         _storageLoaded: { state: true },
         _updateAvailable: { state: true },
         _whisperDownloading: { state: true },
-        _localAiDownloadProgress: { state: true },
     };
 
     constructor() {
@@ -413,7 +425,6 @@ export class CheatingDaddyApp extends LitElement {
         this._timerInterval = null;
         this._updateAvailable = false;
         this._whisperDownloading = false;
-        this._localAiDownloadProgress = { active: false, label: '', percentage: null };
         this._localVersion = '';
 
         this._loadFromStorage();
@@ -478,9 +489,6 @@ export class CheatingDaddyApp extends LitElement {
             ipcRenderer.on('whisper-downloading', (_, downloading) => {
                 this._whisperDownloading = downloading;
             });
-            ipcRenderer.on('local-ai-download-progress', (_, progress) => {
-                this._localAiDownloadProgress = progress;
-            });
         }
     }
 
@@ -495,7 +503,6 @@ export class CheatingDaddyApp extends LitElement {
             ipcRenderer.removeAllListeners('click-through-toggled');
             ipcRenderer.removeAllListeners('reconnect-failed');
             ipcRenderer.removeAllListeners('whisper-downloading');
-            ipcRenderer.removeAllListeners('local-ai-download-progress');
         }
     }
 
@@ -537,7 +544,8 @@ export class CheatingDaddyApp extends LitElement {
 
     addNewResponse(response) {
         const wasOnLatest = this.currentResponseIndex === this.responses.length - 1;
-        this.responses = [...this.responses, response];
+        const formattedResponse = typeof response === 'string' ? { isUser: false, text: response } : response;
+        this.responses = [...this.responses, formattedResponse];
         if (wasOnLatest || this.currentResponseIndex === -1) {
             this.currentResponseIndex = this.responses.length - 1;
         }
@@ -546,8 +554,9 @@ export class CheatingDaddyApp extends LitElement {
     }
 
     updateCurrentResponse(response) {
-        if (this.responses.length > 0) {
-            this.responses = [...this.responses.slice(0, -1), response];
+        if (this.responses.length > 0 && !this.responses[this.responses.length - 1].isUser) {
+            const formattedResponse = typeof response === 'string' ? { isUser: false, text: response } : response;
+            this.responses = [...this.responses.slice(0, -1), formattedResponse];
         } else {
             this.addNewResponse(response);
         }
@@ -597,7 +606,7 @@ export class CheatingDaddyApp extends LitElement {
 
     async handleStart() {
         const prefs = await cheatingDaddy.storage.getPreferences();
-        const providerMode = prefs.providerMode === 'cloud' ? 'byok' : prefs.providerMode || 'byok';
+        const providerMode = prefs.providerMode || 'cloud';
 
         if (providerMode === 'cloud') {
             const creds = await cheatingDaddy.storage.getCredentials();
@@ -648,14 +657,10 @@ export class CheatingDaddyApp extends LitElement {
         this._startTimer();
     }
 
-    async handleCancelLocalDownload() {
-        await cheatingDaddy.cancelLocalInitialization();
-    }
-
     async handleAPIKeyHelp() {
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
-            await ipcRenderer.invoke('open-external', 'https://cheatingdaddy.com/help/api-key');
+            await ipcRenderer.invoke('open-external', 'https://devilai.com/help/api-key');
         }
     }
 
@@ -691,6 +696,14 @@ export class CheatingDaddyApp extends LitElement {
     async handleLayoutModeChange(layoutMode) {
         this.layoutMode = layoutMode;
         await cheatingDaddy.storage.updateConfig('layout', layoutMode);
+        if (window.require) {
+            try {
+                const { ipcRenderer } = window.require('electron');
+                await ipcRenderer.invoke('update-sizes');
+            } catch (error) {
+                console.error('Failed to update sizes:', error);
+            }
+        }
         this.requestUpdate();
     }
 
@@ -702,6 +715,11 @@ export class CheatingDaddyApp extends LitElement {
     }
 
     async handleSendText(message) {
+        // Optimistically add user message to UI
+        this.responses = [...this.responses, { isUser: true, text: message }];
+        this.currentResponseIndex = this.responses.length - 1;
+        this.requestUpdate();
+
         const result = await window.cheatingDaddy.sendTextMessage(message);
         if (!result.success) {
             this.setStatus('Error sending message: ' + result.error);
@@ -753,8 +771,6 @@ export class CheatingDaddyApp extends LitElement {
                         .onStart=${() => this.handleStart()}
                         .onExternalLink=${url => this.handleExternalLinkClick(url)}
                         .whisperDownloading=${this._whisperDownloading}
-                        .downloadProgress=${this._localAiDownloadProgress}
-                        .onCancelDownload=${() => this.handleCancelLocalDownload()}
                     ></main-view>
                 `;
 
@@ -906,25 +922,23 @@ export class CheatingDaddyApp extends LitElement {
                     )}
                 </nav>
                 <div class="sidebar-footer">
-                    ${
-                        this._updateAvailable
-                            ? html`
-                                  <button class="update-btn" @click=${() => this.handleExternalLinkClick('https://cheatingdaddy.com/download')}>
-                                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                                          <path
-                                              fill="none"
-                                              stroke="currentColor"
-                                              stroke-linecap="round"
-                                              stroke-linejoin="round"
-                                              stroke-width="2"
-                                              d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2M7 11l5 5l5-5m-5-7v12"
-                                          />
-                                      </svg>
-                                      Update available
-                                  </button>
-                              `
-                            : html` <div class="version-text">v${this._localVersion}</div> `
-                    }
+                    ${this._updateAvailable
+                        ? html`
+                              <button class="update-btn" @click=${() => this.handleExternalLinkClick('https://devilai.com/download')}>
+                                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                                      <path
+                                          fill="none"
+                                          stroke="currentColor"
+                                          stroke-linecap="round"
+                                          stroke-linejoin="round"
+                                          stroke-width="2"
+                                          d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2M7 11l5 5l5-5m-5-7v12"
+                                      />
+                                  </svg>
+                                  Update available
+                              </button>
+                          `
+                        : html` <div class="version-text">v${this._localVersion}</div> `}
                 </div>
             </div>
         `;
@@ -990,6 +1004,7 @@ export class CheatingDaddyApp extends LitElement {
                     <div class="content-inner ${isLive ? 'live' : ''}">${this.renderCurrentView()}</div>
                 </div>
             </div>
+            <div class="resize-handle"></div>
         `;
     }
 }

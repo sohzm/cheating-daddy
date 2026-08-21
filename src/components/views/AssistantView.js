@@ -54,12 +54,22 @@ export class AssistantView extends LitElement {
             font-weight: var(--font-weight-semibold);
         }
 
-        .response-container h1 { font-size: 1.5em; }
-        .response-container h2 { font-size: 1.3em; }
-        .response-container h3 { font-size: 1.15em; }
-        .response-container h4 { font-size: 1.05em; }
+        .response-container h1 {
+            font-size: 1.5em;
+        }
+        .response-container h2 {
+            font-size: 1.3em;
+        }
+        .response-container h3 {
+            font-size: 1.15em;
+        }
+        .response-container h4 {
+            font-size: 1.05em;
+        }
         .response-container h5,
-        .response-container h6 { font-size: 1em; }
+        .response-container h6 {
+            font-size: 1em;
+        }
 
         .response-container p {
             margin: 0.6em 0;
@@ -159,52 +169,39 @@ export class AssistantView extends LitElement {
             background: #444444;
         }
 
-        /* ── Response navigation strip ── */
+        /* ── Continuous Chat ── */
 
-        .response-nav {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: var(--space-sm);
-            padding: var(--space-xs) var(--space-md);
-            border-top: 1px solid var(--border);
-            background: var(--bg-app);
+        .chat-message {
+            margin-bottom: var(--space-md);
+            padding-bottom: var(--space-md);
         }
 
-        .nav-btn {
-            background: none;
-            border: none;
-            color: var(--text-muted);
-            cursor: pointer;
-            padding: var(--space-xs);
-            border-radius: var(--radius-sm);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: color var(--transition);
+        .assistant-message {
+            border-bottom: 1px solid var(--border);
         }
 
-        .nav-btn:hover:not(:disabled) {
-            color: var(--text-primary);
+        .chat-message:last-child {
+            margin-bottom: 0;
+            padding-bottom: 0;
+            border-bottom: none;
         }
 
-        .nav-btn:disabled {
-            opacity: 0.25;
-            cursor: default;
+        .user-message {
+            background: var(--bg-hover);
+            border-radius: var(--radius-md);
+            padding: var(--space-sm) var(--space-md);
+            margin-left: 10%;
+            border-bottom: none;
         }
 
-        .nav-btn svg {
-            width: 14px;
-            height: 14px;
-        }
-
-        .response-counter {
+        .message-role {
             font-size: var(--font-size-xs);
             color: var(--text-muted);
-            font-family: var(--font-mono);
-            min-width: 40px;
-            text-align: center;
+            margin-bottom: var(--space-xs);
+            font-weight: var(--font-weight-medium);
         }
+
+        /* Removed response navigation strip CSS as we use continuous scrolling now */
 
         /* ── Bottom input bar ── */
 
@@ -263,7 +260,9 @@ export class AssistantView extends LitElement {
             display: flex;
             align-items: center;
             gap: 4px;
-            transition: border-color 0.4s ease, background var(--transition);
+            transition:
+                border-color 0.4s ease,
+                background var(--transition);
             flex-shrink: 0;
             overflow: hidden;
         }
@@ -332,9 +331,7 @@ export class AssistantView extends LitElement {
 
     getCurrentResponse() {
         const profileNames = this.getProfileNames();
-        return this.responses.length > 0 && this.currentResponseIndex >= 0
-            ? this.responses[this.currentResponseIndex]
-            : `Listening to your ${profileNames[this.selectedProfile] || 'session'}...`;
+        return `Listening to your ${profileNames[this.selectedProfile] || 'session'}...`;
     }
 
     renderMarkdown(content) {
@@ -384,30 +381,6 @@ export class AssistantView extends LitElement {
         return doc.body.innerHTML;
     }
 
-    navigateToPreviousResponse() {
-        if (this.currentResponseIndex > 0) {
-            this.currentResponseIndex--;
-            this.dispatchEvent(
-                new CustomEvent('response-index-changed', {
-                    detail: { index: this.currentResponseIndex },
-                })
-            );
-            this.requestUpdate();
-        }
-    }
-
-    navigateToNextResponse() {
-        if (this.currentResponseIndex < this.responses.length - 1) {
-            this.currentResponseIndex++;
-            this.dispatchEvent(
-                new CustomEvent('response-index-changed', {
-                    detail: { index: this.currentResponseIndex },
-                })
-            );
-            this.requestUpdate();
-        }
-    }
-
     scrollResponseUp() {
         const container = this.shadowRoot.querySelector('.response-container');
         if (container) {
@@ -429,14 +402,9 @@ export class AssistantView extends LitElement {
 
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
-
-            this.handlePreviousResponse = () => this.navigateToPreviousResponse();
-            this.handleNextResponse = () => this.navigateToNextResponse();
             this.handleScrollUp = () => this.scrollResponseUp();
             this.handleScrollDown = () => this.scrollResponseDown();
 
-            ipcRenderer.on('navigate-previous-response', this.handlePreviousResponse);
-            ipcRenderer.on('navigate-next-response', this.handleNextResponse);
             ipcRenderer.on('scroll-response-up', this.handleScrollUp);
             ipcRenderer.on('scroll-response-down', this.handleScrollDown);
         }
@@ -448,8 +416,6 @@ export class AssistantView extends LitElement {
 
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
-            if (this.handlePreviousResponse) ipcRenderer.removeListener('navigate-previous-response', this.handlePreviousResponse);
-            if (this.handleNextResponse) ipcRenderer.removeListener('navigate-next-response', this.handleNextResponse);
             if (this.handleScrollUp) ipcRenderer.removeListener('scroll-response-up', this.handleScrollUp);
             if (this.handleScrollDown) ipcRenderer.removeListener('scroll-response-down', this.handleScrollDown);
         }
@@ -480,6 +446,15 @@ export class AssistantView extends LitElement {
         }
     }
 
+    async handleScreenAnswerLong() {
+        if (this.isAnalyzing) return;
+        if (window.captureManualScreenshotLong) {
+            this.isAnalyzing = true;
+            this._responseCountWhenStarted = this.responses.length;
+            window.captureManualScreenshotLong();
+        }
+    }
+
     _startWaveformAnimation() {
         const canvas = this.shadowRoot.querySelector('.analyze-canvas');
         if (!canvas) return;
@@ -506,7 +481,7 @@ export class AssistantView extends LitElement {
         const perimeter = 2 * straightLen + 2 * arcLen;
 
         // Given a distance along the perimeter, return {x, y, nx, ny} (position + inward normal)
-        const pointOnPerimeter = (d) => {
+        const pointOnPerimeter = d => {
             d = ((d % perimeter) + perimeter) % perimeter;
             // Top straight: left to right
             if (d < straightLen) {
@@ -539,13 +514,13 @@ export class AssistantView extends LitElement {
             };
         };
 
-        // Pre-seed random offsets for stable particles
-        const seeds = [];
-        for (let i = 0; i < PARTICLE_COUNT; i++) {
-            seeds.push({ pos: Math.random(), drift: Math.random(), depthSeed: Math.random() });
-        }
+        const seeds = Array.from({ length: PARTICLE_COUNT }).map(() => ({
+            pos: Math.random(),
+            drift: (Math.random() - 0.5) * 2,
+            depthSeed: Math.random(),
+        }));
 
-        const draw = (now) => {
+        const draw = now => {
             const elapsed = (now - startTime) / 1000;
             const fade = Math.min(1, elapsed / FADE_IN);
 
@@ -633,7 +608,7 @@ export class AssistantView extends LitElement {
 
     updated(changedProperties) {
         super.updated(changedProperties);
-        if (changedProperties.has('responses') || changedProperties.has('currentResponseIndex')) {
+        if (changedProperties.has('responses')) {
             this.updateResponseContent();
         }
 
@@ -655,9 +630,26 @@ export class AssistantView extends LitElement {
     updateResponseContent() {
         const container = this.shadowRoot.querySelector('#responseContainer');
         if (container) {
-            const currentResponse = this.getCurrentResponse();
-            const renderedResponse = this.renderMarkdown(currentResponse);
-            container.innerHTML = renderedResponse;
+            const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 50;
+
+            if (this.responses.length === 0) {
+                container.innerHTML = `<div class="chat-message assistant-message">${this.renderMarkdown(this.getCurrentResponse())}</div>`;
+            } else {
+                container.innerHTML = this.responses
+                    .map(resp => {
+                        const isUser = typeof resp === 'object' && resp.isUser;
+                        const text = typeof resp === 'string' ? resp : resp.text || '';
+                        const cssClass = isUser ? 'user-message' : 'assistant-message';
+                        const roleLabel = isUser ? `<div class="message-role">You</div>` : '';
+                        return `<div class="chat-message ${cssClass}">${roleLabel}${this.renderMarkdown(text)}</div>`;
+                    })
+                    .join('');
+            }
+
+            if (isAtBottom && this.responses.length > 0) {
+                this.scrollToBottom();
+            }
+
             if (this.shouldAnimateResponse) {
                 this.dispatchEvent(new CustomEvent('response-animation-complete', { bubbles: true, composed: true }));
             }
@@ -665,45 +657,48 @@ export class AssistantView extends LitElement {
     }
 
     render() {
-        const hasMultipleResponses = this.responses.length > 1;
-
         return html`
             <div class="response-container" id="responseContainer"></div>
 
-            ${hasMultipleResponses ? html`
-                <div class="response-nav">
-                    <button class="nav-btn" @click=${this.navigateToPreviousResponse} ?disabled=${this.currentResponseIndex <= 0} title="Previous response">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd" />
-                        </svg>
+            <div class="controls-row">
+                <div class="input-bar">
+                    <div class="input-bar-inner">
+                        <input type="text" id="textInput" placeholder="Type a message..." @keydown=${this.handleTextKeydown} />
+                    </div>
+                </div>
+                <div class="buttons-bar">
+                    <button class="analyze-btn" @click=${this.handleScreenAnswerLong} title="Analyze Long Screen (Auto-Scrolls)">
+                        <span class="analyze-btn-content">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24">
+                                <path
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M12 5v14m-4-4l4 4l4-4"
+                                />
+                            </svg>
+                            Long
+                        </span>
                     </button>
-                    <span class="response-counter">${this.currentResponseIndex + 1} of ${this.responses.length}</span>
-                    <button class="nav-btn" @click=${this.navigateToNextResponse} ?disabled=${this.currentResponseIndex >= this.responses.length - 1} title="Next response">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
-                        </svg>
+                    <button class="analyze-btn ${this.isAnalyzing ? 'analyzing' : ''}" @click=${this.handleScreenAnswer} title="Analyze Screen">
+                        <canvas class="analyze-canvas"></canvas>
+                        <span class="analyze-btn-content">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24">
+                                <path
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M13 3v7h6l-8 11v-7H5z"
+                                />
+                            </svg>
+                            Analyze Screen
+                        </span>
                     </button>
                 </div>
-            ` : ''}
-
-            <div class="input-bar">
-                <div class="input-bar-inner">
-                    <input
-                        type="text"
-                        id="textInput"
-                        placeholder="Type a message..."
-                        @keydown=${this.handleTextKeydown}
-                    />
-                </div>
-                <button class="analyze-btn ${this.isAnalyzing ? 'analyzing' : ''}" @click=${this.handleScreenAnswer}>
-                    <canvas class="analyze-canvas"></canvas>
-                    <span class="analyze-btn-content">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24">
-                            <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 3v7h6l-8 11v-7H5z" />
-                        </svg>
-                        Analyze Screen
-                    </span>
-                </button>
             </div>
         `;
     }

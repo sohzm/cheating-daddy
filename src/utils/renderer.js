@@ -155,11 +155,12 @@ async function initializeGemini(profile = 'interview', language = 'en-US') {
 
 async function initializeLocal(profile = 'interview') {
     const prefs = await storage.getPreferences();
-    const localLlmModel = prefs.localLlmModel || 'unsloth/Qwen3.5-4B-GGUF:Q4_K_M';
-    const whisperModel = prefs.whisperModel || 'tiny.en';
+    const ollamaHost = prefs.ollamaHost || 'http://127.0.0.1:11434';
+    const ollamaModel = prefs.ollamaModel || 'llama3.1';
+    const whisperModel = prefs.whisperModel || 'Xenova/whisper-small';
     const customPrompt = prefs.customPrompt || '';
 
-    const success = await ipcRenderer.invoke('initialize-local', localLlmModel, whisperModel, profile, customPrompt);
+    const success = await ipcRenderer.invoke('initialize-local', ollamaHost, ollamaModel, whisperModel, profile, customPrompt);
     if (success) {
         cheatingDaddy.setStatus('Local AI Live');
         return true;
@@ -167,10 +168,6 @@ async function initializeLocal(profile = 'interview') {
         cheatingDaddy.setStatus('error');
         return false;
     }
-}
-
-async function cancelLocalInitialization() {
-    return ipcRenderer.invoke('cancel-local-initialization');
 }
 
 async function initializeCloud(profile = 'interview') {
@@ -661,8 +658,116 @@ async function captureManualScreenshot(imageQuality = null) {
     );
 }
 
-// Expose functions to global scope for external access
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+async function captureManualScreenshotLong(imageQuality = null) {
+    console.log('Long manual screenshot (auto-scroll) triggered');
+    const quality = imageQuality || currentImageQuality;
+
+    if (!mediaStream) {
+        console.error('No media stream available');
+        return;
+    }
+
+    if (!hiddenVideo) {
+        hiddenVideo = document.createElement('video');
+        hiddenVideo.srcObject = mediaStream;
+        hiddenVideo.muted = true;
+        hiddenVideo.playsInline = true;
+        await hiddenVideo.play();
+        await new Promise(resolve => {
+            if (hiddenVideo.readyState >= 2) return resolve();
+            hiddenVideo.onloadedmetadata = () => resolve();
+        });
+    }
+
+    if (hiddenVideo.readyState < 2) {
+        console.warn('Video not ready yet');
+        return;
+    }
+
+    // Hide the app to reveal the content behind it
+    await ipcRenderer.invoke('toggle-window-visibility');
+    await sleep(400);
+
+    const MAX_WIDTH = 1280;
+    const srcW = hiddenVideo.videoWidth;
+    const srcH = hiddenVideo.videoHeight;
+    let destW = srcW;
+    let destH = srcH;
+    if (srcW > MAX_WIDTH) {
+        destW = MAX_WIDTH;
+        destH = Math.round(srcH * (MAX_WIDTH / srcW));
+    }
+
+    // Determine how many scrolls we want. 2 scrolls = 3 screens total.
+    const SCROLL_COUNT = 3;
+
+    const tallCanvas = document.createElement('canvas');
+    tallCanvas.width = destW;
+    tallCanvas.height = destH * SCROLL_COUNT;
+    const tallCtx = tallCanvas.getContext('2d');
+
+    for (let i = 0; i < SCROLL_COUNT; i++) {
+        // Capture frame
+        tallCtx.drawImage(hiddenVideo, 0, i * destH, destW, destH);
+
+        if (i < SCROLL_COUNT - 1) {
+            // Scroll down for the next frame
+            await ipcRenderer.invoke('simulate-pagedown');
+            await sleep(600); // Wait for smooth scrolling to finish
+        }
+    }
+
+    // Show the app again
+    await ipcRenderer.invoke('toggle-window-visibility');
+
+    let qualityValue;
+    switch (quality) {
+        case 'high':
+            qualityValue = 0.85;
+            break;
+        case 'medium':
+            qualityValue = 0.6;
+            break;
+        case 'low':
+            qualityValue = 0.4;
+            break;
+        default:
+            qualityValue = 0.6;
+    }
+
+    tallCanvas.toBlob(
+        async blob => {
+            if (!blob) {
+                console.error('Failed to create blob');
+                return;
+            }
+            const reader = new FileReader();
+            reader.onloadend = async () => {
+                const base64data = reader.result.split(',')[1];
+                if (!base64data || base64data.length < 100) return;
+
+                console.log(`Sending long image: ${destW}x${tallCanvas.height}, ~${Math.round(base64data.length / 1024)}KB`);
+
+                const result = await ipcRenderer.invoke('send-image-content', {
+                    data: base64data,
+                    prompt: MANUAL_SCREENSHOT_PROMPT,
+                });
+                if (result.success) {
+                    console.log(`Long image response completed from ${result.model}`);
+                }
+            };
+            reader.readAsDataURL(blob);
+        },
+        'image/jpeg',
+        qualityValue
+    );
+}
+
+// Global exposure for UI
 window.captureManualScreenshot = captureManualScreenshot;
+window.captureManualScreenshotLong = captureManualScreenshotLong;
 
 function stopCapture() {
     if (screenshotInterval) {
@@ -781,6 +886,10 @@ function handleShortcut(shortcutKey) {
             cheatingDaddy.element().handleStart();
         } else {
             captureManualScreenshot();
+        }
+    } else if (shortcutKey === 'ctrl+shift+enter' || shortcutKey === 'cmd+shift+enter') {
+        if (currentView !== 'main') {
+            captureManualScreenshotLong();
         }
     }
 }
@@ -1062,7 +1171,9 @@ const theme = {
 
     async save(themeName) {
         await storage.updatePreference('theme', themeName);
-        this.apply(themeName);
+        const prefs = await storage.getPreferences();
+        const alpha = prefs.backgroundTransparency ?? 0.8;
+        this.apply(themeName, alpha);
     },
 };
 
@@ -1088,7 +1199,6 @@ const cheatingDaddy = {
     initializeGemini,
     initializeCloud,
     initializeLocal,
-    cancelLocalInitialization,
     startCapture,
     stopCapture,
     sendTextMessage,

@@ -1,5 +1,6 @@
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
 import { unifiedPageStyles } from './sharedPageStyles.js';
+import '../ui/CustomSelect.js';
 
 export class AICustomizeView extends LitElement {
     static styles = [
@@ -101,9 +102,13 @@ export class AICustomizeView extends LitElement {
                         <div class="form-grid">
                             <div class="form-group">
                                 <label class="form-label">Profile</label>
-                                <select class="control" .value=${this.selectedProfile} @change=${this._handleProfileChange}>
-                                    ${profiles.map(profile => html`<option value=${profile.value}>${profile.label}</option>`)}
-                                </select>
+                                <custom-select
+                                    style="width: 200px"
+                                    .value=${this.selectedProfile}
+                                    @change=${this._handleProfileChange}
+                                    .options=${profiles}
+                                >
+                                </custom-select>
                             </div>
                             <div class="form-group vertical">
                                 <label class="form-label">Custom Instructions</label>
@@ -117,7 +122,6 @@ export class AICustomizeView extends LitElement {
                             </div>
                         </div>
                     </section>
-
                 </div>
             </div>
         `;

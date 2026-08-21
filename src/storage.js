@@ -9,10 +9,6 @@ const DEFAULT_CONFIG = {
     configVersion: CONFIG_VERSION,
     onboarded: false,
     layout: 'normal',
-    geminiLiveModel: 'gemini-3.1-flash-live-preview',
-    groqModel: 'qwen/qwen3.6-27b',
-    groqImageModel: 'qwen/qwen3.6-27b',
-    disableGroqThinking: true,
 };
 
 const DEFAULT_CREDENTIALS = {
@@ -22,7 +18,6 @@ const DEFAULT_CREDENTIALS = {
 
 const DEFAULT_PREFERENCES = {
     customPrompt: '',
-    providerMode: 'byok',
     selectedProfile: 'interview',
     selectedLanguage: 'en-US',
     selectedScreenshotInterval: '5',
@@ -32,14 +27,15 @@ const DEFAULT_PREFERENCES = {
     fontSize: 'medium',
     backgroundTransparency: 0.8,
     googleSearchEnabled: false,
-    localLlmModel: 'unsloth/Qwen3.5-4B-GGUF:Q4_K_M',
-    whisperModel: 'tiny.en',
+    ollamaHost: 'http://127.0.0.1:11434',
+    ollamaModel: 'llama3.1',
+    whisperModel: 'Xenova/whisper-small',
 };
 
 const DEFAULT_KEYBINDS = null; // null means use system defaults
 
 const DEFAULT_LIMITS = {
-    data: [], // Array of { date: 'YYYY-MM-DD', flash: { count }, flashLite: { count }, groq: { 'qwen3-32b': { chars, limit }, 'gpt-oss-120b': { chars, limit }, 'gpt-oss-20b': { chars, limit } }, gemini: { 'gemma-4-26b-a4b-it': { chars } } }
+    data: [], // Array of { date: 'YYYY-MM-DD', flash: { count }, flashLite: { count }, groq: { 'qwen3-32b': { chars, limit }, 'gpt-oss-120b': { chars, limit }, 'gpt-oss-20b': { chars, limit } }, gemini: { 'gemma-3-27b-it': { chars } } }
 };
 
 // Get the config directory path based on OS
@@ -165,8 +161,7 @@ function initializeStorage() {
 // ============ CONFIG ============
 
 function getConfig() {
-    const saved = readJsonFile(getConfigPath(), {});
-    return { ...DEFAULT_CONFIG, ...saved };
+    return readJsonFile(getConfigPath(), DEFAULT_CONFIG);
 }
 
 function setConfig(config) {
@@ -213,15 +208,7 @@ function setGroqApiKey(groqApiKey) {
 
 function getPreferences() {
     const saved = readJsonFile(getPreferencesPath(), {});
-    const preferences = { ...DEFAULT_PREFERENCES, ...saved };
-    const legacyWhisperModels = {
-        'Xenova/whisper-tiny': 'tiny.en',
-        'Xenova/whisper-base': 'base.en',
-        'Xenova/whisper-small': 'small.en',
-    };
-
-    preferences.whisperModel = legacyWhisperModels[preferences.whisperModel] || preferences.whisperModel;
-    return preferences;
+    return { ...DEFAULT_PREFERENCES, ...saved };
 }
 
 function setPreferences(preferences) {
@@ -280,7 +267,7 @@ function getTodayLimits() {
         }
         if (!todayEntry.gemini) {
             todayEntry.gemini = {
-                'gemma-4-26b-a4b-it': { chars: 0 },
+                'gemma-3-27b-it': { chars: 0 },
             };
         }
         setLimits(limits);
@@ -300,7 +287,7 @@ function getTodayLimits() {
             'kimi-k2-instruct': { chars: 0, limit: 600000 },
         },
         gemini: {
-            'gemma-4-26b-a4b-it': { chars: 0 },
+            'gemma-3-27b-it': { chars: 0 },
         },
     };
     limits.data.push(newEntry);
@@ -374,6 +361,9 @@ function getModelForToday() {
     const todayEntry = getTodayLimits();
     const groq = todayEntry.groq;
 
+    if (groq['qwen3-32b'].chars < groq['qwen3-32b'].limit) {
+        return 'qwen/qwen3-32b';
+    }
     if (groq['gpt-oss-120b'].chars < groq['gpt-oss-120b'].limit) {
         return 'openai/gpt-oss-120b';
     }
