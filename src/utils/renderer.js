@@ -249,41 +249,23 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
                 }
             }
         } else if (isLinux) {
-            // Linux - use display media for screen capture and try to get system audio
-            try {
-                // First try to get system audio via getDisplayMedia (works on newer browsers)
-                mediaStream = await navigator.mediaDevices.getDisplayMedia({
-                    video: {
-                        frameRate: 1,
-                        width: { ideal: 1920 },
-                        height: { ideal: 1080 },
-                    },
-                    audio: {
-                        sampleRate: SAMPLE_RATE,
-                        channelCount: 1,
-                        echoCancellation: false, // Don't cancel system audio
-                        noiseSuppression: false,
-                        autoGainControl: false,
-                    },
-                });
-
-                console.log('Linux system audio capture via getDisplayMedia succeeded');
-
-                // Setup audio processing for Linux system audio
-                setupLinuxSystemAudioProcessing();
-            } catch (systemAudioError) {
-                console.warn('System audio via getDisplayMedia failed, trying screen-only capture:', systemAudioError);
-
-                // Fallback to screen-only capture
-                mediaStream = await navigator.mediaDevices.getDisplayMedia({
-                    video: {
-                        frameRate: 1,
-                        width: { ideal: 1920 },
-                        height: { ideal: 1080 },
-                    },
-                    audio: false,
-                });
+            // Linux: system audio is captured in the main process via PipeWire
+            // (pw-record on the default sink monitor). getDisplayMedia audio is
+            // unreliable on Linux, so the screen capture is video-only here.
+            const captureMode = preferencesCache.linuxCaptureMode === 'intercept' ? 'intercept' : 'tap';
+            const audioResult = await ipcRenderer.invoke('start-linux-audio', { mode: captureMode });
+            if (!audioResult.success) {
+                console.warn('Failed to start Linux system audio capture:', audioResult.error);
             }
+
+            mediaStream = await navigator.mediaDevices.getDisplayMedia({
+                video: {
+                    frameRate: 1,
+                    width: { ideal: 1920 },
+                    height: { ideal: 1080 },
+                },
+                audio: false,
+            });
 
             // Additionally get microphone input for Linux based on audio mode
             if (audioMode === 'mic_only' || audioMode === 'both') {
@@ -310,7 +292,7 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
                 }
             }
 
-            console.log('Linux capture started - system audio:', mediaStream.getAudioTracks().length > 0, 'microphone mode:', audioMode);
+            console.log('Linux capture started - system audio:', audioResult.success, 'microphone mode:', audioMode);
         } else {
             // Windows - use display media with loopback for system audio
             mediaStream = await navigator.mediaDevices.getDisplayMedia({
@@ -364,6 +346,16 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
         console.log('Manual mode enabled - screenshots will be captured on demand only');
     } catch (err) {
         console.error('Error starting capture:', err);
+        // If system audio capture already started, stop it so we don't keep
+        // recording - and in intercept mode holding the default sink on the
+        // virtual tap - with no UI running.
+        if (isLinux) {
+            try {
+                await ipcRenderer.invoke('stop-linux-audio');
+            } catch (cleanupError) {
+                console.warn('Failed to stop Linux audio after capture error:', cleanupError);
+            }
+        }
         cheatingDaddy.setStatus('error');
     }
 }
@@ -399,36 +391,6 @@ function setupLinuxMicProcessing(micStream) {
 
     // Store processor reference for cleanup
     micAudioProcessor = micProcessor;
-}
-
-function setupLinuxSystemAudioProcessing() {
-    // Setup system audio processing for Linux (from getDisplayMedia)
-    audioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
-    const source = audioContext.createMediaStreamSource(mediaStream);
-    audioProcessor = audioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
-
-    let audioBuffer = [];
-    const samplesPerChunk = SAMPLE_RATE * AUDIO_CHUNK_DURATION;
-
-    audioProcessor.onaudioprocess = async e => {
-        const inputData = e.inputBuffer.getChannelData(0);
-        audioBuffer.push(...inputData);
-
-        // Process audio in chunks
-        while (audioBuffer.length >= samplesPerChunk) {
-            const chunk = audioBuffer.splice(0, samplesPerChunk);
-            const pcmData16 = convertFloat32ToInt16(chunk);
-            const base64Data = arrayBufferToBase64(pcmData16.buffer);
-
-            await ipcRenderer.invoke('send-audio-content', {
-                data: base64Data,
-                mimeType: 'audio/pcm;rate=24000',
-            });
-        }
-    };
-
-    source.connect(audioProcessor);
-    audioProcessor.connect(audioContext.destination);
 }
 
 function setupWindowsLoopbackProcessing() {
@@ -695,6 +657,13 @@ function stopCapture() {
     if (isMacOS) {
         ipcRenderer.invoke('stop-macos-audio').catch(err => {
             console.error('Error stopping macOS audio:', err);
+        });
+    }
+
+    // Stop Linux audio capture if running (main-process PipeWire capture)
+    if (isLinux) {
+        ipcRenderer.invoke('stop-linux-audio').catch(err => {
+            console.error('Error stopping Linux audio:', err);
         });
     }
 

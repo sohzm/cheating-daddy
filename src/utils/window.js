@@ -36,7 +36,14 @@ function createWindow(sendToRenderer, geminiSessionRef) {
     session.defaultSession.setDisplayMediaRequestHandler(
         (request, callback) => {
             desktopCapturer.getSources({ types: ['screen'] }).then(sources => {
-                callback({ video: sources[0], audio: 'loopback' });
+                // 'loopback' system audio is only supported on Windows (and macOS 14+,
+                // where this app uses SystemAudioDump instead). Requesting it elsewhere
+                // makes the whole capture fail or yields a dead audio track.
+                if (process.platform === 'win32' && request.audioRequested) {
+                    callback({ video: sources[0], audio: 'loopback' });
+                } else {
+                    callback({ video: sources[0] });
+                }
             });
         },
         { useSystemPicker: true }

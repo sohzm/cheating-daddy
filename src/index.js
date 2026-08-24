@@ -1,14 +1,26 @@
+// Prevent uncaught EPIPE crashes when stdout/stderr pipes are closed
+// (e.g. app launched from a desktop entry or a pipe whose reader exited)
+for (const stream of [process.stdout, process.stderr]) {
+    stream.on('error', error => {
+        if (error && error.code === 'EPIPE') return;
+        throw error;
+    });
+}
+
 if (require('electron-squirrel-startup')) {
     process.exit(0);
 }
 
 const { app, BrowserWindow, shell, ipcMain } = require('electron');
 const { createWindow, updateGlobalShortcuts } = require('./utils/window');
-const { setupGeminiIpcHandlers, stopMacOSAudioCapture, sendToRenderer } = require('./utils/gemini');
+const { setupGeminiIpcHandlers, stopMacOSAudioCapture, stopLinuxAudioCapture, sendToRenderer } = require('./utils/gemini');
+const linuxAudio = require('./utils/linuxAudio');
 const storage = require('./storage');
 
 const geminiSessionRef = { current: null };
 let mainWindow = null;
+let quitCleanupStarted = false;
+let quitCleanupSettled = false;
 
 function createMainWindow() {
     mainWindow = createWindow(sendToRenderer, geminiSessionRef);
@@ -18,6 +30,13 @@ function createMainWindow() {
 app.whenReady().then(async () => {
     // Initialize storage (checks version, resets if needed)
     storage.initializeStorage();
+
+    // Clean up leftover interception modules from a crashed previous session
+    if (process.platform === 'linux') {
+        linuxAudio.recoverStaleInterception().catch(error => {
+            console.warn('Interception recovery failed:', error.message);
+        });
+    }
 
     // Trigger screen recording permission prompt on macOS if not already granted
     if (process.platform === 'darwin') {
@@ -33,14 +52,35 @@ app.whenReady().then(async () => {
 
 app.on('window-all-closed', () => {
     stopMacOSAudioCapture();
+    // Linux audio cleanup is awaited in before-quit
     if (process.platform !== 'darwin') {
         app.quit();
     }
 });
 
-app.on('before-quit', () => {
+app.on('before-quit', event => {
     stopMacOSAudioCapture();
     require('./utils/localai').closeLocalSession();
+
+    if (quitCleanupStarted) {
+        // A second quit trigger while cleanup is still running must not let
+        // Electron exit before the sink restore settles.
+        if (!quitCleanupSettled) event.preventDefault();
+        return;
+    }
+
+    // Restoring the default sink and unloading interception modules is async.
+    // Defer quitting until it settles, otherwise the process can exit first
+    // and leave the virtual sink as default with no audible output.
+    quitCleanupStarted = true;
+    event.preventDefault();
+    const cleanup = process.platform === 'linux' ? stopLinuxAudioCapture() : Promise.resolve();
+    cleanup
+        .catch(error => console.error('Error during quit audio cleanup:', error))
+        .finally(() => {
+            quitCleanupSettled = true;
+            app.quit();
+        });
 });
 
 app.on('activate', () => {
@@ -266,7 +306,7 @@ function setupGeneralIpcHandlers() {
 
     ipcMain.handle('quit-application', async event => {
         try {
-            stopMacOSAudioCapture();
+            // Async audio cleanup is handled by the before-quit handler
             app.quit();
             return { success: true };
         } catch (error) {
