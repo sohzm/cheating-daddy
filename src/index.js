@@ -3,16 +3,6 @@ if (require('electron-squirrel-startup')) {
 }
 
 const { app, BrowserWindow, shell, ipcMain } = require('electron');
-
-// Linux (Wayland/PipeWire): desktopCapturer.getSources returns nothing and
-// getDisplayMedia fails unless capture is routed through the xdg-desktop-portal
-// via the PipeWire capturer. These switches must be set before app is ready.
-if (process.platform === 'linux') {
-    app.commandLine.appendSwitch('enable-features', 'WebRTCPipeWireCapturer');
-    // Prefer native Wayland when available; falls back to X11/XWayland otherwise.
-    app.commandLine.appendSwitch('ozone-platform-hint', 'auto');
-}
-
 const { createWindow, updateGlobalShortcuts } = require('./utils/window');
 const { setupGeminiIpcHandlers, stopMacOSAudioCapture, stopLinuxAudioCapture, sendToRenderer } = require('./utils/gemini');
 const storage = require('./storage');

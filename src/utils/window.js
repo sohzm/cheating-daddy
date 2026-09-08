@@ -33,23 +33,11 @@ function createWindow(sendToRenderer, geminiSessionRef) {
     });
 
     const { session, desktopCapturer } = require('electron');
-    // Windows exposes system audio via 'loopback'; macOS uses SystemAudioDump and
-    // Linux routes through the PipeWire portal, so 'loopback' is Windows-only.
-    const audioMode = process.platform === 'win32' ? 'loopback' : undefined;
     session.defaultSession.setDisplayMediaRequestHandler(
         (request, callback) => {
-            // On Wayland, getSources can come back empty and the system picker
-            // supplies the real source; request both screen and window so X11 and
-            // the macOS/Windows pickers still have something to select.
-            desktopCapturer
-                .getSources({ types: ['screen', 'window'] })
-                .then(sources => {
-                    callback({ video: sources[0] || null, audio: audioMode });
-                })
-                .catch(error => {
-                    console.error('desktopCapturer.getSources failed:', error.message);
-                    callback({ video: null, audio: audioMode });
-                });
+            desktopCapturer.getSources({ types: ['screen'] }).then(sources => {
+                callback({ video: sources[0], audio: 'loopback' });
+            });
         },
         { useSystemPicker: true }
     );

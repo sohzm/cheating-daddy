@@ -40,6 +40,15 @@ function buildHeaders() {
 async function readSseStream(response, onDelta) {
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
+    try {
+        return await pumpSseStream(reader, decoder, onDelta);
+    } finally {
+        // The reader still owns the body if we threw part-way through.
+        reader.cancel().catch(() => {});
+    }
+}
+
+async function pumpSseStream(reader, decoder, onDelta) {
     let pending = '';
     let fullText = '';
     let finishReason = null;
@@ -152,7 +161,11 @@ function buildImageMessage(prompt, base64Data) {
 // Verifies the gateway is reachable and the key (if any) is accepted.
 async function checkConnection() {
     try {
-        const response = await fetch(`${getBaseUrl()}/models`, { headers: buildHeaders() });
+        const response = await fetch(`${getBaseUrl()}/models`, {
+            headers: buildHeaders(),
+            // Without a deadline a silent gateway leaves the UI stuck on "testing".
+            signal: AbortSignal.timeout(10000),
+        });
         if (!response.ok) {
             const body = await response.text().catch(() => '');
             return { success: false, error: `HTTP ${response.status}: ${extractErrorMessage(body)}` };

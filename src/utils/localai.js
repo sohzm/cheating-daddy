@@ -424,7 +424,11 @@ async function startLlamaServer(executablePath, modelPath, projectorPath) {
     // Offload to the GPU where one is typically present. llama.cpp silently
     // clamps the layer count to what fits in VRAM.
     if (process.platform === 'darwin' || process.platform === 'linux') {
-        const gpuLayers = getConfig().llamaGpuLayers;
+        let gpuLayers = getConfig().llamaGpuLayers;
+        // The generic config writer can persist this as a string.
+        if (typeof gpuLayers === 'string' && gpuLayers.trim() !== '') {
+            gpuLayers = Number(gpuLayers);
+        }
         argumentsList.push('-ngl', String(Number.isFinite(gpuLayers) ? gpuLayers : 99));
     }
 

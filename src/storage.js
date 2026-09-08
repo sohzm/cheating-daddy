@@ -197,8 +197,14 @@ function initializeStorage() {
 
     if (isFreshInstall) {
         writeJsonFile(getConfigPath(), DEFAULT_CONFIG);
-        writeJsonFile(getCredentialsPath(), DEFAULT_CREDENTIALS);
-        writeJsonFile(getPreferencesPath(), DEFAULT_PREFERENCES);
+        // Only config.json proves freshness, so never overwrite credentials or
+        // preferences that a previous install already wrote.
+        if (!fs.existsSync(getCredentialsPath())) {
+            writeJsonFile(getCredentialsPath(), DEFAULT_CREDENTIALS);
+        }
+        if (!fs.existsSync(getPreferencesPath())) {
+            writeJsonFile(getPreferencesPath(), DEFAULT_PREFERENCES);
+        }
         console.log('Config directory initialized with defaults');
         return;
     }

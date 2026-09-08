@@ -176,13 +176,19 @@ async function cancelLocalInitialization() {
 
 async function initializeOmniRoute(profile = 'interview') {
     const prefs = await storage.getPreferences();
-    const success = await ipcRenderer.invoke('initialize-omniroute', profile, prefs.customPrompt || '', prefs.whisperModel || 'base.en');
-    if (success) {
-        cheatingDaddy.setStatus('OmniRoute Live');
-        return true;
+    const result = await ipcRenderer.invoke('initialize-omniroute', profile, prefs.customPrompt || '', prefs.whisperModel || 'base.en');
+
+    if (result && result.success) {
+        // Don't overwrite the warning the main process set when Whisper failed:
+        // text and screenshots still work, live audio does not.
+        if (result.audio) {
+            cheatingDaddy.setStatus('OmniRoute Live');
+        }
+        return result;
     }
+
     cheatingDaddy.setStatus('error');
-    return false;
+    return result || { success: false, audio: false };
 }
 
 async function omnirouteCheckConnection() {

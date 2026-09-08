@@ -1085,6 +1085,15 @@ export class MainView extends LitElement {
         this.onStart();
     }
 
+    triggerStartError(message) {
+        if (this._mode === 'omniroute') {
+            this._omnirouteStatus = { state: 'error', message: message || 'Could not start OmniRoute session' };
+            this.requestUpdate();
+            return;
+        }
+        this.triggerApiKeyError();
+    }
+
     triggerApiKeyError() {
         this._keyError = this._mode === 'byok';
         this.requestUpdate();
@@ -1353,8 +1362,8 @@ export class MainView extends LitElement {
                     }
 
                     <div class="config-note">
-                        Speech is transcribed locally by Whisper, then answered through the gateway. Only the transcript text leaves your machine -
-                        never the audio.
+                        Speech is transcribed locally by Whisper, so raw audio never leaves your machine - only the resulting transcript is sent.
+                        Screen captures are uploaded to the gateway as images.
                     </div>
                 </div>
             </details>

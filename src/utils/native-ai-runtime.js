@@ -110,6 +110,16 @@ function resolveLinuxBinary(type) {
         if (!fs.existsSync(configuredPath)) {
             throw new Error(`Configured ${type}-server path does not exist: ${configuredPath}`);
         }
+        // existsSync also accepts directories, and spawn would then fail with an
+        // opaque EACCES, so check for an executable regular file up front.
+        try {
+            if (!fs.statSync(configuredPath).isFile()) {
+                throw new Error('not a regular file');
+            }
+            fs.accessSync(configuredPath, fs.constants.X_OK);
+        } catch {
+            throw new Error(`Configured ${type}-server path is not an executable file: ${configuredPath}`);
+        }
         return configuredPath;
     }
 

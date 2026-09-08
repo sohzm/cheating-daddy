@@ -1031,7 +1031,13 @@ function getLinuxMonitorSource() {
     }
 
     try {
-        const defaultSink = execFileSync('pactl', ['get-default-sink'], { encoding: 'utf8' }).trim();
+        // Runs on the main thread, so cap it: an unresponsive sound server
+        // would otherwise freeze the window.
+        const defaultSink = execFileSync('pactl', ['get-default-sink'], {
+            encoding: 'utf8',
+            timeout: 2000,
+            stdio: ['ignore', 'pipe', 'ignore'],
+        }).trim();
         if (defaultSink) {
             return `${defaultSink}.monitor`;
         }
@@ -1265,15 +1271,15 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
             if (!transcriptionReady) {
                 // Text and screenshots still work; only live audio is unavailable.
                 sendToRenderer('update-status', 'OmniRoute ready (no audio - Whisper unavailable)');
-                return true;
+                return { success: true, audio: false };
             }
 
             sendToRenderer('update-status', `OmniRoute ready (${omniroute.getModel()}) - Listening...`);
-            return true;
+            return { success: true, audio: true };
         } catch (error) {
             console.error('[OmniRoute] Init error:', error);
             currentProviderMode = 'byok';
-            return false;
+            return { success: false, audio: false, error: error.message };
         }
     });
 
