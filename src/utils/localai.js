@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { getSystemPrompt } = require('./prompts');
+const { getConfig } = require('../storage');
 const { sendToRenderer, initializeNewSession, saveConversationTurn } = require('./gemini');
 const {
     ensureNativeBinary,
@@ -21,6 +22,10 @@ let whisperBaseUrl = null;
 let localConversationHistory = [];
 let currentSystemPrompt = null;
 let isLocalActive = false;
+// When true, only Whisper is running and transcripts go to transcriptionSink
+// instead of a local Llama server (used by omniroute mode).
+let isTranscriptionOnly = false;
+let transcriptionSink = null;
 let initializationController = null;
 let llamaCacheSnapshot = new Set();
 
@@ -176,6 +181,14 @@ async function handleSpeechEnd(audioData) {
         }
 
         sendToRenderer('update-status', 'Generating response...');
+
+        if (isTranscriptionOnly) {
+            if (transcriptionSink) {
+                await transcriptionSink(transcription);
+            }
+            return;
+        }
+
         await sendToLlama(transcription);
     } catch (error) {
         console.error('[LocalAI] Transcription error:', error);
@@ -408,8 +421,11 @@ async function startLlamaServer(executablePath, modelPath, projectorPath) {
         projectorPath,
     ];
 
-    if (process.platform === 'darwin') {
-        argumentsList.push('-ngl', '99');
+    // Offload to the GPU where one is typically present. llama.cpp silently
+    // clamps the layer count to what fits in VRAM.
+    if (process.platform === 'darwin' || process.platform === 'linux') {
+        const gpuLayers = getConfig().llamaGpuLayers;
+        argumentsList.push('-ngl', String(Number.isFinite(gpuLayers) ? gpuLayers : 99));
     }
 
     llamaBaseUrl = `http://127.0.0.1:${port}`;
@@ -477,6 +493,58 @@ async function initializeLocalSession(model, whisperModel, profile, customPrompt
     }
 }
 
+// Starts only the Whisper server, for providers that answer text but cannot
+// transcribe audio themselves.
+async function initializeTranscriptionSession(whisperModel, onTranscript) {
+    try {
+        closeLocalSession();
+        initializationController = new AbortController();
+        const signal = initializationController.signal;
+
+        sendDownloadProgress('Checking Whisper runner');
+        const whisperBinaryPath = await ensureNativeBinary('whisper', null, signal);
+
+        sendToRenderer('whisper-downloading', true);
+        let whisperModelPath;
+        try {
+            sendDownloadProgress('Checking Whisper model');
+            whisperModelPath = await ensureWhisperModel(
+                whisperModel,
+                progress => {
+                    sendToRenderer('update-status', formatDownloadStatus('Whisper model', progress));
+                    sendDownloadProgress('Whisper model', progress);
+                },
+                signal
+            );
+        } finally {
+            sendToRenderer('whisper-downloading', false);
+        }
+
+        sendToRenderer('update-status', 'Starting Whisper...');
+        await startWhisperServer(whisperBinaryPath, whisperModelPath);
+
+        isSpeaking = false;
+        speechBuffers = [];
+        silenceFrameCount = 0;
+        speechFrameCount = 0;
+        resampleRemainder = Buffer.alloc(0);
+
+        transcriptionSink = onTranscript;
+        isTranscriptionOnly = true;
+        isLocalActive = true;
+        initializationController = null;
+        sendToRenderer('local-ai-download-progress', { active: false });
+        console.log('[LocalAI] Transcription-only session ready');
+        return true;
+    } catch (error) {
+        console.error('[LocalAI] Transcription init error:', error);
+        closeLocalSession();
+        sendToRenderer('local-ai-download-progress', { active: false });
+        sendToRenderer('update-status', 'Whisper error: ' + error.message);
+        return false;
+    }
+}
+
 function processLocalAudio(monoChunk24k) {
     if (!isLocalActive) return;
 
@@ -488,6 +556,8 @@ function processLocalAudio(monoChunk24k) {
 
 function closeLocalSession() {
     isLocalActive = false;
+    isTranscriptionOnly = false;
+    transcriptionSink = null;
     initializationController?.abort();
     initializationController = null;
     stopNativeServer(llamaProcess);
@@ -591,6 +661,7 @@ async function sendLocalImage(base64Data, prompt) {
 
 module.exports = {
     initializeLocalSession,
+    initializeTranscriptionSession,
     cancelLocalInitialization,
     processLocalAudio,
     closeLocalSession,

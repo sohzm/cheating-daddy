@@ -5,7 +5,7 @@ const path = require('path');
 const { spawn } = require('child_process');
 const { Readable, Transform } = require('stream');
 const { pipeline } = require('stream/promises');
-const { getConfigDir } = require('../storage');
+const { getConfigDir, getConfig } = require('../storage');
 
 const RELEASE_BASE_URL = 'https://github.com/sohzm/cheating-daddy/releases/download/v0.7.0';
 
@@ -70,6 +70,58 @@ function getPlatformReleases() {
         throw new Error(`Local AI is not available for ${process.platform}/${process.arch}`);
     }
     return platformReleases;
+}
+
+// Upstream publishes prebuilt runners for macOS and Windows only. On Linux the
+// user supplies them, so we resolve an explicit configured path first and then
+// fall back to whatever is on PATH.
+const LINUX_BINARY_NAMES = {
+    llama: ['llama-server'],
+    whisper: ['whisper-server'],
+};
+
+const LINUX_CONFIG_KEYS = {
+    llama: 'llamaServerPath',
+    whisper: 'whisperServerPath',
+};
+
+function findExecutableOnPath(names) {
+    const pathEntries = (process.env.PATH || '').split(path.delimiter).filter(Boolean);
+
+    for (const name of names) {
+        for (const directory of pathEntries) {
+            const candidate = path.join(directory, name);
+            try {
+                fs.accessSync(candidate, fs.constants.X_OK);
+                return candidate;
+            } catch {
+                // Not here; keep looking.
+            }
+        }
+    }
+
+    return null;
+}
+
+function resolveLinuxBinary(type) {
+    const configuredPath = (getConfig()[LINUX_CONFIG_KEYS[type]] || '').trim();
+
+    if (configuredPath) {
+        if (!fs.existsSync(configuredPath)) {
+            throw new Error(`Configured ${type}-server path does not exist: ${configuredPath}`);
+        }
+        return configuredPath;
+    }
+
+    const discovered = findExecutableOnPath(LINUX_BINARY_NAMES[type]);
+    if (discovered) {
+        return discovered;
+    }
+
+    throw new Error(
+        `Could not find ${LINUX_BINARY_NAMES[type][0]}. Install llama.cpp/whisper.cpp and put it on your PATH, ` +
+            `or set "${LINUX_CONFIG_KEYS[type]}" in config.json to its full path.`
+    );
 }
 
 function getBinariesDirectory() {
@@ -157,6 +209,10 @@ async function installVerifiedFile({ url, destinationPath, sha256, executable, o
 }
 
 async function ensureNativeBinary(type, onProgress, signal) {
+    if (process.platform === 'linux') {
+        return resolveLinuxBinary(type);
+    }
+
     const release = getPlatformReleases()[type];
     const destinationPath = path.join(getBinariesDirectory(), release.filename);
 
