@@ -9,4 +9,5 @@ export { HelpView } from './views/HelpView.js';
 export { HistoryView } from './views/HistoryView.js';
 export { AssistantView } from './views/AssistantView.js';
 export { OnboardingView } from './views/OnboardingView.js';
-export { AdvancedView } from './views/AdvancedView.js';
+export { AICustomizeView } from './views/AICustomizeView.js';
+export { FeedbackView } from './views/FeedbackView.js';

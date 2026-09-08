@@ -709,6 +709,11 @@ export class MainView extends LitElement {
         _useCustomLocalLlmModel: { state: true },
         _whisperModel: { state: true },
         _showLocalHelp: { state: true },
+        // OmniRoute state
+        _omnirouteKey: { state: true },
+        _omnirouteBaseUrl: { state: true },
+        _omnirouteModel: { state: true },
+        _omnirouteStatus: { state: true },
     };
 
     constructor() {
@@ -737,6 +742,10 @@ export class MainView extends LitElement {
         this._localLlmModel = 'unsloth/Qwen3.5-4B-GGUF:Q4_K_M';
         this._useCustomLocalLlmModel = false;
         this._whisperModel = 'tiny.en';
+        this._omnirouteKey = '';
+        this._omnirouteBaseUrl = 'http://localhost:20128/v1';
+        this._omnirouteModel = 'auto';
+        this._omnirouteStatus = null;
 
         this._animId = null;
         this._time = 0;
@@ -776,6 +785,11 @@ export class MainView extends LitElement {
             this._localLlmModel = prefs.localLlmModel || 'unsloth/Qwen3.5-4B-GGUF:Q4_K_M';
             this._useCustomLocalLlmModel = !LOCAL_LLM_PRESETS.some(preset => preset.value === this._localLlmModel);
             this._whisperModel = prefs.whisperModel || 'tiny.en';
+
+            // OmniRoute settings
+            this._omnirouteKey = creds.omnirouteKey || '';
+            this._omnirouteBaseUrl = config.omnirouteBaseUrl || 'http://localhost:20128/v1';
+            this._omnirouteModel = config.omnirouteModel || 'auto';
 
             this.requestUpdate();
         } catch (e) {
@@ -1001,6 +1015,40 @@ export class MainView extends LitElement {
         this.requestUpdate();
     }
 
+    async _saveOmnirouteKey(val) {
+        this._omnirouteKey = val;
+        this._omnirouteStatus = null;
+        try {
+            const creds = await cheatingDaddy.storage.getCredentials().catch(() => ({}));
+            await cheatingDaddy.storage.setCredentials({ ...creds, omnirouteKey: val });
+        } catch (e) {}
+        this.requestUpdate();
+    }
+
+    async _saveOmnirouteBaseUrl(val) {
+        this._omnirouteBaseUrl = val;
+        this._omnirouteStatus = null;
+        await cheatingDaddy.storage.updateConfig('omnirouteBaseUrl', val);
+        this.requestUpdate();
+    }
+
+    async _saveOmnirouteModel(val) {
+        this._omnirouteModel = val;
+        await cheatingDaddy.storage.updateConfig('omnirouteModel', val);
+        this.requestUpdate();
+    }
+
+    async _testOmnirouteConnection() {
+        this._omnirouteStatus = { state: 'testing', message: 'Checking gateway...' };
+        this.requestUpdate();
+
+        const result = await cheatingDaddy.omnirouteCheckConnection();
+        this._omnirouteStatus = result.success
+            ? { state: 'ok', message: `Connected - ${result.models.length} models available` }
+            : { state: 'error', message: result.error };
+        this.requestUpdate();
+    }
+
     _handleProfileChange(e) {
         this.onProfileChange(e.target.value);
     }
@@ -1037,8 +1085,17 @@ export class MainView extends LitElement {
         this.onStart();
     }
 
+    triggerStartError(message) {
+        if (this._mode === 'omniroute') {
+            this._omnirouteStatus = { state: 'error', message: message || 'Could not start OmniRoute session' };
+            this.requestUpdate();
+            return;
+        }
+        this.triggerApiKeyError();
+    }
+
     triggerApiKeyError() {
-        this._keyError = this._mode !== 'local';
+        this._keyError = this._mode === 'byok';
         this.requestUpdate();
         setTimeout(() => {
             this._tokenError = false;
@@ -1239,6 +1296,84 @@ export class MainView extends LitElement {
 
             <div class="mode-links">
                 <button class="mode-link" @click=${() => this._saveMode('local')}>Use local AI</button>
+                <button class="mode-link" @click=${() => this._saveMode('omniroute')}>Use OmniRoute</button>
+            </div>
+        `;
+    }
+
+    _modeSubtitle() {
+        if (this._mode === 'local') return 'Run models locally on your machine';
+        if (this._mode === 'omniroute') return 'Route through your local OmniRoute gateway';
+        return 'Bring your own API keys';
+    }
+
+    // ── OmniRoute mode ──
+
+    _renderOmniRouteMode() {
+        const status = this._omnirouteStatus;
+        return html`
+            <details class="config-section" open>
+                <summary class="config-summary">
+                    <span class="config-summary-text">
+                        <span class="config-summary-title">Gateway</span>
+                        <span class="config-summary-description">OpenAI-compatible endpoint</span>
+                    </span>
+                    ${this._renderConfigChevron()}
+                </summary>
+                <div class="config-content">
+                    <div class="form-group">
+                        <label class="form-label">Base URL</label>
+                        <input type="text" .value=${this._omnirouteBaseUrl} @input=${e => this._saveOmnirouteBaseUrl(e.target.value)} />
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">API Key</label>
+                        <input
+                            type="password"
+                            placeholder="Optional - keyless free providers work without one"
+                            .value=${this._omnirouteKey}
+                            @input=${e => this._saveOmnirouteKey(e.target.value)}
+                        />
+                        <div class="form-hint">Copy from the OmniRoute dashboard under Endpoints.</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Model</label>
+                        <input type="text" .value=${this._omnirouteModel} @input=${e => this._saveOmnirouteModel(e.target.value)} />
+                        <div class="form-hint">Use <code>auto</code> to let the gateway pick and fall back automatically.</div>
+                    </div>
+
+                    <button class="mode-link" @click=${() => this._testOmnirouteConnection()}>Test connection</button>
+                    ${
+                        status
+                            ? html`<div
+                                  class="config-note"
+                                  style="color: ${
+                                      status.state === 'error'
+                                          ? 'var(--error-color)'
+                                          : status.state === 'ok'
+                                            ? 'var(--success-color)'
+                                            : 'var(--text-secondary)'
+                                  }"
+                              >
+                                  ${status.message}
+                              </div>`
+                            : ''
+                    }
+
+                    <div class="config-note">
+                        Speech is transcribed locally by Whisper, so raw audio never leaves your machine - only the resulting transcript is sent.
+                        Screen captures are uploaded to the gateway as images.
+                    </div>
+                </div>
+            </details>
+
+            ${this._renderStartButton()} ${this._renderDivider()}
+
+            <div class="mode-links">
+                <button class="mode-link" @click=${() => this._saveMode('byok')}>Use own API keys</button>
+                <button class="mode-link" @click=${() => this._saveMode('omniroute')}>Use OmniRoute</button>
+                <button class="mode-link" @click=${() => this._saveMode('local')}>Use local AI</button>
             </div>
         `;
     }
@@ -1339,12 +1474,18 @@ export class MainView extends LitElement {
                                   <button class="help-btn" @click=${this._openLocalHelp} aria-label="Open Local AI help">${helpIcon}</button>
                               </div>
                           `
-                        : html` <div class="page-title">${html`Cheating Daddy <span class="mode-suffix">BYOK</span>`}</div> `
+                        : html`
+                              <div class="page-title">
+                                  Cheating Daddy
+                                  <span class="mode-suffix">${this._mode === 'omniroute' ? 'OmniRoute' : 'BYOK'}</span>
+                              </div>
+                          `
                 }
-                <div class="page-subtitle">${this._mode === 'byok' ? 'Bring your own API keys' : 'Run models locally on your machine'}</div>
+                <div class="page-subtitle">${this._modeSubtitle()}</div>
 
                 <!-- Cloud mode render branch intentionally disabled. -->
                 ${this._mode === 'byok' ? this._renderByokMode() : ''} ${this._mode === 'local' ? this._renderLocalMode() : ''}
+                ${this._mode === 'omniroute' ? this._renderOmniRouteMode() : ''}
             </div>
             ${this._mode === 'local' && this._showLocalHelp ? this._renderLocalHelp(closeIcon) : ''}
         `;

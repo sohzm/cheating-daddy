@@ -4,7 +4,7 @@ if (require('electron-squirrel-startup')) {
 
 const { app, BrowserWindow, shell, ipcMain } = require('electron');
 const { createWindow, updateGlobalShortcuts } = require('./utils/window');
-const { setupGeminiIpcHandlers, stopMacOSAudioCapture, sendToRenderer } = require('./utils/gemini');
+const { setupGeminiIpcHandlers, stopMacOSAudioCapture, stopLinuxAudioCapture, sendToRenderer } = require('./utils/gemini');
 const storage = require('./storage');
 
 const geminiSessionRef = { current: null };
@@ -33,6 +33,7 @@ app.whenReady().then(async () => {
 
 app.on('window-all-closed', () => {
     stopMacOSAudioCapture();
+    stopLinuxAudioCapture();
     if (process.platform !== 'darwin') {
         app.quit();
     }
@@ -40,6 +41,7 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
     stopMacOSAudioCapture();
+    stopLinuxAudioCapture();
     require('./utils/localai').closeLocalSession();
 });
 
@@ -267,6 +269,7 @@ function setupGeneralIpcHandlers() {
     ipcMain.handle('quit-application', async event => {
         try {
             stopMacOSAudioCapture();
+            stopLinuxAudioCapture();
             app.quit();
             return { success: true };
         } catch (error) {

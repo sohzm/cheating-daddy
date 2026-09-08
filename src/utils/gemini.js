@@ -1,11 +1,12 @@
 const { GoogleGenAI, Modality } = require('@google/genai');
 const { BrowserWindow, ipcMain } = require('electron');
-const { spawn } = require('child_process');
+const { spawn, execFileSync } = require('child_process');
 const { saveDebugAudio } = require('../audioUtils');
 const { getSystemPrompt } = require('./prompts');
-const { getAvailableModel, incrementLimitCount, getApiKey, getGroqApiKey, incrementCharUsage, getConfig } = require('../storage');
+const { getAvailableModel, incrementLimitCount, getApiKey, getGroqApiKey, incrementCharUsage, getConfig, getPreferences } = require('../storage');
 const { connectCloud, sendCloudAudio, sendCloudText, sendCloudImage, closeCloud, isCloudActive, setOnTurnComplete } = require('./cloud');
 const { startTransportLog, logTransportEvent, closeTransportLog } = require('./transportLogger');
+const omniroute = require('./omniroute');
 
 // Lazy-loaded to avoid circular dependency (localai.js imports from gemini.js)
 let _localai = null;
@@ -14,8 +15,11 @@ function getLocalAi() {
     return _localai;
 }
 
-// Provider mode: 'byok', 'cloud', or 'local'
+// Provider mode: 'byok', 'cloud', 'local', or 'omniroute'
 let currentProviderMode = 'byok';
+
+// OmniRoute conversation history for context
+let omnirouteConversationHistory = [];
 
 // Groq conversation history for context
 let groqConversationHistory = [];
@@ -45,6 +49,7 @@ module.exports.formatSpeakerResults = formatSpeakerResults;
 
 // Audio capture variables
 let systemAudioProc = null;
+let linuxAudioProc = null;
 let messageBuffer = '';
 let groqRequestStartedForTurn = false;
 
@@ -56,6 +61,10 @@ const GROQ_EMPTY_RESPONSE_MESSAGE =
 let isUserClosing = false;
 let sessionParams = null;
 let reconnectAttempts = 0;
+const LINUX_SAMPLE_RATE = 24000;
+// 100 ms of 16-bit mono audio, matching the macOS capture cadence.
+const LINUX_CHUNK_SIZE = LINUX_SAMPLE_RATE * 2 * 0.1;
+
 const MAX_RECONNECT_ATTEMPTS = 3;
 const RECONNECT_DELAY = 2000;
 
@@ -87,6 +96,7 @@ function initializeNewSession(profile = null, customPrompt = null) {
     conversationHistory = [];
     screenAnalysisHistory = [];
     groqConversationHistory = [];
+    omnirouteConversationHistory = [];
     currentProfile = profile;
     currentCustomPrompt = customPrompt;
     console.log('New conversation session started:', currentSessionId, 'profile:', profile);
@@ -158,11 +168,10 @@ function getCurrentSessionData() {
 async function getEnabledTools() {
     const tools = [];
 
-    // Check if Google Search is enabled (default: true)
-    const googleSearchEnabled = await getStoredSetting('googleSearchEnabled', 'true');
+    const googleSearchEnabled = getPreferences().googleSearchEnabled === true;
     console.log('Google Search enabled:', googleSearchEnabled);
 
-    if (googleSearchEnabled === 'true') {
+    if (googleSearchEnabled) {
         tools.push({ googleSearch: {} });
         console.log('Added Google Search tool');
     } else {
@@ -170,39 +179,6 @@ async function getEnabledTools() {
     }
 
     return tools;
-}
-
-async function getStoredSetting(key, defaultValue) {
-    try {
-        const windows = BrowserWindow.getAllWindows();
-        if (windows.length > 0) {
-            // Wait a bit for the renderer to be ready
-            await new Promise(resolve => setTimeout(resolve, 100));
-
-            // Try to get setting from renderer process localStorage
-            const value = await windows[0].webContents.executeJavaScript(`
-                (function() {
-                    try {
-                        if (typeof localStorage === 'undefined') {
-                            console.log('localStorage not available yet for ${key}');
-                            return '${defaultValue}';
-                        }
-                        const stored = localStorage.getItem('${key}');
-                        console.log('Retrieved setting ${key}:', stored);
-                        return stored || '${defaultValue}';
-                    } catch (e) {
-                        console.error('Error accessing localStorage for ${key}:', e);
-                        return '${defaultValue}';
-                    }
-                })()
-            `);
-            return value;
-        }
-    } catch (error) {
-        console.error('Error getting stored setting for', key, ':', error.message);
-    }
-    console.log('Using default value for', key, ':', defaultValue);
-    return defaultValue;
 }
 
 // helper to check if groq has been configured
@@ -626,6 +602,96 @@ async function sendToGemma(transcription) {
     }
 }
 
+function trimOmniRouteHistory() {
+    if (omnirouteConversationHistory.length > 20) {
+        omnirouteConversationHistory = omnirouteConversationHistory.slice(-20);
+    }
+}
+
+function omnirouteSystemMessage() {
+    return { role: 'system', content: currentSystemPrompt || 'You are a helpful assistant.' };
+}
+
+async function sendToOmniRoute(transcription) {
+    const text = (transcription || '').trim();
+    if (text === '') {
+        return { success: false, error: 'Empty message' };
+    }
+
+    omnirouteConversationHistory.push({ role: 'user', content: text });
+    trimOmniRouteHistory();
+
+    logTransportEvent('omniroute.text.request', { model: omniroute.getModel(), transcription: text });
+
+    try {
+        let isFirst = true;
+        const { text: fullText, model } = await omniroute.streamCompletion([omnirouteSystemMessage(), ...omnirouteConversationHistory], partial => {
+            sendToRenderer(isFirst ? 'new-response' : 'update-response', partial);
+            isFirst = false;
+        });
+
+        const answer = fullText.trim();
+        if (!answer) {
+            logTransportEvent('omniroute.text.empty_response', { model });
+            sendToRenderer('update-status', 'OmniRoute error: returned an empty response');
+            return { success: false, error: 'OmniRoute returned an empty response' };
+        }
+
+        omnirouteConversationHistory.push({ role: 'assistant', content: answer });
+        trimOmniRouteHistory();
+        saveConversationTurn(text, answer);
+
+        logTransportEvent('omniroute.text.completed', { model, response: answer });
+        sendToRenderer('update-status', 'Listening...');
+        return { success: true };
+    } catch (error) {
+        console.error('Error calling OmniRoute:', error);
+        logTransportEvent('omniroute.text.error', { error: error.message });
+        sendToRenderer('update-status', 'OmniRoute error: ' + error.message);
+        return { success: false, error: error.message };
+    }
+}
+
+async function sendImageToOmniRoute(base64Data, prompt) {
+    logTransportEvent('omniroute.image.request', {
+        model: omniroute.getVisionModel(),
+        prompt,
+        imageBytes: Buffer.byteLength(base64Data, 'base64'),
+    });
+
+    try {
+        let isFirst = true;
+        const { text: fullText, model } = await omniroute.streamCompletion(
+            [omnirouteSystemMessage(), ...omnirouteConversationHistory, omniroute.buildImageMessage(prompt, base64Data)],
+            partial => {
+                sendToRenderer(isFirst ? 'new-response' : 'update-response', partial);
+                isFirst = false;
+            },
+            omniroute.getVisionModel()
+        );
+
+        const answer = fullText.trim();
+        if (!answer) {
+            logTransportEvent('omniroute.image.empty_response', { model });
+            return { success: false, error: 'OmniRoute returned an empty response' };
+        }
+
+        omnirouteConversationHistory.push({ role: 'user', content: prompt });
+        omnirouteConversationHistory.push({ role: 'assistant', content: answer });
+        trimOmniRouteHistory();
+        saveScreenAnalysis(prompt, answer, model);
+
+        logTransportEvent('omniroute.image.completed', { model });
+        sendToRenderer('update-status', 'Listening...');
+        return { success: true, text: answer, model };
+    } catch (error) {
+        console.error('Error calling OmniRoute vision:', error);
+        logTransportEvent('omniroute.image.error', { error: error.message });
+        sendToRenderer('update-status', 'OmniRoute error: ' + error.message);
+        return { success: false, error: error.message };
+    }
+}
+
 async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'interview', language = 'en-US', isReconnect = false) {
     if (isInitializingSession) {
         console.log('Session initialization already in progress');
@@ -957,6 +1023,116 @@ async function startMacOSAudioCapture(geminiSessionRef) {
     return true;
 }
 
+// Chromium hides PipeWire monitor sources from enumerateDevices, so system audio
+// on Linux is captured out-of-process with parec, mirroring the macOS helper.
+function getLinuxMonitorSource() {
+    const configured = (getConfig().linuxAudioDevice || '').trim();
+    if (configured) {
+        return configured;
+    }
+
+    try {
+        // Runs on the main thread, so cap it: an unresponsive sound server
+        // would otherwise freeze the window.
+        const defaultSink = execFileSync('pactl', ['get-default-sink'], {
+            encoding: 'utf8',
+            timeout: 2000,
+            stdio: ['ignore', 'pipe', 'ignore'],
+        }).trim();
+        if (defaultSink) {
+            return `${defaultSink}.monitor`;
+        }
+    } catch (error) {
+        console.warn('Could not query default sink:', error.message);
+    }
+
+    return '@DEFAULT_MONITOR@';
+}
+
+function startLinuxAudioCapture(geminiSessionRef) {
+    if (process.platform !== 'linux') return false;
+
+    stopLinuxAudioCapture();
+
+    const device = getLinuxMonitorSource();
+    console.log('Starting Linux system audio capture from:', device);
+
+    // Held locally so the exit handlers below can tell whether they belong to
+    // the process still in use, or to one that has already been replaced.
+    let audioProcess;
+
+    try {
+        audioProcess = spawn('parec', ['--format=s16le', `--rate=${LINUX_SAMPLE_RATE}`, '--channels=1', '--latency-msec=100', '-d', device], {
+            stdio: ['ignore', 'pipe', 'pipe'],
+        });
+        linuxAudioProc = audioProcess;
+    } catch (error) {
+        console.error('Failed to spawn parec:', error.message);
+        return false;
+    }
+
+    if (!audioProcess.pid) {
+        console.error('parec did not start');
+        linuxAudioProc = null;
+        return false;
+    }
+
+    let audioBuffer = Buffer.alloc(0);
+
+    audioProcess.stdout.on('data', data => {
+        audioBuffer = Buffer.concat([audioBuffer, data]);
+
+        while (audioBuffer.length >= LINUX_CHUNK_SIZE) {
+            const chunk = audioBuffer.slice(0, LINUX_CHUNK_SIZE);
+            audioBuffer = audioBuffer.slice(LINUX_CHUNK_SIZE);
+
+            if (currentProviderMode === 'cloud') {
+                sendCloudAudio(chunk);
+            } else if (currentProviderMode === 'local') {
+                getLocalAi().processLocalAudio(chunk);
+            } else if (currentProviderMode === 'omniroute') {
+                // Whisper does the transcription; its sink forwards to OmniRoute.
+                getLocalAi().processLocalAudio(chunk);
+            } else if (currentProviderMode === 'byok') {
+                sendAudioToGemini(chunk.toString('base64'), geminiSessionRef);
+            }
+        }
+
+        const maxBufferSize = LINUX_SAMPLE_RATE * 2;
+        if (audioBuffer.length > maxBufferSize) {
+            audioBuffer = audioBuffer.slice(-maxBufferSize);
+        }
+    });
+
+    audioProcess.stderr.on('data', data => {
+        console.error('parec stderr:', data.toString().trim());
+    });
+
+    audioProcess.on('close', code => {
+        console.log('parec exited with code:', code);
+        if (linuxAudioProc === audioProcess) {
+            linuxAudioProc = null;
+        }
+    });
+
+    audioProcess.on('error', error => {
+        console.error('parec process error:', error.message);
+        if (linuxAudioProc === audioProcess) {
+            linuxAudioProc = null;
+        }
+    });
+
+    return true;
+}
+
+function stopLinuxAudioCapture() {
+    if (linuxAudioProc) {
+        console.log('Stopping Linux system audio capture...');
+        linuxAudioProc.kill('SIGTERM');
+        linuxAudioProc = null;
+    }
+}
+
 function convertStereoToMono(stereoBuffer) {
     const samples = stereoBuffer.length / 4;
     const monoBuffer = Buffer.alloc(samples * 2);
@@ -1091,6 +1267,45 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
         return success;
     });
 
+    const MAX_CUSTOM_PROMPT_LENGTH = 32000;
+
+    ipcMain.handle('initialize-omniroute', async (event, profile = 'interview', customPrompt = '', whisperModel = 'base.en') => {
+        if (typeof profile !== 'string' || typeof whisperModel !== 'string' || typeof customPrompt !== 'string') {
+            return { success: false, audio: false, error: 'Invalid session arguments' };
+        }
+        if (customPrompt.length > MAX_CUSTOM_PROMPT_LENGTH) {
+            return { success: false, audio: false, error: 'Custom prompt is too long' };
+        }
+
+        try {
+            currentProviderMode = 'omniroute';
+            currentSystemPrompt = getSystemPrompt(profile, customPrompt, false);
+            initializeNewSession(profile, customPrompt);
+
+            // OmniRoute answers text but cannot transcribe, so run Whisper locally
+            // and feed its transcripts straight into the gateway.
+            sendToRenderer('update-status', 'Starting local transcription...');
+            const transcriptionReady = await getLocalAi().initializeTranscriptionSession(whisperModel, text => sendToOmniRoute(text));
+
+            if (!transcriptionReady) {
+                // Text and screenshots still work; only live audio is unavailable.
+                sendToRenderer('update-status', 'OmniRoute ready (no audio - Whisper unavailable)');
+                return { success: true, audio: false };
+            }
+
+            sendToRenderer('update-status', `OmniRoute ready (${omniroute.getModel()}) - Listening...`);
+            return { success: true, audio: true };
+        } catch (error) {
+            console.error('[OmniRoute] Init error:', error);
+            currentProviderMode = 'byok';
+            return { success: false, audio: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('omniroute-check-connection', async () => {
+        return omniroute.checkConnection();
+    });
+
     ipcMain.handle('cancel-local-initialization', async () => {
         const cancelled = await getLocalAi().cancelLocalInitialization();
         if (cancelled) {
@@ -1110,7 +1325,7 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
                 return { success: false, error: error.message };
             }
         }
-        if (currentProviderMode === 'local') {
+        if (currentProviderMode === 'local' || currentProviderMode === 'omniroute') {
             try {
                 const pcmBuffer = Buffer.from(data, 'base64');
                 getLocalAi().processLocalAudio(pcmBuffer);
@@ -1145,7 +1360,7 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
                 return { success: false, error: error.message };
             }
         }
-        if (currentProviderMode === 'local') {
+        if (currentProviderMode === 'local' || currentProviderMode === 'omniroute') {
             try {
                 const pcmBuffer = Buffer.from(data, 'base64');
                 getLocalAi().processLocalAudio(pcmBuffer);
@@ -1197,6 +1412,11 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
                 return result;
             }
 
+            if (currentProviderMode === 'omniroute') {
+                sendToRenderer('update-status', 'Analyzing image...');
+                return sendImageToOmniRoute(data, prompt);
+            }
+
             const result = hasGroqKey() ? await sendImageToGroq(data, prompt) : await sendImageToGeminiHttp(data, prompt);
             return result;
         } catch (error) {
@@ -1229,6 +1449,11 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
                 console.error('Error sending local text:', error);
                 return { success: false, error: error.message };
             }
+        }
+
+        if (currentProviderMode === 'omniroute') {
+            sendToRenderer('update-status', 'Generating response...');
+            return sendToOmniRoute(text.trim());
         }
 
         if (!geminiSessionRef.current) return { success: false, error: 'No active Gemini session' };
@@ -1266,6 +1491,29 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
         }
     });
 
+    ipcMain.handle('start-linux-audio', async event => {
+        if (process.platform !== 'linux') {
+            return { success: false, error: 'Linux audio capture only available on Linux' };
+        }
+
+        try {
+            const success = startLinuxAudioCapture(geminiSessionRef);
+            return { success, error: success ? undefined : 'parec failed to start (install pulseaudio-utils)' };
+        } catch (error) {
+            console.error('Error starting Linux audio capture:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('stop-linux-audio', async event => {
+        try {
+            stopLinuxAudioCapture();
+            return { success: true };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    });
+
     ipcMain.handle('stop-macos-audio', async event => {
         try {
             stopMacOSAudioCapture();
@@ -1279,6 +1527,7 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
     ipcMain.handle('close-session', async event => {
         try {
             stopMacOSAudioCapture();
+            stopLinuxAudioCapture();
 
             if (currentProviderMode === 'cloud') {
                 closeCloud();
@@ -1289,6 +1538,14 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
 
             if (currentProviderMode === 'local') {
                 getLocalAi().closeLocalSession();
+                currentProviderMode = 'byok';
+                closeTransportLog();
+                return { success: true };
+            }
+
+            if (currentProviderMode === 'omniroute') {
+                getLocalAi().closeLocalSession();
+                omnirouteConversationHistory = [];
                 currentProviderMode = 'byok';
                 closeTransportLog();
                 return { success: true };
@@ -1349,7 +1606,6 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
 module.exports = {
     initializeGeminiSession,
     getEnabledTools,
-    getStoredSetting,
     sendToRenderer,
     initializeNewSession,
     saveConversationTurn,
@@ -1358,6 +1614,8 @@ module.exports = {
     startMacOSAudioCapture,
     convertStereoToMono,
     stopMacOSAudioCapture,
+    startLinuxAudioCapture,
+    stopLinuxAudioCapture,
     sendAudioToGemini,
     sendImageToGeminiHttp,
     setupGeminiIpcHandlers,

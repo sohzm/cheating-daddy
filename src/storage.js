@@ -13,11 +13,28 @@ const DEFAULT_CONFIG = {
     groqModel: 'qwen/qwen3.6-27b',
     groqImageModel: 'qwen/qwen3.6-27b',
     disableGroqThinking: true,
+    omnirouteBaseUrl: 'http://localhost:20128/v1',
+    // 'auto' lets the gateway pick and fall back on its own, which works with
+    // whatever providers a given install happens to have connected.
+    // For live use, prefer a non-thinking model: the auto/* reasoning combos
+    // can take 8-20s, which is too slow to answer while someone is waiting.
+    omnirouteModel: 'auto',
+    // Screen captures need a multimodal route; falls back to omnirouteModel.
+    omnirouteVisionModel: '',
+    // Linux only: upstream ships no prebuilt runners, so these locate them.
+    // Empty means "look on PATH".
+    llamaServerPath: '',
+    whisperServerPath: '',
+    // Layers to offload to the GPU. llama.cpp clamps to what actually fits.
+    llamaGpuLayers: 99,
+    // Linux system-audio source for parec. Empty means "default sink monitor".
+    linuxAudioDevice: '',
 };
 
 const DEFAULT_CREDENTIALS = {
     apiKey: '',
     groqApiKey: '',
+    omnirouteKey: '',
 };
 
 const DEFAULT_PREFERENCES = {
@@ -111,18 +128,18 @@ function writeJsonFile(filePath, data) {
     }
 }
 
-// Check if we need to reset (no configVersion or wrong version)
-function needsReset() {
+// Read the stored config version, or null when there is no readable config yet.
+function readStoredConfigVersion() {
     const configPath = getConfigPath();
     if (!fs.existsSync(configPath)) {
-        return true;
+        return null;
     }
 
     try {
         const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-        return !config.configVersion || config.configVersion !== CONFIG_VERSION;
+        return config.configVersion || null;
     } catch {
-        return true;
+        return null;
     }
 }
 
@@ -149,16 +166,52 @@ function resetConfigDir() {
     console.log('Config directory initialized with defaults');
 }
 
+// Bring an older config directory up to the current version WITHOUT deleting
+// credentials, preferences, keybinds or session history. Only the config file is
+// rewritten, merging in any keys added since the stored version.
+function migrateConfigDir(storedVersion) {
+    console.log(`Migrating config from version ${storedVersion || 'unversioned'} to ${CONFIG_VERSION}...`);
+
+    const existingConfig = readJsonFile(getConfigPath(), {});
+    writeJsonFile(getConfigPath(), { ...DEFAULT_CONFIG, ...existingConfig, configVersion: CONFIG_VERSION });
+
+    // Backfill any files a previous version never created, without touching
+    // files that already hold user data.
+    if (!fs.existsSync(getCredentialsPath())) {
+        writeJsonFile(getCredentialsPath(), DEFAULT_CREDENTIALS);
+    }
+    if (!fs.existsSync(getPreferencesPath())) {
+        writeJsonFile(getPreferencesPath(), DEFAULT_PREFERENCES);
+    }
+
+    console.log('Config migrated; credentials and history preserved');
+}
+
 // Initialize storage - call this on app startup
 function initializeStorage() {
-    if (needsReset()) {
-        resetConfigDir();
-    } else {
-        // Ensure history directory exists
-        const historyDir = getHistoryDir();
-        if (!fs.existsSync(historyDir)) {
-            fs.mkdirSync(historyDir, { recursive: true });
+    const configDir = getConfigDir();
+    const isFreshInstall = !fs.existsSync(getConfigPath());
+
+    fs.mkdirSync(configDir, { recursive: true });
+    fs.mkdirSync(getHistoryDir(), { recursive: true });
+
+    if (isFreshInstall) {
+        writeJsonFile(getConfigPath(), DEFAULT_CONFIG);
+        // Only config.json proves freshness, so never overwrite credentials or
+        // preferences that a previous install already wrote.
+        if (!fs.existsSync(getCredentialsPath())) {
+            writeJsonFile(getCredentialsPath(), DEFAULT_CREDENTIALS);
         }
+        if (!fs.existsSync(getPreferencesPath())) {
+            writeJsonFile(getPreferencesPath(), DEFAULT_PREFERENCES);
+        }
+        console.log('Config directory initialized with defaults');
+        return;
+    }
+
+    const storedVersion = readStoredConfigVersion();
+    if (storedVersion !== CONFIG_VERSION) {
+        migrateConfigDir(storedVersion);
     }
 }
 
@@ -348,10 +401,15 @@ function incrementCharUsage(provider, model, charCount) {
     const today = getTodayDateString();
     const todayEntry = limits.data.find(entry => entry.date === today);
 
-    if (todayEntry[provider] && todayEntry[provider][model]) {
-        todayEntry[provider][model].chars += charCount;
-        setLimits(limits);
+    if (!todayEntry[provider]) {
+        todayEntry[provider] = {};
     }
+    if (!todayEntry[provider][model]) {
+        // Gateways expose an open-ended model list, so track usage without a preset limit.
+        todayEntry[provider][model] = { chars: 0 };
+    }
+    todayEntry[provider][model].chars += charCount;
+    setLimits(limits);
 
     return todayEntry;
 }

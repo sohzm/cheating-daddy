@@ -11,6 +11,7 @@ const SAMPLE_RATE = 24000;
 const AUDIO_CHUNK_DURATION = 0.1; // seconds
 const BUFFER_SIZE = 4096; // Increased buffer size for smoother audio
 
+let linuxMonitorStream = null;
 let hiddenVideo = null;
 let offscreenCanvas = null;
 let offscreenContext = null;
@@ -173,6 +174,27 @@ async function cancelLocalInitialization() {
     return ipcRenderer.invoke('cancel-local-initialization');
 }
 
+async function initializeOmniRoute(profile = 'interview') {
+    const prefs = await storage.getPreferences();
+    const result = await ipcRenderer.invoke('initialize-omniroute', profile, prefs.customPrompt || '', prefs.whisperModel || 'base.en');
+
+    if (result && result.success) {
+        // Don't overwrite the warning the main process set when Whisper failed:
+        // text and screenshots still work, live audio does not.
+        if (result.audio) {
+            cheatingDaddy.setStatus('OmniRoute Live');
+        }
+        return result;
+    }
+
+    cheatingDaddy.setStatus('error');
+    return result || { success: false, audio: false };
+}
+
+async function omnirouteCheckConnection() {
+    return ipcRenderer.invoke('omniroute-check-connection');
+}
+
 async function initializeCloud(profile = 'interview') {
     const creds = await storage.getCredentials();
     const token = creds.cloudToken;
@@ -249,40 +271,39 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
                 }
             }
         } else if (isLinux) {
-            // Linux - use display media for screen capture and try to get system audio
-            try {
-                // First try to get system audio via getDisplayMedia (works on newer browsers)
-                mediaStream = await navigator.mediaDevices.getDisplayMedia({
-                    video: {
-                        frameRate: 1,
-                        width: { ideal: 1920 },
-                        height: { ideal: 1080 },
-                    },
-                    audio: {
-                        sampleRate: SAMPLE_RATE,
-                        channelCount: 1,
-                        echoCancellation: false, // Don't cancel system audio
-                        noiseSuppression: false,
-                        autoGainControl: false,
-                    },
-                });
+            // Screen capture goes through the desktop portal; system audio does not.
+            // The portal usually returns a video-only stream on Wayland, so ask for
+            // video here and capture speaker audio separately below.
+            mediaStream = await navigator.mediaDevices.getDisplayMedia({
+                video: {
+                    frameRate: 1,
+                    width: { ideal: 1920 },
+                    height: { ideal: 1080 },
+                },
+                audio: false,
+            });
 
-                console.log('Linux system audio capture via getDisplayMedia succeeded');
+            console.log('Linux screen capture started');
 
-                // Setup audio processing for Linux system audio
-                setupLinuxSystemAudioProcessing();
-            } catch (systemAudioError) {
-                console.warn('System audio via getDisplayMedia failed, trying screen-only capture:', systemAudioError);
+            if (audioMode !== 'mic_only') {
+                // Preferred path: parec reads the PipeWire monitor in the main
+                // process, because Chromium hides monitor sources from the renderer.
+                const audioResult = await ipcRenderer.invoke('start-linux-audio');
 
-                // Fallback to screen-only capture
-                mediaStream = await navigator.mediaDevices.getDisplayMedia({
-                    video: {
-                        frameRate: 1,
-                        width: { ideal: 1920 },
-                        height: { ideal: 1080 },
-                    },
-                    audio: false,
-                });
+                if (audioResult.success) {
+                    console.log('Linux system audio capture started via parec');
+                } else {
+                    console.warn('parec capture unavailable:', audioResult.error);
+
+                    // Fallback for setups that do expose a monitor as an input device.
+                    const monitorStream = await captureLinuxMonitorAudio();
+                    if (monitorStream) {
+                        linuxMonitorStream = monitorStream;
+                        setupSystemAudioProcessing(monitorStream);
+                    } else {
+                        cheatingDaddy.setStatus('No system audio - install pulseaudio-utils');
+                    }
+                }
             }
 
             // Additionally get microphone input for Linux based on audio mode
@@ -401,10 +422,45 @@ function setupLinuxMicProcessing(micStream) {
     micAudioProcessor = micProcessor;
 }
 
+// Finds a PipeWire/PulseAudio monitor source so we can capture what the speakers
+// are playing. The desktop portal frequently hands back a video-only stream on
+// Wayland, which would otherwise leave us with no interviewer audio at all.
+async function captureLinuxMonitorAudio() {
+    try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const monitor = devices.find(device => device.kind === 'audioinput' && /monitor/i.test(device.label));
+
+        if (!monitor) {
+            console.warn('No PipeWire monitor source found; system audio unavailable on this session');
+            return null;
+        }
+
+        console.log('Using monitor source for system audio:', monitor.label);
+        return await navigator.mediaDevices.getUserMedia({
+            audio: {
+                deviceId: { exact: monitor.deviceId },
+                sampleRate: SAMPLE_RATE,
+                channelCount: 1,
+                echoCancellation: false,
+                noiseSuppression: false,
+                autoGainControl: false,
+            },
+            video: false,
+        });
+    } catch (error) {
+        console.warn('Failed to capture monitor source:', error);
+        return null;
+    }
+}
+
 function setupLinuxSystemAudioProcessing() {
-    // Setup system audio processing for Linux (from getDisplayMedia)
+    setupSystemAudioProcessing(mediaStream);
+}
+
+function setupSystemAudioProcessing(stream) {
+    // Setup system audio processing for Linux (from getDisplayMedia or a monitor source)
     audioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
-    const source = audioContext.createMediaStreamSource(mediaStream);
+    const source = audioContext.createMediaStreamSource(stream);
     audioProcessor = audioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
 
     let audioBuffer = [];
@@ -691,10 +747,21 @@ function stopCapture() {
         mediaStream = null;
     }
 
+    if (linuxMonitorStream) {
+        linuxMonitorStream.getTracks().forEach(track => track.stop());
+        linuxMonitorStream = null;
+    }
+
     // Stop macOS audio capture if running
     if (isMacOS) {
         ipcRenderer.invoke('stop-macos-audio').catch(err => {
             console.error('Error stopping macOS audio:', err);
+        });
+    }
+
+    if (isLinux) {
+        ipcRenderer.invoke('stop-linux-audio').catch(err => {
+            console.error('Error stopping Linux audio:', err);
         });
     }
 
@@ -1088,6 +1155,8 @@ const cheatingDaddy = {
     initializeGemini,
     initializeCloud,
     initializeLocal,
+    initializeOmniRoute,
+    omnirouteCheckConnection,
     cancelLocalInitialization,
     startCapture,
     stopCapture,

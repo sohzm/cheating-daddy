@@ -8,6 +8,9 @@ import { OnboardingView } from '../views/OnboardingView.js';
 import { AICustomizeView } from '../views/AICustomizeView.js';
 import { FeedbackView } from '../views/FeedbackView.js';
 
+// Matches the "browse your last 100 answers" behaviour; older turns stay in history.
+const MAX_LIVE_RESPONSES = 100;
+
 export class CheatingDaddyApp extends LitElement {
     static styles = css`
         * {
@@ -530,17 +533,29 @@ export class CheatingDaddyApp extends LitElement {
 
     setStatus(text) {
         this.statusText = text;
-        if (text.includes('Ready') || text.includes('Listening') || text.includes('Error')) {
+        // Match case-insensitively: providers emit "... error: ..." in lower
+        // case, which previously left the failed response marked in progress.
+        const normalized = String(text).toLowerCase();
+        if (normalized.includes('ready') || normalized.includes('listening') || normalized.includes('error')) {
             this._currentResponseIsComplete = true;
         }
     }
 
     addNewResponse(response) {
         const wasOnLatest = this.currentResponseIndex === this.responses.length - 1;
-        this.responses = [...this.responses, response];
+        const appended = [...this.responses, response];
+
+        // Keep the in-session backlog bounded; the full log still lives in history.
+        const overflow = Math.max(0, appended.length - MAX_LIVE_RESPONSES);
+        this.responses = overflow ? appended.slice(overflow) : appended;
+
         if (wasOnLatest || this.currentResponseIndex === -1) {
             this.currentResponseIndex = this.responses.length - 1;
+        } else if (overflow) {
+            // Trimming shifts every index down; clamp so the view stays in range.
+            this.currentResponseIndex = Math.max(0, this.currentResponseIndex - overflow);
         }
+
         this._awaitingNewResponse = false;
         this.requestUpdate();
     }
@@ -614,6 +629,15 @@ export class CheatingDaddyApp extends LitElement {
                 const mainView = this.shadowRoot.querySelector('main-view');
                 if (mainView && mainView.triggerApiKeyError) {
                     mainView.triggerApiKeyError();
+                }
+                return;
+            }
+        } else if (providerMode === 'omniroute') {
+            const result = await cheatingDaddy.initializeOmniRoute(this.selectedProfile);
+            if (!result || !result.success) {
+                const mainView = this.shadowRoot.querySelector('main-view');
+                if (mainView && mainView.triggerStartError) {
+                    mainView.triggerStartError(result && result.error);
                 }
                 return;
             }
