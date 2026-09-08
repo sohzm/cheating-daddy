@@ -633,7 +633,7 @@ async function sendToOmniRoute(transcription) {
         const answer = fullText.trim();
         if (!answer) {
             logTransportEvent('omniroute.text.empty_response', { model });
-            sendToRenderer('update-status', 'OmniRoute returned an empty response');
+            sendToRenderer('update-status', 'OmniRoute error: returned an empty response');
             return { success: false, error: 'OmniRoute returned an empty response' };
         }
 
@@ -687,6 +687,7 @@ async function sendImageToOmniRoute(base64Data, prompt) {
     } catch (error) {
         console.error('Error calling OmniRoute vision:', error);
         logTransportEvent('omniroute.image.error', { error: error.message });
+        sendToRenderer('update-status', 'OmniRoute error: ' + error.message);
         return { success: false, error: error.message };
     }
 }
@@ -1257,7 +1258,16 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
         return success;
     });
 
+    const MAX_CUSTOM_PROMPT_LENGTH = 32000;
+
     ipcMain.handle('initialize-omniroute', async (event, profile = 'interview', customPrompt = '', whisperModel = 'base.en') => {
+        if (typeof profile !== 'string' || typeof whisperModel !== 'string' || typeof customPrompt !== 'string') {
+            return { success: false, audio: false, error: 'Invalid session arguments' };
+        }
+        if (customPrompt.length > MAX_CUSTOM_PROMPT_LENGTH) {
+            return { success: false, audio: false, error: 'Custom prompt is too long' };
+        }
+
         try {
             currentProviderMode = 'omniroute';
             currentSystemPrompt = getSystemPrompt(profile, customPrompt, false);

@@ -533,7 +533,10 @@ export class CheatingDaddyApp extends LitElement {
 
     setStatus(text) {
         this.statusText = text;
-        if (text.includes('Ready') || text.includes('Listening') || text.includes('Error')) {
+        // Match case-insensitively: providers emit "... error: ..." in lower
+        // case, which previously left the failed response marked in progress.
+        const normalized = String(text).toLowerCase();
+        if (normalized.includes('ready') || normalized.includes('listening') || normalized.includes('error')) {
             this._currentResponseIsComplete = true;
         }
     }

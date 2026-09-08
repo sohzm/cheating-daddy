@@ -25,13 +25,39 @@ function getVisionModel() {
     return (getConfig().omnirouteVisionModel || '').trim() || getModel();
 }
 
+// Loopback traffic never leaves the machine, so a bearer key is safe there even
+// over plain HTTP. Sending it in cleartext to a remote host is not.
+function canSendCredentials(baseUrl) {
+    try {
+        const url = new URL(baseUrl);
+        if (url.protocol === 'https:') {
+            return true;
+        }
+        return ['localhost', '127.0.0.1', '::1', '[::1]'].includes(url.hostname);
+    } catch {
+        return false;
+    }
+}
+
+let warnedAboutCleartextKey = false;
+
 function buildHeaders() {
     const headers = { 'Content-Type': 'application/json' };
     const key = getApiKey();
     // OmniRoute serves keyless free providers, so an empty key is still a valid setup.
-    if (key) {
-        headers.Authorization = `Bearer ${key}`;
+    if (!key) {
+        return headers;
     }
+
+    if (!canSendCredentials(getBaseUrl())) {
+        if (!warnedAboutCleartextKey) {
+            warnedAboutCleartextKey = true;
+            console.warn('OmniRoute: refusing to send the API key over plain HTTP to a remote host. Use HTTPS.');
+        }
+        return headers;
+    }
+
+    headers.Authorization = `Bearer ${key}`;
     return headers;
 }
 
