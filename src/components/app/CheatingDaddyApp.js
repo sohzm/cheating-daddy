@@ -633,11 +633,11 @@ export class CheatingDaddyApp extends LitElement {
                 return;
             }
         } else if (providerMode === 'omniroute') {
-            const success = await cheatingDaddy.initializeOmniRoute(this.selectedProfile);
-            if (!success) {
+            const result = await cheatingDaddy.initializeOmniRoute(this.selectedProfile);
+            if (!result || !result.success) {
                 const mainView = this.shadowRoot.querySelector('main-view');
-                if (mainView && mainView.triggerApiKeyError) {
-                    mainView.triggerApiKeyError();
+                if (mainView && mainView.triggerStartError) {
+                    mainView.triggerStartError(result && result.error);
                 }
                 return;
             }

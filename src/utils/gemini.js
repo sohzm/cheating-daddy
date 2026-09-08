@@ -1057,16 +1057,21 @@ function startLinuxAudioCapture(geminiSessionRef) {
     const device = getLinuxMonitorSource();
     console.log('Starting Linux system audio capture from:', device);
 
+    // Held locally so the exit handlers below can tell whether they belong to
+    // the process still in use, or to one that has already been replaced.
+    let audioProcess;
+
     try {
-        linuxAudioProc = spawn('parec', ['--format=s16le', `--rate=${LINUX_SAMPLE_RATE}`, '--channels=1', '--latency-msec=100', '-d', device], {
+        audioProcess = spawn('parec', ['--format=s16le', `--rate=${LINUX_SAMPLE_RATE}`, '--channels=1', '--latency-msec=100', '-d', device], {
             stdio: ['ignore', 'pipe', 'pipe'],
         });
+        linuxAudioProc = audioProcess;
     } catch (error) {
         console.error('Failed to spawn parec:', error.message);
         return false;
     }
 
-    if (!linuxAudioProc.pid) {
+    if (!audioProcess.pid) {
         console.error('parec did not start');
         linuxAudioProc = null;
         return false;
@@ -1074,7 +1079,7 @@ function startLinuxAudioCapture(geminiSessionRef) {
 
     let audioBuffer = Buffer.alloc(0);
 
-    linuxAudioProc.stdout.on('data', data => {
+    audioProcess.stdout.on('data', data => {
         audioBuffer = Buffer.concat([audioBuffer, data]);
 
         while (audioBuffer.length >= LINUX_CHUNK_SIZE) {
@@ -1099,18 +1104,22 @@ function startLinuxAudioCapture(geminiSessionRef) {
         }
     });
 
-    linuxAudioProc.stderr.on('data', data => {
+    audioProcess.stderr.on('data', data => {
         console.error('parec stderr:', data.toString().trim());
     });
 
-    linuxAudioProc.on('close', code => {
+    audioProcess.on('close', code => {
         console.log('parec exited with code:', code);
-        linuxAudioProc = null;
+        if (linuxAudioProc === audioProcess) {
+            linuxAudioProc = null;
+        }
     });
 
-    linuxAudioProc.on('error', error => {
+    audioProcess.on('error', error => {
         console.error('parec process error:', error.message);
-        linuxAudioProc = null;
+        if (linuxAudioProc === audioProcess) {
+            linuxAudioProc = null;
+        }
     });
 
     return true;
