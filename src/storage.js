@@ -18,6 +18,8 @@ const DEFAULT_CONFIG = {
 const DEFAULT_CREDENTIALS = {
     apiKey: '',
     groqApiKey: '',
+    commandCodeApiKey: '',
+    openaiKey: '',
 };
 
 const DEFAULT_PREFERENCES = {
@@ -34,6 +36,9 @@ const DEFAULT_PREFERENCES = {
     googleSearchEnabled: false,
     localLlmModel: 'unsloth/Qwen3.5-4B-GGUF:Q4_K_M',
     whisperModel: 'tiny.en',
+    commandCodeModel: 'deepseek/deepseek-v4.1-flash',
+    openaiBaseUrl: 'https://api.openai.com/v1',
+    openaiModel: '',
 };
 
 const DEFAULT_KEYBINDS = null; // null means use system defaults

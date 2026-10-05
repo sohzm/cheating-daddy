@@ -12,6 +12,9 @@ const {
     stopNativeServer,
     waitForServer,
 } = require('./native-ai-runtime');
+const { initializeApiClient, closeApiClient, sendApiText, sendApiImage } = require('./openai-compat');
+
+const COMMAND_CODE_BASE_URL = 'https://api.commandcode.ai/provider/v1';
 
 let llamaProcess = null;
 let llamaBaseUrl = null;
@@ -23,6 +26,8 @@ let currentSystemPrompt = null;
 let isLocalActive = false;
 let initializationController = null;
 let llamaCacheSnapshot = new Set();
+let activeBackend = 'llama'; // 'llama' for local llama.cpp, 'api' for OpenAI-format HTTP APIs
+let apiBackendLabel = 'API';
 
 let isSpeaking = false;
 let speechBuffers = [];
@@ -239,6 +244,19 @@ async function requestLlama(messages, onText) {
 }
 
 async function sendToLlama(transcription) {
+    if (activeBackend === 'api') {
+        try {
+            await sendApiText(transcription);
+            console.log(`[LocalAI] ${apiBackendLabel} response completed`);
+            sendToRenderer('update-status', 'Listening...');
+        } catch (error) {
+            console.error(`[LocalAI] ${apiBackendLabel} error:`, error);
+            sendToRenderer('update-status', `${apiBackendLabel} error: ` + error.message);
+            throw error;
+        }
+        return;
+    }
+
     localConversationHistory.push({
         role: 'user',
         content: transcription.trim(),
@@ -324,33 +342,41 @@ function removeNewLlamaCacheEntries() {
     }
 }
 
-async function prepareNativeFiles(llamaModelReference, whisperModel, signal) {
-    const binaryProgress = label => progress => {
+function nativeProgressReporter(label) {
+    return progress => {
         sendToRenderer('update-status', formatDownloadStatus(label, progress));
         sendDownloadProgress(label, progress);
     };
+}
 
-    sendDownloadProgress('Checking Llama runner');
-    const llamaBinaryPath = await ensureNativeBinary('llama', binaryProgress('Llama runner'), signal);
-
+async function prepareWhisperFiles(whisperModel, signal) {
     sendDownloadProgress('Checking Whisper runner');
-    const whisperBinaryPath = await ensureNativeBinary('whisper', binaryProgress('Whisper runner'), signal);
+    const whisperBinaryPath = await ensureNativeBinary('whisper', nativeProgressReporter('Whisper runner'), signal);
 
     let whisperModelPath;
     sendToRenderer('whisper-downloading', true);
     try {
         sendDownloadProgress('Checking Whisper model');
-        whisperModelPath = await ensureWhisperModel(whisperModel, binaryProgress('Whisper model'), signal);
+        whisperModelPath = await ensureWhisperModel(whisperModel, nativeProgressReporter('Whisper model'), signal);
     } finally {
         sendToRenderer('whisper-downloading', false);
     }
 
+    return { whisperBinaryPath, whisperModelPath };
+}
+
+async function prepareNativeFiles(llamaModelReference, whisperModel, signal) {
+    const whisperFiles = await prepareWhisperFiles(whisperModel, signal);
+
+    sendDownloadProgress('Checking Llama runner');
+    const llamaBinaryPath = await ensureNativeBinary('llama', nativeProgressReporter('Llama runner'), signal);
+
     sendDownloadProgress('Checking language model');
-    const llamaFiles = await ensureLlamaModel(llamaModelReference, binaryProgress('Language model'), binaryProgress('Vision model'), signal);
+    const llamaFiles = await ensureLlamaModel(llamaModelReference, nativeProgressReporter('Language model'), nativeProgressReporter('Vision model'), signal);
+
     return {
+        ...whisperFiles,
         llamaBinaryPath,
-        whisperBinaryPath,
-        whisperModelPath,
         llamaModelPath: llamaFiles.modelPath,
         projectorPath: llamaFiles.projectorPath,
     };
@@ -363,6 +389,19 @@ function validatePreparedNativeFiles(nativeFiles) {
         ['Whisper model', nativeFiles.whisperModelPath],
         ['Language model', nativeFiles.llamaModelPath],
         ['Vision model', nativeFiles.projectorPath],
+    ];
+
+    for (const [label, filePath] of requiredFiles) {
+        if (!filePath || !fs.existsSync(filePath)) {
+            throw new Error(`${label} path is invalid: ${filePath}`);
+        }
+    }
+}
+
+function validateWhisperFiles(nativeFiles) {
+    const requiredFiles = [
+        ['Whisper runner', nativeFiles.whisperBinaryPath],
+        ['Whisper model', nativeFiles.whisperModelPath],
     ];
 
     for (const [label, filePath] of requiredFiles) {
@@ -428,6 +467,7 @@ async function initializeLocalSession(model, whisperModel, profile, customPrompt
 
     try {
         closeLocalSession();
+        activeBackend = 'llama';
         initializationController = new AbortController();
         llamaCacheSnapshot = getDirectoryEntries(path.join(getModelsDirectory(), 'llama'));
         currentSystemPrompt = getSystemPrompt(profile, customPrompt, false);
@@ -477,6 +517,88 @@ async function initializeLocalSession(model, whisperModel, profile, customPrompt
     }
 }
 
+async function initializeApiSession(apiConfig, model, whisperModel, profile, customPrompt) {
+    const label = apiConfig.label || 'API';
+    console.log('[LocalAI] Initializing API session:', { label, model, whisperModel, profile });
+    sendToRenderer('session-initializing', true);
+
+    try {
+        closeLocalSession();
+        if (!apiConfig.baseUrl || !apiConfig.baseUrl.trim()) {
+            throw new Error(`${label} base URL is required`);
+        }
+
+        activeBackend = 'api';
+        apiBackendLabel = label;
+        initializationController = new AbortController();
+        llamaCacheSnapshot = getDirectoryEntries(path.join(getModelsDirectory(), 'llama'));
+        currentSystemPrompt = getSystemPrompt(profile, customPrompt, false);
+        llamaModel = model;
+
+        const whisperFiles = await prepareWhisperFiles(whisperModel, initializationController.signal);
+        validateWhisperFiles(whisperFiles);
+
+        sendToRenderer('update-status', 'Starting Whisper...');
+        sendDownloadProgress('Starting Whisper');
+        await startWhisperServer(whisperFiles.whisperBinaryPath, whisperFiles.whisperModelPath);
+
+        isSpeaking = false;
+        speechBuffers = [];
+        silenceFrameCount = 0;
+        speechFrameCount = 0;
+        resampleRemainder = Buffer.alloc(0);
+        localConversationHistory = [];
+
+        initializeNewSession(profile, customPrompt);
+        initializeApiClient({
+            baseUrl: apiConfig.baseUrl.trim(),
+            apiKey: apiConfig.apiKey,
+            model,
+            systemPrompt: currentSystemPrompt,
+            label,
+        });
+        isLocalActive = true;
+        initializationController = null;
+        sendToRenderer('local-ai-download-progress', { active: false });
+        sendToRenderer('session-initializing', false);
+        sendToRenderer('update-status', `${label} ready - Listening...`);
+        console.log(`[LocalAI] ${label} session initialized successfully`);
+        return { success: true };
+    } catch (error) {
+        const wasCancelled = error.name === 'AbortError' || initializationController?.signal.aborted;
+        if (wasCancelled) {
+            console.log('[LocalAI] Initialization cancelled');
+        } else {
+            console.error('[LocalAI] Initialization error:', error);
+        }
+        closeLocalSession();
+        sendToRenderer('local-ai-download-progress', { active: false });
+        sendToRenderer('session-initializing', false);
+        sendToRenderer('update-status', wasCancelled ? 'Local AI download cancelled' : `${label} error: ` + error.message);
+        return { success: false, error: wasCancelled ? '' : error.message };
+    }
+}
+
+async function initializeCommandCodeSession(commandCodeApiKey, model, whisperModel, profile, customPrompt) {
+    if (!commandCodeApiKey || !commandCodeApiKey.trim()) {
+        console.error('[LocalAI] Initialization error: Command Code API key is required');
+        sendToRenderer('update-status', 'Command Code error: Command Code API key is required');
+        return { success: false, error: 'Command Code API key is required' };
+    }
+
+    return initializeApiSession(
+        { label: 'Command Code', baseUrl: COMMAND_CODE_BASE_URL, apiKey: commandCodeApiKey.trim() },
+        model,
+        whisperModel,
+        profile,
+        customPrompt
+    );
+}
+
+async function initializeOpenAiSession(baseUrl, apiKey, model, whisperModel, profile, customPrompt) {
+    return initializeApiSession({ label: 'OpenAI API', baseUrl, apiKey }, model, whisperModel, profile, customPrompt);
+}
+
 function processLocalAudio(monoChunk24k) {
     if (!isLocalActive) return;
 
@@ -504,6 +626,9 @@ function closeLocalSession() {
     resampleRemainder = Buffer.alloc(0);
     localConversationHistory = [];
     currentSystemPrompt = null;
+    activeBackend = 'llama';
+    apiBackendLabel = 'API';
+    closeApiClient();
 }
 
 async function cancelLocalInitialization() {
@@ -526,7 +651,7 @@ function isLocalSessionActive() {
 }
 
 async function sendLocalText(text) {
-    if (!isLocalActive || !llamaProcess) {
+    if (!isLocalActive || (activeBackend === 'llama' && !llamaProcess)) {
         return { success: false, error: 'No active local session' };
     }
 
@@ -539,8 +664,21 @@ async function sendLocalText(text) {
 }
 
 async function sendLocalImage(base64Data, prompt) {
-    if (!isLocalActive || !llamaProcess) {
+    if (!isLocalActive || (activeBackend === 'llama' && !llamaProcess)) {
         return { success: false, error: 'No active local session' };
+    }
+
+    if (activeBackend === 'api') {
+        sendToRenderer('update-status', 'Analyzing image...');
+        try {
+            const fullText = await sendApiImage(base64Data, prompt);
+            sendToRenderer('update-status', 'Listening...');
+            return { success: true, text: fullText, model: llamaModel };
+        } catch (error) {
+            console.error(`[LocalAI] ${apiBackendLabel} image error:`, error);
+            sendToRenderer('update-status', `${apiBackendLabel} image error: ` + error.message);
+            return { success: false, error: error.message };
+        }
     }
 
     const userMessage = {
@@ -590,7 +728,10 @@ async function sendLocalImage(base64Data, prompt) {
 }
 
 module.exports = {
+    COMMAND_CODE_BASE_URL,
     initializeLocalSession,
+    initializeCommandCodeSession,
+    initializeOpenAiSession,
     cancelLocalInitialization,
     processLocalAudio,
     closeLocalSession,

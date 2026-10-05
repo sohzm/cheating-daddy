@@ -3,7 +3,16 @@ const { BrowserWindow, ipcMain } = require('electron');
 const { spawn } = require('child_process');
 const { saveDebugAudio } = require('../audioUtils');
 const { getSystemPrompt } = require('./prompts');
-const { getAvailableModel, incrementLimitCount, getApiKey, getGroqApiKey, incrementCharUsage, getConfig } = require('../storage');
+const {
+    getAvailableModel,
+    incrementLimitCount,
+    getApiKey,
+    getGroqApiKey,
+    incrementCharUsage,
+    getConfig,
+    getCredentials,
+    getPreferences,
+} = require('../storage');
 const { connectCloud, sendCloudAudio, sendCloudText, sendCloudImage, closeCloud, isCloudActive, setOnTurnComplete } = require('./cloud');
 const { startTransportLog, logTransportEvent, closeTransportLog } = require('./transportLogger');
 
@@ -14,8 +23,20 @@ function getLocalAi() {
     return _localai;
 }
 
-// Provider mode: 'byok', 'cloud', or 'local'
+// Lazy-loaded to avoid circular dependency (openai-compat.js imports from gemini.js)
+let _openaiCompat = null;
+function getOpenAiCompat() {
+    if (!_openaiCompat) _openaiCompat = require('./openai-compat');
+    return _openaiCompat;
+}
+
+// Provider mode: 'byok', 'cloud', 'local', 'commandcode', or 'openai'
 let currentProviderMode = 'byok';
+
+// Modes backed by the local pipeline (Whisper transcription + llama.cpp or an OpenAI-format API)
+function isLocalBackedProvider() {
+    return currentProviderMode === 'local' || currentProviderMode === 'commandcode' || currentProviderMode === 'openai';
+}
 
 // Groq conversation history for context
 let groqConversationHistory = [];
@@ -1091,6 +1112,54 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
         return success;
     });
 
+    ipcMain.handle('initialize-commandcode', async (event, commandCodeApiKey, model, whisperModel, profile, customPrompt) => {
+        currentProviderMode = 'commandcode';
+        const result = await getLocalAi().initializeCommandCodeSession(commandCodeApiKey, model, whisperModel, profile, customPrompt);
+        if (!result.success) {
+            currentProviderMode = 'byok';
+        }
+        return result;
+    });
+
+    ipcMain.handle('initialize-openai', async (event, baseUrl, apiKey, model, whisperModel, profile, customPrompt) => {
+        currentProviderMode = 'openai';
+        const result = await getLocalAi().initializeOpenAiSession(baseUrl, apiKey, model, whisperModel, profile, customPrompt);
+        if (!result.success) {
+            currentProviderMode = 'byok';
+        }
+        return result;
+    });
+
+    ipcMain.handle('list-models', async (event, provider) => {
+        try {
+            const creds = getCredentials();
+            let baseUrl;
+            let apiKey;
+            let label;
+
+            if (provider === 'commandcode') {
+                baseUrl = getLocalAi().COMMAND_CODE_BASE_URL;
+                apiKey = (creds.commandCodeApiKey || '').trim();
+                label = 'Command Code';
+                if (!apiKey) {
+                    return { success: false, error: 'Enter your Command Code API key first.' };
+                }
+            } else {
+                baseUrl = (getPreferences().openaiBaseUrl || '').trim();
+                apiKey = (creds.openaiKey || '').trim();
+                label = 'OpenAI API';
+                if (!baseUrl) {
+                    return { success: false, error: 'Enter a Base URL first.' };
+                }
+            }
+
+            const models = await getOpenAiCompat().listAvailableModels({ baseUrl, apiKey, label });
+            return { success: true, data: models };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    });
+
     ipcMain.handle('cancel-local-initialization', async () => {
         const cancelled = await getLocalAi().cancelLocalInitialization();
         if (cancelled) {
@@ -1110,7 +1179,7 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
                 return { success: false, error: error.message };
             }
         }
-        if (currentProviderMode === 'local') {
+        if (isLocalBackedProvider()) {
             try {
                 const pcmBuffer = Buffer.from(data, 'base64');
                 getLocalAi().processLocalAudio(pcmBuffer);
@@ -1145,7 +1214,7 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
                 return { success: false, error: error.message };
             }
         }
-        if (currentProviderMode === 'local') {
+        if (isLocalBackedProvider()) {
             try {
                 const pcmBuffer = Buffer.from(data, 'base64');
                 getLocalAi().processLocalAudio(pcmBuffer);
@@ -1192,7 +1261,7 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
                 return { success: true, model: 'cloud' };
             }
 
-            if (currentProviderMode === 'local') {
+            if (isLocalBackedProvider()) {
                 const result = await getLocalAi().sendLocalImage(data, prompt);
                 return result;
             }
@@ -1221,7 +1290,7 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
             }
         }
 
-        if (currentProviderMode === 'local') {
+        if (isLocalBackedProvider()) {
             try {
                 console.log('Sending text to local Llama:', text);
                 return await getLocalAi().sendLocalText(text.trim());
@@ -1287,7 +1356,7 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
                 return { success: true };
             }
 
-            if (currentProviderMode === 'local') {
+            if (isLocalBackedProvider()) {
                 getLocalAi().closeLocalSession();
                 currentProviderMode = 'byok';
                 closeTransportLog();
@@ -1353,6 +1422,7 @@ module.exports = {
     sendToRenderer,
     initializeNewSession,
     saveConversationTurn,
+    saveScreenAnalysis,
     getCurrentSessionData,
     killExistingSystemAudioDump,
     startMacOSAudioCapture,

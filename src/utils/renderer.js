@@ -169,6 +169,43 @@ async function initializeLocal(profile = 'interview') {
     }
 }
 
+async function initializeCommandCode(profile = 'interview') {
+    const prefs = await storage.getPreferences();
+    const creds = await storage.getCredentials();
+    const commandCodeApiKey = creds.commandCodeApiKey || '';
+    const commandCodeModel = prefs.commandCodeModel || 'deepseek/deepseek-v4.1-flash';
+    const whisperModel = prefs.whisperModel || 'tiny.en';
+    const customPrompt = prefs.customPrompt || '';
+
+    const result = await ipcRenderer.invoke('initialize-commandcode', commandCodeApiKey, commandCodeModel, whisperModel, profile, customPrompt);
+    if (result.success) {
+        cheatingDaddy.setStatus('Command Code Live');
+        return { success: true };
+    } else {
+        cheatingDaddy.setStatus('error');
+        return { success: false, error: result.error || '' };
+    }
+}
+
+async function initializeOpenAi(profile = 'interview') {
+    const prefs = await storage.getPreferences();
+    const creds = await storage.getCredentials();
+    const baseUrl = prefs.openaiBaseUrl || 'https://api.openai.com/v1';
+    const apiKey = creds.openaiKey || '';
+    const model = prefs.openaiModel || '';
+    const whisperModel = prefs.whisperModel || 'tiny.en';
+    const customPrompt = prefs.customPrompt || '';
+
+    const result = await ipcRenderer.invoke('initialize-openai', baseUrl, apiKey, model, whisperModel, profile, customPrompt);
+    if (result.success) {
+        cheatingDaddy.setStatus('OpenAI API Live');
+        return { success: true };
+    } else {
+        cheatingDaddy.setStatus('error');
+        return { success: false, error: result.error || '' };
+    }
+}
+
 async function cancelLocalInitialization() {
     return ipcRenderer.invoke('cancel-local-initialization');
 }
@@ -1088,6 +1125,9 @@ const cheatingDaddy = {
     initializeGemini,
     initializeCloud,
     initializeLocal,
+    initializeCommandCode,
+    initializeOpenAi,
+    listModels: provider => ipcRenderer.invoke('list-models', provider),
     cancelLocalInitialization,
     startCapture,
     stopCapture,
