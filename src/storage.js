@@ -9,9 +9,9 @@ const DEFAULT_CONFIG = {
     configVersion: CONFIG_VERSION,
     onboarded: false,
     layout: 'normal',
-    geminiLiveModel: 'gemini-3.1-flash-live-preview',
-    groqModel: 'qwen/qwen3.6-27b',
-    groqImageModel: 'qwen/qwen3.6-27b',
+    geminiLiveModel: 'gemini-3.8-live',
+    groqModel: 'qwen/qwen3.8-27b',
+    groqImageModel: 'qwen/qwen3.8-27b',
     disableGroqThinking: true,
 };
 
@@ -166,7 +166,17 @@ function initializeStorage() {
 
 function getConfig() {
     const saved = readJsonFile(getConfigPath(), {});
-    return { ...DEFAULT_CONFIG, ...saved };
+    const config = { ...DEFAULT_CONFIG, ...saved };
+    // Migrate shipped defaults without bumping the version, which resets user data.
+    if (config.geminiLiveModel === 'gemini-3.1-flash-live-preview') {
+        config.geminiLiveModel = DEFAULT_CONFIG.geminiLiveModel;
+    }
+    for (const key of ['groqModel', 'groqImageModel']) {
+        if (config[key] === 'qwen/qwen3.6-27b') {
+            config[key] = DEFAULT_CONFIG[key];
+        }
+    }
+    return config;
 }
 
 function setConfig(config) {
@@ -331,9 +341,9 @@ function incrementLimitCount(model) {
     }
 
     // Increment the appropriate model count
-    if (model === 'gemini-2.5-flash') {
+    if (model === 'gemini-3.8-flash') {
         todayEntry.flash.count++;
-    } else if (model === 'gemini-2.5-flash-lite') {
+    } else if (model === 'gemini-3.5-flash-lite') {
         todayEntry.flashLite.count++;
     }
 
@@ -359,15 +369,15 @@ function incrementCharUsage(provider, model, charCount) {
 function getAvailableModel() {
     const todayLimits = getTodayLimits();
 
-    // RPD limits: flash = 20, flash-lite = 20
+    // Local selection thresholds; actual provider quotas may differ.
     // After both exhausted, fall back to flash (for paid API users)
     if (todayLimits.flash.count < 20) {
-        return 'gemini-2.5-flash';
+        return 'gemini-3.8-flash';
     } else if (todayLimits.flashLite.count < 20) {
-        return 'gemini-2.5-flash-lite';
+        return 'gemini-3.5-flash-lite';
     }
 
-    return 'gemini-2.5-flash'; // Default to flash for paid API users
+    return 'gemini-3.8-flash'; // Default to flash for paid API users
 }
 
 function getModelForToday() {

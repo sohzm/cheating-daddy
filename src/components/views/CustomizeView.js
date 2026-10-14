@@ -206,7 +206,7 @@ export class CustomizeView extends LitElement {
         this.onLanguageChange = () => {};
         this.onImageQualityChange = () => {};
         this.onLayoutModeChange = () => {};
-        this.googleSearchEnabled = true;
+        this.googleSearchEnabled = false;
         this.isClearing = false;
         this.isRestoring = false;
         this.clearStatusMessage = '';
@@ -226,7 +226,7 @@ export class CustomizeView extends LitElement {
     async _loadFromStorage() {
         try {
             const [prefs, keybinds] = await Promise.all([cheatingDaddy.storage.getPreferences(), cheatingDaddy.storage.getKeybinds()]);
-            this.googleSearchEnabled = prefs.googleSearchEnabled ?? true;
+            this.googleSearchEnabled = prefs.googleSearchEnabled ?? false;
             this.backgroundTransparency = prefs.backgroundTransparency ?? 0.8;
             this.fontSize = prefs.fontSize ?? 20;
             this.audioMode = prefs.audioMode ?? 'speaker_only';
