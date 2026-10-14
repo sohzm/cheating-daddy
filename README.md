@@ -18,7 +18,7 @@ A real-time AI assistant that provides contextual help during video calls, inter
 
 ## Features
 
-- **Live AI Assistance**: Real-time help powered by Google Gemini 2.0 Flash Live
+- **Live AI Assistance**: Gemini Live, with optional Groq responses in BYOK mode, or native Local AI
 - **Screen & Audio Capture**: Analyzes what you see and hear for contextual responses
 - **Multiple Profiles**: Interview, Sales Call, Business Meeting, Presentation, Negotiation
 - **Transparent Overlay**: Always-on-top window that can be positioned anywhere
@@ -27,13 +27,17 @@ A real-time AI assistant that provides contextual help during video calls, inter
 
 ## Setup
 
-1. **Get a Gemini API Key**: Visit [Google AI Studio](https://aistudio.google.com/apikey)
+1. **Choose an AI mode**: BYOK requires a [Gemini API key](https://aistudio.google.com/apikey); Local AI requires no API key and downloads models on first use
 2. **Install Dependencies**: `npm install`
 3. **Run the App**: `npm start`
 
+## API documentation
+
+See [API setup and compatibility](docs/API.md) for provider setup, model lifecycle notes, request routing, and troubleshooting. Check this guide before relying on the shipped model defaults.
+
 ## Usage
 
-1. Enter your Gemini API key in the main window
+1. Configure BYOK with your Gemini API key (and optional Groq key), or choose Local AI and a local model
 2. Choose your profile and language in settings
 3. Click "Start Session" to begin
 4. Position the window using keyboard shortcuts
@@ -55,6 +59,7 @@ A real-time AI assistant that provides contextual help during video calls, inter
 ## Requirements
 
 - Electron-compatible OS (macOS, Windows, Linux)
-- Gemini API key
+- Gemini API key for BYOK; optional Groq API key for Groq responses and screenshots
+- For Local AI: macOS arm64/x64 or Windows x64, and disk space for the downloaded native runners and models
 - Screen recording permissions
 - Microphone/audio permissions
