@@ -3,6 +3,11 @@ const path = require('path');
 const os = require('os');
 
 const CONFIG_VERSION = 1;
+const GEMINI_FLASH_MODEL = 'gemini-3.8-flash';
+const GEMINI_FLASH_LITE_MODEL = 'gemini-3.5-flash-lite';
+// Free-tier requests per day; flash-lite has a far larger quota than flash
+const GEMINI_FLASH_DAILY_LIMIT = 20;
+const GEMINI_FLASH_LITE_DAILY_LIMIT = 500;
 
 // Default values
 const DEFAULT_CONFIG = {
@@ -331,9 +336,9 @@ function incrementLimitCount(model) {
     }
 
     // Increment the appropriate model count
-    if (model === 'gemini-2.5-flash') {
+    if (model === GEMINI_FLASH_MODEL) {
         todayEntry.flash.count++;
-    } else if (model === 'gemini-2.5-flash-lite') {
+    } else if (model === GEMINI_FLASH_LITE_MODEL) {
         todayEntry.flashLite.count++;
     }
 
@@ -359,15 +364,15 @@ function incrementCharUsage(provider, model, charCount) {
 function getAvailableModel() {
     const todayLimits = getTodayLimits();
 
-    // RPD limits: flash = 20, flash-lite = 20
-    // After both exhausted, fall back to flash (for paid API users)
-    if (todayLimits.flash.count < 20) {
-        return 'gemini-2.5-flash';
-    } else if (todayLimits.flashLite.count < 20) {
-        return 'gemini-2.5-flash-lite';
+    // Flash-lite goes first because flash is frequently overloaded (503) or hangs
+    // After both exhausted, fall back to flash-lite (for paid API users)
+    if (todayLimits.flashLite.count < GEMINI_FLASH_LITE_DAILY_LIMIT) {
+        return GEMINI_FLASH_LITE_MODEL;
+    } else if (todayLimits.flash.count < GEMINI_FLASH_DAILY_LIMIT) {
+        return GEMINI_FLASH_MODEL;
     }
 
-    return 'gemini-2.5-flash'; // Default to flash for paid API users
+    return GEMINI_FLASH_LITE_MODEL; // Default to flash-lite for paid API users
 }
 
 function getModelForToday() {
@@ -497,6 +502,8 @@ function clearAllData() {
 }
 
 module.exports = {
+    GEMINI_FLASH_MODEL,
+    GEMINI_FLASH_LITE_MODEL,
     // Initialization
     initializeStorage,
     getConfigDir,

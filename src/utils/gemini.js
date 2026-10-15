@@ -3,7 +3,16 @@ const { BrowserWindow, ipcMain } = require('electron');
 const { spawn } = require('child_process');
 const { saveDebugAudio } = require('../audioUtils');
 const { getSystemPrompt } = require('./prompts');
-const { getAvailableModel, incrementLimitCount, getApiKey, getGroqApiKey, incrementCharUsage, getConfig } = require('../storage');
+const {
+    GEMINI_FLASH_MODEL,
+    GEMINI_FLASH_LITE_MODEL,
+    getAvailableModel,
+    incrementLimitCount,
+    getApiKey,
+    getGroqApiKey,
+    incrementCharUsage,
+    getConfig,
+} = require('../storage');
 const { connectCloud, sendCloudAudio, sendCloudText, sendCloudImage, closeCloud, isCloudActive, setOnTurnComplete } = require('./cloud');
 const { startTransportLog, logTransportEvent, closeTransportLog } = require('./transportLogger');
 
@@ -993,60 +1002,72 @@ async function sendAudioToGemini(base64Data, geminiSessionRef) {
     }
 }
 
-async function sendImageToGeminiHttp(base64Data, prompt) {
-    // Get available model based on rate limits
-    const model = getAvailableModel();
+// The SDK never clears this timer, so it also caps streaming time, not just time to first byte
+const GEMINI_IMAGE_TIMEOUT_MS = 60000;
 
+async function streamImageAnalysis(ai, model, base64Data, prompt) {
+    const contents = [
+        {
+            inlineData: {
+                mimeType: 'image/jpeg',
+                data: base64Data,
+            },
+        },
+        { text: prompt },
+    ];
+
+    console.log(`Sending image to ${model} (streaming)...`);
+    const response = await ai.models.generateContentStream({
+        model: model,
+        contents: contents,
+    });
+
+    // Increment count after successful call
+    incrementLimitCount(model);
+
+    // Stream the response
+    let fullText = '';
+    let isFirst = true;
+    for await (const chunk of response) {
+        const chunkText = chunk.text;
+        if (chunkText) {
+            fullText += chunkText;
+            // Send to renderer - new response for first chunk, update for subsequent
+            sendToRenderer(isFirst ? 'new-response' : 'update-response', fullText);
+            isFirst = false;
+        }
+    }
+
+    console.log(`Image response completed from ${model}`);
+
+    // Save screen analysis to history
+    saveScreenAnalysis(prompt, fullText, model);
+
+    return { success: true, text: fullText, model: model };
+}
+
+async function sendImageToGeminiHttp(base64Data, prompt) {
     const apiKey = getApiKey();
     if (!apiKey) {
         return { success: false, error: 'No API key configured' };
     }
 
-    try {
-        const ai = new GoogleGenAI({ apiKey: apiKey });
+    // Either model can be overloaded (503) or rate limited, so retry once with the other one
+    const primaryModel = getAvailableModel();
+    const fallbackModel = primaryModel === GEMINI_FLASH_LITE_MODEL ? GEMINI_FLASH_MODEL : GEMINI_FLASH_LITE_MODEL;
+    const models = [primaryModel, fallbackModel];
+    const ai = new GoogleGenAI({ apiKey: apiKey, httpOptions: { timeout: GEMINI_IMAGE_TIMEOUT_MS } });
 
-        const contents = [
-            {
-                inlineData: {
-                    mimeType: 'image/jpeg',
-                    data: base64Data,
-                },
-            },
-            { text: prompt },
-        ];
-
-        console.log(`Sending image to ${model} (streaming)...`);
-        const response = await ai.models.generateContentStream({
-            model: model,
-            contents: contents,
-        });
-
-        // Increment count after successful call
-        incrementLimitCount(model);
-
-        // Stream the response
-        let fullText = '';
-        let isFirst = true;
-        for await (const chunk of response) {
-            const chunkText = chunk.text;
-            if (chunkText) {
-                fullText += chunkText;
-                // Send to renderer - new response for first chunk, update for subsequent
-                sendToRenderer(isFirst ? 'new-response' : 'update-response', fullText);
-                isFirst = false;
-            }
+    let lastError = null;
+    for (const model of models) {
+        try {
+            return await streamImageAnalysis(ai, model, base64Data, prompt);
+        } catch (error) {
+            console.error(`Error sending image to ${model}:`, error);
+            lastError = error;
         }
-
-        console.log(`Image response completed from ${model}`);
-
-        // Save screen analysis to history
-        saveScreenAnalysis(prompt, fullText, model);
-
-        return { success: true, text: fullText, model: model };
-    } catch (error) {
-        console.error('Error sending image to Gemini HTTP:', error);
-        return { success: false, error: error.message };
     }
+    return { success: false, error: lastError.message };
 }
 
 function setupGeminiIpcHandlers(geminiSessionRef) {
