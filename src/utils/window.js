@@ -295,7 +295,7 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
 function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
     ipcMain.on('view-changed', (event, view) => {
         if (!mainWindow.isDestroyed()) {
-            const isLiveMode = view === 'assistant';
+            const isLiveMode = view === 'assistant' || view === 'script-player';
 
             if (process.platform !== 'win32') {
                 mainWindow.setAlwaysOnTop(isLiveMode);

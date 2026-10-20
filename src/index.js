@@ -6,6 +6,7 @@ const { app, BrowserWindow, shell, ipcMain } = require('electron');
 const { createWindow, updateGlobalShortcuts } = require('./utils/window');
 const { setupGeminiIpcHandlers, stopMacOSAudioCapture, sendToRenderer } = require('./utils/gemini');
 const storage = require('./storage');
+const { setupScriptSyncIpcHandlers } = require('./utils/scriptSync');
 
 const geminiSessionRef = { current: null };
 let mainWindow = null;
@@ -28,6 +29,7 @@ app.whenReady().then(async () => {
     createMainWindow();
     setupGeminiIpcHandlers(geminiSessionRef);
     setupStorageIpcHandlers();
+    setupScriptSyncIpcHandlers();
     setupGeneralIpcHandlers();
 });
 

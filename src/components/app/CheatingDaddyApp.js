@@ -7,6 +7,7 @@ import { AssistantView } from '../views/AssistantView.js';
 import { OnboardingView } from '../views/OnboardingView.js';
 import { AICustomizeView } from '../views/AICustomizeView.js';
 import { FeedbackView } from '../views/FeedbackView.js';
+import { ScriptView } from '../views/ScriptView.js';
 
 export class CheatingDaddyApp extends LitElement {
     static styles = css`
@@ -571,6 +572,8 @@ export class CheatingDaddyApp extends LitElement {
             this.sessionActive = false;
             this._stopTimer();
             this.currentView = 'main';
+        } else if (this.currentView === 'script-player') {
+            this.currentView = 'script';
         } else {
             if (window.require) {
                 const { ipcRenderer } = window.require('electron');
@@ -591,6 +594,13 @@ export class CheatingDaddyApp extends LitElement {
             const { ipcRenderer } = window.require('electron');
             await ipcRenderer.invoke('toggle-window-visibility');
         }
+    }
+
+    // ── Script player ──
+
+    toggleScriptPlayback() {
+        const view = this.shadowRoot.querySelector('script-view');
+        if (view && view.presenting) view.togglePlay();
     }
 
     // ── Session start ──
@@ -733,7 +743,7 @@ export class CheatingDaddyApp extends LitElement {
     // ── Helpers ──
 
     _isLiveMode() {
-        return this.currentView === 'assistant';
+        return this.currentView === 'assistant' || this.currentView === 'script-player';
     }
 
     // ── Render ──
@@ -790,6 +800,16 @@ export class CheatingDaddyApp extends LitElement {
 
             case 'history':
                 return html`<history-view></history-view>`;
+
+            case 'script':
+            case 'script-player':
+                return html`
+                    <script-view
+                        .presenting=${this.currentView === 'script-player'}
+                        .onPresent=${() => this.navigate('script-player')}
+                        .onExit=${() => this.navigate('script')}
+                    ></script-view>
+                `;
 
             case 'assistant':
                 return html`
@@ -850,6 +870,16 @@ export class CheatingDaddyApp extends LitElement {
                             d="M10 20.777a9 9 0 0 1-2.48-.969M14 3.223a9.003 9.003 0 0 1 0 17.554m-9.421-3.684a9 9 0 0 1-1.227-2.592M3.124 10.5c.16-.95.468-1.85.9-2.675l.169-.305m2.714-2.941A9 9 0 0 1 10 3.223"
                         />
                         <path d="M12 8v4l3 3" />
+                    </g>
+                </svg>`,
+            },
+            {
+                id: 'script',
+                label: 'Script',
+                icon: html`<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24">
+                    <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
+                        <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+                        <path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2M9 9h1m-1 4h6m-6 4h6" />
                     </g>
                 </svg>`,
             },
@@ -942,10 +972,12 @@ export class CheatingDaddyApp extends LitElement {
             exam: 'Exam',
         };
 
+        const isScript = this.currentView === 'script-player';
+
         return html`
             <div class="live-bar">
                 <div class="live-bar-left">
-                    <button class="live-bar-back" @click=${() => this.handleClose()} title="End session">
+                    <button class="live-bar-back" @click=${() => this.handleClose()} title=${isScript ? 'Back to scripts' : 'End session'}>
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                             <path
                                 fill-rule="evenodd"
@@ -955,10 +987,10 @@ export class CheatingDaddyApp extends LitElement {
                         </svg>
                     </button>
                 </div>
-                <div class="live-bar-center">${profileLabels[this.selectedProfile] || 'Session'}</div>
+                <div class="live-bar-center">${isScript ? 'Script' : profileLabels[this.selectedProfile] || 'Session'}</div>
                 <div class="live-bar-right">
-                    ${this.statusText ? html`<span class="live-bar-text">${this.statusText}</span>` : ''}
-                    <span class="live-bar-text">${this.getElapsedTime()}</span>
+                    ${!isScript && this.statusText ? html`<span class="live-bar-text">${this.statusText}</span>` : ''}
+                    ${isScript ? '' : html`<span class="live-bar-text">${this.getElapsedTime()}</span>`}
                     ${this._isClickThrough ? html`<span class="live-bar-text">[click through]</span>` : ''}
                     <span class="live-bar-text clickable" @click=${() => this.handleHideToggle()}>[hide]</span>
                 </div>

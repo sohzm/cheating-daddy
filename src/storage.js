@@ -18,6 +18,8 @@ const DEFAULT_CONFIG = {
 const DEFAULT_CREDENTIALS = {
     apiKey: '',
     groqApiKey: '',
+    anthropicApiKey: '',
+    deepseekApiKey: '',
 };
 
 const DEFAULT_PREFERENCES = {
@@ -34,6 +36,9 @@ const DEFAULT_PREFERENCES = {
     googleSearchEnabled: false,
     localLlmModel: 'unsloth/Qwen3.5-4B-GGUF:Q4_K_M',
     whisperModel: 'tiny.en',
+    scriptSyncEnabled: false,
+    scriptSyncProvider: 'claude',
+    deepseekVisionModel: 'deepseek-v4-flash-vision-exp',
 };
 
 const DEFAULT_KEYBINDS = null; // null means use system defaults

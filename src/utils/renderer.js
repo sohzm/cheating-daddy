@@ -779,6 +779,8 @@ function handleShortcut(shortcutKey) {
     if (shortcutKey === 'ctrl+enter' || shortcutKey === 'cmd+enter') {
         if (currentView === 'main') {
             cheatingDaddy.element().handleStart();
+        } else if (currentView === 'script-player') {
+            cheatingDaddy.element().toggleScriptPlayback();
         } else {
             captureManualScreenshot();
         }
