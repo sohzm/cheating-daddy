@@ -308,6 +308,27 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
         }
     });
 
+    // Screenshot of the display the app is on, without the app window itself (see utils/screenCapture.js)
+    ipcMain.handle('capture-screen', async (event, options = {}) => {
+        try {
+            const { desktopCapturer } = require('electron');
+            const { captureScreen, jpegQualityFor } = require('./screenCapture');
+            const isManual = options.manual === true;
+
+            const result = await captureScreen({
+                desktopCapturer,
+                screen,
+                windowBounds: mainWindow.isDestroyed() ? null : mainWindow.getBounds(),
+                maxWidth: isManual ? 1280 : 1920,
+                quality: jpegQualityFor(options.quality, isManual),
+            });
+            return { success: true, ...result };
+        } catch (error) {
+            console.error('Error capturing screen:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
     ipcMain.handle('window-minimize', () => {
         if (!mainWindow.isDestroyed()) {
             mainWindow.minimize();
