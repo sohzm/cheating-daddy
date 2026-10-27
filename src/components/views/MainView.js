@@ -1258,12 +1258,17 @@ export class MainView extends LitElement {
                 <div class="config-content">
                     <div class="form-group">
                         <label class="form-label">Model</label>
-                        <select
-                            .value=${this._useCustomLocalLlmModel ? 'custom' : this._localLlmModel}
-                            @change=${event => this._selectLocalLlmModel(event.target.value)}
-                        >
-                            ${LOCAL_LLM_PRESETS.map(preset => html`<option value=${preset.value}>${preset.label}</option>`)}
-                            <option value="custom">Custom Hugging Face model or local GGUF…</option>
+                        <select @change=${event => this._selectLocalLlmModel(event.target.value)}>
+                            ${LOCAL_LLM_PRESETS.map(
+                                preset =>
+                                    html`<option
+                                        value=${preset.value}
+                                        .selected=${!this._useCustomLocalLlmModel && preset.value === this._localLlmModel}
+                                    >
+                                        ${preset.label}
+                                    </option>`
+                            )}
+                            <option value="custom" .selected=${this._useCustomLocalLlmModel}>Custom Hugging Face model or local GGUF…</option>
                         </select>
                         ${
                             this._useCustomLocalLlmModel
