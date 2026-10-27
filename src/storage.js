@@ -34,6 +34,8 @@ const DEFAULT_PREFERENCES = {
     googleSearchEnabled: false,
     localLlmModel: 'unsloth/Qwen3.5-4B-GGUF:Q4_K_M',
     whisperModel: 'tiny.en',
+    // '#rrggbb' for answer text in the assistant view, or null to use the theme's text color
+    responseTextColor: null,
 };
 
 const DEFAULT_KEYBINDS = null; // null means use system defaults

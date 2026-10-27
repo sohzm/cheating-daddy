@@ -1,5 +1,7 @@
 // renderer.js
 const { ipcRenderer } = require('electron');
+// Relative to index.html: this classic script resolves require() from the page's directory
+const { normalizeHexColor } = require('./utils/colors');
 
 let mediaStream = null;
 let screenshotInterval = null;
@@ -1053,6 +1055,7 @@ const theme = {
             const themeName = prefs.theme || 'dark';
             const alpha = prefs.backgroundTransparency ?? 0.8;
             this.apply(themeName, alpha);
+            this.applyResponseTextColor(prefs.responseTextColor);
             return themeName;
         } catch (err) {
             this.apply('dark');
@@ -1063,6 +1066,24 @@ const theme = {
     async save(themeName) {
         await storage.updatePreference('theme', themeName);
         this.apply(themeName);
+    },
+
+    // Answer text color (preference responseTextColor); null or an invalid value falls back to the theme's text color
+    applyResponseTextColor(color) {
+        const normalized = normalizeHexColor(color);
+        if (normalized) {
+            document.documentElement.style.setProperty('--response-text-color', normalized);
+        } else {
+            document.documentElement.style.removeProperty('--response-text-color');
+        }
+        return normalized;
+    },
+
+    async saveResponseTextColor(color) {
+        const normalized = normalizeHexColor(color);
+        await storage.updatePreference('responseTextColor', normalized);
+        this.applyResponseTextColor(normalized);
+        return normalized;
     },
 };
 

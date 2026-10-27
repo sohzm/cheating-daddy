@@ -25,7 +25,9 @@ export class AssistantView extends LitElement {
             scroll-behavior: smooth;
             user-select: text;
             cursor: text;
-            color: var(--text-primary);
+            /* Settings → Appearance → Response Text Color, falls back to the theme */
+            --response-text: var(--response-text-color, var(--text-primary));
+            color: var(--response-text);
         }
 
         .response-container * {
@@ -50,7 +52,7 @@ export class AssistantView extends LitElement {
         .response-container h5,
         .response-container h6 {
             margin: 1em 0 0.5em 0;
-            color: var(--text-primary);
+            color: var(--response-text);
             font-weight: var(--font-weight-semibold);
         }
 
@@ -63,14 +65,14 @@ export class AssistantView extends LitElement {
 
         .response-container p {
             margin: 0.6em 0;
-            color: var(--text-primary);
+            color: var(--response-text);
         }
 
         .response-container ul,
         .response-container ol {
             margin: 0.6em 0;
             padding-left: 1.5em;
-            color: var(--text-primary);
+            color: var(--response-text);
         }
 
         .response-container li {

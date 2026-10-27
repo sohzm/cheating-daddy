@@ -82,6 +82,22 @@ export class CustomizeView extends LitElement {
                 padding: 2px 8px;
             }
 
+            .color-row {
+                display: flex;
+                align-items: center;
+                gap: var(--space-sm);
+            }
+
+            .color-input {
+                width: 36px;
+                height: 28px;
+                padding: 0 2px;
+                background: var(--bg-elevated);
+                border: 1px solid var(--border);
+                border-radius: var(--radius-sm);
+                cursor: pointer;
+            }
+
             .slider-input {
                 -webkit-appearance: none;
                 appearance: none;
@@ -184,6 +200,7 @@ export class CustomizeView extends LitElement {
         googleSearchEnabled: { type: Boolean },
         backgroundTransparency: { type: Number },
         fontSize: { type: Number },
+        responseTextColor: { type: String },
         theme: { type: String },
         onProfileChange: { type: Function },
         onLanguageChange: { type: Function },
@@ -213,6 +230,7 @@ export class CustomizeView extends LitElement {
         this.clearStatusType = '';
         this.backgroundTransparency = 0.8;
         this.fontSize = 20;
+        this.responseTextColor = null;
         this.audioMode = 'speaker_only';
         this.customPrompt = '';
         this.theme = 'dark';
@@ -229,6 +247,7 @@ export class CustomizeView extends LitElement {
             this.googleSearchEnabled = prefs.googleSearchEnabled ?? true;
             this.backgroundTransparency = prefs.backgroundTransparency ?? 0.8;
             this.fontSize = prefs.fontSize ?? 20;
+            this.responseTextColor = prefs.responseTextColor ?? null;
             this.audioMode = prefs.audioMode ?? 'speaker_only';
             this.customPrompt = prefs.customPrompt ?? '';
             this.theme = prefs.theme ?? 'dark';
@@ -405,6 +424,14 @@ export class CustomizeView extends LitElement {
         document.documentElement.style.setProperty('--response-font-size', `${this.fontSize}px`);
     }
 
+    async handleResponseTextColorChange(e) {
+        this.responseTextColor = await cheatingDaddy.theme.saveResponseTextColor(e.target.value);
+    }
+
+    async resetResponseTextColor() {
+        this.responseTextColor = await cheatingDaddy.theme.saveResponseTextColor(null);
+    }
+
     handleKeybindChange(action, value) {
         this.keybinds = { ...this.keybinds, [action]: value };
         this.saveKeybinds();
@@ -490,6 +517,7 @@ export class CustomizeView extends LitElement {
                 backgroundTransparency: 0.8,
                 googleSearchEnabled: false,
                 theme: 'dark',
+                responseTextColor: null,
             };
             for (const [key, value] of Object.entries(defaults)) {
                 await cheatingDaddy.storage.updatePreference(key, value);
@@ -513,6 +541,7 @@ export class CustomizeView extends LitElement {
             this.googleSearchEnabled = defaults.googleSearchEnabled;
             this.customPrompt = defaults.customPrompt;
             this.theme = defaults.theme;
+            this.responseTextColor = defaults.responseTextColor;
 
             // Notify parent callbacks
             this.onProfileChange(defaults.selectedProfile);
@@ -522,6 +551,7 @@ export class CustomizeView extends LitElement {
             // Apply visual changes
             this.updateBackgroundAppearance();
             this.updateFontSize();
+            cheatingDaddy.theme.applyResponseTextColor(defaults.responseTextColor);
             await cheatingDaddy.theme.save(defaults.theme);
 
             this.clearStatusMessage = 'All settings restored to defaults';
@@ -652,6 +682,22 @@ export class CustomizeView extends LitElement {
                             .value=${this.fontSize}
                             @input=${this.handleFontSizeChange}
                         />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Response Text Color</label>
+                        <div class="color-row">
+                            <span class="slider-value">${this.responseTextColor || 'Theme'}</span>
+                            <input
+                                class="color-input"
+                                type="color"
+                                title="Response text color"
+                                .value=${this.responseTextColor || cheatingDaddy.theme.get(this.theme).text}
+                                @input=${this.handleResponseTextColorChange}
+                            />
+                            <button class="control" style="width:auto;padding:6px 10px;" @click=${this.resetResponseTextColor} ?disabled=${!this.responseTextColor}>
+                                Reset
+                            </button>
+                        </div>
                     </div>
                 </div>
             </section>
