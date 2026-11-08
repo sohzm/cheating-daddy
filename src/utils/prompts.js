@@ -1,3 +1,14 @@
+const LANGUAGE_NAMES = {
+    'en-US': 'English', 'en-GB': 'English', 'en-AU': 'English', 'en-IN': 'English',
+    'de-DE': 'German', 'es-US': 'Spanish', 'es-ES': 'Spanish', 'fr-FR': 'French',
+    'fr-CA': 'French', 'hi-IN': 'Hindi', 'pt-BR': 'Portuguese (Brazil)', 'ar-XA': 'Arabic',
+    'id-ID': 'Indonesian', 'it-IT': 'Italian', 'ja-JP': 'Japanese', 'tr-TR': 'Turkish',
+    'vi-VN': 'Vietnamese', 'bn-IN': 'Bengali', 'gu-IN': 'Gujarati', 'kn-IN': 'Kannada',
+    'ml-IN': 'Malayalam', 'mr-IN': 'Marathi', 'ta-IN': 'Tamil', 'te-IN': 'Telugu',
+    'nl-NL': 'Dutch', 'ko-KR': 'Korean', 'cmn-CN': 'Mandarin Chinese', 'pl-PL': 'Polish',
+    'ru-RU': 'Russian', 'th-TH': 'Thai',
+};
+
 const profilePrompts = {
     interview: {
         intro: `You are an AI-powered interview assistant, designed to act as a discreet on-screen teleprompter. Your mission is to help the user excel in their job interview by providing concise, impactful, and ready-to-speak answers or key talking points. Analyze the ongoing interview dialogue and, crucially, the 'User-provided context' below.`,
@@ -201,7 +212,7 @@ Provide direct exam answers in **markdown format**. Include the question text, t
     },
 };
 
-function buildSystemPrompt(promptParts, customPrompt = '', googleSearchEnabled = true) {
+function buildSystemPrompt(promptParts, customPrompt = '', googleSearchEnabled = true, language = 'en-US') {
     const sections = [promptParts.intro, '\n\n', promptParts.formatRequirements];
 
     // Only add search usage section if Google Search is enabled
@@ -211,12 +222,21 @@ function buildSystemPrompt(promptParts, customPrompt = '', googleSearchEnabled =
 
     sections.push('\n\n', promptParts.content, '\n\nUser-provided context\n-----\n', customPrompt, '\n-----\n\n', promptParts.outputInstructions);
 
+    if (language && !/^en(-|_|$)/i.test(language)) {
+        const languageName = LANGUAGE_NAMES[language] || language;
+        sections.push(
+            '\n\n**RESPONSE LANGUAGE:** Always answer in ', languageName,
+            '. The English example answers above illustrate style only - translate them into ', languageName,
+            '. Never switch to English unless the interviewer speaks English.'
+        );
+    }
+
     return sections.join('');
 }
 
-function getSystemPrompt(profile, customPrompt = '', googleSearchEnabled = true) {
+function getSystemPrompt(profile, customPrompt = '', googleSearchEnabled = true, language = 'en-US') {
     const promptParts = profilePrompts[profile] || profilePrompts.interview;
-    return buildSystemPrompt(promptParts, customPrompt, googleSearchEnabled);
+    return buildSystemPrompt(promptParts, customPrompt, googleSearchEnabled, language);
 }
 
 module.exports = {
