@@ -422,7 +422,7 @@ async function startLlamaServer(executablePath, modelPath, projectorPath) {
     await waitForServer(`${llamaBaseUrl}/health`, llamaProcess, 30 * 60 * 1000);
 }
 
-async function initializeLocalSession(model, whisperModel, profile, customPrompt) {
+async function initializeLocalSession(model, whisperModel, profile, customPrompt, language = 'en-US') {
     console.log('[LocalAI] Initializing native local session:', { model, whisperModel, profile });
     sendToRenderer('session-initializing', true);
 
@@ -430,7 +430,7 @@ async function initializeLocalSession(model, whisperModel, profile, customPrompt
         closeLocalSession();
         initializationController = new AbortController();
         llamaCacheSnapshot = getDirectoryEntries(path.join(getModelsDirectory(), 'llama'));
-        currentSystemPrompt = getSystemPrompt(profile, customPrompt, false);
+        currentSystemPrompt = getSystemPrompt(profile, customPrompt, false, language);
         llamaModel = model;
 
         const nativeFiles = await prepareNativeFiles(model, whisperModel, initializationController.signal);

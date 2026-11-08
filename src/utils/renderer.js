@@ -158,8 +158,9 @@ async function initializeLocal(profile = 'interview') {
     const localLlmModel = prefs.localLlmModel || 'unsloth/Qwen3.5-4B-GGUF:Q4_K_M';
     const whisperModel = prefs.whisperModel || 'tiny.en';
     const customPrompt = prefs.customPrompt || '';
+    const language = prefs.selectedLanguage || 'en-US';
 
-    const success = await ipcRenderer.invoke('initialize-local', localLlmModel, whisperModel, profile, customPrompt);
+    const success = await ipcRenderer.invoke('initialize-local', localLlmModel, whisperModel, profile, customPrompt, language);
     if (success) {
         cheatingDaddy.setStatus('Local AI Live');
         return true;
