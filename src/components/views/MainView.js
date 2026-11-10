@@ -23,7 +23,8 @@ export class MainView extends LitElement {
         }
 
         :host {
-            height: 100%;
+            height: auto;
+            min-height: 100%;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -697,6 +698,13 @@ export class MainView extends LitElement {
         _token: { state: true },
         _geminiKey: { state: true },
         _groqKey: { state: true },
+        _deepseekKey: { state: true },
+        _deepseekHasKey: { state: true },
+        _deepseekKeyStorage: { state: true },
+        _deepseekError: { state: true },
+        _deepseekThinking: { state: true },
+        _deepseekSaveHistory: { state: true },
+        _starting: { state: true },
         _openaiKey: { state: true },
         _geminiLiveModel: { state: true },
         _groqModel: { state: true },
@@ -726,6 +734,13 @@ export class MainView extends LitElement {
         this._token = '';
         this._geminiKey = '';
         this._groqKey = '';
+        this._deepseekKey = '';
+        this._deepseekHasKey = false;
+        this._deepseekKeyStorage = 'none';
+        this._deepseekError = '';
+        this._deepseekThinking = false;
+        this._deepseekSaveHistory = false;
+        this._starting = false;
         this._openaiKey = '';
         this._geminiLiveModel = 'gemini-3.1-flash-live-preview';
         this._groqModel = 'qwen/qwen3.6-27b';
@@ -771,6 +786,12 @@ export class MainView extends LitElement {
             this._groqModel = config.groqModel || 'qwen/qwen3.6-27b';
             this._groqImageModel = config.groqImageModel || 'qwen/qwen3.6-27b';
             this._disableGroqThinking = config.disableGroqThinking === true;
+            const deepseekKeyStatus = await cheatingDaddy.storage.getDeepseekKeyStatus();
+            this._deepseekHasKey = deepseekKeyStatus.hasKey === true;
+            this._deepseekKeyStorage = deepseekKeyStatus.storage || 'none';
+            this._deepseekError = deepseekKeyStatus.error || '';
+            this._deepseekThinking = prefs.deepseekThinking === true;
+            this._deepseekSaveHistory = prefs.deepseekSaveHistory === true;
 
             // Load local AI settings
             this._localLlmModel = prefs.localLlmModel || 'unsloth/Qwen3.5-4B-GGUF:Q4_K_M';
@@ -1019,8 +1040,35 @@ export class MainView extends LitElement {
 
     // ── Start ──
 
-    _handleStart() {
-        if (this.isInitializing || this.downloadProgress.active) return;
+    async _handleStart() {
+        if (this.isInitializing || this.downloadProgress.active || this._starting) return;
+
+        if (this._mode === 'deepseek') {
+            this._starting = true;
+            try {
+                if (this._deepseekKey.trim()) {
+                    const saved = await cheatingDaddy.storage.setDeepseekKey(this._deepseekKey);
+                    if (!saved.success) {
+                        this._deepseekError = saved.error;
+                        return;
+                    }
+                    this._deepseekKey = '';
+                    this._deepseekHasKey = saved.hasKey;
+                    this._deepseekKeyStorage = saved.storage;
+                }
+                if (!this._deepseekHasKey) {
+                    this._deepseekError = 'Enter your DeepSeek API key.';
+                    return;
+                }
+                this._deepseekError = '';
+                const started = await this.onStart();
+                if (started?.error) this._deepseekError = started.error;
+            } finally {
+                this._starting = false;
+                this.requestUpdate();
+            }
+            return;
+        }
 
         if (this._mode === 'byok') {
             if (!this._geminiKey.trim()) {
@@ -1100,8 +1148,8 @@ export class MainView extends LitElement {
 
         return html`
             <button
-                class="start-button ${this.isInitializing || isDownloading ? 'disabled' : ''}"
-                ?disabled=${this.isInitializing || isDownloading}
+                class="start-button ${this.isInitializing || isDownloading || this._starting ? 'disabled' : ''}"
+                ?disabled=${this.isInitializing || isDownloading || this._starting}
                 @click=${() => this._handleStart()}
             >
                 <canvas class="btn-aurora"></canvas>
@@ -1239,11 +1287,109 @@ export class MainView extends LitElement {
 
             <div class="mode-links">
                 <button class="mode-link" @click=${() => this._saveMode('local')}>Use local AI</button>
+                <button class="mode-link" @click=${() => this._saveMode('deepseek')}>Use DeepSeek</button>
             </div>
         `;
     }
 
     // ── Local AI mode ──
+
+    _renderDeepseekMode() {
+        return html`
+            <div class="config-section">
+                <div class="config-content">
+                    <div class="form-group">
+                        <label class="form-label" for="deepseek-key">DeepSeek API key</label>
+                        <input
+                            id="deepseek-key"
+                            type="password"
+                            autocomplete="off"
+                            spellcheck="false"
+                            placeholder=${this._deepseekHasKey ? 'Key available — enter to replace' : 'sk-…'}
+                            .value=${this._deepseekKey}
+                            @input=${e => {
+                                this._deepseekKey = e.target.value;
+                                this._deepseekError = '';
+                            }}
+                        />
+                        <div class="form-hint">
+                            ${
+                                this._deepseekKeyStorage === 'memory'
+                                    ? 'Key is in memory until you quit Cheating Daddy. Enter it again after restarting.'
+                                    : this._deepseekKeyStorage === 'encrypted'
+                                      ? 'Key saved with OS encryption.'
+                                      : this._deepseekKeyStorage === 'environment'
+                                        ? 'Using DEEPSEEK_API_KEY from the launch environment.'
+                                        : 'Saved with OS encryption when available; otherwise kept in memory until you quit Cheating Daddy.'
+                            }
+                        </div>
+                        <div class="form-hint">
+                            <span class="link" @click=${() => this.onExternalLink('https://platform.deepseek.com/api_keys')}>Get DeepSeek key</span>
+                            ${
+                                this._deepseekHasKey && this._deepseekKeyStorage !== 'environment'
+                                    ? html`<button
+                                          class="mode-link"
+                                          @click=${async () => {
+                                              const result = await cheatingDaddy.storage.setDeepseekKey('');
+                                              if (!result.success) {
+                                                  this._deepseekError = result.error;
+                                                  return;
+                                              }
+                                              this._deepseekHasKey = result.hasKey === true;
+                                              this._deepseekKeyStorage = result.storage || 'none';
+                                              this._deepseekKey = '';
+                                              this._deepseekError = result.error || (result.hasKey ? 'An environment key is still active.' : '');
+                                          }}
+                                      >
+                                          Forget key
+                                      </button>`
+                                    : ''
+                            }
+                        </div>
+                    </div>
+                    <div class="config-note">Model: deepseek-flash · Vision enabled. Text and screenshots only; no audio capture in this mode.</div>
+                    <label class="config-checkbox">
+                        <input
+                            type="checkbox"
+                            .checked=${this._deepseekThinking}
+                            @change=${async e => {
+                                this._deepseekThinking = e.target.checked;
+                                await cheatingDaddy.storage.updatePreference('deepseekThinking', this._deepseekThinking);
+                            }}
+                        />
+                        <span class="config-checkbox-text">
+                            <span class="config-summary-title">Thinking mode</span>
+                            <span class="config-summary-description">More reasoning; slower responses and higher token use</span>
+                        </span>
+                    </label>
+                    <label class="config-checkbox">
+                        <input
+                            type="checkbox"
+                            .checked=${this._deepseekSaveHistory}
+                            @change=${async e => {
+                                this._deepseekSaveHistory = e.target.checked;
+                                await cheatingDaddy.storage.updatePreference('deepseekSaveHistory', this._deepseekSaveHistory);
+                            }}
+                        />
+                        <span class="config-checkbox-text">
+                            <span class="config-summary-title">Save DeepSeek history</span>
+                            <span class="config-summary-description">Off by default: no session history or transport logs are written</span>
+                        </span>
+                    </label>
+                    <div class="config-note">
+                        Screenshots are sent to DeepSeek only when you press the capture shortcut. Text and the latest image stay in memory for
+                        follow-ups until the session ends.
+                    </div>
+                    ${this._deepseekError ? html`<div class="config-note" role="alert">${this._deepseekError}</div>` : ''}
+                </div>
+            </div>
+            ${this._renderStartButton()} ${this._renderDivider()}
+            <div class="mode-links">
+                <button class="mode-link" @click=${() => this._saveMode('byok')}>Use Gemini / Groq</button>
+                <button class="mode-link" @click=${() => this._saveMode('local')}>Use local AI</button>
+            </div>
+        `;
+    }
 
     _renderLocalMode() {
         return html`
@@ -1312,6 +1458,7 @@ export class MainView extends LitElement {
 
             <div class="mode-links">
                 <button class="mode-link" @click=${() => this._saveMode('byok')}>Use own API keys</button>
+                <button class="mode-link" @click=${() => this._saveMode('deepseek')}>Use DeepSeek</button>
             </div>
         `;
     }
@@ -1339,12 +1486,23 @@ export class MainView extends LitElement {
                                   <button class="help-btn" @click=${this._openLocalHelp} aria-label="Open Local AI help">${helpIcon}</button>
                               </div>
                           `
-                        : html` <div class="page-title">${html`Cheating Daddy <span class="mode-suffix">BYOK</span>`}</div> `
+                        : html`
+                              <div class="page-title">Cheating Daddy <span class="mode-suffix">${this._mode === 'deepseek' ? 'DeepSeek' : 'BYOK'}</span></div>
+                          `
                 }
-                <div class="page-subtitle">${this._mode === 'byok' ? 'Bring your own API keys' : 'Run models locally on your machine'}</div>
+                <div class="page-subtitle">
+                    ${
+                        this._mode === 'deepseek'
+                            ? 'Screen understanding with DeepSeek Vision'
+                            : this._mode === 'byok'
+                              ? 'Bring your own API keys'
+                              : 'Run models locally on your machine'
+                    }
+                </div>
 
                 <!-- Cloud mode render branch intentionally disabled. -->
                 ${this._mode === 'byok' ? this._renderByokMode() : ''} ${this._mode === 'local' ? this._renderLocalMode() : ''}
+                ${this._mode === 'deepseek' ? this._renderDeepseekMode() : ''}
             </div>
             ${this._mode === 'local' && this._showLocalHelp ? this._renderLocalHelp(closeIcon) : ''}
         `;
@@ -1363,8 +1521,8 @@ export class MainView extends LitElement {
                         <div class="help-section">
                             <div class="help-section-title">Native local AI</div>
                             <div class="help-section-text">
-                                Cheating Daddy runs llama.cpp and whisper.cpp directly. Everything stays on your computer — no external AI service or
-                                Ollama installation is required.
+                                Cheating Daddy runs llama.cpp and whisper.cpp directly. Everything stays on your computer — no external AI service or Ollama
+                                installation is required.
                             </div>
                         </div>
 
