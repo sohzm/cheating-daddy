@@ -40,6 +40,8 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
     stopMacOSAudioCapture();
+    require('./utils/gemini').closeDeepSeekSession();
+    require('./utils/gemini').closeDeepSeekSession();
     require('./utils/localai').closeLocalSession();
 });
 

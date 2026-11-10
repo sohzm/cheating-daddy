@@ -1,19 +1,16 @@
 const { BrowserWindow, globalShortcut, ipcMain, screen } = require('electron');
 const path = require('node:path');
 const storage = require('../storage');
+const { MIN_WINDOW_SIZE, normalizeWindowSize, attachDisplayControls } = require('./display');
 
 let mouseEventsIgnored = false;
 
-const DEFAULT_MAIN_WINDOW_SIZE = { width: 1100, height: 800 };
-const MIN_WINDOW_SIZE = { width: 700, height: 320 };
-
 function createWindow(sendToRenderer, geminiSessionRef) {
-    let windowWidth = DEFAULT_MAIN_WINDOW_SIZE.width;
-    let windowHeight = DEFAULT_MAIN_WINDOW_SIZE.height;
+    const size = normalizeWindowSize(storage.getConfig().windowSize, screen.getPrimaryDisplay().workAreaSize);
 
     const mainWindow = new BrowserWindow({
-        width: windowWidth,
-        height: windowHeight,
+        width: size.width,
+        height: size.height,
         minWidth: MIN_WINDOW_SIZE.width,
         minHeight: MIN_WINDOW_SIZE.height,
         resizable: true,
@@ -66,6 +63,7 @@ function createWindow(sendToRenderer, geminiSessionRef) {
         }
     }
 
+    attachDisplayControls(mainWindow, { storage, screen, ipcMain });
     mainWindow.loadFile(path.join(__dirname, '../index.html'));
 
     // After window is created, initialize keybinds

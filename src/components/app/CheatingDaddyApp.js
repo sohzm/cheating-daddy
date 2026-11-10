@@ -243,6 +243,8 @@ export class CheatingDaddyApp extends LitElement {
         /* ── Main content area ── */
 
         .content {
+            min-width: 0;
+            min-height: 0;
             flex: 1;
             overflow: hidden;
             display: flex;
@@ -252,6 +254,7 @@ export class CheatingDaddyApp extends LitElement {
 
         /* Live mode top bar */
         .live-bar {
+            flex-shrink: 0;
             position: relative;
             display: flex;
             align-items: center;
@@ -329,6 +332,7 @@ export class CheatingDaddyApp extends LitElement {
 
         /* Content inner */
         .content-inner {
+            min-height: 0;
             flex: 1;
             overflow-y: auto;
             overflow-x: hidden;
@@ -365,9 +369,89 @@ export class CheatingDaddyApp extends LitElement {
         ::-webkit-scrollbar-thumb:hover {
             background: #444444;
         }
+
+        .regular-content {
+            padding-top: 38px;
+        }
+        .display-controls {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            padding: 0 4px;
+            -webkit-app-region: no-drag;
+        }
+        .display-controls button {
+            min-width: 22px;
+            height: 24px;
+            padding: 0 4px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: var(--bg-surface);
+            color: var(--text-secondary);
+            font-size: 11px;
+            cursor: pointer;
+        }
+        .display-controls button:hover {
+            color: var(--text-primary);
+            background: var(--bg-hover);
+        }
+        .display-controls button:disabled {
+            opacity: 0.35;
+        }
+        .live-status {
+            max-width: 220px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        @media (max-width: 760px) {
+            .sidebar:not(.hidden) {
+                width: 48px;
+                min-width: 48px;
+            }
+            .sidebar-brand,
+            .sidebar-footer,
+            .nav-label {
+                display: none;
+            }
+            .sidebar-nav {
+                padding: 0 4px;
+                overflow-y: auto;
+                min-height: 0;
+            }
+            .nav-item {
+                justify-content: center;
+                padding: 8px 4px;
+            }
+            .live-bar-center,
+            .live-status,
+            .live-timer {
+                display: none;
+            }
+            .live-bar-right {
+                gap: 4px;
+            }
+            .live-bar {
+                padding: 0 4px;
+                height: 28px;
+            }
+        }
+        @media (max-width: 300px) {
+            .traffic-lights {
+                gap: 6px;
+                padding: 0 6px;
+            }
+            .display-controls .scale-label {
+                display: none;
+            }
+            .display-controls button {
+                min-width: 20px;
+                padding: 0 2px;
+            }
+        }
     `;
 
     static properties = {
+        uiScale: { state: true },
         currentView: { type: String },
         statusText: { type: String },
         startTime: { type: Number },
@@ -415,6 +499,7 @@ export class CheatingDaddyApp extends LitElement {
         this._whisperDownloading = false;
         this._localAiDownloadProgress = { active: false, label: '', percentage: null };
         this._localVersion = '';
+        this.uiScale = 100;
 
         this._loadFromStorage();
         this._checkForUpdates();
@@ -453,6 +538,7 @@ export class CheatingDaddyApp extends LitElement {
             this.selectedScreenshotInterval = prefs.selectedScreenshotInterval || '5';
             this.selectedImageQuality = prefs.selectedImageQuality || 'medium';
             this.layoutMode = config.layout || 'normal';
+            this.uiScale = (await cheatingDaddy.display.get()).scale || 100;
 
             this._storageLoaded = true;
             this.requestUpdate();
@@ -465,6 +551,10 @@ export class CheatingDaddyApp extends LitElement {
 
     connectedCallback() {
         super.connectedCallback();
+        this._displayChanged = event => {
+            this.uiScale = event.detail.scale;
+        };
+        window.addEventListener('display-changed', this._displayChanged);
 
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
@@ -486,6 +576,7 @@ export class CheatingDaddyApp extends LitElement {
 
     disconnectedCallback() {
         super.disconnectedCallback();
+        window.removeEventListener('display-changed', this._displayChanged);
         this._stopTimer();
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
@@ -530,7 +621,7 @@ export class CheatingDaddyApp extends LitElement {
 
     setStatus(text) {
         this.statusText = text;
-        if (text.includes('Ready') || text.includes('Listening') || text.includes('Error')) {
+        if (text.toLowerCase().includes('ready') || text.includes('Listening') || text.includes('Error')) {
             this._currentResponseIsComplete = true;
         }
     }
@@ -569,6 +660,9 @@ export class CheatingDaddyApp extends LitElement {
                 await ipcRenderer.invoke('close-session');
             }
             this.sessionActive = false;
+            this.responses = [];
+            this.currentResponseIndex = -1;
+            this._awaitingNewResponse = false;
             this._stopTimer();
             this.currentView = 'main';
         } else {
@@ -617,6 +711,9 @@ export class CheatingDaddyApp extends LitElement {
                 }
                 return;
             }
+        } else if (providerMode === 'deepseek') {
+            const result = await cheatingDaddy.initializeDeepseek();
+            if (!result.success) return result;
         } else if (providerMode === 'local') {
             const success = await cheatingDaddy.initializeLocal(this.selectedProfile);
             if (!success) {
@@ -639,7 +736,14 @@ export class CheatingDaddyApp extends LitElement {
             await cheatingDaddy.initializeGemini(this.selectedProfile, this.selectedLanguage);
         }
 
-        cheatingDaddy.startCapture(this.selectedScreenshotInterval, this.selectedImageQuality);
+        const captureStarted = await cheatingDaddy.startCapture(this.selectedScreenshotInterval, this.selectedImageQuality);
+        if (!captureStarted) {
+            cheatingDaddy.stopCapture();
+            const { ipcRenderer } = window.require('electron');
+            await ipcRenderer.invoke('close-session');
+            this.setStatus('Screen capture failed. Check permissions and start again.');
+            return { success: false, error: 'Screen capture failed. Check permissions and start again.' };
+        }
         this.responses = [];
         this.currentResponseIndex = -1;
         this.startTime = Date.now();
@@ -703,8 +807,11 @@ export class CheatingDaddyApp extends LitElement {
 
     async handleSendText(message) {
         const result = await window.cheatingDaddy.sendTextMessage(message);
+        if (result.cancelled || !this.sessionActive) return;
         if (!result.success) {
             this.setStatus('Error sending message: ' + result.error);
+        } else if (result.model === 'deepseek-flash') {
+            this.setStatus('DeepSeek ready — text & screenshots');
         } else {
             this.setStatus('Message sent...');
             this._awaitingNewResponse = true;
@@ -900,31 +1007,29 @@ export class CheatingDaddyApp extends LitElement {
                                 @click=${() => this.navigate(item.id)}
                                 title=${item.label}
                             >
-                                ${item.icon} ${item.label}
+                                ${item.icon} <span class="nav-label">${item.label}</span>
                             </button>
                         `
                     )}
                 </nav>
                 <div class="sidebar-footer">
-                    ${
-                        this._updateAvailable
-                            ? html`
-                                  <button class="update-btn" @click=${() => this.handleExternalLinkClick('https://cheatingdaddy.com/download')}>
-                                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                                          <path
-                                              fill="none"
-                                              stroke="currentColor"
-                                              stroke-linecap="round"
-                                              stroke-linejoin="round"
-                                              stroke-width="2"
-                                              d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2M7 11l5 5l5-5m-5-7v12"
-                                          />
-                                      </svg>
-                                      Update available
-                                  </button>
-                              `
-                            : html` <div class="version-text">v${this._localVersion}</div> `
-                    }
+                    ${this._updateAvailable
+                        ? html`
+                              <button class="update-btn" @click=${() => this.handleExternalLinkClick('https://cheatingdaddy.com/download')}>
+                                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                                      <path
+                                          fill="none"
+                                          stroke="currentColor"
+                                          stroke-linecap="round"
+                                          stroke-linejoin="round"
+                                          stroke-width="2"
+                                          d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2M7 11l5 5l5-5m-5-7v12"
+                                      />
+                                  </svg>
+                                  Update available
+                              </button>
+                          `
+                        : html` <div class="version-text">v${this._localVersion}</div> `}
                 </div>
             </div>
         `;
@@ -957,13 +1062,43 @@ export class CheatingDaddyApp extends LitElement {
                 </div>
                 <div class="live-bar-center">${profileLabels[this.selectedProfile] || 'Session'}</div>
                 <div class="live-bar-right">
-                    ${this.statusText ? html`<span class="live-bar-text">${this.statusText}</span>` : ''}
-                    <span class="live-bar-text">${this.getElapsedTime()}</span>
-                    ${this._isClickThrough ? html`<span class="live-bar-text">[click through]</span>` : ''}
+                    ${this.statusText ? html`<span class="live-bar-text live-status" title=${this.statusText}>${this.statusText}</span>` : ''}
+                    <span class="live-bar-text live-timer">${this.getElapsedTime()}</span>
+                    ${this.renderDisplayControls()} ${this._isClickThrough ? html`<span class="live-bar-text">[click through]</span>` : ''}
                     <span class="live-bar-text clickable" @click=${() => this.handleHideToggle()}>[hide]</span>
                 </div>
             </div>
         `;
+    }
+
+    renderDisplayControls() {
+        return html`<div class="display-controls">
+            <button
+                title="Zoom out (Ctrl/Cmd+-)"
+                aria-label="Zoom out"
+                ?disabled=${this.uiScale <= 25}
+                @click=${() => cheatingDaddy.display.action('zoom-out')}
+            >
+                −
+            </button>
+            <button
+                class="scale-label"
+                title="Reset scale and window (Ctrl/Cmd+0)"
+                aria-label="Reset display"
+                @click=${() => cheatingDaddy.display.action('reset')}
+            >
+                ${this.uiScale}%
+            </button>
+            <button
+                title="Zoom in (Ctrl/Cmd++)"
+                aria-label="Zoom in"
+                ?disabled=${this.uiScale >= 150}
+                @click=${() => cheatingDaddy.display.action('zoom-in')}
+            >
+                +
+            </button>
+            <button title="Mini window: 320 × 180 at 60%" @click=${() => cheatingDaddy.display.action('mini')}>Mini</button>
+        </div>`;
     }
 
     render() {
@@ -983,9 +1118,10 @@ export class CheatingDaddyApp extends LitElement {
                         <button class="traffic-light maximize" title="Maximize"></button>
                     </div>
                     <div class="drag-region"></div>
+                    ${this.renderDisplayControls()}
                 </div>
                 ${this.renderSidebar()}
-                <div class="content">
+                <div class="content ${isLive ? '' : 'regular-content'}">
                     ${isLive ? this.renderLiveBar() : ''}
                     <div class="content-inner ${isLive ? 'live' : ''}">${this.renderCurrentView()}</div>
                 </div>

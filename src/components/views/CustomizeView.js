@@ -184,6 +184,7 @@ export class CustomizeView extends LitElement {
         googleSearchEnabled: { type: Boolean },
         backgroundTransparency: { type: Number },
         fontSize: { type: Number },
+        uiScale: { type: Number },
         theme: { type: String },
         onProfileChange: { type: Function },
         onLanguageChange: { type: Function },
@@ -212,7 +213,8 @@ export class CustomizeView extends LitElement {
         this.clearStatusMessage = '';
         this.clearStatusType = '';
         this.backgroundTransparency = 0.8;
-        this.fontSize = 20;
+        this.fontSize = 14;
+        this.uiScale = 100;
         this.audioMode = 'speaker_only';
         this.customPrompt = '';
         this.theme = 'dark';
@@ -223,12 +225,31 @@ export class CustomizeView extends LitElement {
         return cheatingDaddy.theme.getAll();
     }
 
+    connectedCallback() {
+        super.connectedCallback();
+        this._displayChanged = event => {
+            this.uiScale = event.detail.scale;
+        };
+        window.addEventListener('display-changed', this._displayChanged);
+    }
+
+    disconnectedCallback() {
+        window.removeEventListener('display-changed', this._displayChanged);
+        super.disconnectedCallback();
+    }
+
+    async handleUiScaleChange(event) {
+        const result = await cheatingDaddy.display.action('scale', Number(event.target.value));
+        if (result.success) this.uiScale = result.scale;
+    }
+
     async _loadFromStorage() {
         try {
             const [prefs, keybinds] = await Promise.all([cheatingDaddy.storage.getPreferences(), cheatingDaddy.storage.getKeybinds()]);
             this.googleSearchEnabled = prefs.googleSearchEnabled ?? true;
             this.backgroundTransparency = prefs.backgroundTransparency ?? 0.8;
-            this.fontSize = prefs.fontSize ?? 20;
+            this.fontSize = cheatingDaddy.display.normalizeFontSize(prefs.fontSize);
+            this.uiScale = (await cheatingDaddy.display.get()).scale || 100;
             this.audioMode = prefs.audioMode ?? 'speaker_only';
             this.customPrompt = prefs.customPrompt ?? '';
             this.theme = prefs.theme ?? 'dark';
@@ -395,7 +416,7 @@ export class CustomizeView extends LitElement {
     }
 
     async handleFontSizeChange(e) {
-        this.fontSize = parseInt(e.target.value, 10);
+        this.fontSize = cheatingDaddy.display.normalizeFontSize(e.target.value);
         await cheatingDaddy.storage.updatePreference('fontSize', this.fontSize);
         this.updateFontSize();
         this.requestUpdate();
@@ -486,7 +507,7 @@ export class CustomizeView extends LitElement {
                 selectedScreenshotInterval: '5',
                 selectedImageQuality: 'medium',
                 audioMode: 'speaker_only',
-                fontSize: 20,
+                fontSize: 14,
                 backgroundTransparency: 0.8,
                 googleSearchEnabled: false,
                 theme: 'dark',
@@ -522,6 +543,7 @@ export class CustomizeView extends LitElement {
             // Apply visual changes
             this.updateBackgroundAppearance();
             this.updateFontSize();
+            await cheatingDaddy.display.action('reset');
             await cheatingDaddy.theme.save(defaults.theme);
 
             this.clearStatusMessage = 'All settings restored to defaults';
@@ -580,9 +602,9 @@ export class CustomizeView extends LitElement {
                             <option value="both">Both Speaker and Microphone</option>
                         </select>
                     </div>
-                    ${this.audioMode !== 'speaker_only' ? html`
-                        <div class="warning-callout">May cause unexpected behavior. Only change this if you know what you're doing.</div>
-                    ` : ''}
+                    ${this.audioMode !== 'speaker_only'
+                        ? html` <div class="warning-callout">May cause unexpected behavior. Only change this if you know what you're doing.</div> `
+                        : ''}
                     <div class="form-group">
                         <label class="form-label">Image Quality</label>
                         <select class="control" .value=${this.selectedImageQuality} @change=${this.handleImageQualitySelect}>
@@ -617,6 +639,27 @@ export class CustomizeView extends LitElement {
             <section class="surface">
                 <div class="surface-title">Appearance</div>
                 <div class="form-grid">
+                    <div class="form-group slider-wrap">
+                        <div class="slider-header">
+                            <label class="form-label" for="ui-scale">Interface scale</label>
+                            <span class="slider-value">${this.uiScale}%</span>
+                        </div>
+                        <input
+                            id="ui-scale"
+                            class="slider-input"
+                            type="range"
+                            min="25"
+                            max="150"
+                            step="5"
+                            .value=${this.uiScale}
+                            @input=${this.handleUiScaleChange}
+                        />
+                        <div class="form-help">Ctrl/Cmd + − / + changes scale. Ctrl/Cmd + 0 restores a usable window at 100%.</div>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap">
+                            <button class="control" @click=${() => cheatingDaddy.display.action('mini')}>Mini: 320 × 180</button>
+                            <button class="control" @click=${() => cheatingDaddy.display.action('reset')}>Reset size & scale</button>
+                        </div>
+                    </div>
                     <div class="form-group">
                         <label class="form-label">Theme</label>
                         <select class="control" .value=${this.theme} @change=${this.handleThemeChange}>
@@ -646,7 +689,7 @@ export class CustomizeView extends LitElement {
                         <input
                             class="slider-input"
                             type="range"
-                            min="12"
+                            min="6"
                             max="32"
                             step="1"
                             .value=${this.fontSize}
@@ -662,20 +705,22 @@ export class CustomizeView extends LitElement {
         return html`
             <section class="surface">
                 <div class="surface-title">Keyboard Shortcuts</div>
-                ${this.getKeybindActions().map(action => html`
-                    <div class="keybind-row">
-                        <span class="keybind-name">${action.name}</span>
-                        <input
-                            type="text"
-                            class="control keybind-input"
-                            .value=${this.keybinds[action.key]}
-                            data-action=${action.key}
-                            @keydown=${this.handleKeybindInput}
-                            @focus=${this.handleKeybindFocus}
-                            readonly
-                        />
-                    </div>
-                `)}
+                ${this.getKeybindActions().map(
+                    action => html`
+                        <div class="keybind-row">
+                            <span class="keybind-name">${action.name}</span>
+                            <input
+                                type="text"
+                                class="control keybind-input"
+                                .value=${this.keybinds[action.key]}
+                                data-action=${action.key}
+                                @keydown=${this.handleKeybindInput}
+                                @focus=${this.handleKeybindFocus}
+                                readonly
+                            />
+                        </div>
+                    `
+                )}
                 <div style="margin-top: var(--space-sm);">
                     <button class="control" style="width:auto;padding:8px 10px;" @click=${this.resetKeybinds}>Reset to defaults</button>
                 </div>
@@ -695,9 +740,9 @@ export class CustomizeView extends LitElement {
                         ${this.isClearing ? 'Clearing...' : 'Delete all data'}
                     </button>
                 </div>
-                ${this.clearStatusMessage ? html`
-                    <div class="status ${this.clearStatusType === 'success' ? 'success' : 'error'}">${this.clearStatusMessage}</div>
-                ` : ''}
+                ${this.clearStatusMessage
+                    ? html` <div class="status ${this.clearStatusType === 'success' ? 'success' : 'error'}">${this.clearStatusMessage}</div> `
+                    : ''}
             </section>
         `;
     }
@@ -707,10 +752,7 @@ export class CustomizeView extends LitElement {
             <div class="unified-page">
                 <div class="unified-wrap">
                     <div class="page-title">Settings</div>
-                    ${this.renderAudioSection()}
-                    ${this.renderLanguageSection()}
-                    ${this.renderAppearanceSection()}
-                    ${this.renderKeyboardSection()}
+                    ${this.renderAudioSection()} ${this.renderLanguageSection()} ${this.renderAppearanceSection()} ${this.renderKeyboardSection()}
                     ${this.renderPrivacySection()}
                 </div>
             </div>
