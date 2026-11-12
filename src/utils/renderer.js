@@ -169,6 +169,26 @@ async function initializeLocal(profile = 'interview') {
     }
 }
 
+async function initializeClaude(profile = 'interview') {
+    const prefs = await storage.getPreferences();
+    const claude = {
+        model: prefs.claudeModel || 'sonnet',
+        effort: prefs.claudeEffort || 'medium',
+        imageModel: prefs.claudeImageModel || 'haiku',
+        imageEffort: prefs.claudeImageEffort || 'default',
+    };
+    const whisperModel = prefs.whisperModel || 'tiny.en';
+    const customPrompt = prefs.customPrompt || '';
+
+    const success = await ipcRenderer.invoke('initialize-claude', claude, whisperModel, profile, customPrompt);
+    if (success) {
+        cheatingDaddy.setStatus('Claude Live');
+        return true;
+    }
+    cheatingDaddy.setStatus('error');
+    return false;
+}
+
 async function cancelLocalInitialization() {
     return ipcRenderer.invoke('cancel-local-initialization');
 }
@@ -1088,6 +1108,7 @@ const cheatingDaddy = {
     initializeGemini,
     initializeCloud,
     initializeLocal,
+    initializeClaude,
     cancelLocalInitialization,
     startCapture,
     stopCapture,

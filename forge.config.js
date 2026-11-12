@@ -3,7 +3,8 @@ const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 
 module.exports = {
     packagerConfig: {
-        asar: true,
+        // The Claude Code binary shipped with the SDK must be spawnable, so it cannot stay inside app.asar
+        asar: { unpack: '**/@anthropic-ai/claude-agent-sdk-*/**' },
         extraResource: ['./src/assets/SystemAudioDump'],
         name: 'Cheating Daddy',
         icon: 'src/assets/logo',
