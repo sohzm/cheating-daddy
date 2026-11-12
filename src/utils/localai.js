@@ -21,6 +21,11 @@ let whisperBaseUrl = null;
 let localConversationHistory = [];
 let currentSystemPrompt = null;
 let isLocalActive = false;
+// 'llama' = local GGUF model, 'claude' = Claude via the user's subscription (Whisper still runs locally)
+let llmBackend = 'llama';
+let claudeChat = null;
+let claudeImageChatPromise = null; // separate session for screenshots, only when their model/effort differ from text
+let claudeSettings = null; // { model, effort, imageModel, imageEffort }
 let initializationController = null;
 let llamaCacheSnapshot = new Set();
 
@@ -166,20 +171,27 @@ async function handleSpeechEnd(audioData) {
         return;
     }
 
+    let transcription;
     try {
-        const transcription = await transcribeAudio(audioData);
-
-        if (!transcription || transcription.length < 2) {
-            console.log('[LocalAI] Empty transcription, skipping');
-            sendToRenderer('update-status', 'Listening...');
-            return;
-        }
-
-        sendToRenderer('update-status', 'Generating response...');
-        await sendToLlama(transcription);
+        transcription = await transcribeAudio(audioData);
     } catch (error) {
         console.error('[LocalAI] Transcription error:', error);
         sendToRenderer('update-status', 'Transcription error: ' + error.message);
+        return;
+    }
+
+    if (!transcription || transcription.length < 2) {
+        console.log('[LocalAI] Empty transcription, skipping');
+        sendToRenderer('update-status', 'Listening...');
+        return;
+    }
+
+    sendToRenderer('update-status', 'Generating response...');
+    try {
+        await sendToLlama(transcription);
+    } catch (error) {
+        // sendToLlama already put the failure in the status line; do not relabel it as a transcription problem
+        console.error('[LocalAI] Response error:', error);
     }
 }
 
@@ -209,6 +221,91 @@ async function readStreamingResponse(response, onText) {
     }
 
     return fullText;
+}
+
+// Creates the screenshot session once. Callers share one promise, so simultaneous screenshots
+// cannot each start their own session, and a session closed mid-creation is shut down again.
+function getClaudeImageChat() {
+    if (!claudeImageChatPromise) {
+        const parent = claudeChat;
+        const settings = claudeSettings;
+        const prompt = currentSystemPrompt;
+        const promise = (async () => {
+            const chat = await require('./claudeai').createChat({
+                model: settings.imageModel,
+                effort: settings.imageEffort,
+                systemPrompt: prompt,
+                alreadyVerified: true,
+            });
+            if (claudeChat !== parent) {
+                chat.close();
+                throw new Error('Claude session closed');
+            }
+            chat.history = parent.history.slice();
+            if (chat.history.length) {
+                const earlier = chat.history.map(t => `${t.role === 'user' ? 'User' : 'Assistant'}: ${t.text}`).join('\n\n');
+                chat.addNote(`Conversation so far:\n\n${earlier}`);
+            }
+            return chat;
+        })();
+        claudeImageChatPromise = promise;
+        // A failed start must not be cached, so the next screenshot can try again
+        promise.catch(() => {
+            if (claudeImageChatPromise === promise) claudeImageChatPromise = null;
+        });
+    }
+    return claudeImageChatPromise;
+}
+
+// The last message is always the newest user turn; Claude keeps earlier turns in its own session.
+async function requestClaude(messages, onText) {
+    if (!claudeChat) {
+        throw new Error('Claude session is not running');
+    }
+
+    const last = messages[messages.length - 1];
+    const parts = typeof last.content === 'string' ? [{ type: 'text', text: last.content }] : last.content;
+    const blocks = [];
+    let summary = '';
+    for (const part of parts) {
+        if (part.type === 'text') {
+            blocks.push({ type: 'text', text: part.text });
+            summary += part.text;
+        } else if (part.type === 'image_url') {
+            const match = /^data:(image\/[a-z+.-]+);base64,(.+)$/s.exec(part.image_url?.url || '');
+            if (match) {
+                blocks.push({ type: 'image', source: { type: 'base64', media_type: match[1], data: match[2] } });
+                summary += ' [screenshot]';
+            }
+        }
+    }
+
+    const hasImage = blocks.some(block => block.type === 'image');
+    if (!hasImage) {
+        return claudeChat.ask(blocks, summary.trim(), onText);
+    }
+
+    // Same model and effort as text: stay in the main session
+    const sameAsText =
+        claudeSettings.imageModel === claudeSettings.model && (claudeSettings.imageEffort || 'default') === (claudeSettings.effort || 'default');
+    if (sameAsText) {
+        return claudeChat.ask(blocks, summary.trim(), onText);
+    }
+
+    // Otherwise screenshots get their own session. It starts with the conversation so far, and the main
+    // session is told about the answer so follow-up questions make sense.
+    const imageChat = await getClaudeImageChat();
+    const answer = await imageChat.ask(blocks, summary.trim(), onText);
+    claudeChat.addNote(
+        `The user shared a screenshot (${summary.replace('[screenshot]', '').trim() || 'no question'}). You (via another session) answered:\n${answer}`
+    );
+    claudeChat.history.push({ role: 'user', text: summary.trim() }, { role: 'assistant', text: answer });
+    if (claudeChat.history.length > 40) claudeChat.history = claudeChat.history.slice(-40);
+    return answer;
+}
+
+function requestLlm(messages, onText) {
+    return llmBackend === 'claude' ? requestClaude(messages, onText) : requestLlama(messages, onText);
 }
 
 async function requestLlama(messages, onText) {
@@ -252,7 +349,7 @@ async function sendToLlama(transcription) {
         const messages = [{ role: 'system', content: currentSystemPrompt || 'You are a helpful assistant.' }, ...localConversationHistory];
 
         let isFirst = true;
-        const fullText = await requestLlama(messages, text => {
+        const fullText = await requestLlm(messages, text => {
             sendToRenderer(isFirst ? 'new-response' : 'update-response', text);
             isFirst = false;
         });
@@ -324,14 +421,17 @@ function removeNewLlamaCacheEntries() {
     }
 }
 
-async function prepareNativeFiles(llamaModelReference, whisperModel, signal) {
+async function prepareNativeFiles(llamaModelReference, whisperModel, signal, needsLlama = true) {
     const binaryProgress = label => progress => {
         sendToRenderer('update-status', formatDownloadStatus(label, progress));
         sendDownloadProgress(label, progress);
     };
 
-    sendDownloadProgress('Checking Llama runner');
-    const llamaBinaryPath = await ensureNativeBinary('llama', binaryProgress('Llama runner'), signal);
+    let llamaBinaryPath = null;
+    if (needsLlama) {
+        sendDownloadProgress('Checking Llama runner');
+        llamaBinaryPath = await ensureNativeBinary('llama', binaryProgress('Llama runner'), signal);
+    }
 
     sendDownloadProgress('Checking Whisper runner');
     const whisperBinaryPath = await ensureNativeBinary('whisper', binaryProgress('Whisper runner'), signal);
@@ -345,6 +445,10 @@ async function prepareNativeFiles(llamaModelReference, whisperModel, signal) {
         sendToRenderer('whisper-downloading', false);
     }
 
+    if (!needsLlama) {
+        return { whisperBinaryPath, whisperModelPath };
+    }
+
     sendDownloadProgress('Checking language model');
     const llamaFiles = await ensureLlamaModel(llamaModelReference, binaryProgress('Language model'), binaryProgress('Vision model'), signal);
     return {
@@ -356,14 +460,18 @@ async function prepareNativeFiles(llamaModelReference, whisperModel, signal) {
     };
 }
 
-function validatePreparedNativeFiles(nativeFiles) {
+function validatePreparedNativeFiles(nativeFiles, needsLlama = true) {
     const requiredFiles = [
-        ['Llama runner', nativeFiles.llamaBinaryPath],
         ['Whisper runner', nativeFiles.whisperBinaryPath],
         ['Whisper model', nativeFiles.whisperModelPath],
-        ['Language model', nativeFiles.llamaModelPath],
-        ['Vision model', nativeFiles.projectorPath],
     ];
+    if (needsLlama) {
+        requiredFiles.push(
+            ['Llama runner', nativeFiles.llamaBinaryPath],
+            ['Language model', nativeFiles.llamaModelPath],
+            ['Vision model', nativeFiles.projectorPath]
+        );
+    }
 
     for (const [label, filePath] of requiredFiles) {
         if (!filePath || !fs.existsSync(filePath)) {
@@ -422,27 +530,47 @@ async function startLlamaServer(executablePath, modelPath, projectorPath) {
     await waitForServer(`${llamaBaseUrl}/health`, llamaProcess, 30 * 60 * 1000);
 }
 
-async function initializeLocalSession(model, whisperModel, profile, customPrompt) {
-    console.log('[LocalAI] Initializing native local session:', { model, whisperModel, profile });
+async function initializeLocalSession(model, whisperModel, profile, customPrompt, options = {}) {
+    const backend = options.backend === 'claude' ? 'claude' : 'llama';
+    const usesLlama = backend === 'llama';
+    console.log('[LocalAI] Initializing native local session:', { model, whisperModel, profile, backend });
     sendToRenderer('session-initializing', true);
 
     try {
         closeLocalSession();
+        llmBackend = backend;
         initializationController = new AbortController();
         llamaCacheSnapshot = getDirectoryEntries(path.join(getModelsDirectory(), 'llama'));
         currentSystemPrompt = getSystemPrompt(profile, customPrompt, false);
         llamaModel = model;
 
-        const nativeFiles = await prepareNativeFiles(model, whisperModel, initializationController.signal);
-        validatePreparedNativeFiles(nativeFiles);
+        const nativeFiles = await prepareNativeFiles(model, whisperModel, initializationController.signal, usesLlama);
+        validatePreparedNativeFiles(nativeFiles, usesLlama);
 
         sendToRenderer('update-status', 'Starting Whisper...');
         sendDownloadProgress('Starting Whisper');
         await startWhisperServer(nativeFiles.whisperBinaryPath, nativeFiles.whisperModelPath);
 
-        sendToRenderer('update-status', 'Loading local language model...');
-        sendDownloadProgress('Loading language model');
-        await startLlamaServer(nativeFiles.llamaBinaryPath, nativeFiles.llamaModelPath, nativeFiles.projectorPath);
+        if (usesLlama) {
+            sendToRenderer('update-status', 'Loading local language model...');
+            sendDownloadProgress('Loading language model');
+            await startLlamaServer(nativeFiles.llamaBinaryPath, nativeFiles.llamaModelPath, nativeFiles.projectorPath);
+        } else {
+            sendToRenderer('update-status', 'Connecting to Claude...');
+            sendDownloadProgress('Connecting to Claude');
+            claudeSettings = options.claude;
+            const chat = await require('./claudeai').createChat({
+                model: options.claude.model,
+                effort: options.claude.effort,
+                systemPrompt: currentSystemPrompt,
+            });
+            // createChat cannot be interrupted, so honour a Cancel that arrived while it was running
+            if (initializationController?.signal.aborted) {
+                chat.close();
+                throw Object.assign(new Error('Initialization cancelled'), { name: 'AbortError' });
+            }
+            claudeChat = chat;
+        }
 
         isSpeaking = false;
         speechBuffers = [];
@@ -456,7 +584,7 @@ async function initializeLocalSession(model, whisperModel, profile, customPrompt
         initializationController = null;
         sendToRenderer('local-ai-download-progress', { active: false });
         sendToRenderer('session-initializing', false);
-        sendToRenderer('update-status', 'Local AI ready - Listening...');
+        sendToRenderer('update-status', usesLlama ? 'Local AI ready - Listening...' : 'Claude ready - Listening...');
         console.log('[LocalAI] Native session initialized successfully');
         return true;
     } catch (error) {
@@ -490,6 +618,15 @@ function closeLocalSession() {
     isLocalActive = false;
     initializationController?.abort();
     initializationController = null;
+    claudeChat?.close();
+    claudeChat = null;
+    claudeImageChatPromise?.then(
+        chat => chat.close(),
+        () => {}
+    );
+    claudeImageChatPromise = null;
+    claudeSettings = null;
+    llmBackend = 'llama';
     stopNativeServer(llamaProcess);
     stopNativeServer(whisperProcess);
     llamaProcess = null;
@@ -525,8 +662,12 @@ function isLocalSessionActive() {
     return isLocalActive;
 }
 
+function hasActiveLlm() {
+    return isLocalActive && (llmBackend === 'claude' ? !!claudeChat : !!llamaProcess);
+}
+
 async function sendLocalText(text) {
-    if (!isLocalActive || !llamaProcess) {
+    if (!hasActiveLlm()) {
         return { success: false, error: 'No active local session' };
     }
 
@@ -539,7 +680,7 @@ async function sendLocalText(text) {
 }
 
 async function sendLocalImage(base64Data, prompt) {
-    if (!isLocalActive || !llamaProcess) {
+    if (!hasActiveLlm()) {
         return { success: false, error: 'No active local session' };
     }
 
@@ -570,7 +711,7 @@ async function sendLocalImage(base64Data, prompt) {
         ];
 
         let isFirst = true;
-        const fullText = await requestLlama(messages, text => {
+        const fullText = await requestLlm(messages, text => {
             sendToRenderer(isFirst ? 'new-response' : 'update-response', text);
             isFirst = false;
         });

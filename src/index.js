@@ -27,6 +27,7 @@ app.whenReady().then(async () => {
 
     createMainWindow();
     setupGeminiIpcHandlers(geminiSessionRef);
+    require('./utils/claudeai').setupClaudeIpcHandlers();
     setupStorageIpcHandlers();
     setupGeneralIpcHandlers();
 });

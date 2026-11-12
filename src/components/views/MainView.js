@@ -709,6 +709,14 @@ export class MainView extends LitElement {
         _useCustomLocalLlmModel: { state: true },
         _whisperModel: { state: true },
         _showLocalHelp: { state: true },
+        // Claude (subscription) state
+        _claudePrefs: { state: true },
+        _claudeCustom: { state: true },
+        _claudeModels: { state: true },
+        _claudeStatus: { state: true },
+        _claudeBusy: { state: true },
+        _claudeLoginUrl: { state: true },
+        _claudeError: { state: true },
     };
 
     constructor() {
@@ -737,6 +745,13 @@ export class MainView extends LitElement {
         this._localLlmModel = 'unsloth/Qwen3.5-4B-GGUF:Q4_K_M';
         this._useCustomLocalLlmModel = false;
         this._whisperModel = 'tiny.en';
+        this._claudePrefs = { claudeModel: 'sonnet', claudeEffort: 'medium', claudeImageModel: 'haiku', claudeImageEffort: 'default' };
+        this._claudeCustom = {};
+        this._claudeModels = [];
+        this._claudeStatus = null;
+        this._claudeBusy = false;
+        this._claudeLoginUrl = '';
+        this._claudeError = '';
 
         this._animId = null;
         this._time = 0;
@@ -776,7 +791,14 @@ export class MainView extends LitElement {
             this._localLlmModel = prefs.localLlmModel || 'unsloth/Qwen3.5-4B-GGUF:Q4_K_M';
             this._useCustomLocalLlmModel = !LOCAL_LLM_PRESETS.some(preset => preset.value === this._localLlmModel);
             this._whisperModel = prefs.whisperModel || 'tiny.en';
+            this._claudePrefs = {
+                claudeModel: prefs.claudeModel || 'sonnet',
+                claudeEffort: prefs.claudeEffort || 'medium',
+                claudeImageModel: prefs.claudeImageModel || 'haiku',
+                claudeImageEffort: prefs.claudeImageEffort || 'default',
+            };
 
+            if (this._mode === 'claude') this._refreshClaudeStatus();
             this.requestUpdate();
         } catch (e) {
             console.error('Error loading MainView storage:', e);
@@ -919,7 +941,129 @@ export class MainView extends LitElement {
         this._tokenError = false;
         this._keyError = false;
         await cheatingDaddy.storage.updatePreference('providerMode', mode);
+        if (mode === 'claude') this._refreshClaudeStatus();
         this.requestUpdate();
+    }
+
+    // ── Claude (subscription) ──
+
+    get _ipc() {
+        return window.require ? window.require('electron').ipcRenderer : null;
+    }
+
+    async _loadClaudeModels() {
+        if (this._claudeModels.length) return;
+        try {
+            this._claudeModels = await this._ipc.invoke('claude-models');
+        } catch (e) {
+            this._claudeModels = [];
+        }
+    }
+
+    async _refreshClaudeStatus() {
+        try {
+            this._claudeStatus = await this._ipc.invoke('claude-auth-status');
+            if (this._claudeStatus.loggedIn) this._loadClaudeModels();
+        } catch (e) {
+            this._claudeStatus = { available: false, loggedIn: false, error: e.message };
+        }
+    }
+
+    async _claudeLogin() {
+        this._claudeBusy = true;
+        this._claudeError = '';
+        // The sign-in page URL is offered as a link in case the browser did not open by itself
+        const onUrl = (event, url) => {
+            this._claudeLoginUrl = url;
+        };
+        this._ipc.on('claude-login-url', onUrl);
+        try {
+            const result = await this._ipc.invoke('claude-login');
+            if (!result.success) this._claudeError = result.error || 'Sign-in failed';
+        } catch (e) {
+            this._claudeError = e.message;
+        } finally {
+            this._ipc.removeListener('claude-login-url', onUrl);
+            this._claudeLoginUrl = '';
+        }
+        await this._refreshClaudeStatus();
+        this._claudeBusy = false;
+    }
+
+    async _claudeLogout() {
+        this._claudeBusy = true;
+        this._claudeError = '';
+        await this._ipc.invoke('claude-logout');
+        await this._refreshClaudeStatus();
+        this._claudeBusy = false;
+    }
+
+    async _saveClaudePref(key, val) {
+        this._claudePrefs = { ...this._claudePrefs, [key]: val };
+        await cheatingDaddy.storage.updatePreference(key, val);
+    }
+
+    async _saveClaudeModelPref(modelKey, effortKey, val) {
+        await this._saveClaudePref(modelKey, val);
+        // Drop an effort level the newly chosen model does not support
+        const effort = this._claudePrefs[effortKey];
+        if (effort !== 'default' && !this._claudeEffortOptions(modelKey).includes(effort)) {
+            await this._saveClaudePref(effortKey, 'default');
+        }
+    }
+
+    _selectClaudeModel(modelKey, effortKey, val) {
+        if (val === 'custom') {
+            this._claudeCustom = { ...this._claudeCustom, [modelKey]: true };
+            return;
+        }
+        this._claudeCustom = { ...this._claudeCustom, [modelKey]: false };
+        this._saveClaudeModelPref(modelKey, effortKey, val);
+    }
+
+    _isCustomClaudeModel(modelKey) {
+        if (this._claudeCustom[modelKey]) return true;
+        return this._claudeModels.length > 0 && !this._claudeModels.some(m => m.value === this._claudePrefs[modelKey]);
+    }
+
+    // Effort levels the chosen model supports; a custom model ID could be anything, so offer them all
+    _claudeEffortOptions(modelKey) {
+        const found = this._claudeModels.find(m => m.value === this._claudePrefs[modelKey]);
+        return found?.efforts?.length ? found.efforts : ['low', 'medium', 'high', 'xhigh', 'max'];
+    }
+
+    _renderClaudeModelPicker(title, hint, modelKey, effortKey) {
+        const current = this._claudePrefs[modelKey];
+        const custom = this._isCustomClaudeModel(modelKey);
+        const list = this._claudeModels.length ? this._claudeModels : [{ value: current, label: current }];
+        const efforts = this._claudeEffortOptions(modelKey);
+        return html`
+            <div class="form-group">
+                <label class="form-label">${title} model</label>
+                <select .value=${custom ? 'custom' : current} @change=${e => this._selectClaudeModel(modelKey, effortKey, e.target.value)}>
+                    ${list.map(m => html`<option value=${m.value} ?selected=${!custom && current === m.value}>${m.label}</option>`)}
+                    <option value="custom" ?selected=${custom}>Custom model ID…</option>
+                </select>
+                ${
+                    custom
+                        ? html`<input
+                              type="text"
+                              placeholder="e.g. claude-sonnet-5-5 or an alias like sonnet"
+                              .value=${current}
+                              @input=${e => this._saveClaudePref(modelKey, e.target.value.trim())}
+                          />`
+                        : html`<div class="form-hint">${list.find(m => m.value === current)?.description || ''}</div>`
+                }
+            </div>
+            <div class="form-group">
+                <label class="form-label">${title} effort</label>
+                <select .value=${this._claudePrefs[effortKey]} @change=${e => this._saveClaudePref(effortKey, e.target.value)}>
+                    <option value="default" ?selected=${this._claudePrefs[effortKey] === 'default'}>None (fastest, no extended thinking)</option>
+                    ${efforts.map(level => html`<option value=${level} ?selected=${this._claudePrefs[effortKey] === level}>${level}</option>`)}
+                </select>
+                <div class="form-hint">${hint}</div>
+            </div>
+        `;
     }
 
     async _saveToken(val) {
@@ -1019,7 +1163,7 @@ export class MainView extends LitElement {
 
     // ── Start ──
 
-    _handleStart() {
+    async _handleStart() {
         if (this.isInitializing || this.downloadProgress.active) return;
 
         if (this._mode === 'byok') {
@@ -1032,13 +1176,22 @@ export class MainView extends LitElement {
             if (!this._localLlmModel.trim()) {
                 return;
             }
+        } else if (this._mode === 'claude') {
+            // The cached status may be missing or stale (for example after signing in from a terminal)
+            if (!this._claudeStatus?.loggedIn) await this._refreshClaudeStatus();
+            if (!this._claudeStatus?.loggedIn) {
+                this._claudeError = 'Sign in with Claude first.';
+                this.requestUpdate();
+                return;
+            }
         }
 
         this.onStart();
     }
 
     triggerApiKeyError() {
-        this._keyError = this._mode !== 'local';
+        this._keyError = this._mode === 'byok';
+        if (this._mode === 'claude') this._refreshClaudeStatus();
         this.requestUpdate();
         setTimeout(() => {
             this._tokenError = false;
@@ -1051,7 +1204,7 @@ export class MainView extends LitElement {
 
     _renderStartButton() {
         const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-        const isDownloading = this._mode === 'local' && this.downloadProgress.active;
+        const isDownloading = (this._mode === 'local' || this._mode === 'claude') && this.downloadProgress.active;
         const percentage = this.downloadProgress.percentage;
         const hasPercentage = Number.isFinite(percentage);
 
@@ -1238,6 +1391,7 @@ export class MainView extends LitElement {
             <!-- Cloud promo intentionally removed from the active UI. -->
 
             <div class="mode-links">
+                <button class="mode-link" @click=${() => this._saveMode('claude')}>Use Claude subscription</button>
                 <button class="mode-link" @click=${() => this._saveMode('local')}>Use local AI</button>
             </div>
         `;
@@ -1311,7 +1465,120 @@ export class MainView extends LitElement {
             <!-- Cloud promo intentionally removed from the active UI. -->
 
             <div class="mode-links">
+                <button class="mode-link" @click=${() => this._saveMode('claude')}>Use Claude subscription</button>
                 <button class="mode-link" @click=${() => this._saveMode('byok')}>Use own API keys</button>
+            </div>
+        `;
+    }
+
+    // ── Claude subscription mode ──
+
+    _renderClaudeMode() {
+        const status = this._claudeStatus;
+        const loggedIn = status?.loggedIn === true;
+        let statusText = 'Checking sign-in…';
+        if (status) {
+            if (loggedIn) {
+                statusText = `Signed in${status.email ? ' as ' + status.email : ''}${status.subscriptionType ? ' (' + status.subscriptionType + ')' : ''}`;
+            } else {
+                statusText = status.available === false ? status.error || 'Claude Code was not found' : 'Not signed in';
+            }
+        }
+
+        return html`
+            <details class="config-section" open>
+                <summary class="config-summary">
+                    <span class="config-summary-text">
+                        <span class="config-summary-title">Claude account</span>
+                        <span class="config-summary-description">${statusText}</span>
+                    </span>
+                    ${this._renderConfigChevron()}
+                </summary>
+                <div class="config-content">
+                    <div class="form-group">
+                        ${
+                            loggedIn
+                                ? html`<button class="mode-link" ?disabled=${this._claudeBusy} @click=${() => this._claudeLogout()}>Sign out</button>`
+                                : html`<button class="mode-link" ?disabled=${this._claudeBusy} @click=${() => this._claudeLogin()}>
+                                      ${this._claudeBusy ? 'Waiting for browser sign-in…' : 'Sign in with Claude'}
+                                  </button>`
+                        }
+                        ${this._claudeError ? html`<div class="form-hint">${this._claudeError}</div>` : ''}
+                        ${
+                            this._claudeBusy && this._claudeLoginUrl
+                                ? html`<div class="form-hint">
+                                      Browser did not open?
+                                      <span class="link" @click=${() => this.onExternalLink(this._claudeLoginUrl)}>Open the sign-in page</span>
+                                  </div>`
+                                : ''
+                        }
+                        <div class="form-hint">Uses your Claude subscription through Claude Code. No API key needed.</div>
+                    </div>
+                </div>
+            </details>
+
+            <details class="config-section">
+                <summary class="config-summary">
+                    <span class="config-summary-text">
+                        <span class="config-summary-title">Answers to speech and typed text</span>
+                        <span class="config-summary-description">${this._claudePrefs.claudeModel} · ${this._claudePrefs.claudeEffort === 'default' ? 'no thinking' : this._claudePrefs.claudeEffort + ' effort'}</span>
+                    </span>
+                    ${this._renderConfigChevron()}
+                </summary>
+                <div class="config-content">
+                    ${this._renderClaudeModelPicker('Text', 'Higher effort thinks longer: better answers, slower replies.', 'claudeModel', 'claudeEffort')}
+                </div>
+            </details>
+
+            <details class="config-section">
+                <summary class="config-summary">
+                    <span class="config-summary-text">
+                        <span class="config-summary-title">Answers to screenshots</span>
+                        <span class="config-summary-description">${this._claudePrefs.claudeImageModel} · ${this._claudePrefs.claudeImageEffort === 'default' ? 'no thinking' : this._claudePrefs.claudeImageEffort + ' effort'}</span>
+                    </span>
+                    ${this._renderConfigChevron()}
+                </summary>
+                <div class="config-content">
+                    ${this._renderClaudeModelPicker('Screenshot', 'Using the same model and effort as text keeps everything in one session; a different choice runs a second session.', 'claudeImageModel', 'claudeImageEffort')}
+                </div>
+            </details>
+
+            <details class="config-section">
+                <summary class="config-summary">
+                    <span class="config-summary-text">
+                        <span class="config-summary-title">Transcription</span>
+                        <span class="config-summary-description">Whisper speech-to-text model (runs locally)</span>                </div>
+            </details>
+
+            <details class="config-section">
+                <summary class="config-summary">
+                    <span class="config-summary-text">
+                        <span class="config-summary-title">Transcription</span>
+                        <span class="config-summary-description">Whisper speech-to-text model (runs locally)</span>
+                    </span>
+                    ${this._renderConfigChevron()}
+                </summary>
+                <div class="config-content">
+                    <div class="form-group">
+                        <div class="whisper-label-row">
+                            <label class="form-label">Whisper Model</label>
+                            ${this.whisperDownloading ? html`<div class="whisper-spinner"></div>` : ''}
+                        </div>
+                        <select .value=${this._whisperModel} @change=${e => this._saveWhisperModel(e.target.value)}>
+                            <option value="tiny.en" ?selected=${this._whisperModel === 'tiny.en'}>Tiny English (75 MB, fastest)</option>
+                            <option value="base.en" ?selected=${this._whisperModel === 'base.en'}>Base English (142 MB)</option>
+                            <option value="small.en" ?selected=${this._whisperModel === 'small.en'}>Small English (466 MB, most accurate)</option>
+                        </select>
+                        <div class="form-hint">${this.whisperDownloading ? 'Downloading model...' : 'Downloaded automatically on first use'}</div>
+                    </div>
+                </div>
+            </details>
+
+            ${this._renderStartButton()} ${this._renderDivider()}
+
+            <div class="mode-links">
+                <button class="mode-link" @click=${() => this._saveMode('byok')}>Use own API keys</button>
+                <button class="mode-link" @click=${() => this._saveMode('local')}>Use local AI</button>
             </div>
         `;
     }
@@ -1339,12 +1606,19 @@ export class MainView extends LitElement {
                                   <button class="help-btn" @click=${this._openLocalHelp} aria-label="Open Local AI help">${helpIcon}</button>
                               </div>
                           `
-                        : html` <div class="page-title">${html`Cheating Daddy <span class="mode-suffix">BYOK</span>`}</div> `
+                        : html`
+                              <div class="page-title">
+                                  Cheating Daddy <span class="mode-suffix">${this._mode === 'claude' ? 'Claude' : 'BYOK'}</span>
+                              </div>
+                          `
                 }
-                <div class="page-subtitle">${this._mode === 'byok' ? 'Bring your own API keys' : 'Run models locally on your machine'}</div>
+                <div class="page-subtitle">
+                    ${this._mode === 'byok' ? 'Bring your own API keys' : this._mode === 'claude' ? 'Use your Claude subscription' : 'Run models locally on your machine'}
+                </div>
 
                 <!-- Cloud mode render branch intentionally disabled. -->
                 ${this._mode === 'byok' ? this._renderByokMode() : ''} ${this._mode === 'local' ? this._renderLocalMode() : ''}
+                ${this._mode === 'claude' ? this._renderClaudeMode() : ''}
             </div>
             ${this._mode === 'local' && this._showLocalHelp ? this._renderLocalHelp(closeIcon) : ''}
         `;

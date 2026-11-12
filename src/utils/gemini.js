@@ -1091,6 +1091,24 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
         return success;
     });
 
+    // Claude (via the user's Claude subscription) reuses the local pipeline: Whisper for audio, Claude as the language model
+    ipcMain.handle('initialize-claude', async (event, rawClaude, whisperModel, profile, customPrompt) => {
+        const claude = require('./claudeai').normalizeSettings(rawClaude);
+        if (!claude || typeof whisperModel !== 'string' || typeof profile !== 'string') {
+            console.error('[Claude] Rejected invalid initialize-claude parameters');
+            return false;
+        }
+        currentProviderMode = 'local';
+        const success = await getLocalAi().initializeLocalSession(claude.model, whisperModel, profile, customPrompt, {
+            backend: 'claude',
+            claude,
+        });
+        if (!success) {
+            currentProviderMode = 'byok';
+        }
+        return success;
+    });
+
     ipcMain.handle('cancel-local-initialization', async () => {
         const cancelled = await getLocalAi().cancelLocalInitialization();
         if (cancelled) {
