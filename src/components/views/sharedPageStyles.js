@@ -107,7 +107,9 @@ export const unifiedPageStyles = css`
         border-radius: var(--radius-sm);
         padding: 8px 12px;
         font-size: var(--font-size-sm);
-        transition: border-color var(--transition), box-shadow var(--transition);
+        transition:
+            border-color var(--transition),
+            box-shadow var(--transition);
     }
 
     .control:hover:not(:focus) {
@@ -166,7 +168,17 @@ export const unifiedPageStyles = css`
 
     @media (max-width: 640px) {
         .unified-page {
-            padding: var(--space-md);
+            padding: var(--space-sm);
+        }
+        .form-group {
+            flex-wrap: wrap;
+        }
+        .control {
+            width: 100%;
+            min-width: 0;
+        }
+        .form-label {
+            white-space: normal;
         }
     }
 `;

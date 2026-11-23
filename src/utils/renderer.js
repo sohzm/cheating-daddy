@@ -1,5 +1,7 @@
 // renderer.js
 const { ipcRenderer } = require('electron');
+const { normalizeFontSize } = require('./utils/display');
+ipcRenderer.on('display-changed', (_, state) => window.dispatchEvent(new CustomEvent('display-changed', { detail: state })));
 
 let mediaStream = null;
 let screenshotInterval = null;
@@ -35,6 +37,12 @@ const storage = {
     },
 
     // Credentials
+    async getDeepseekKeyStatus() {
+        return ipcRenderer.invoke('deepseek:key-status');
+    },
+    async setDeepseekKey(key) {
+        return ipcRenderer.invoke('deepseek:set-key', key);
+    },
     async getCredentials() {
         const result = await ipcRenderer.invoke('storage:get-credentials');
         return result.success ? result.data : {};
@@ -114,6 +122,7 @@ let preferencesCache = null;
 
 async function loadPreferencesCache() {
     preferencesCache = await storage.getPreferences();
+    document.documentElement.style.setProperty('--response-font-size', `${normalizeFontSize(preferencesCache.fontSize)}px`);
     return preferencesCache;
 }
 
@@ -169,6 +178,12 @@ async function initializeLocal(profile = 'interview') {
     }
 }
 
+async function initializeDeepseek() {
+    const result = await ipcRenderer.invoke('initialize-deepseek');
+    if (!result.success) cheatingDaddy.setStatus(result.error);
+    return result;
+}
+
 async function cancelLocalInitialization() {
     return ipcRenderer.invoke('cancel-local-initialization');
 }
@@ -207,7 +222,12 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
     const audioMode = preferencesCache.audioMode || 'speaker_only';
 
     try {
-        if (isMacOS) {
+        if (preferencesCache.providerMode === 'deepseek') {
+            mediaStream = await navigator.mediaDevices.getDisplayMedia({
+                video: { frameRate: 1, width: { ideal: 2560 }, height: { ideal: 1440 } },
+                audio: false,
+            });
+        } else if (isMacOS) {
             // On macOS, use SystemAudioDump for audio and getDisplayMedia for screen
             console.log('Starting macOS capture with SystemAudioDump...');
 
@@ -362,9 +382,11 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
 
         // Manual mode only - screenshots captured on demand via shortcut
         console.log('Manual mode enabled - screenshots will be captured on demand only');
+        return true;
     } catch (err) {
         console.error('Error starting capture:', err);
         cheatingDaddy.setStatus('error');
+        return false;
     }
 }
 
@@ -594,7 +616,7 @@ async function captureManualScreenshot(imageQuality = null) {
     }
 
     // Downscale to max 1280px wide for faster transfer — vision models don't need 4K
-    const MAX_WIDTH = 1280;
+    const MAX_WIDTH = preferencesCache?.providerMode === 'deepseek' ? 2560 : 1280;
     const srcW = hiddenVideo.videoWidth;
     const srcH = hiddenVideo.videoHeight;
     let destW = srcW;
@@ -649,9 +671,10 @@ async function captureManualScreenshot(imageQuality = null) {
                 if (result.success) {
                     console.log(`Image response completed from ${result.model}`);
                     // Response already displayed via streaming events (new-response/update-response)
-                } else {
+                } else if (!result.cancelled) {
                     console.error('Failed to get image response:', result.error);
-                    cheatingDaddy.addNewResponse(`Error: ${result.error}`);
+                    if (result.busy) cheatingDaddy.setStatus(result.error);
+                    else cheatingDaddy.addNewResponse(`Error: ${result.error}`);
                 }
             };
             reader.readAsDataURL(blob);
@@ -778,7 +801,7 @@ function handleShortcut(shortcutKey) {
 
     if (shortcutKey === 'ctrl+enter' || shortcutKey === 'cmd+enter') {
         if (currentView === 'main') {
-            cheatingDaddy.element().handleStart();
+            cheatingDaddy.element().shadowRoot.querySelector('main-view')?._handleStart();
         } else {
             captureManualScreenshot();
         }
@@ -1088,6 +1111,7 @@ const cheatingDaddy = {
     initializeGemini,
     initializeCloud,
     initializeLocal,
+    initializeDeepseek,
     cancelLocalInitialization,
     startCapture,
     stopCapture,
@@ -1096,6 +1120,11 @@ const cheatingDaddy = {
 
     // Storage API
     storage,
+    display: {
+        get: () => ipcRenderer.invoke('window:get-display'),
+        action: (name, value) => ipcRenderer.invoke('window:display-action', name, value),
+        normalizeFontSize,
+    },
 
     // Theme API
     theme,

@@ -58,3 +58,14 @@ A real-time AI assistant that provides contextual help during video calls, inter
 - Gemini API key
 - Screen recording permissions
 - Microphone/audio permissions
+
+
+### DeepSeek API (text and screen vision)
+
+DeepSeek can answer text prompts and analyze screenshots using the Chat Completions API. Choose **Use DeepSeek** on Home, enter an API key, and start a session. Screenshots are sent only on explicit capture; audio capture is not used in this mode. The key is encrypted by Electron's OS credential store where available. When encryption is unavailable, it remains in memory until the app exits; it is never saved in plaintext. Session history is opt-in.
+
+### Window and text scaling
+
+The interface can be resized to 220 × 120 logical pixels. The **Mini** control selects 320 × 180 at 60% interface scale. Zoom controls and Ctrl/Cmd + −, +, and 0 change scale from 25% to 150%; response text size is independently adjustable from 6px to 32px. These settings are remembered.
+
+Run the feature tests with npm test.
