@@ -19,6 +19,10 @@ function setup(t, saveHistory, env = { DEEPSEEK_API_KEY: 'test-key' }) {
     const filename = path.resolve(__dirname, '../src/utils/gemini.js');
     const realRequire = createRequire(filename);
     const mocks = {
+        '@google/genai': { GoogleGenAI: class {}, Modality: {} },
+        '../audioUtils': { saveDebugAudio() {} },
+        './prompts': { getSystemPrompt: () => '' },
+        './cloud': {},
         electron: {
             ipcMain: { handle: (name, callback) => handlers.set(name, callback) },
             BrowserWindow: { getAllWindows: () => [{ webContents: { send: (...args) => events.push(args) } }] },
@@ -94,6 +98,7 @@ test('DeepSeek IPC routes text and screen, preserves language, and writes no pri
     const app = setup(t, false);
     assert.equal((await app.invoke('deepseek:key-status')).hasKey, true);
     assert.equal((await app.invoke('initialize-deepseek')).success, true);
+    assert.equal((await app.invoke('start-new-session')).success, true);
     assert.equal((await app.invoke('send-text-message', 'Question')).success, true);
     assert.equal((await app.invoke('send-image-content', { data: '/9j/AA==', prompt: 'Read screen' })).success, true);
     assert.match(app.requests[0].messages[0].content, /ru-RU/);
@@ -114,11 +119,12 @@ test('DeepSeek IPC routes text and screen, preserves language, and writes no pri
 test('history is persisted only after explicit opt-in and excludes screenshot bytes', async t => {
     const app = setup(t, true);
     await app.invoke('initialize-deepseek');
+    assert.equal((await app.invoke('start-new-session')).success, true);
     await app.invoke('send-text-message', 'Question');
     await app.invoke('send-image-content', { data: '/9j/AA==', prompt: 'Read screen' });
     const saves = app.events.filter(([name]) => name.startsWith('save-'));
     assert.equal(saves.length, 3);
-    assert.equal(app.logStarts(), 1);
+    assert.equal(app.logStarts(), 2);
     assert.equal(JSON.stringify(saves).includes('/9j/AA=='), false);
     await app.invoke('close-session');
 });

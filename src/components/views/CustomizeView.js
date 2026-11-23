@@ -239,8 +239,12 @@ export class CustomizeView extends LitElement {
     }
 
     async handleUiScaleChange(event) {
-        const result = await cheatingDaddy.display.action('scale', Number(event.target.value));
-        if (result.success) this.uiScale = result.scale;
+        try {
+            const result = await cheatingDaddy.display.action('scale', Number(event.target.value));
+            if (result.success) this.uiScale = result.scale;
+        } catch (error) {
+            console.error('Error changing display scale:', error);
+        }
     }
 
     async _loadFromStorage() {
@@ -543,7 +547,8 @@ export class CustomizeView extends LitElement {
             // Apply visual changes
             this.updateBackgroundAppearance();
             this.updateFontSize();
-            await cheatingDaddy.display.action('reset');
+            const displayResult = await cheatingDaddy.display.action('reset');
+            if (displayResult.success) this.uiScale = displayResult.scale;
             await cheatingDaddy.theme.save(defaults.theme);
 
             this.clearStatusMessage = 'All settings restored to defaults';

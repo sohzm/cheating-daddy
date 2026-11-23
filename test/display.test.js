@@ -12,6 +12,7 @@ test('display preferences clamp invalid or legacy settings to usable values', ()
     assert.equal(normalizeFontSize('bad'), 14);
     assert.deepEqual(normalizeWindowSize({ width: 5, height: 1 }), { width: 220, height: 120 });
     assert.deepEqual(normalizeWindowSize({ width: 9999, height: 9999 }, { width: 1920, height: 1080 }), { width: 1920, height: 1080 });
+    assert.deepEqual(normalizeWindowSize({ width: 640, height: 420 }, { width: 180, height: 90 }), { width: 180, height: 90 });
     assert.deepEqual(normalizeWindowSize(null), { width: 640, height: 420 });
 });
 
@@ -68,4 +69,35 @@ test('mini preset, keyboard recovery, IPC validation and saved scale restoration
     assert.equal(zoom, 0.45);
     window.emit('closed');
     assert.equal(handlers.size, 0);
+});
+
+test('a storage failure while saving window size does not interrupt resizing', () => {
+    const window = new EventEmitter();
+    const contents = new EventEmitter();
+    contents.send = () => {};
+    contents.setZoomFactor = () => {};
+    Object.assign(window, {
+        webContents: contents,
+        isDestroyed: () => false,
+        isMaximized: () => false,
+        isMinimized: () => false,
+        getSize: () => [320, 180],
+    });
+    const originalError = console.error;
+    const errors = [];
+    console.error = (...args) => errors.push(args);
+    try {
+        attachDisplayControls(window, {
+            storage: {
+                getPreferences: () => ({ uiScale: 100 }),
+                updateConfig: () => { throw new Error('disk full'); },
+            },
+            screen: {},
+            ipcMain: { handle() {}, removeHandler() {} },
+        });
+        assert.doesNotThrow(() => window.emit('close'));
+        assert.match(errors[0][0], /window size/);
+    } finally {
+        console.error = originalError;
+    }
 });

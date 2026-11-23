@@ -1398,7 +1398,7 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
 
     ipcMain.handle('start-new-session', async event => {
         try {
-            initializeNewSession();
+            initializeNewSession(null, null, { privateSession: currentProviderMode === 'deepseek' && privateSession });
             return { success: true, sessionId: currentSessionId };
         } catch (error) {
             console.error('Error starting new session:', error);

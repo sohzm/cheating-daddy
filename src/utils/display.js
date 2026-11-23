@@ -16,7 +16,7 @@ function normalizeWindowSize(value, workArea = { width: 4096, height: 2160 }) {
     for (const dimension of ['width', 'height']) {
         const size = value?.[dimension];
         const proposed = typeof size === 'number' && Number.isFinite(size) ? Math.round(size) : DEFAULT_WINDOW_SIZE[dimension];
-        result[dimension] = Math.max(MIN_WINDOW_SIZE[dimension], Math.min(workArea[dimension], proposed));
+        result[dimension] = Math.min(workArea[dimension], Math.max(MIN_WINDOW_SIZE[dimension], proposed));
     }
     return result;
 }
@@ -30,7 +30,11 @@ function attachDisplayControls(window, { storage, screen, ipcMain }) {
     const saveSize = () => {
         if (window.isDestroyed() || window.isMaximized() || window.isMinimized()) return;
         const [width, height] = window.getSize();
-        storage.updateConfig('windowSize', { width, height });
+        try {
+            storage.updateConfig('windowSize', { width, height });
+        } catch (error) {
+            console.error('Error saving window size:', error);
+        }
     };
     const setScale = next => {
         scale = normalizeScale(next);
