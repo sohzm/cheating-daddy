@@ -13,6 +13,22 @@ const LOCAL_LLM_PRESETS = [
     { value: 'unsloth/Qwen3.5-35B-A3B-GGUF:Q4_K_M', label: 'Qwen 3.5 35B-A3B Q4 — 22.92 GB · Largest' },
 ];
 
+const GEMINI_LIVE_PRESETS = [
+    { value: 'gemini-3.1-flash-live-preview', label: 'gemini-3.1-flash-live-preview · Recommended' },
+    { value: 'gemini-3.8-live', label: 'gemini-3.8-live · Advanced' },
+];
+
+const GROQ_MODEL_PRESETS = [
+    { value: 'qwen/qwen3.6-27b', label: 'qwen/qwen3.6-27b · Recommended' },
+    { value: 'llama-3.3-70b-versatile', label: 'llama-3.3-70b-versatile · High Quality' },
+    { value: 'llama-3.1-8b-instant', label: 'llama-3.1-8b-instant · Ultra Fast' },
+];
+
+const GROQ_IMAGE_PRESETS = [
+    { value: 'qwen/qwen3.6-27b', label: 'qwen/qwen3.6-27b · Recommended' },
+    { value: 'meta-models/muse-spark-open', label: 'meta-models/muse-spark-open' },
+];
+
 export class MainView extends LitElement {
     static styles = css`
         * {
@@ -699,8 +715,11 @@ export class MainView extends LitElement {
         _groqKey: { state: true },
         _openaiKey: { state: true },
         _geminiLiveModel: { state: true },
+        _useCustomGeminiLiveModel: { state: true },
         _groqModel: { state: true },
+        _useCustomGroqModel: { state: true },
         _groqImageModel: { state: true },
+        _useCustomGroqImageModel: { state: true },
         _disableGroqThinking: { state: true },
         _tokenError: { state: true },
         _keyError: { state: true },
@@ -728,8 +747,11 @@ export class MainView extends LitElement {
         this._groqKey = '';
         this._openaiKey = '';
         this._geminiLiveModel = 'gemini-3.1-flash-live-preview';
+        this._useCustomGeminiLiveModel = false;
         this._groqModel = 'qwen/qwen3.6-27b';
+        this._useCustomGroqModel = false;
         this._groqImageModel = 'qwen/qwen3.6-27b';
+        this._useCustomGroqImageModel = false;
         this._disableGroqThinking = true;
         this._tokenError = false;
         this._keyError = false;
@@ -768,8 +790,11 @@ export class MainView extends LitElement {
             this._groqKey = (await cheatingDaddy.storage.getGroqApiKey().catch(() => '')) || '';
             this._openaiKey = creds.openaiKey || '';
             this._geminiLiveModel = config.geminiLiveModel || 'gemini-3.1-flash-live-preview';
+            this._useCustomGeminiLiveModel = !GEMINI_LIVE_PRESETS.some(preset => preset.value === this._geminiLiveModel);
             this._groqModel = config.groqModel || 'qwen/qwen3.6-27b';
+            this._useCustomGroqModel = !GROQ_MODEL_PRESETS.some(preset => preset.value === this._groqModel);
             this._groqImageModel = config.groqImageModel || 'qwen/qwen3.6-27b';
+            this._useCustomGroqImageModel = !GROQ_IMAGE_PRESETS.some(preset => preset.value === this._groqImageModel);
             this._disableGroqThinking = config.disableGroqThinking === true;
 
             // Load local AI settings
@@ -951,16 +976,49 @@ export class MainView extends LitElement {
         this.requestUpdate();
     }
 
+    async _selectGeminiLiveModel(value) {
+        if (value === 'custom') {
+            this._useCustomGeminiLiveModel = true;
+            this.requestUpdate();
+            return;
+        }
+
+        this._useCustomGeminiLiveModel = false;
+        await this._saveGeminiLiveModel(value);
+    }
+
     async _saveGroqModel(val) {
         this._groqModel = val;
         await cheatingDaddy.storage.updateConfig('groqModel', val);
         this.requestUpdate();
     }
 
+    async _selectGroqModel(value) {
+        if (value === 'custom') {
+            this._useCustomGroqModel = true;
+            this.requestUpdate();
+            return;
+        }
+
+        this._useCustomGroqModel = false;
+        await this._saveGroqModel(value);
+    }
+
     async _saveGroqImageModel(val) {
         this._groqImageModel = val;
         await cheatingDaddy.storage.updateConfig('groqImageModel', val);
         this.requestUpdate();
+    }
+
+    async _selectGroqImageModel(value) {
+        if (value === 'custom') {
+            this._useCustomGroqImageModel = true;
+            this.requestUpdate();
+            return;
+        }
+
+        this._useCustomGroqImageModel = false;
+        await this._saveGroqImageModel(value);
     }
 
     async _saveDisableGroqThinking(disabled) {
@@ -1183,7 +1241,26 @@ export class MainView extends LitElement {
 
                     <div class="form-group">
                         <label class="form-label">Gemini Live Model</label>
-                        <input type="text" .value=${this._geminiLiveModel} @input=${e => this._saveGeminiLiveModel(e.target.value)} />
+                        <select
+                            .value=${this._useCustomGeminiLiveModel ? 'custom' : this._geminiLiveModel}
+                            @change=${e => this._selectGeminiLiveModel(e.target.value)}
+                        >
+                            ${GEMINI_LIVE_PRESETS.map(preset => html`<option value=${preset.value} ?selected=${!this._useCustomGeminiLiveModel && this._geminiLiveModel === preset.value}>${preset.label}</option>`)}
+                            <option value="custom" ?selected=${this._useCustomGeminiLiveModel}>Custom model…</option>
+                        </select>
+                        ${
+                            this._useCustomGeminiLiveModel
+                                ? html`
+                                      <input
+                                          type="text"
+                                          placeholder="e.g. gemini-3.1-flash-live-preview"
+                                          .value=${this._geminiLiveModel}
+                                          @input=${e => this._saveGeminiLiveModel(e.target.value)}
+                                      />
+                                  `
+                                : ''
+                        }
+                        <div class="form-hint">Must support bidirectional streaming (e.g. gemini-3.1-flash-live-preview)</div>
                     </div>
                 </div>
             </details>
@@ -1207,12 +1284,45 @@ export class MainView extends LitElement {
 
                     <div class="form-group">
                         <label class="form-label">Groq Model</label>
-                        <input type="text" .value=${this._groqModel} @input=${e => this._saveGroqModel(e.target.value)} />
+                        <select .value=${this._useCustomGroqModel ? 'custom' : this._groqModel} @change=${e => this._selectGroqModel(e.target.value)}>
+                            ${GROQ_MODEL_PRESETS.map(preset => html`<option value=${preset.value} ?selected=${!this._useCustomGroqModel && this._groqModel === preset.value}>${preset.label}</option>`)}
+                            <option value="custom" ?selected=${this._useCustomGroqModel}>Custom model…</option>
+                        </select>
+                        ${
+                            this._useCustomGroqModel
+                                ? html`
+                                      <input
+                                          type="text"
+                                          placeholder="e.g. llama-3.3-70b-versatile"
+                                          .value=${this._groqModel}
+                                          @input=${e => this._saveGroqModel(e.target.value)}
+                                      />
+                                  `
+                                : ''
+                        }
                     </div>
 
                     <div class="form-group">
                         <label class="form-label">Groq Image Model</label>
-                        <input type="text" .value=${this._groqImageModel} @input=${e => this._saveGroqImageModel(e.target.value)} />
+                        <select
+                            .value=${this._useCustomGroqImageModel ? 'custom' : this._groqImageModel}
+                            @change=${e => this._selectGroqImageModel(e.target.value)}
+                        >
+                            ${GROQ_IMAGE_PRESETS.map(preset => html`<option value=${preset.value} ?selected=${!this._useCustomGroqImageModel && this._groqImageModel === preset.value}>${preset.label}</option>`)}
+                            <option value="custom" ?selected=${this._useCustomGroqImageModel}>Custom model…</option>
+                        </select>
+                        ${
+                            this._useCustomGroqImageModel
+                                ? html`
+                                      <input
+                                          type="text"
+                                          placeholder="e.g. qwen/qwen3.6-27b"
+                                          .value=${this._groqImageModel}
+                                          @input=${e => this._saveGroqImageModel(e.target.value)}
+                                      />
+                                  `
+                                : ''
+                        }
                     </div>
 
                     <label class="config-checkbox">
