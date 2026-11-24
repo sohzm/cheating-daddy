@@ -164,9 +164,18 @@ function initializeStorage() {
 
 // ============ CONFIG ============
 
+const LEGACY_LIVE_MODELS = {
+    'gemini-4-hydrogen': 'gemini-3.1-flash-live-preview',
+    'gemini-2.5-flash-native-audio-preview-09-2025': 'gemini-3.1-flash-live-preview',
+};
+
 function getConfig() {
     const saved = readJsonFile(getConfigPath(), {});
-    return { ...DEFAULT_CONFIG, ...saved };
+    const config = { ...DEFAULT_CONFIG, ...saved };
+    if (config.geminiLiveModel && LEGACY_LIVE_MODELS[config.geminiLiveModel]) {
+        config.geminiLiveModel = LEGACY_LIVE_MODELS[config.geminiLiveModel];
+    }
+    return config;
 }
 
 function setConfig(config) {
@@ -331,10 +340,10 @@ function incrementLimitCount(model) {
     }
 
     // Increment the appropriate model count
-    if (model === 'gemini-2.5-flash') {
-        todayEntry.flash.count++;
-    } else if (model === 'gemini-2.5-flash-lite') {
+    if (model === 'gemini-3.1-flash-lite' || model === 'gemini-2.5-flash-lite') {
         todayEntry.flashLite.count++;
+    } else if (model === 'gemini-3.8-flash' || model === 'gemini-2.5-flash') {
+        todayEntry.flash.count++;
     }
 
     setLimits(limits);
@@ -357,17 +366,8 @@ function incrementCharUsage(provider, model, charCount) {
 }
 
 function getAvailableModel() {
-    const todayLimits = getTodayLimits();
-
-    // RPD limits: flash = 20, flash-lite = 20
-    // After both exhausted, fall back to flash (for paid API users)
-    if (todayLimits.flash.count < 20) {
-        return 'gemini-2.5-flash';
-    } else if (todayLimits.flashLite.count < 20) {
-        return 'gemini-2.5-flash-lite';
-    }
-
-    return 'gemini-2.5-flash'; // Default to flash for paid API users
+    // Prioritize gemini-3.1-flash-lite for immediate ultra-low-latency responses and no 503 hangs
+    return 'gemini-3.1-flash-lite';
 }
 
 function getModelForToday() {

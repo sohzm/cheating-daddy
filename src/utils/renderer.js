@@ -622,43 +622,49 @@ async function captureManualScreenshot(imageQuality = null) {
             qualityValue = 0.6;
     }
 
-    offscreenCanvas.toBlob(
-        async blob => {
-            if (!blob) {
-                console.error('Failed to create blob from canvas');
-                return;
-            }
-
-            const reader = new FileReader();
-            reader.onloadend = async () => {
-                const base64data = reader.result.split(',')[1];
-
-                if (!base64data || base64data.length < 100) {
-                    console.error('Invalid base64 data generated');
+    return new Promise(resolve => {
+        offscreenCanvas.toBlob(
+            async blob => {
+                if (!blob) {
+                    console.error('Failed to create blob from canvas');
+                    resolve({ success: false, error: 'Failed to create blob' });
                     return;
                 }
 
-                console.log(`Sending image: ${destW}x${destH}, ~${Math.round(base64data.length / 1024)}KB`);
+                const reader = new FileReader();
+                reader.onloadend = async () => {
+                    const base64data = reader.result.split(',')[1];
 
-                // Send image with prompt to HTTP API (response streams via IPC events)
-                const result = await ipcRenderer.invoke('send-image-content', {
-                    data: base64data,
-                    prompt: MANUAL_SCREENSHOT_PROMPT,
-                });
+                    if (!base64data || base64data.length < 100) {
+                        console.error('Invalid base64 data generated');
+                        resolve({ success: false, error: 'Invalid base64 data' });
+                        return;
+                    }
 
-                if (result.success) {
-                    console.log(`Image response completed from ${result.model}`);
-                    // Response already displayed via streaming events (new-response/update-response)
-                } else {
-                    console.error('Failed to get image response:', result.error);
-                    cheatingDaddy.addNewResponse(`Error: ${result.error}`);
-                }
-            };
-            reader.readAsDataURL(blob);
-        },
-        'image/jpeg',
-        qualityValue
-    );
+                    console.log(`Sending image: ${destW}x${destH}, ~${Math.round(base64data.length / 1024)}KB`);
+
+                    // Send image with prompt to HTTP API (response streams via IPC events)
+                    const result = await ipcRenderer.invoke('send-image-content', {
+                        data: base64data,
+                        prompt: MANUAL_SCREENSHOT_PROMPT,
+                    });
+
+                    if (result.success) {
+                        console.log(`Image response completed from ${result.model}`);
+                        // Response already displayed via streaming events (new-response/update-response)
+                    } else {
+                        console.error('Failed to get image response:', result.error);
+                        cheatingDaddy.addNewResponse(`Error: ${result.error}`);
+                    }
+                    resolve(result);
+                };
+                reader.onerror = () => resolve({ success: false, error: 'FileReader error' });
+                reader.readAsDataURL(blob);
+            },
+            'image/jpeg',
+            qualityValue
+        );
+    });
 }
 
 // Expose functions to global scope for external access

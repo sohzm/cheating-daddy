@@ -3,7 +3,7 @@ const { BrowserWindow, ipcMain } = require('electron');
 const { spawn } = require('child_process');
 const { saveDebugAudio } = require('../audioUtils');
 const { getSystemPrompt } = require('./prompts');
-const { getAvailableModel, incrementLimitCount, getApiKey, getGroqApiKey, incrementCharUsage, getConfig } = require('../storage');
+const { getAvailableModel, incrementLimitCount, getApiKey, getGroqApiKey, incrementCharUsage, getConfig, getPreferences } = require('../storage');
 const { connectCloud, sendCloudAudio, sendCloudText, sendCloudImage, closeCloud, isCloudActive, setOnTurnComplete } = require('./cloud');
 const { startTransportLog, logTransportEvent, closeTransportLog } = require('./transportLogger');
 
@@ -158,11 +158,12 @@ function getCurrentSessionData() {
 async function getEnabledTools() {
     const tools = [];
 
-    // Check if Google Search is enabled (default: true)
-    const googleSearchEnabled = await getStoredSetting('googleSearchEnabled', 'true');
+    // Check if Google Search is enabled from saved preferences (default: false)
+    const preferences = getPreferences();
+    const googleSearchEnabled = preferences.googleSearchEnabled === true;
     console.log('Google Search enabled:', googleSearchEnabled);
 
-    if (googleSearchEnabled === 'true') {
+    if (googleSearchEnabled) {
         tools.push({ googleSearch: {} });
         console.log('Added Google Search tool');
     } else {
@@ -545,7 +546,7 @@ async function sendImageToGroq(base64Data, prompt) {
     }
 }
 
-async function sendToGemma(transcription) {
+async function sendToGeminiHttpText(transcription) {
     const apiKey = getApiKey();
     if (!apiKey) {
         console.log('No Gemini API key configured');
@@ -553,11 +554,11 @@ async function sendToGemma(transcription) {
     }
 
     if (!transcription || transcription.trim() === '') {
-        console.log('Empty transcription, skipping Gemma');
+        console.log('Empty transcription, skipping HTTP Gemini');
         return;
     }
 
-    console.log('Sending to Gemma:', transcription.substring(0, 100) + '...');
+    console.log('Sending text to Gemini HTTP:', transcription.substring(0, 100) + '...');
 
     groqConversationHistory.push({
         role: 'user',
@@ -567,7 +568,10 @@ async function sendToGemma(transcription) {
     const trimmedHistory = trimConversationHistoryForGemma(groqConversationHistory, 42000);
 
     try {
-        const ai = new GoogleGenAI({ apiKey: apiKey });
+        const ai = new GoogleGenAI({
+            apiKey: apiKey,
+            httpOptions: { timeout: 15000 },
+        });
 
         const messages = trimmedHistory.map(msg => ({
             role: msg.role === 'assistant' ? 'model' : 'user',
@@ -581,10 +585,21 @@ async function sendToGemma(transcription) {
             ...messages,
         ];
 
-        const response = await ai.models.generateContentStream({
-            model: 'gemma-4-26b-a4b-it',
-            contents: messagesWithSystem,
-        });
+        let model = 'gemini-3.1-flash-lite';
+        let response;
+        try {
+            response = await ai.models.generateContentStream({
+                model: model,
+                contents: messagesWithSystem,
+            });
+        } catch (primaryErr) {
+            console.warn(`Primary text model ${model} failed (${primaryErr.message}), trying gemma-4-26b-a4b-it...`);
+            model = 'gemma-4-26b-a4b-it';
+            response = await ai.models.generateContentStream({
+                model: model,
+                contents: messagesWithSystem,
+            });
+        }
 
         let fullText = '';
         let isFirst = true;
@@ -603,7 +618,7 @@ async function sendToGemma(transcription) {
         const inputChars = systemPromptChars + historyChars;
         const outputChars = fullText.length;
 
-        incrementCharUsage('gemini', 'gemma-4-26b-a4b-it', inputChars + outputChars);
+        incrementCharUsage('gemini', model, inputChars + outputChars);
 
         if (fullText.trim()) {
             groqConversationHistory.push({
@@ -618,11 +633,11 @@ async function sendToGemma(transcription) {
             saveConversationTurn(transcription, fullText);
         }
 
-        console.log('Gemma response completed');
+        console.log(`Gemini HTTP text response completed (${model})`);
         sendToRenderer('update-status', 'Listening...');
     } catch (error) {
-        console.error('Error calling Gemma API:', error);
-        sendToRenderer('update-status', 'Gemma error: ' + error.message);
+        console.error('Error calling Gemini HTTP text API:', error);
+        sendToRenderer('new-response', 'Gemini error: ' + error.message);
     }
 }
 
@@ -995,7 +1010,7 @@ async function sendAudioToGemini(base64Data, geminiSessionRef) {
 
 async function sendImageToGeminiHttp(base64Data, prompt) {
     // Get available model based on rate limits
-    const model = getAvailableModel();
+    let model = getAvailableModel();
 
     const apiKey = getApiKey();
     if (!apiKey) {
@@ -1003,7 +1018,10 @@ async function sendImageToGeminiHttp(base64Data, prompt) {
     }
 
     try {
-        const ai = new GoogleGenAI({ apiKey: apiKey });
+        const ai = new GoogleGenAI({
+            apiKey: apiKey,
+            httpOptions: { timeout: 20000 },
+        });
 
         const contents = [
             {
@@ -1016,10 +1034,25 @@ async function sendImageToGeminiHttp(base64Data, prompt) {
         ];
 
         console.log(`Sending image to ${model} (streaming)...`);
-        const response = await ai.models.generateContentStream({
-            model: model,
-            contents: contents,
-        });
+        let response;
+        try {
+            response = await ai.models.generateContentStream({
+                model: model,
+                contents: contents,
+            });
+        } catch (streamError) {
+            // If primary flash model fails (e.g. 503 high demand or 404), fall back to gemini-3.1-flash-lite
+            if (model !== 'gemini-3.1-flash-lite') {
+                console.warn(`Primary model ${model} failed (${streamError.message}), falling back to gemini-3.1-flash-lite...`);
+                model = 'gemini-3.1-flash-lite';
+                response = await ai.models.generateContentStream({
+                    model: model,
+                    contents: contents,
+                });
+            } else {
+                throw streamError;
+            }
+        }
 
         // Increment count after successful call
         incrementLimitCount(model);
@@ -1231,17 +1264,26 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
             }
         }
 
-        if (!geminiSessionRef.current) return { success: false, error: 'No active Gemini session' };
-
         try {
             console.log('Sending text message:', text);
 
             if (hasGroqKey()) {
                 groqRequestStartedForTurn = true;
                 sendToGroq(text.trim());
+                return { success: true };
             }
 
-            await geminiSessionRef.current.sendRealtimeInput({ text: text.trim() });
+            if (geminiSessionRef.current) {
+                try {
+                    currentTranscription = text.trim();
+                    await geminiSessionRef.current.sendRealtimeInput({ text: text.trim() });
+                    return { success: true };
+                } catch (liveError) {
+                    console.warn('Gemini Live sendRealtimeInput failed, falling back to HTTP:', liveError.message);
+                }
+            }
+
+            sendToGeminiHttpText(text.trim());
             return { success: true };
         } catch (error) {
             console.error('Error sending text:', error);
